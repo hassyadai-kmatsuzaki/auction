@@ -53,9 +53,18 @@ export default function ParticipantLayout() {
             <MenuIcon />
           </IconButton>
           
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            メダカライブオークション
-          </Typography>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+            <Box
+              component="img"
+              src="/img/logo.png"
+              alt="MEDAKA AUCTION PORT"
+              sx={{
+                height: 36,
+                width: 'auto',
+                objectFit: 'contain',
+              }}
+            />
+          </Box>
 
           {/* デスクトップメニュー */}
           <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>

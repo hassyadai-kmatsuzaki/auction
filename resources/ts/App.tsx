@@ -30,11 +30,19 @@ import SellerManagement from './pages/admin/SellerManagement';
 import SellerDetail from './pages/admin/SellerDetail';
 import BuyerManagement from './pages/admin/BuyerManagement';
 import BuyerDetail from './pages/admin/BuyerDetail';
+import DocumentManagement from './pages/admin/DocumentManagement';
+
+// Seller pages
+import SellerLayout from './layouts/SellerLayout';
+import SellerDashboard from './pages/seller/Dashboard';
+import SubmitItem from './pages/seller/SubmitItem';
+import SellerProfile from './pages/seller/Profile';
+import SellerShipping from './pages/seller/Shipping';
 
 // Mock: ログイン状態とユーザータイプを管理（実際はContextやReduxを使用）
 const mockUser = {
   isLoggedIn: true,
-  userType: 'participant' as 'admin' | 'participant',
+  userType: 'participant' as 'admin' | 'participant' | 'seller',
 };
 
 function App() {
@@ -46,12 +54,25 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* 参加者ページ */}
+          {/* 参加者（買受者）ページ */}
           <Route path="/participant" element={<ParticipantLayout />}>
             <Route index element={<Navigate to="/participant/home" replace />} />
             <Route path="home" element={<ParticipantHome />} />
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
             <Route path="won-items" element={<WonItems />} />
+          </Route>
+
+          {/* 出品者ページ */}
+          <Route path="/seller" element={<SellerLayout />}>
+            <Route index element={<Navigate to="/seller/dashboard" replace />} />
+            <Route path="dashboard" element={<SellerDashboard />} />
+            <Route path="submit" element={<SubmitItem />} />
+            <Route path="items" element={<SellerDashboard />} /> {/* 出品履歴（ダッシュボードで代用） */}
+            <Route path="sales" element={<SellerDashboard />} /> {/* 売上精算（ダッシュボードで代用） */}
+            <Route path="shipping" element={<SellerShipping />} />
+            <Route path="profile" element={<SellerProfile />} />
+            <Route path="bank" element={<SellerProfile />} /> {/* 口座情報（プロフィールで代用） */}
+            <Route path="settings" element={<SellerProfile />} /> {/* 設定（プロフィールで代用） */}
           </Route>
 
           {/* 管理者ページ */}
@@ -90,6 +111,9 @@ function App() {
             <Route path="buyers/:id" element={<BuyerDetail />} />
             <Route path="buyers/:id/edit" element={<BuyerDetail />} />
             
+            {/* 帳票管理 */}
+            <Route path="documents" element={<DocumentManagement />} />
+            
             {/* ユーザー管理（旧） */}
             <Route path="users" element={<UserManagement />} />
             <Route path="users/:id" element={<UserDetail />} />
@@ -101,7 +125,11 @@ function App() {
           {/* デフォルトリダイレクト */}
           <Route path="/" element={
             mockUser.isLoggedIn 
-              ? <Navigate to={mockUser.userType === 'admin' ? '/admin' : '/participant'} replace />
+              ? <Navigate to={
+                  mockUser.userType === 'admin' ? '/admin' 
+                  : mockUser.userType === 'seller' ? '/seller'
+                  : '/participant'
+                } replace />
               : <Navigate to="/login" replace />
           } />
         </Routes>
