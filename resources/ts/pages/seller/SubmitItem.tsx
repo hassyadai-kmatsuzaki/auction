@@ -385,11 +385,15 @@ export default function SubmitItem() {
                     borderColor: 'grey.300',
                     borderRadius: 2,
                     p: 4,
-                    textAlign: 'center',
                     mb: 3,
                     bgcolor: 'grey.50',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: 180,
                     '&:hover': {
                       borderColor: 'primary.main',
                       bgcolor: 'primary.light',
@@ -405,11 +409,11 @@ export default function SubmitItem() {
                     onChange={handleImageUpload}
                     disabled={uploadedImages.length >= MAX_IMAGES}
                   />
-                  <CameraIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  <CameraIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 1, textAlign: 'center' }}>
                     クリックまたはドラッグ＆ドロップ
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
                     JPG, PNG形式 / 最大{MAX_IMAGES}枚まで
                   </Typography>
                 </Box>
