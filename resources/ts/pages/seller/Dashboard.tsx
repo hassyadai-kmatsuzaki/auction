@@ -26,6 +26,11 @@ import {
   Add as AddIcon,
   ArrowForward as ArrowForwardIcon,
   Event as EventIcon,
+  Campaign as CampaignIcon,
+  Info as InfoIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  NewReleases as NewReleasesIcon,
 } from '@mui/icons-material';
 
 // Mock データ
@@ -49,9 +54,40 @@ const recentItems = [
   { id: 3, species_name: '三色ラメ 2ペア', auction: '2025年11月オークション', status: 'shipping', price: 42000 },
 ];
 
-const notifications = [
-  { id: 1, message: '12月オークションの出品申込受付が開始しました', type: 'info' },
-  { id: 2, message: '11月オークションの精算が完了しました', type: 'success' },
+// 出品者向けお知らせ
+const sellerAnnouncements = [
+  {
+    id: 1,
+    title: '【重要】12月オークション出品申込受付開始',
+    content: '2025年12月オークションの出品申込受付を開始しました。締切は12月5日(木)です。お早めにお申し込みください。',
+    date: '2025-12-01',
+    type: 'important',
+    isNew: true,
+  },
+  {
+    id: 2,
+    title: '11月オークション精算完了のお知らせ',
+    content: '11月オークションの精算処理が完了しました。ご登録の口座へ入金済みです。',
+    date: '2025-11-28',
+    type: 'success',
+    isNew: true,
+  },
+  {
+    id: 3,
+    title: '年末年始の配送スケジュールについて',
+    content: '年末年始期間（12/28〜1/5）は配送業者の都合により、生体の配送をお休みさせていただきます。',
+    date: '2025-11-25',
+    type: 'warning',
+    isNew: false,
+  },
+  {
+    id: 4,
+    title: '出品手数料改定のお知らせ',
+    content: '2026年1月より出品手数料を一部改定いたします。詳細は添付資料をご確認ください。',
+    date: '2025-11-20',
+    type: 'info',
+    isNew: false,
+  },
 ];
 
 // KPIカード
@@ -117,12 +153,93 @@ export default function SellerDashboard() {
         </Button>
       </Box>
 
-      {/* お知らせ */}
-      {notifications.map((notif) => (
-        <Alert key={notif.id} severity={notif.type as any} sx={{ mb: 2 }}>
-          {notif.message}
-        </Alert>
-      ))}
+      {/* 出品者向けお知らせ */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CampaignIcon sx={{ color: '#059669' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                出品者向けお知らせ
+              </Typography>
+              {sellerAnnouncements.filter(a => a.isNew).length > 0 && (
+                <Chip
+                  label={`${sellerAnnouncements.filter(a => a.isNew).length}件の新着`}
+                  size="small"
+                  color="error"
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+              )}
+            </Box>
+            <Button size="small" endIcon={<ArrowForwardIcon />}>
+              すべて見る
+            </Button>
+          </Box>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {sellerAnnouncements.slice(0, 3).map((announcement) => (
+              <Box
+                key={announcement.id}
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: announcement.type === 'important' ? '#FEF2F2' :
+                           announcement.type === 'success' ? '#F0FDF4' :
+                           announcement.type === 'warning' ? '#FFFBEB' : '#F0F9FF',
+                  border: '1px solid',
+                  borderColor: announcement.type === 'important' ? '#FECACA' :
+                               announcement.type === 'success' ? '#BBF7D0' :
+                               announcement.type === 'warning' ? '#FDE68A' : '#BAE6FD',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    transform: 'translateX(4px)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  },
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      bgcolor: announcement.type === 'important' ? '#EF4444' :
+                               announcement.type === 'success' ? '#10B981' :
+                               announcement.type === 'warning' ? '#F59E0B' : '#3B82F6',
+                    }}
+                  >
+                    {announcement.type === 'important' ? <NewReleasesIcon sx={{ fontSize: 20 }} /> :
+                     announcement.type === 'success' ? <CheckCircleIcon sx={{ fontSize: 20 }} /> :
+                     announcement.type === 'warning' ? <WarningIcon sx={{ fontSize: 20 }} /> :
+                     <InfoIcon sx={{ fontSize: 20 }} />}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {announcement.title}
+                      </Typography>
+                      {announcement.isNew && (
+                        <Chip
+                          label="NEW"
+                          size="small"
+                          color="error"
+                          sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
+                        />
+                      )}
+                    </Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                      {announcement.content}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {new Date(announcement.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* KPIカード */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
