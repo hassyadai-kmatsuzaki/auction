@@ -24,6 +24,8 @@ import {
   Store as StoreIcon,
   Pets as PetsIcon,
   Info as InfoIcon,
+  Close as CloseIcon,
+  Image as ImageIcon,
 } from '@mui/icons-material';
 
 // Mock 出品者データ
@@ -100,6 +102,42 @@ export default function ItemForm() {
     admin_notes: '',
     is_premium: false,
   });
+
+  // 画像アップロード用の状態
+  const [uploadedImages, setUploadedImages] = useState<{ file: File; preview: string }[]>([]);
+  const MAX_IMAGES = 20;
+
+  // 画像ファイル選択時の処理
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newImages: { file: File; preview: string }[] = [];
+    const remainingSlots = MAX_IMAGES - uploadedImages.length;
+    const filesToAdd = Math.min(files.length, remainingSlots);
+
+    for (let i = 0; i < filesToAdd; i++) {
+      const file = files[i];
+      if (file.type.startsWith('image/')) {
+        newImages.push({
+          file,
+          preview: URL.createObjectURL(file),
+        });
+      }
+    }
+
+    setUploadedImages([...uploadedImages, ...newImages]);
+    // inputをリセット
+    e.target.value = '';
+  };
+
+  // 画像削除時の処理
+  const handleRemoveImage = (index: number) => {
+    const newImages = [...uploadedImages];
+    URL.revokeObjectURL(newImages[index].preview); // メモリリーク防止
+    newImages.splice(index, 1);
+    setUploadedImages(newImages);
+  };
 
   // 出品者選択時の処理
   const handleSellerChange = (seller: typeof sellers[0] | null) => {
@@ -451,30 +489,130 @@ export default function ItemForm() {
                 </Button>
               </Box>
 
-              {formData.is_premium && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    追加写真（最大3枚）
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    startIcon={<UploadIcon />}
-                    component="label"
-                    sx={{ py: 1.5, borderStyle: 'dashed' }}
-                  >
-                    写真をアップロード
-                    <input type="file" accept="image/*" multiple hidden />
-                  </Button>
+              <Divider sx={{ my: 3 }} />
+
+              {/* 画像アップロードセクション */}
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ImageIcon sx={{ fontSize: 20, color: '#059669' }} />
+                    <Typography variant="subtitle2">
+                      画像
+                    </Typography>
+                  </Box>
+                  <Chip 
+                    label={`${uploadedImages.length} / ${MAX_IMAGES}`} 
+                    size="small" 
+                    color={uploadedImages.length >= MAX_IMAGES ? 'error' : 'default'}
+                  />
                 </Box>
-              )}
+                
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  startIcon={<UploadIcon />}
+                  component="label"
+                  disabled={uploadedImages.length >= MAX_IMAGES}
+                  sx={{ py: 1.5, borderStyle: 'dashed', mb: 2 }}
+                >
+                  画像をアップロード（最大{MAX_IMAGES}枚）
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple 
+                    hidden 
+                    onChange={handleImageUpload}
+                  />
+                </Button>
+
+                {/* アップロード済み画像のプレビュー */}
+                {uploadedImages.length > 0 && (
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(3, 1fr)', 
+                    gap: 1,
+                    maxHeight: 300,
+                    overflowY: 'auto',
+                    p: 1,
+                    bgcolor: 'grey.50',
+                    borderRadius: 2,
+                  }}>
+                    {uploadedImages.map((image, index) => (
+                      <Box 
+                        key={index} 
+                        sx={{ 
+                          position: 'relative',
+                          aspectRatio: '1',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          border: '1px solid',
+                          borderColor: 'grey.200',
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={image.preview}
+                          alt={`uploaded-${index}`}
+                          sx={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                        <Box
+                          onClick={() => handleRemoveImage(index)}
+                          sx={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 2,
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            bgcolor: 'rgba(0,0,0,0.6)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              bgcolor: 'error.main',
+                            },
+                          }}
+                        >
+                          <CloseIcon sx={{ fontSize: 14 }} />
+                        </Box>
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 2,
+                            left: 2,
+                            bgcolor: 'rgba(0,0,0,0.6)',
+                            color: 'white',
+                            fontSize: '0.65rem',
+                            px: 0.5,
+                            borderRadius: 0.5,
+                          }}
+                        >
+                          {index + 1}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
 
               <Divider sx={{ my: 3 }} />
 
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
                 <InfoIcon sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2 }} />
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   動画は30秒以内、ファイルサイズ50MB以下でアップロードしてください。
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <InfoIcon sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2 }} />
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  画像は最大{MAX_IMAGES}枚まで、1枚あたり10MB以下でアップロードしてください。
                 </Typography>
               </Box>
             </CardContent>

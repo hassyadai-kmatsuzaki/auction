@@ -40,14 +40,14 @@ const drawerWidth = 280;
 // サイドバーのロゴコンポーネント
 function Logo() {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
       <Box
         component="img"
         src="/img/logo.png"
         alt="MEDAKA AUCTION PORT"
         sx={{
           height: 48,
-          width: 'auto',
+          width: '100%',
           objectFit: 'contain',
         }}
       />

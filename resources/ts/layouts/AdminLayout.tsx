@@ -39,6 +39,12 @@ import {
   Store as StoreIcon,
   Person as PersonIcon,
   Receipt as ReceiptIcon,
+  Psychology as AIIcon,
+  CameraAlt as CameraIcon,
+  Timeline as TimelineIcon,
+  Warning as WarningIcon,
+  Recommend as RecommendIcon,
+  Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 280;
@@ -46,14 +52,14 @@ const drawerWidth = 280;
 // サイドバーのロゴコンポーネント
 function Logo() {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
       <Box
         component="img"
         src="/img/logo.png"
         alt="MEDAKA AUCTION PORT"
         sx={{
           height: 48,
-          width: 'auto',
+          width: '100%',
           objectFit: 'contain',
         }}
       />
@@ -67,6 +73,7 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [auctionMenuOpen, setAuctionMenuOpen] = React.useState(true);
   const [userMenuOpen, setUserMenuOpen] = React.useState(true);
+  const [aiMenuOpen, setAiMenuOpen] = React.useState(true);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -92,6 +99,15 @@ export default function AdminLayout() {
   const userSubItems = [
     { text: '出品者登録一覧', icon: <StoreIcon />, path: '/admin/sellers' },
     { text: '買受者登録一覧', icon: <PersonIcon />, path: '/admin/buyers' },
+  ];
+
+  const aiSubItems = [
+    { text: 'AI分析センター', icon: <AIIcon />, path: '/admin/ai-analytics' },
+    { text: '画像認識', icon: <CameraIcon />, path: '/admin/ai/image-recognition' },
+    { text: '価格予測', icon: <TimelineIcon />, path: '/admin/ai/price-prediction' },
+    { text: '異常検知', icon: <WarningIcon />, path: '/admin/ai/fraud-detection' },
+    { text: 'レコメンド', icon: <RecommendIcon />, path: '/admin/ai/recommendations' },
+    { text: 'レポート', icon: <AssessmentIcon />, path: '/admin/reports' },
   ];
 
   const bottomMenuItems = [
@@ -260,6 +276,66 @@ export default function AdminLayout() {
                       },
                       '& .MuiListItemText-primary': {
                         color: '#059669',
+                        fontWeight: 600,
+                      },
+                    },
+                  }}
+                  selected={isPathActive(item.path)}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobileOpen(false);
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 18 } }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.text}
+                    primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: 500 }}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </Collapse>
+
+          {/* AI・分析（折りたたみメニュー） */}
+          <ListItem disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              onClick={() => setAiMenuOpen(!aiMenuOpen)}
+              sx={{ py: 1.2 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <AIIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="AI・分析"
+                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
+              />
+              {aiMenuOpen ? (
+                <ExpandLess sx={{ fontSize: 18, color: 'text.secondary' }} />
+              ) : (
+                <ExpandMore sx={{ fontSize: 18, color: 'text.secondary' }} />
+              )}
+            </ListItemButton>
+          </ListItem>
+          <Collapse in={aiMenuOpen} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {aiSubItems.map((item) => (
+                <ListItemButton
+                  key={item.path}
+                  sx={{
+                    pl: 5.5,
+                    py: 1,
+                    ml: 1,
+                    mr: 1,
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      backgroundColor: '#EDE9FE',
+                      '& .MuiListItemIcon-root': {
+                        color: '#7C3AED',
+                      },
+                      '& .MuiListItemText-primary': {
+                        color: '#7C3AED',
                         fontWeight: 600,
                       },
                     },

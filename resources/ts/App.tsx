@@ -32,6 +32,14 @@ import BuyerManagement from './pages/admin/BuyerManagement';
 import BuyerDetail from './pages/admin/BuyerDetail';
 import DocumentManagement from './pages/admin/DocumentManagement';
 
+// AI pages
+import AIAnalytics from './pages/admin/AIAnalytics';
+import AIImageRecognition from './pages/admin/AIImageRecognition';
+import AIPricePrediction from './pages/admin/AIPricePrediction';
+import AIFraudDetection from './pages/admin/AIFraudDetection';
+import AIRecommendations from './pages/admin/AIRecommendations';
+import Reports from './pages/admin/Reports';
+
 // Seller pages
 import SellerLayout from './layouts/SellerLayout';
 import SellerDashboard from './pages/seller/Dashboard';
@@ -113,6 +121,14 @@ function App() {
             
             {/* 帳票管理 */}
             <Route path="documents" element={<DocumentManagement />} />
+            
+            {/* AI・分析 */}
+            <Route path="ai-analytics" element={<AIAnalytics />} />
+            <Route path="ai/image-recognition" element={<AIImageRecognition />} />
+            <Route path="ai/price-prediction" element={<AIPricePrediction />} />
+            <Route path="ai/fraud-detection" element={<AIFraudDetection />} />
+            <Route path="ai/recommendations" element={<AIRecommendations />} />
+            <Route path="reports" element={<Reports />} />
             
             {/* ユーザー管理（旧） */}
             <Route path="users" element={<UserManagement />} />

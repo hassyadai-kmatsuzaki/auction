@@ -59,8 +59,9 @@ export default function ParticipantLayout() {
               src="/img/logo.png"
               alt="MEDAKA AUCTION PORT"
               sx={{
-                height: 36,
-                width: 'auto',
+                height: 48,
+                width: '100%',
+                maxWidth: 200,
                 objectFit: 'contain',
               }}
             />
