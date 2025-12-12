@@ -26,6 +26,8 @@ export default function Login() {
       // 仮のログイン処理
       if (email === 'admin@example.com') {
         navigate('/admin/dashboard');
+      } else if (email === 'seller@example.com') {
+        navigate('/seller/dashboard');
       } else {
         navigate('/participant/home');
       }
@@ -104,6 +106,7 @@ export default function Login() {
             <Typography variant="caption" color="text.secondary">
               【デモ用アカウント】<br />
               管理者: admin@example.com / password<br />
+              出品者: seller@example.com / password<br />
               参加者: user@example.com / password
             </Typography>
           </Box>
