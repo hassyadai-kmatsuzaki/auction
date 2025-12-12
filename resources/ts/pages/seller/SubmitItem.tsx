@@ -1071,11 +1071,11 @@ export default function SubmitItem() {
                 })}
               </Grid>
 
-              <Box sx={{ p: 2, bgcolor: 'primary.light', borderRadius: 2, mb: 2 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+              <Box sx={{ p: 2, bgcolor: '#F0FDF4', borderRadius: 2, mb: 2, border: '1px solid #BBF7D0' }}>
+                <Typography variant="body2" sx={{ color: '#059669', mb: 0.5, fontWeight: 500 }}>
                   推奨開始価格
                 </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#047857' }}>
                   ¥{aiAnalysisResult.estimatedPrice.min.toLocaleString()} 〜 ¥{aiAnalysisResult.estimatedPrice.max.toLocaleString()}
                 </Typography>
               </Box>

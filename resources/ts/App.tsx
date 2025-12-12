@@ -46,6 +46,8 @@ import SellerDashboard from './pages/seller/Dashboard';
 import SubmitItem from './pages/seller/SubmitItem';
 import SellerProfile from './pages/seller/Profile';
 import SellerShipping from './pages/seller/Shipping';
+import ItemHistory from './pages/seller/ItemHistory';
+import SalesSettlement from './pages/seller/SalesSettlement';
 
 // Mock: ログイン状態とユーザータイプを管理（実際はContextやReduxを使用）
 const mockUser = {
@@ -75,8 +77,8 @@ function App() {
             <Route index element={<Navigate to="/seller/dashboard" replace />} />
             <Route path="dashboard" element={<SellerDashboard />} />
             <Route path="submit" element={<SubmitItem />} />
-            <Route path="items" element={<SellerDashboard />} /> {/* 出品履歴（ダッシュボードで代用） */}
-            <Route path="sales" element={<SellerDashboard />} /> {/* 売上精算（ダッシュボードで代用） */}
+            <Route path="items" element={<ItemHistory />} />
+            <Route path="sales" element={<SalesSettlement />} />
             <Route path="shipping" element={<SellerShipping />} />
             <Route path="profile" element={<SellerProfile />} />
             <Route path="bank" element={<SellerProfile />} /> {/* 口座情報（プロフィールで代用） */}
