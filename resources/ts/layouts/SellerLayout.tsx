@@ -369,14 +369,12 @@ export default function SellerLayout() {
               variant="caption"
               component="a"
               href="/legal/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
                 color: 'text.secondary',
                 textDecoration: 'none',
                 '&:hover': { textDecoration: 'underline' },
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/legal/privacy');
               }}
             >
               プライバシーポリシー
@@ -386,14 +384,12 @@ export default function SellerLayout() {
               variant="caption"
               component="a"
               href="/legal/tokushoho"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
                 color: 'text.secondary',
                 textDecoration: 'none',
                 '&:hover': { textDecoration: 'underline' },
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/legal/tokushoho');
               }}
             >
               特定商取引法に基づく表記
@@ -403,14 +399,12 @@ export default function SellerLayout() {
               variant="caption"
               component="a"
               href="/legal/terms"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
                 color: 'text.secondary',
                 textDecoration: 'none',
                 '&:hover': { textDecoration: 'underline' },
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/legal/terms');
               }}
             >
               利用規約

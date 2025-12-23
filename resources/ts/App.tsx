@@ -9,6 +9,7 @@ import Register from './pages/auth/Register';
 // Participant pages
 import ParticipantLayout from './layouts/ParticipantLayout';
 import ParticipantHome from './pages/participant/Home';
+import AuctionItems from './pages/participant/AuctionItems';
 import AuctionLive from './pages/participant/AuctionLive';
 import WonItems from './pages/participant/WonItems';
 
@@ -78,6 +79,7 @@ function App() {
           <Route path="/participant" element={<ParticipantLayout />}>
             <Route index element={<Navigate to="/participant/home" replace />} />
             <Route path="home" element={<ParticipantHome />} />
+            <Route path="auction/:auctionId/items" element={<AuctionItems />} />
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
             <Route path="won-items" element={<WonItems />} />
           </Route>

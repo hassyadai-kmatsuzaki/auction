@@ -22,6 +22,7 @@ import {
   Gavel as GavelIcon,
   Receipt as ReceiptIcon,
   Logout as LogoutIcon,
+  List as ListIcon,
 } from '@mui/icons-material';
 
 export default function ParticipantLayout() {
@@ -31,6 +32,7 @@ export default function ParticipantLayout() {
 
   const menuItems = [
     { text: 'お知らせ', icon: <HomeIcon />, path: '/participant/home' },
+    { text: '出品一覧', icon: <ListIcon />, path: '/participant/auction/1/items' },
     { text: 'オークション会場', icon: <GavelIcon />, path: '/participant/auction/1/live' },
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
   ];
@@ -158,14 +160,12 @@ export default function ParticipantLayout() {
               variant="caption"
               component="a"
               href="/legal/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
                 color: 'text.secondary',
                 textDecoration: 'none',
                 '&:hover': { textDecoration: 'underline' },
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/legal/privacy');
               }}
             >
               プライバシーポリシー
@@ -175,14 +175,12 @@ export default function ParticipantLayout() {
               variant="caption"
               component="a"
               href="/legal/tokushoho"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
                 color: 'text.secondary',
                 textDecoration: 'none',
                 '&:hover': { textDecoration: 'underline' },
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/legal/tokushoho');
               }}
             >
               特定商取引法に基づく表記
@@ -192,14 +190,12 @@ export default function ParticipantLayout() {
               variant="caption"
               component="a"
               href="/legal/terms"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
                 color: 'text.secondary',
                 textDecoration: 'none',
                 '&:hover': { textDecoration: 'underline' },
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/legal/terms');
               }}
             >
               利用規約
