@@ -8,7 +8,7 @@ export default function SpecifiedCommercialTransaction() {
     { label: '所在地', value: '〒104-0061\n東京都中央区銀座1-12-4 N&E BLD.7階' },
     { label: '電話番号', value: '03-1234-5678\n（お問い合わせはメールにてお願いいたします）' },
     { label: 'メールアドレス', value: 'info@medaka-auction.example.com' },
-    { label: 'URL', value: 'https://medaka-auction.example.com' },
+    // { label: 'URL', value: 'https://medaka-auction.example.com' },
     { label: '販売価格', value: 'オークション形式のため、落札価格が販売価格となります。\n別途、システム利用手数料・配送料がかかります。' },
     { label: '商品代金以外の必要料金', value: '・システム利用手数料：落札価格の10%\n・配送料：実費（地域・サイズにより異なります）\n・振込手数料：お客様負担' },
     { label: '支払方法', value: '銀行振込、クレジットカード決済' },
