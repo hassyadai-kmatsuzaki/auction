@@ -49,6 +49,11 @@ import SellerShipping from './pages/seller/Shipping';
 import ItemHistory from './pages/seller/ItemHistory';
 import SalesSettlement from './pages/seller/SalesSettlement';
 
+// Legal pages
+import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import SpecifiedCommercialTransaction from './pages/legal/SpecifiedCommercialTransaction';
+import TermsOfService from './pages/legal/TermsOfService';
+
 // Mock: ログイン状態とユーザータイプを管理（実際はContextやReduxを使用）
 const mockUser = {
   isLoggedIn: true,
@@ -63,6 +68,11 @@ function App() {
           {/* 認証ページ */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+          {/* 法的ページ */}
+          <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+          <Route path="/legal/tokushoho" element={<SpecifiedCommercialTransaction />} />
+          <Route path="/legal/terms" element={<TermsOfService />} />
 
           {/* 参加者（買受者）ページ */}
           <Route path="/participant" element={<ParticipantLayout />}>

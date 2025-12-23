@@ -144,8 +144,69 @@ export default function ParticipantLayout() {
         }}
       >
         <Container maxWidth="lg">
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 2,
+              flexWrap: 'wrap',
+              mb: 1,
+            }}
+          >
+            <Typography
+              variant="caption"
+              component="a"
+              href="/legal/privacy"
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/legal/privacy');
+              }}
+            >
+              プライバシーポリシー
+            </Typography>
+            <Typography variant="caption" color="text.secondary">|</Typography>
+            <Typography
+              variant="caption"
+              component="a"
+              href="/legal/tokushoho"
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/legal/tokushoho');
+              }}
+            >
+              特定商取引法に基づく表記
+            </Typography>
+            <Typography variant="caption" color="text.secondary">|</Typography>
+            <Typography
+              variant="caption"
+              component="a"
+              href="/legal/terms"
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/legal/terms');
+              }}
+            >
+              利用規約
+            </Typography>
+          </Box>
           <Typography variant="body2" color="text.secondary" align="center">
-            © 2025 メダカライブオークション. All rights reserved.
+            © 2025 メダカオークション運営事務局
           </Typography>
         </Container>
       </Box>

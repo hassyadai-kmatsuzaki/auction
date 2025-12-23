@@ -343,6 +343,83 @@ export default function SellerLayout() {
         <Box sx={{ flex: 1, p: 3 }}>
           <Outlet />
         </Box>
+
+        {/* フッター */}
+        <Box
+          component="footer"
+          sx={{
+            py: 2,
+            px: 3,
+            mt: 'auto',
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 2,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Typography
+              variant="caption"
+              component="a"
+              href="/legal/privacy"
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/legal/privacy');
+              }}
+            >
+              プライバシーポリシー
+            </Typography>
+            <Typography variant="caption" color="text.secondary">|</Typography>
+            <Typography
+              variant="caption"
+              component="a"
+              href="/legal/tokushoho"
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/legal/tokushoho');
+              }}
+            >
+              特定商取引法に基づく表記
+            </Typography>
+            <Typography variant="caption" color="text.secondary">|</Typography>
+            <Typography
+              variant="caption"
+              component="a"
+              href="/legal/terms"
+              sx={{
+                color: 'text.secondary',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/legal/terms');
+              }}
+            >
+              利用規約
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+            © 2025 メダカオークション運営事務局
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );
