@@ -31,6 +31,7 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   NewReleases as NewReleasesIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 
 // Mock データ
@@ -87,6 +88,29 @@ const sellerAnnouncements = [
     date: '2025-11-20',
     type: 'info',
     isNew: false,
+  },
+];
+
+// 出品者向け広告データ
+interface SponsoredAd {
+  id: number;
+  title: string;
+  description: string;
+  image_url: string;
+  link_url: string;
+  advertiser: string;
+  badge?: string;
+}
+
+const sellerSponsoredAds: SponsoredAd[] = [
+  {
+    id: 1,
+    title: 'プロ仕様 繁殖用ヒーター「温極」',
+    description: '安定した水温管理で繁殖成功率UP！省エネ設計で電気代も節約。ブリーダー様に大好評',
+    image_url: '/img/medaka/03.png',
+    link_url: 'https://example.com/heater',
+    advertiser: 'アクアヒート工業',
+    badge: '送料無料',
   },
 ];
 
@@ -177,65 +201,147 @@ export default function SellerDashboard() {
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {sellerAnnouncements.slice(0, 3).map((announcement) => (
-              <Box
-                key={announcement.id}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: announcement.type === 'important' ? '#FEF2F2' :
-                           announcement.type === 'success' ? '#F0FDF4' :
-                           announcement.type === 'warning' ? '#FFFBEB' : '#F0F9FF',
-                  border: '1px solid',
-                  borderColor: announcement.type === 'important' ? '#FECACA' :
-                               announcement.type === 'success' ? '#BBF7D0' :
-                               announcement.type === 'warning' ? '#FDE68A' : '#BAE6FD',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    transform: 'translateX(4px)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  },
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                  <Avatar
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      bgcolor: announcement.type === 'important' ? '#EF4444' :
-                               announcement.type === 'success' ? '#10B981' :
-                               announcement.type === 'warning' ? '#F59E0B' : '#3B82F6',
-                    }}
-                  >
-                    {announcement.type === 'important' ? <NewReleasesIcon sx={{ fontSize: 20 }} /> :
-                     announcement.type === 'success' ? <CheckCircleIcon sx={{ fontSize: 20 }} /> :
-                     announcement.type === 'warning' ? <WarningIcon sx={{ fontSize: 20 }} /> :
-                     <InfoIcon sx={{ fontSize: 20 }} />}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        {announcement.title}
+            {sellerAnnouncements.slice(0, 3).map((announcement, index) => (
+              <React.Fragment key={announcement.id}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: announcement.type === 'important' ? '#FEF2F2' :
+                             announcement.type === 'success' ? '#F0FDF4' :
+                             announcement.type === 'warning' ? '#FFFBEB' : '#F0F9FF',
+                    border: '1px solid',
+                    borderColor: announcement.type === 'important' ? '#FECACA' :
+                                 announcement.type === 'success' ? '#BBF7D0' :
+                                 announcement.type === 'warning' ? '#FDE68A' : '#BAE6FD',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      transform: 'translateX(4px)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                    <Avatar
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        bgcolor: announcement.type === 'important' ? '#EF4444' :
+                                 announcement.type === 'success' ? '#10B981' :
+                                 announcement.type === 'warning' ? '#F59E0B' : '#3B82F6',
+                      }}
+                    >
+                      {announcement.type === 'important' ? <NewReleasesIcon sx={{ fontSize: 20 }} /> :
+                       announcement.type === 'success' ? <CheckCircleIcon sx={{ fontSize: 20 }} /> :
+                       announcement.type === 'warning' ? <WarningIcon sx={{ fontSize: 20 }} /> :
+                       <InfoIcon sx={{ fontSize: 20 }} />}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {announcement.title}
+                        </Typography>
+                        {announcement.isNew && (
+                          <Chip
+                            label="NEW"
+                            size="small"
+                            color="error"
+                            sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
+                          />
+                        )}
+                      </Box>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                        {announcement.content}
                       </Typography>
-                      {announcement.isNew && (
-                        <Chip
-                          label="NEW"
-                          size="small"
-                          color="error"
-                          sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
-                        />
-                      )}
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {new Date(announcement.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                      {announcement.content}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {new Date(announcement.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </Typography>
                   </Box>
                 </Box>
-              </Box>
+
+                {/* 2番目のお知らせの後に広告を挿入 */}
+                {index === 1 && sellerSponsoredAds.length > 0 && (
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: '#FAFAFA',
+                      border: '1px solid',
+                      borderColor: 'grey.200',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      '&:hover': {
+                        bgcolor: 'grey.100',
+                      },
+                    }}
+                    component="a"
+                    href={sellerSponsoredAds[0].link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        color: 'text.secondary',
+                        fontSize: '0.6rem',
+                        fontWeight: 600,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      SPONSORED
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        component="img"
+                        src={sellerSponsoredAds[0].image_url}
+                        alt={sellerSponsoredAds[0].title}
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 1,
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <Box sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {sellerSponsoredAds[0].title}
+                          </Typography>
+                          {sellerSponsoredAds[0].badge && (
+                            <Chip
+                              label={sellerSponsoredAds[0].badge}
+                              size="small"
+                              sx={{
+                                height: 18,
+                                fontSize: '0.6rem',
+                                fontWeight: 600,
+                                bgcolor: '#FEF3C7',
+                                color: '#B45309',
+                              }}
+                            />
+                          )}
+                        </Box>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
+                          {sellerSponsoredAds[0].description}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            提供: {sellerSponsoredAds[0].advertiser}
+                          </Typography>
+                          <OpenInNewIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
+              </React.Fragment>
             ))}
           </Box>
         </CardContent>

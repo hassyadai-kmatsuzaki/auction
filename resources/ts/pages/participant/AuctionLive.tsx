@@ -29,13 +29,36 @@ import {
 } from '@mui/icons-material';
 import type { Lane, Item } from '../../types';
 
+// 拡張されたレーン型（入札者数表示設定を含む）
+interface ExtendedLane extends Lane {
+  bidder_display: 'count' | 'simple' | 'hidden';
+  lane_name?: string;
+  current_item: Item & { 
+    bidder_count?: number; 
+    bidder_display?: 'lane_default' | 'count' | 'simple' | 'hidden';
+  };
+}
+
+// 入札者数の表示形式を取得
+const getBidderDisplay = (
+  item: ExtendedLane['current_item'],
+  laneBidderDisplay: 'count' | 'simple' | 'hidden'
+): 'count' | 'simple' | 'hidden' => {
+  if (item.bidder_display === 'lane_default' || !item.bidder_display) {
+    return laneBidderDisplay;
+  }
+  return item.bidder_display;
+};
+
 // Mock データ
-const mockLanes: Lane[] = [
+const mockLanes: ExtendedLane[] = [
   {
     id: 1,
     auction_id: 1,
     lane_number: 1,
+    lane_name: 'レーン1 - 幹之系',
     status: 'active',
+    bidder_display: 'count',
     current_item: {
       id: 1,
       auction_id: 1,
@@ -45,18 +68,22 @@ const mockLanes: Lane[] = [
       start_price: 500,
       current_price: 850,
       estimated_price: 1000,
-      inspection_info: '体外光あり',
+      inspection_info: '体外光あり、フルボディタイプ',
       individual_info: '全体的に光沢があり美しい個体です',
       is_premium: true,
       thumbnail_path: '/img/medaka/01.png',
       status: 'live',
+      bidder_count: 5,
+      bidder_display: 'lane_default',
     },
   },
   {
     id: 2,
     auction_id: 1,
     lane_number: 2,
+    lane_name: 'レーン2 - 楊貴妃系',
     status: 'active',
+    bidder_display: 'simple',
     current_item: {
       id: 2,
       auction_id: 1,
@@ -66,18 +93,22 @@ const mockLanes: Lane[] = [
       start_price: 300,
       current_price: 450,
       estimated_price: 600,
-      inspection_info: '色揚げ良好',
+      inspection_info: '色揚げ良好、赤みが強い',
       individual_info: '赤みが強く出ています',
       is_premium: false,
       thumbnail_path: '/img/medaka/02.png',
       status: 'live',
+      bidder_count: 3,
+      bidder_display: 'lane_default',
     },
   },
   {
     id: 3,
     auction_id: 1,
     lane_number: 3,
+    lane_name: 'レーン3 - オロチ系',
     status: 'active',
+    bidder_display: 'count',
     current_item: {
       id: 3,
       auction_id: 1,
@@ -87,18 +118,22 @@ const mockLanes: Lane[] = [
       start_price: 800,
       current_price: 800,
       estimated_price: 1500,
-      inspection_info: '黒化良好',
+      inspection_info: '黒化良好、全身真っ黒',
       individual_info: '全身真っ黒な美個体',
       is_premium: true,
       thumbnail_path: '/img/medaka/03.png',
       status: 'live',
+      bidder_count: 7,
+      bidder_display: 'lane_default',
     },
   },
   {
     id: 4,
     auction_id: 1,
     lane_number: 4,
+    lane_name: 'レーン4 - 三色・錦系',
     status: 'active',
+    bidder_display: 'hidden',
     current_item: {
       id: 4,
       auction_id: 1,
@@ -107,16 +142,21 @@ const mockLanes: Lane[] = [
       quantity: 6,
       start_price: 600,
       current_price: 750,
+      inspection_info: '配色バランス良好',
       is_premium: false,
       thumbnail_path: '/img/medaka/04.png',
       status: 'live',
+      bidder_count: 2,
+      bidder_display: 'lane_default',
     },
   },
   {
     id: 5,
     auction_id: 1,
     lane_number: 5,
+    lane_name: 'レーン5 - ラメ系',
     status: 'active',
+    bidder_display: 'count',
     current_item: {
       id: 5,
       auction_id: 1,
@@ -125,16 +165,21 @@ const mockLanes: Lane[] = [
       quantity: 5,
       start_price: 700,
       current_price: 700,
+      inspection_info: '青みが美しいラメ個体',
       is_premium: false,
       thumbnail_path: '/img/medaka/05.png',
       status: 'live',
+      bidder_count: 4,
+      bidder_display: 'lane_default',
     },
   },
   {
     id: 6,
     auction_id: 1,
     lane_number: 6,
+    lane_name: 'レーン6 - 特選・レア',
     status: 'active',
+    bidder_display: 'count',
     current_item: {
       id: 6,
       auction_id: 1,
@@ -143,27 +188,12 @@ const mockLanes: Lane[] = [
       quantity: 4,
       start_price: 400,
       current_price: 550,
+      inspection_info: '紅白の模様が美しい',
       is_premium: false,
       thumbnail_path: '/img/medaka/06.png',
       status: 'live',
-    },
-  },
-  {
-    id: 7,
-    auction_id: 1,
-    lane_number: 1,
-    status: 'active',
-    current_item: {
-      id: 6,
-      auction_id: 1,
-      item_number: 2,
-      species_name: '紅白メダカ',
-      quantity: 4,
-      start_price: 400,
-      current_price: 550,
-      is_premium: false,
-      thumbnail_path: '/img/medaka/06.png',
-      status: 'live',
+      bidder_count: 6,
+      bidder_display: 'lane_default',
     },
   },
 ];
@@ -171,7 +201,8 @@ const mockLanes: Lane[] = [
 export default function AuctionLive() {
   const [myBids, setMyBids] = useState<Record<number, boolean>>({});
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ExtendedLane['current_item'] | null>(null);
+  const [selectedLaneDisplay, setSelectedLaneDisplay] = useState<'count' | 'simple' | 'hidden'>('count');
   const [countdown] = useState(3); // Mock: 実際はWebSocketで更新
 
   const handleBidToggle = (itemId: number) => {
@@ -181,8 +212,9 @@ export default function AuctionLive() {
     }));
   };
 
-  const handleDetailOpen = (item: Item) => {
+  const handleDetailOpen = (item: ExtendedLane['current_item'], laneBidderDisplay: 'count' | 'simple' | 'hidden') => {
     setSelectedItem(item);
+    setSelectedLaneDisplay(laneBidderDisplay);
     setDetailOpen(true);
   };
 
@@ -191,9 +223,35 @@ export default function AuctionLive() {
     setSelectedItem(null);
   };
 
-  // Mock: 入札者数
-  const getActiveBidders = (itemId: number) => {
-    return Math.floor(Math.random() * 5) + 1;
+  // 入札者数表示コンポーネント
+  const BidderCountDisplay = ({ 
+    count, 
+    displayMode 
+  }: { 
+    count: number; 
+    displayMode: 'count' | 'simple' | 'hidden';
+  }) => {
+    if (displayMode === 'hidden') return null;
+    
+    if (displayMode === 'count') {
+      return (
+        <Chip
+          icon={<PeopleIcon />}
+          label={`${count}人入札中`}
+          size="small"
+          color="error"
+        />
+      );
+    }
+    
+    // simple - 人数なしで「入札中」のみ
+    return count > 0 ? (
+      <Chip
+        label="入札中"
+        size="small"
+        color="error"
+      />
+    ) : null;
   };
 
   return (
@@ -203,7 +261,7 @@ export default function AuctionLive() {
         <Container maxWidth="xl">
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h5" fontWeight="bold">
-              オークション会場 - 6レーン同時進行中
+              オークション会場 - {mockLanes.length}レーン同時進行中
             </Typography>
             <Chip label="開催中" color="success" icon={<PlayArrowIcon />} />
           </Box>
@@ -222,7 +280,7 @@ export default function AuctionLive() {
                   position: 'relative',
                 }}
               >
-                {/* レーン番号 */}
+                {/* レーン名 */}
                 <Box
                   sx={{
                     position: 'absolute',
@@ -235,9 +293,10 @@ export default function AuctionLive() {
                     borderRadius: 1,
                     fontWeight: 'bold',
                     zIndex: 1,
+                    fontSize: '0.85rem',
                   }}
                 >
-                  レーン {lane.lane_number}
+                  {lane.lane_name || `レーン ${lane.lane_number}`}
                 </Box>
 
                 {/* プレミアムバッジ */}
@@ -287,23 +346,24 @@ export default function AuctionLive() {
                   </Box>
 
                   {/* 入札者数 */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                    <Chip
-                      icon={<PeopleIcon />}
-                      label={`${getActiveBidders(lane.current_item!.id)}人入札中`}
-                      size="small"
-                      color="primary"
-                    />
-                    {getActiveBidders(lane.current_item!.id) > 1 && (
-                      <Chip
-                        label={`${countdown}秒`}
-                        size="small"
-                        color="error"
-                      />
-                    )}
-                  </Box>
+                  {(() => {
+                    const displayMode = getBidderDisplay(lane.current_item!, lane.bidder_display);
+                    const bidderCount = lane.current_item?.bidder_count || 0;
+                    return (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                        <BidderCountDisplay count={bidderCount} displayMode={displayMode} />
+                        {bidderCount > 1 && displayMode !== 'hidden' && (
+                          <Chip
+                            label={`${countdown}秒`}
+                            size="small"
+                            color="warning"
+                          />
+                        )}
+                      </Box>
+                    );
+                  })()}
 
-                  {/* 審査情報 */}
+                  {/* 個体情報 */}
                   {lane.current_item?.inspection_info && (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       {lane.current_item.inspection_info}
@@ -324,7 +384,7 @@ export default function AuctionLive() {
                   </Button>
                   <IconButton
                     color="primary"
-                    onClick={() => handleDetailOpen(lane.current_item!)}
+                    onClick={() => handleDetailOpen(lane.current_item!, lane.bidder_display)}
                   >
                     <InfoIcon />
                   </IconButton>
@@ -390,14 +450,21 @@ export default function AuctionLive() {
               />
             </Grid>
             <Grid item xs={12} md={6}>
+              {/* 入札者数 */}
+              {selectedItem && (
+                <Box sx={{ mb: 2 }}>
+                  <BidderCountDisplay 
+                    count={selectedItem.bidder_count || 0} 
+                    displayMode={getBidderDisplay(selectedItem, selectedLaneDisplay)} 
+                  />
+                </Box>
+              )}
+
               <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
                 ¥{selectedItem?.current_price.toLocaleString()}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 開始価格: ¥{selectedItem?.start_price.toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                落札想定: ¥{selectedItem?.estimated_price?.toLocaleString()}
               </Typography>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" gutterBottom>
@@ -409,20 +476,10 @@ export default function AuctionLive() {
               {selectedItem?.inspection_info && (
                 <>
                   <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    審査情報
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    {selectedItem.inspection_info}
-                  </Typography>
-                </>
-              )}
-              {selectedItem?.individual_info && (
-                <>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
                     個体情報
                   </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    {selectedItem.individual_info}
+                  <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedItem.inspection_info}
                   </Typography>
                 </>
               )}

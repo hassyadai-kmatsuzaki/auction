@@ -16,6 +16,10 @@ import {
   Alert,
   Chip,
   Avatar,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -101,6 +105,7 @@ export default function ItemForm() {
     seller_notes: '',
     admin_notes: '',
     is_premium: false,
+    bidder_display: 'lane_default' as 'lane_default' | 'count' | 'simple' | 'hidden',
   });
 
   // 画像アップロード用の状態
@@ -402,15 +407,32 @@ export default function ItemForm() {
                     />
                   </Grid>
 
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>入札者数表示</InputLabel>
+                      <Select
+                        value={formData.bidder_display}
+                        label="入札者数表示"
+                        onChange={(e) => setFormData({ ...formData, bidder_display: e.target.value as typeof formData.bidder_display })}
+                      >
+                        <MenuItem value="lane_default">レーン設定に従う</MenuItem>
+                        <MenuItem value="count">何人入札中</MenuItem>
+                        <MenuItem value="simple">入札中</MenuItem>
+                        <MenuItem value="hidden">非表示</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="審査情報（管理者記入）"
+                      label="個体情報（オークション表示用）"
                       value={formData.inspection_info}
                       onChange={handleChange('inspection_info')}
                       multiline
-                      rows={2}
-                      placeholder="審査時の確認事項など"
+                      rows={3}
+                      placeholder="買受者に表示される個体の特徴・情報を入力してください"
+                      helperText="ここで入力した内容がオークション参加者に表示されます"
                     />
                   </Grid>
 

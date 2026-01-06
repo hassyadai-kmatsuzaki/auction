@@ -18,8 +18,38 @@ import {
   Gavel as GavelIcon,
   Event as EventIcon,
   AccessTime as AccessTimeIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import type { Announcement, Auction } from '../../types';
+
+// Mock 広告データ
+interface SponsoredAd {
+  id: number;
+  title: string;
+  description: string;
+  image_url: string;
+  link_url: string;
+  advertiser: string;
+}
+
+const mockSponsoredAds: SponsoredAd[] = [
+  {
+    id: 1,
+    title: '高品質メダカ用飼料「極」新発売！',
+    description: '色揚げ効果抜群！プロブリーダー推奨の最高級飼料。今なら初回購入20%OFF',
+    image_url: '/img/medaka/01.png',
+    link_url: 'https://example.com/feed',
+    advertiser: 'メダカフード株式会社',
+  },
+  {
+    id: 2,
+    title: 'メダカ専用LED照明「輝」',
+    description: 'メダカの美しさを最大限に引き出す専用設計。自然光に近い演色性で体外光が映える',
+    image_url: '/img/medaka/02.png',
+    link_url: 'https://example.com/led',
+    advertiser: 'アクアライト工業',
+  },
+];
 
 // Mock データ
 const mockAnnouncements: Announcement[] = [
@@ -130,42 +160,112 @@ export default function ParticipantHome() {
       </Typography>
 
       <Grid container spacing={3}>
-        {mockAnnouncements.map((announcement) => (
-          <Grid item xs={12} key={announcement.id}>
-            <Card
-              sx={{
-                bgcolor: !announcement.is_read ? 'action.hover' : 'background.paper',
-                border: announcement.priority === 'high' ? 2 : 0,
-                borderColor: 'error.main',
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Chip
-                    label={getPriorityLabel(announcement.priority)}
-                    color={getPriorityColor(announcement.priority)}
-                    size="small"
-                    sx={{ mr: 1 }}
-                  />
-                  {!announcement.is_read && (
-                    <Chip label="未読" color="primary" size="small" sx={{ mr: 1 }} />
-                  )}
-                  <Typography variant="caption" color="text.secondary">
-                    {new Date(announcement.created_at).toLocaleString('ja-JP')}
+        {mockAnnouncements.map((announcement, index) => (
+          <React.Fragment key={announcement.id}>
+            <Grid item xs={12}>
+              <Card
+                sx={{
+                  bgcolor: !announcement.is_read ? 'action.hover' : 'background.paper',
+                  border: announcement.priority === 'high' ? 2 : 0,
+                  borderColor: 'error.main',
+                }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Chip
+                      label={getPriorityLabel(announcement.priority)}
+                      color={getPriorityColor(announcement.priority)}
+                      size="small"
+                      sx={{ mr: 1 }}
+                    />
+                    {!announcement.is_read && (
+                      <Chip label="未読" color="primary" size="small" sx={{ mr: 1 }} />
+                    )}
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(announcement.created_at).toLocaleString('ja-JP')}
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" gutterBottom>
+                    {announcement.title}
                   </Typography>
-                </Box>
-                <Typography variant="h6" gutterBottom>
-                  {announcement.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {announcement.content}
-                </Typography>
-              </CardContent>
-              <CardActions>
-                <Button size="small">詳細を見る</Button>
-              </CardActions>
-            </Card>
-          </Grid>
+                  <Typography variant="body2" color="text.secondary">
+                    {announcement.content}
+                  </Typography>
+                </CardContent>
+                <CardActions>
+                  <Button size="small">詳細を見る</Button>
+                </CardActions>
+              </Card>
+            </Grid>
+
+            {/* 2番目のお知らせの後に広告を挿入 */}
+            {index === 1 && mockSponsoredAds.length > 0 && (
+              <Grid item xs={12}>
+                <Card
+                  sx={{
+                    bgcolor: '#FAFAFA',
+                    border: '1px solid',
+                    borderColor: 'grey.200',
+                    position: 'relative',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      color: 'text.secondary',
+                      fontSize: '0.65rem',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    SPONSORED
+                  </Box>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={3}>
+                        <Box
+                          component="img"
+                          src={mockSponsoredAds[0].image_url}
+                          alt={mockSponsoredAds[0].title}
+                          sx={{
+                            width: '100%',
+                            maxWidth: 120,
+                            height: 'auto',
+                            borderRadius: 1.5,
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={9}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          {mockSponsoredAds[0].title}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
+                          {mockSponsoredAds[0].description}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            提供: {mockSponsoredAds[0].advertiser}
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}
+                            href={mockSponsoredAds[0].link_url}
+                            target="_blank"
+                            sx={{ fontSize: '0.75rem' }}
+                          >
+                            詳しく見る
+                          </Button>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </React.Fragment>
         ))}
       </Grid>
 
