@@ -59,7 +59,13 @@ class LoginController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'status' => $user->status,
-                    'roles' => $user->roles()->select('roles.id', 'roles.name', 'roles.display_name')->get(),
+                    'roles' => $user->roles->map(function ($role) {
+                        return [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'display_name' => $role->display_name,
+                        ];
+                    }),
                 ],
                 'token' => $token,
             ],
@@ -100,7 +106,13 @@ class LoginController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'status' => $user->status,
-                    'roles' => $user->roles()->select('roles.id', 'roles.name', 'roles.display_name')->get(),
+                    'roles' => $user->roles->map(function ($role) {
+                        return [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'display_name' => $role->display_name,
+                        ];
+                    }),
                     'seller_profile' => $user->sellerProfile,
                 ],
             ],

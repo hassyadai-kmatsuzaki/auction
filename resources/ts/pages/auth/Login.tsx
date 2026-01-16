@@ -11,10 +11,11 @@ import {
   Alert,
 } from '@mui/material';
 import { Login as LoginIcon } from '@mui/icons-material';
-import axios from '../../lib/axios';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,31 +27,41 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/auth/login', {
-        email,
-        password,
-      });
+      console.log('ログイン開始:', email);
+      
+      // AuthContextのlogin関数を使用
+      await login(email, password);
+      
+      console.log('ログイン成功');
 
-      const { token, user } = response.data.data;
-
-      // トークンとユーザー情報を保存
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      // Axiosのデフォルトヘッダーにトークンを設定
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-      // ロールに応じてリダイレクト
-      if (user.roles.some((r: any) => r.name === 'admin')) {
-        navigate('/admin');
-      } else if (user.roles.some((r: any) => r.name === 'seller')) {
-        navigate('/seller');
+      // ログイン成功後、ユーザー情報を取得してリダイレクト
+      const userStr = localStorage.getItem('user');
+      console.log('保存されたユーザー情報:', userStr);
+      
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log('ユーザーロール:', user.roles);
+        
+        // ロールに応じてリダイレクト
+        if (user.roles && user.roles.some((r: any) => r.name === 'admin')) {
+          console.log('管理者としてリダイレクト');
+          navigate('/admin', { replace: true });
+        } else if (user.roles && user.roles.some((r: any) => r.name === 'seller')) {
+          console.log('出品者としてリダイレクト');
+          navigate('/seller', { replace: true });
+        } else {
+          console.log('参加者としてリダイレクト');
+          navigate('/participant/home', { replace: true });
+        }
       } else {
-        navigate('/');
+        throw new Error('ユーザー情報の取得に失敗しました');
       }
     } catch (err: any) {
+      console.error('ログインエラー:', err);
+      console.error('エラーレスポンス:', err.response);
       setError(
         err.response?.data?.message ||
+        err.message ||
         'ログインに失敗しました'
       );
     } finally {
