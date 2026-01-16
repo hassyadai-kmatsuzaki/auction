@@ -46,6 +46,7 @@ import {
   Recommend as RecommendIcon,
   Assessment as AssessmentIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 280;
 
@@ -70,6 +71,7 @@ function Logo() {
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [auctionMenuOpen, setAuctionMenuOpen] = React.useState(true);
   const [userMenuOpen, setUserMenuOpen] = React.useState(true);
@@ -79,7 +81,8 @@ export default function AdminLayout() {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

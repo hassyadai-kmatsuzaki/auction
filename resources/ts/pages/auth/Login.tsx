@@ -11,28 +11,50 @@ import {
   Alert,
 } from '@mui/material';
 import { Login as LoginIcon } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Mock: 実際はAPIを呼び出す
-    if (email && password) {
-      // 仮のログイン処理
-      if (email === 'admin@example.com') {
-        navigate('/admin/dashboard');
-      } else if (email === 'seller@example.com') {
-        navigate('/seller/dashboard');
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await axios.post('/api/auth/login', {
+        email,
+        password,
+      });
+
+      const { token, user } = response.data.data;
+
+      // トークンとユーザー情報を保存
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      // Axiosのデフォルトヘッダーにトークンを設定
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      // ロールに応じてリダイレクト
+      if (user.roles.some((r: any) => r.name === 'admin')) {
+        navigate('/admin');
+      } else if (user.roles.some((r: any) => r.name === 'seller')) {
+        navigate('/seller');
       } else {
-        navigate('/participant/home');
+        navigate('/');
       }
-    } else {
-      setError('メールアドレスとパスワードを入力してください');
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ||
+        'ログインに失敗しました'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,28 +109,21 @@ export default function Login() {
               fullWidth
               variant="contained"
               size="large"
+              disabled={loading}
               sx={{ mt: 3, mb: 2 }}
             >
-              ログイン
+              {loading ? 'ログイン中...' : 'ログイン'}
             </Button>
           </Box>
 
           <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Typography variant="body2">
-              アカウントをお持ちでない方は{' '}
-              <Link href="/register" sx={{ cursor: 'pointer' }}>
-                新規登録
-              </Link>
-            </Typography>
-          </Box>
-
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              【デモ用アカウント】<br />
-              管理者: admin@example.com / password<br />
-              出品者: seller@example.com / password<br />
-              参加者: user@example.com / password
-            </Typography>
+            <Link
+              onClick={() => navigate('/auth/forgot-password')}
+              variant="body2"
+              sx={{ cursor: 'pointer' }}
+            >
+              パスワードをお忘れの方
+            </Link>
           </Box>
         </Paper>
       </Box>

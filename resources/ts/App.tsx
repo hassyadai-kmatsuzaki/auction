@@ -1,10 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
+import { AuthProvider } from './contexts/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
+import RootRedirect from './components/RootRedirect';
 
 // Auth pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import SetPassword from './pages/auth/SetPassword';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Participant pages
 import ParticipantLayout from './layouts/ParticipantLayout';
@@ -55,20 +61,18 @@ import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import SpecifiedCommercialTransaction from './pages/legal/SpecifiedCommercialTransaction';
 import TermsOfService from './pages/legal/TermsOfService';
 
-// Mock: ログイン状態とユーザータイプを管理（実際はContextやReduxを使用）
-const mockUser = {
-  isLoggedIn: true,
-  userType: 'participant' as 'admin' | 'participant' | 'seller',
-};
-
 function App() {
   return (
-    <Router>
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-        <Routes>
-          {/* 認証ページ */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+    <AuthProvider>
+      <Router>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+          <Routes>
+            {/* 認証ページ */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/auth/set-password" element={<SetPassword />} />
+            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
 
           {/* 法的ページ */}
           <Route path="/legal/privacy" element={<PrivacyPolicy />} />
@@ -76,7 +80,11 @@ function App() {
           <Route path="/legal/terms" element={<TermsOfService />} />
 
           {/* 参加者（買受者）ページ */}
-          <Route path="/participant" element={<ParticipantLayout />}>
+          <Route path="/participant" element={
+            <PrivateRoute requiredRoles={['participant']}>
+              <ParticipantLayout />
+            </PrivateRoute>
+          }>
             <Route index element={<Navigate to="/participant/home" replace />} />
             <Route path="home" element={<ParticipantHome />} />
             <Route path="auction/:auctionId/items" element={<AuctionItems />} />
@@ -85,7 +93,11 @@ function App() {
           </Route>
 
           {/* 出品者ページ */}
-          <Route path="/seller" element={<SellerLayout />}>
+          <Route path="/seller" element={
+            <PrivateRoute requiredRoles={['seller']}>
+              <SellerLayout />
+            </PrivateRoute>
+          }>
             <Route index element={<Navigate to="/seller/dashboard" replace />} />
             <Route path="dashboard" element={<SellerDashboard />} />
             <Route path="submit" element={<SubmitItem />} />
@@ -98,7 +110,11 @@ function App() {
           </Route>
 
           {/* 管理者ページ */}
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin" element={
+            <PrivateRoute requiredRoles={['admin']}>
+              <AdminLayout />
+            </PrivateRoute>
+          }>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             
@@ -152,19 +168,12 @@ function App() {
             <Route path="settings" element={<Settings />} />
           </Route>
 
-          {/* デフォルトリダイレクト */}
-          <Route path="/" element={
-            mockUser.isLoggedIn 
-              ? <Navigate to={
-                  mockUser.userType === 'admin' ? '/admin' 
-                  : mockUser.userType === 'seller' ? '/seller'
-                  : '/participant'
-                } replace />
-              : <Navigate to="/login" replace />
-          } />
+          {/* デフォルトリダイレクト（認証必須） */}
+          <Route path="/" element={<RootRedirect />} />
         </Routes>
       </Box>
     </Router>
+    </AuthProvider>
   );
 }
 

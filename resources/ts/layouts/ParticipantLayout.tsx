@@ -24,10 +24,13 @@ import {
   Logout as LogoutIcon,
   List as ListIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 export default function ParticipantLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   const menuItems = [
@@ -37,7 +40,8 @@ export default function ParticipantLayout() {
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -55,18 +59,21 @@ export default function ParticipantLayout() {
             <MenuIcon />
           </IconButton>
           
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box
               component="img"
               src="/img/logo.png"
               alt="MEDAKA AUCTION PORT"
+              onClick={() => navigate('/participant/home')}
               sx={{
                 height: 48,
                 width: '100%',
                 maxWidth: 200,
                 objectFit: 'contain',
+                cursor: 'pointer',
               }}
             />
+            {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
           </Box>
 
           {/* デスクトップメニュー */}
