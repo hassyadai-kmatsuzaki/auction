@@ -417,14 +417,24 @@ class ItemController extends Controller
             if ($disk === 's3') {
                 $path = Storage::disk('s3')->putFileAs('', $file, $filename, 'public');
             } else {
+                // ディレクトリを事前に作成
+                $directory = dirname($filename);
+                if (!Storage::disk('public')->exists($directory)) {
+                    Storage::disk('public')->makeDirectory($directory);
+                }
                 $path = Storage::disk('public')->putFileAs('', $file, $filename);
             }
             
             if (!$path) {
-                throw new \Exception('ファイルの保存に失敗しました。');
+                throw new \Exception('ファイルの保存に失敗しました。ディスク: ' . $disk);
             }
         } catch (\Exception $e) {
-            \Log::error('メディアアップロードエラー: ' . $e->getMessage());
+            \Log::error('メディアアップロードエラー: ' . $e->getMessage(), [
+                'disk' => $disk,
+                'filename' => $filename,
+                'file_size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'ファイルのアップロードに失敗しました: ' . $e->getMessage(),
