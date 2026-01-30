@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Role;
+use App\Models\SellerProfile;
 use App\Models\EmailVerificationToken;
 use App\Mail\SetPasswordMail;
 use Illuminate\Http\Request;
@@ -24,6 +25,12 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $query = User::with(['roles', 'sellerProfile']);
+
+        // デフォルトでアクティブなユーザーのみ表示（削除済みを除外）
+        // show_deleted=true の場合は削除済みも含める
+        if (!$request->boolean('show_deleted')) {
+            $query->where('is_active', true);
+        }
 
         // フィルタ
         if ($request->has('status')) {
@@ -97,7 +104,7 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            // ユーザー作成
+            // ユーザー作成（管理者が作成したので承認済み）
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -108,8 +115,10 @@ class UserController extends Controller
                 'city' => $request->city,
                 'address_line1' => $request->address_line1,
                 'address_line2' => $request->address_line2,
-                'status' => 'pending',
+                'status' => 'approved', // 管理者が作成したユーザーは承認済み
                 'is_active' => true,
+                'approved_at' => now(),
+                'approved_by' => auth()->id(),
             ]);
 
             // ロールを付与
@@ -119,6 +128,15 @@ class UserController extends Controller
                     'assigned_at' => now(),
                     'assigned_by' => auth()->id(),
                 ]);
+
+                // 出品者ロールの場合、seller_profilesも作成
+                if ($roleName === 'seller') {
+                    SellerProfile::create([
+                        'user_id' => $user->id,
+                        'business_name' => null,
+                        'bio' => null,
+                    ]);
+                }
             }
 
             // パスワード設定用トークンを生成

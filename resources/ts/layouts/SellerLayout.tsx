@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -13,15 +13,16 @@ import {
   Divider,
   Avatar,
   Badge,
-  InputBase,
-  Paper,
   Tooltip,
   Chip,
+  CircularProgress,
+  Alert,
+  Button,
+  Paper,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  Pets as PetsIcon,
   Receipt as ReceiptIcon,
   LocalShipping as ShippingIcon,
   Settings as SettingsIcon,
@@ -30,9 +31,11 @@ import {
   HelpOutline as HelpIcon,
   Add as AddIcon,
   History as HistoryIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
+import axios from '../lib/axios';
 
 const drawerWidth = 280;
 
@@ -54,11 +57,44 @@ function Logo() {
   );
 }
 
+interface SellerProfile {
+  id: number;
+  seller_name: string;
+  seller_code: string;
+}
+
 export default function SellerLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
+  const [profileError, setProfileError] = useState(false);
+
+  // プロフィール取得（初回のみ）
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await axios.get('/api/seller/profile');
+        if (response.data.success && response.data.data.profile) {
+          setSellerProfile({
+            id: response.data.data.profile.id,
+            seller_name: response.data.data.profile.seller_name || user?.name || '出品者',
+            seller_code: response.data.data.profile.seller_code || '',
+          });
+        }
+        setProfileError(false);
+      } catch (err: unknown) {
+        // プロフィールがない場合もここに来る（ProfileControllerで自動作成されるはず）
+        setProfileError(true);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user?.name]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -85,12 +121,49 @@ export default function SellerLayout() {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  // Mock 出品者情報
+  // 出品者情報（プロフィールから取得、なければユーザー名を使用）
   const seller = {
-    name: '田中養魚場',
-    representative: '田中太郎',
-    seller_id: 'S-0001',
+    name: sellerProfile?.seller_name || user?.name || '出品者',
+    seller_id: sellerProfile?.seller_code || '',
   };
+
+  // プロフィールロード中
+  if (profileLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // プロフィール作成が必要な場合（プロフィールページ以外でエラーの場合）
+  if (profileError && !location.pathname.startsWith('/seller/profile')) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', p: 3 }}>
+        <Paper sx={{ p: 4, maxWidth: 500, textAlign: 'center' }}>
+          <PersonIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h5" gutterBottom>
+            出品者プロフィールの設定
+          </Typography>
+          <Alert severity="info" sx={{ mb: 3, textAlign: 'left' }}>
+            出品者として活動するには、まずプロフィール情報の登録が必要です。
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            屋号、連絡先、口座情報などを登録してください。
+            これらの情報は出品・精算に使用されます。
+          </Typography>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => navigate('/seller/profile')}
+            startIcon={<SettingsIcon />}
+          >
+            プロフィールを設定する
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
 
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -229,15 +302,17 @@ export default function SellerLayout() {
               fontSize: '0.875rem',
             }}
           >
-            {seller.name.charAt(0)}
+            {seller.name?.charAt(0) || 'S'}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>
               {seller.name}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
-              {seller.seller_id}
-            </Typography>
+            {seller.seller_id && (
+              <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
+                {seller.seller_id}
+              </Typography>
+            )}
           </Box>
           <Tooltip title="ログアウト">
             <IconButton size="small" onClick={handleLogout}>
