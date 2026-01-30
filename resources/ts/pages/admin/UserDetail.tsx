@@ -49,11 +49,36 @@ interface Role {
 
 interface SellerProfile {
   id: number;
-  business_name: string | null;
+  seller_code: string | null;
+  seller_name: string | null;
+  corporate_name: string | null;
   business_type: string | null;
-  business_number: string | null;
-  bio: string | null;
-  website_url: string | null;
+  business_registration_number: string | null;
+  contact_name: string | null;
+  email: string | null;
+  phone: string | null;
+  postal_code: string | null;
+  prefecture: string | null;
+  city: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  instagram: string | null;
+  twitter: string | null;
+  youtube: string | null;
+  website: string | null;
+  other_sns: string | null;
+  sales_channels: string | null;
+  event_history: string | null;
+  event_hosting: string | null;
+  shop_address: string | null;
+  bank_name: string | null;
+  bank_branch: string | null;
+  account_type: string | null;
+  account_number: string | null;
+  account_holder: string | null;
+  commission_rate: number | null;
+  notes: string | null;
+  is_active: boolean;
 }
 
 interface User {
@@ -484,52 +509,296 @@ export default function UserDetail() {
 
         {/* 出品者プロフィール */}
         {user.seller_profile && (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                出品者プロフィール
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+          <>
+            {/* 基本情報 */}
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  出品者情報
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      出品者コード
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {user.seller_profile.seller_code || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      出品者名
+                    </Typography>
+                    <Typography variant="body1">
+                      {user.seller_profile.seller_name || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      法人名
+                    </Typography>
+                    <Typography variant="body1">
+                      {user.seller_profile.corporate_name || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      事業形態
+                    </Typography>
+                    <Typography variant="body1">
+                      {user.seller_profile.business_type || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      事業登録番号
+                    </Typography>
+                    <Typography variant="body1">
+                      {user.seller_profile.business_registration_number || '-'}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      担当者名
+                    </Typography>
+                    <Typography variant="body1">
+                      {user.seller_profile.contact_name || '-'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+
+            {/* 連絡先・住所 */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, height: '100%' }}>
+                <Typography variant="h6" gutterBottom>
+                  連絡先
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
+                <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    屋号
+                    メールアドレス
                   </Typography>
                   <Typography variant="body1">
-                    {user.seller_profile.business_name || '-'}
+                    {user.seller_profile.email || '-'}
                   </Typography>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    事業形態
+                    電話番号
                   </Typography>
                   <Typography variant="body1">
-                    {user.seller_profile.business_type || '-'}
+                    {user.seller_profile.phone || '-'}
                   </Typography>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12}>
+                <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    自己紹介
+                    住所
                   </Typography>
                   <Typography variant="body1">
-                    {user.seller_profile.bio || '-'}
+                    {user.seller_profile.postal_code && `〒${user.seller_profile.postal_code}`}
+                    {user.seller_profile.prefecture || ''}
+                    {user.seller_profile.city || ''}
+                    {user.seller_profile.address_line1 || ''}
+                    {user.seller_profile.address_line2 ? ` ${user.seller_profile.address_line2}` : ''}
+                    {!user.seller_profile.postal_code && !user.seller_profile.prefecture && '-'}
                   </Typography>
-                </Grid>
+                </Box>
 
-                <Grid item xs={12}>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    店舗住所
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.shop_address || '-'}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* SNS・ウェブ */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, height: '100%' }}>
+                <Typography variant="h6" gutterBottom>
+                  SNS・ウェブサイト
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Instagram
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.instagram ? `@${user.seller_profile.instagram}` : '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Twitter/X
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.twitter ? `@${user.seller_profile.twitter}` : '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    YouTube
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.youtube || '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
                     ウェブサイト
                   </Typography>
                   <Typography variant="body1">
-                    {user.seller_profile.website_url || '-'}
+                    {user.seller_profile.website || '-'}
                   </Typography>
-                </Grid>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    その他SNS
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.other_sns || '-'}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* 口座情報 */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, height: '100%' }}>
+                <Typography variant="h6" gutterBottom>
+                  口座情報
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    銀行名
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.bank_name || '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    支店名
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.bank_branch || '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    口座種別
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.account_type === 'checking' ? '当座' : 
+                     user.seller_profile.account_type === 'savings' ? '普通' : '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    口座番号
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.account_number || '-'}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    口座名義
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.account_holder || '-'}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* 活動情報 */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, height: '100%' }}>
+                <Typography variant="h6" gutterBottom>
+                  活動情報
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    販売チャネル
+                  </Typography>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {user.seller_profile.sales_channels || '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    イベント出展歴
+                  </Typography>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {user.seller_profile.event_history || '-'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    イベント主催歴
+                  </Typography>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {user.seller_profile.event_hosting || '-'}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    手数料率
+                  </Typography>
+                  <Typography variant="body1">
+                    {user.seller_profile.commission_rate ? `${user.seller_profile.commission_rate}%` : '-'}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* 備考 */}
+            {user.seller_profile.notes && (
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    備考
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {user.seller_profile.notes}
+                  </Typography>
+                </Paper>
               </Grid>
-            </Paper>
-          </Grid>
+            )}
+          </>
         )}
 
         {/* 操作 */}

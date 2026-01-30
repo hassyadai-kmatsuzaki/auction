@@ -85,7 +85,7 @@ class AuctionController extends Controller
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
-            'upload_deadline' => 'nullable|date|before:event_date',
+            'upload_deadline' => 'nullable|date',
             'payment_deadline_hours' => 'required|integer|min:1',
             'shipping_deadline_hours' => 'required|integer|min:1',
         ], [
@@ -101,7 +101,6 @@ class AuctionController extends Controller
             'default_bid_increment.min' => 'デフォルト入札単位は1円以上を指定してください。',
             'countdown_seconds.required' => 'カウントダウン秒数は必須です。',
             'countdown_seconds.between' => 'カウントダウン秒数は1〜60秒の範囲で指定してください。',
-            'upload_deadline.before' => 'アップロード期限は開催日より前に設定してください。',
             'payment_deadline_hours.required' => '入金期限は必須です。',
             'payment_deadline_hours.min' => '入金期限は1時間以上を指定してください。',
             'shipping_deadline_hours.required' => '発送期限は必須です。',
@@ -113,6 +112,21 @@ class AuctionController extends Controller
                 'success' => false,
                 'errors' => $validator->errors(),
             ], 422);
+        }
+
+        // アップロード期限が開催日時より前かチェック
+        if ($request->upload_deadline) {
+            $eventDateTime = \Carbon\Carbon::parse($request->event_date . ' ' . $request->start_time);
+            $uploadDeadline = \Carbon\Carbon::parse($request->upload_deadline);
+            
+            if ($uploadDeadline >= $eventDateTime) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => [
+                        'upload_deadline' => ['アップロード期限は開催日時より前に設定してください。']
+                    ],
+                ], 422);
+            }
         }
 
         $auction = Auction::create([
@@ -175,7 +189,7 @@ class AuctionController extends Controller
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
-            'upload_deadline' => 'nullable|date|before:event_date',
+            'upload_deadline' => 'nullable|date',
             'payment_deadline_hours' => 'required|integer|min:1',
             'shipping_deadline_hours' => 'required|integer|min:1',
         ]);
@@ -185,6 +199,21 @@ class AuctionController extends Controller
                 'success' => false,
                 'errors' => $validator->errors(),
             ], 422);
+        }
+
+        // アップロード期限が開催日時より前かチェック
+        if ($request->upload_deadline) {
+            $eventDateTime = \Carbon\Carbon::parse($request->event_date . ' ' . $request->start_time);
+            $uploadDeadline = \Carbon\Carbon::parse($request->upload_deadline);
+            
+            if ($uploadDeadline >= $eventDateTime) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => [
+                        'upload_deadline' => ['アップロード期限は開催日時より前に設定してください。']
+                    ],
+                ], 422);
+            }
         }
 
         // レーン数の変更チェック（商品が登録されている場合は変更不可）

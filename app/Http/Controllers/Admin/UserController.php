@@ -75,9 +75,15 @@ class UserController extends Controller
     {
         $user = User::with(['roles', 'sellerProfile'])->findOrFail($id);
 
+        // 出品者プロフィールがある場合は口座情報も含める（管理者用）
+        $userData = $user->toArray();
+        if ($user->sellerProfile) {
+            $userData['seller_profile'] = $user->sellerProfile->getWithBankInfo();
+        }
+
         return response()->json([
             'success' => true,
-            'data' => ['user' => $user],
+            'data' => ['user' => $userData],
         ]);
     }
 

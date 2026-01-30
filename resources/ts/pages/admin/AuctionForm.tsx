@@ -295,16 +295,36 @@ export default function AuctionForm() {
         ? `${formData.start_time.getHours().toString().padStart(2, '0')}:${formData.start_time.getMinutes().toString().padStart(2, '0')}`
         : '10:00';
 
+      // ローカルタイムゾーンの日付を正しく取得（toISOStringはUTCに変換されるため使用しない）
+      const formatLocalDate = (date: Date | null): string | null => {
+        if (!date) return null;
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const formatLocalDateTime = (date: Date | null): string | null => {
+        if (!date) return null;
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+      };
+
       const payload = {
         title: formData.title,
-        event_date: formData.event_date?.toISOString().split('T')[0],
+        event_date: formatLocalDate(formData.event_date),
         start_time: startTime,
         description: formData.description,
         lane_count: formData.lane_count,
         default_bid_increment: formData.default_bid_increment,
         countdown_seconds: formData.countdown_seconds,
         deposit_required: formData.deposit_required,
-        upload_deadline: formData.upload_deadline?.toISOString(),
+        upload_deadline: formatLocalDateTime(formData.upload_deadline),
         payment_deadline_hours: formData.payment_deadline_hours,
         shipping_deadline_hours: formData.shipping_deadline_hours,
         use_custom_settings: formData.use_custom_settings,
