@@ -167,8 +167,17 @@ class UserController extends Controller
                 if ($roleName === 'seller') {
                     SellerProfile::create([
                         'user_id' => $user->id,
-                        'business_name' => null,
-                        'bio' => null,
+                        'seller_code' => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
+                        'seller_name' => $user->name,
+                        'contact_name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone ?? '',
+                        'postal_code' => $user->postal_code,
+                        'prefecture' => $user->prefecture,
+                        'city' => $user->city,
+                        'address_line1' => $user->address_line1,
+                        'address_line2' => $user->address_line2,
+                        'is_active' => true,
                     ]);
                 }
             }
