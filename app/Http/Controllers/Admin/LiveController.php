@@ -441,13 +441,28 @@ class LiveController extends Controller
 
     /**
      * 商品をレーンに割り当て
+     * プレミアム生体を優先的に上位に配置
      */
     private function assignItemsToLanes(Auction $auction): void
     {
-        $items = $auction->items()
+        // プレミアム生体を先に、その後に通常生体を取得
+        $premiumItems = $auction->items()
             ->where('status', 'registered')
+            ->where('is_premium', true)
             ->orderBy('item_number')
             ->get();
+
+        $normalItems = $auction->items()
+            ->where('status', 'registered')
+            ->where(function ($q) {
+                $q->where('is_premium', false)
+                  ->orWhereNull('is_premium');
+            })
+            ->orderBy('item_number')
+            ->get();
+
+        // プレミアム生体を先に、通常生体を後ろに結合
+        $items = $premiumItems->concat($normalItems);
 
         $lanes = $auction->lanes()->orderBy('lane_number')->get();
         $laneCount = $lanes->count();

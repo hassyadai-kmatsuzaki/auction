@@ -113,8 +113,9 @@ class Auction extends Model
      */
     public function canStart(): bool
     {
+        // 予定状態で、承認済み（registered）の生体が1件以上ある場合のみ開始可能
         return $this->status === 'scheduled' 
-            && $this->items()->count() > 0;
+            && $this->items()->where('status', 'registered')->count() > 0;
     }
 
     /**
@@ -339,6 +340,12 @@ class Auction extends Model
      */
     public function scopeWithItemsCount($query)
     {
-        return $query->withCount('items');
+        return $query->withCount('items')
+            ->withCount(['items as registered_items_count' => function ($q) {
+                $q->where('status', 'registered');
+            }])
+            ->withCount(['items as draft_items_count' => function ($q) {
+                $q->where('status', 'draft');
+            }]);
     }
 }

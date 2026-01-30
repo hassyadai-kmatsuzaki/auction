@@ -149,10 +149,10 @@ export default function SubmitItem() {
       });
       
       if (response.data.success) {
-        setSnackbar({ open: true, message: '出品申込を送信しました！', severity: 'success' });
+        setSnackbar({ open: true, message: '出品申込を送信しました！管理者の審査をお待ちください。', severity: 'success' });
         setTimeout(() => {
           navigate('/seller/items');
-        }, 1500);
+        }, 2000);
       }
     } catch (err: any) {
       console.error('出品申込エラー:', err);

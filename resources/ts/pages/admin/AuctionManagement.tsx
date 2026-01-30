@@ -63,6 +63,8 @@ interface Auction {
   payment_deadline_hours: number;
   shipping_deadline_hours: number;
   items_count: number;
+  registered_items_count: number;
+  draft_items_count: number;
   created_by: {
     id: number;
     name: string;
@@ -388,9 +390,16 @@ export default function AuctionManagement() {
                           />
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body2">
-                            {auction.items_count}個体
-                          </Typography>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {auction.registered_items_count || 0}個体
+                            </Typography>
+                            {(auction.draft_items_count || 0) > 0 && (
+                              <Typography variant="caption" sx={{ color: '#F59E0B' }}>
+                                +{auction.draft_items_count}審査中
+                              </Typography>
+                            )}
+                          </Box>
                         </TableCell>
                         <TableCell align="right">
                           <Typography variant="body2">

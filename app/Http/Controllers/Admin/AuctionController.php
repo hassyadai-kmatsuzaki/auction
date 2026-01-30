@@ -339,7 +339,7 @@ class AuctionController extends Controller
                 if (!$auction->start()) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'オークションを開始できません。商品を登録してください。',
+                        'message' => 'オークションを開始できません。承認済みの生体を1件以上登録してください。',
                     ], 400);
                 }
                 $message = 'オークションを開始しました。';

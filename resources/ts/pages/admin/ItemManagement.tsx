@@ -250,9 +250,9 @@ export default function ItemManagement() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'sold': return 'success';
-      case 'live': return 'warning';
-      case 'registered': return 'info';
-      case 'draft': return 'secondary';
+      case 'live': return 'primary';
+      case 'registered': return 'success';
+      case 'draft': return 'warning';  // 審査中は警告色で目立たせる
       case 'unsold': return 'error';
       case 'cancelled': return 'default';
       default: return 'default';
