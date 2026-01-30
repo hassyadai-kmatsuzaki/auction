@@ -80,7 +80,7 @@ class DashboardController extends Controller
                     'id' => $auction->id,
                     'title' => $auction->title,
                     'event_date' => $auction->event_date->format('Y-m-d'),
-                    'start_time' => $auction->start_time ? $auction->start_time->format('H:i') : null,
+                    'start_time' => $auction->start_time,
                     'status' => $auction->status,
                     'items_count' => $auction->items()->count(),
                 ];

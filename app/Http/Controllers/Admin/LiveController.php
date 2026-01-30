@@ -112,7 +112,7 @@ class LiveController extends Controller
                     'title' => $auction->title,
                     'status' => $auction->status,
                     'event_date' => $auction->event_date->format('Y-m-d'),
-                    'start_time' => $auction->start_time ? $auction->start_time->format('H:i') : null,
+                    'start_time' => $auction->start_time,
                     'countdown_seconds' => $auction->countdown_seconds,
                     'default_bid_increment' => $auction->default_bid_increment,
                 ],
