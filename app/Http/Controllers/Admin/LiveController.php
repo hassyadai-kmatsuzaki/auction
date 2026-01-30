@@ -73,7 +73,7 @@ class LiveController extends Controller
             // レーンに割り当てられた商品を取得
             $queuedItems = $lane->items()
                 ->whereIn('status', ['registered', 'live'])
-                ->orderBy('lane_items.sequence')
+                ->orderBy('lane_items.sequence_order')
                 ->get()
                 ->map(function ($item) {
                     return [
@@ -81,7 +81,7 @@ class LiveController extends Controller
                         'item_number' => $item->item_number,
                         'species_name' => $item->species_name,
                         'status' => $item->status,
-                        'sequence' => $item->pivot->sequence,
+                        'sequence' => $item->pivot->sequence_order,
                     ];
                 });
 
@@ -480,8 +480,7 @@ class LiveController extends Controller
             // すでに割り当てられていない場合のみ
             if (!$lane->items()->where('item_id', $item->id)->exists()) {
                 $lane->items()->attach($item->id, [
-                    'sequence' => $sequence,
-                    'status' => 'pending',
+                    'sequence_order' => $sequence,
                 ]);
             }
 
@@ -502,7 +501,7 @@ class LiveController extends Controller
         // 次の商品を取得
         $nextItem = $lane->items()
             ->where('status', 'registered')
-            ->orderBy('lane_items.sequence')
+            ->orderBy('lane_items.sequence_order')
             ->first();
 
         if ($nextItem) {

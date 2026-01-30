@@ -152,7 +152,7 @@ class AuctionController extends Controller
                 ->with(['media' => function ($query) {
                     $query->orderBy('display_order');
                 }])
-                ->orderBy('lane_items.sequence')
+                ->orderBy('lane_items.sequence_order')
                 ->get();
             
             $lanesData[] = [

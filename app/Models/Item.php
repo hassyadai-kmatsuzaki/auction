@@ -96,7 +96,7 @@ class Item extends Model
     public function lanes()
     {
         return $this->belongsToMany(Lane::class, 'lane_items')
-                    ->withPivot(['sequence', 'status'])
+                    ->withPivot(['sequence_order', 'started_at', 'finished_at'])
                     ->withTimestamps();
     }
 }

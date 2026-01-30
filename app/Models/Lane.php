@@ -52,8 +52,8 @@ class Lane extends Model
     public function items()
     {
         return $this->belongsToMany(Item::class, 'lane_items')
-                    ->withPivot(['sequence', 'status'])
+                    ->withPivot(['sequence_order', 'started_at', 'finished_at'])
                     ->withTimestamps()
-                    ->orderBy('sequence');
+                    ->orderBy('lane_items.sequence_order');
     }
 }
