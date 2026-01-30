@@ -34,9 +34,8 @@ export default function ParticipantLayout() {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   const menuItems = [
-    { text: 'お知らせ', icon: <HomeIcon />, path: '/participant/home' },
-    { text: '出品一覧', icon: <ListIcon />, path: '/participant/auction/1/items' },
-    { text: 'オークション会場', icon: <GavelIcon />, path: '/participant/auction/1/live' },
+    { text: 'ホーム', icon: <HomeIcon />, path: '/participant/home' },
+    { text: 'オークション', icon: <GavelIcon />, path: '/participant/auctions' },
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
   ];
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Services\AIContentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -261,6 +262,54 @@ class AnnouncementController extends Controller
             'message' => $message,
             'data' => [
                 'announcement' => $announcement,
+            ],
+        ]);
+    }
+
+    /**
+     * AIでお知らせコンテンツを生成
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function generateContent(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:200',
+            'target_roles' => 'array',
+            'target_roles.*' => 'in:admin,seller,participant',
+            'is_important' => 'boolean',
+        ], [
+            'title.required' => 'タイトルを入力してください。',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $aiService = new AIContentService();
+        $result = $aiService->generateAnnouncementContent(
+            $request->title,
+            [
+                'target_roles' => $request->target_roles ?? ['participant', 'seller'],
+                'is_important' => $request->boolean('is_important', false),
+            ]
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'content' => $result['content'],
             ],
         ]);
     }

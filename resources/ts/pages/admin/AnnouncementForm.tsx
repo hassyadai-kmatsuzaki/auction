@@ -27,6 +27,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Visibility as VisibilityIcon,
   Send as SendIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -61,6 +62,7 @@ export default function AnnouncementForm() {
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [canEdit, setCanEdit] = useState(true);
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   useEffect(() => {
     if (isEdit) {
@@ -190,6 +192,36 @@ export default function AnnouncementForm() {
     setPreviewOpen(true);
   };
 
+  const handleAiGenerate = async () => {
+    if (!formData.title.trim()) {
+      setError('AIでコンテンツを生成するには、先にタイトルを入力してください。');
+      return;
+    }
+
+    try {
+      setAiGenerating(true);
+      setError(null);
+
+      const response = await axios.post('/api/admin/announcements/generate-content', {
+        title: formData.title,
+        target_roles: formData.target_roles,
+        is_important: formData.is_important,
+      });
+
+      if (response.data.success) {
+        setFormData((prev) => ({
+          ...prev,
+          content: response.data.data.content,
+        }));
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setError(axiosErr.response?.data?.message || 'AI生成に失敗しました。');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   if (fetchLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -265,16 +297,35 @@ export default function AnnouncementForm() {
             />
 
             {/* 本文 */}
-            <TextField
-              label="本文"
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              required
-              fullWidth
-              multiline
-              rows={10}
-              helperText="お知らせの本文を入力してください"
-            />
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  本文 *
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={aiGenerating ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+                  onClick={handleAiGenerate}
+                  disabled={aiGenerating || !formData.title.trim()}
+                  sx={{ 
+                    borderColor: 'primary.main',
+                    '&:hover': { borderColor: 'primary.dark' },
+                  }}
+                >
+                  {aiGenerating ? 'AI生成中...' : 'AIで生成'}
+                </Button>
+              </Box>
+              <TextField
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                required
+                fullWidth
+                multiline
+                rows={10}
+                placeholder="お知らせの本文を入力してください。タイトルを入力後「AIで生成」ボタンを押すと自動生成できます。"
+              />
+            </Box>
 
             {/* 対象ユーザー */}
             <FormControl component="fieldset">

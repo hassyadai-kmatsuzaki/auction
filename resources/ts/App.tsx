@@ -15,6 +15,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 // Participant pages
 import ParticipantLayout from './layouts/ParticipantLayout';
 import ParticipantHome from './pages/participant/Home';
+import AuctionList from './pages/participant/AuctionList';
 import AuctionItems from './pages/participant/AuctionItems';
 import AuctionLive from './pages/participant/AuctionLive';
 import WonItems from './pages/participant/WonItems';
@@ -90,6 +91,7 @@ function App() {
           }>
             <Route index element={<Navigate to="/participant/home" replace />} />
             <Route path="home" element={<ParticipantHome />} />
+            <Route path="auctions" element={<AuctionList />} />
             <Route path="auction/:auctionId/items" element={<AuctionItems />} />
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
             <Route path="won-items" element={<WonItems />} />

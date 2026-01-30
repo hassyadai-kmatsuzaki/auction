@@ -58,6 +58,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     // お知らせ管理
     Route::apiResource('announcements', AdminAnnouncementController::class);
     Route::patch('announcements/{id}/toggle-visibility', [AdminAnnouncementController::class, 'toggleVisibility']);
+    Route::post('announcements/generate-content', [AdminAnnouncementController::class, 'generateContent']);
     
     // オークション管理
     Route::apiResource('auctions', AdminAuctionController::class);
