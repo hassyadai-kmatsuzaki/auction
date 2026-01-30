@@ -159,9 +159,11 @@ export default function AuctionManagement() {
     setSelectedAuction(auction);
   };
 
-  const handleMenuClose = () => {
+  const handleMenuClose = (keepSelectedAuction: boolean = false) => {
     setAnchorEl(null);
-    setSelectedAuction(null);
+    if (!keepSelectedAuction) {
+      setSelectedAuction(null);
+    }
   };
 
   const handleEdit = () => {
@@ -198,7 +200,7 @@ export default function AuctionManagement() {
       setNewStatus(selectedAuction.status);
       setStatusDialogOpen(true);
     }
-    handleMenuClose();
+    handleMenuClose(true); // selectedAuctionを保持
   };
 
   const handleStatusChange = async () => {
@@ -441,7 +443,7 @@ export default function AuctionManagement() {
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
+          onClose={() => handleMenuClose()}
         >
           <MenuItem onClick={handleItems}>
             <PetsIcon sx={{ mr: 1, fontSize: 20 }} />
