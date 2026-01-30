@@ -7,8 +7,14 @@ import {
   Typography,
   Box,
   Tooltip,
+  Divider,
 } from '@mui/material';
-import { SwapHoriz as SwapHorizIcon } from '@mui/icons-material';
+import {
+  SwapHoriz as SwapHorizIcon,
+  AdminPanelSettings as AdminIcon,
+  Store as SellerIcon,
+  Person as ParticipantIcon,
+} from '@mui/icons-material';
 
 interface Role {
   name: string;
@@ -24,12 +30,16 @@ const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
-  // seller と participant の両方を持っている場合のみ表示
+  // 各ロールの有無をチェック
+  const hasAdmin = roles.some(r => r.name === 'admin');
   const hasSeller = roles.some(r => r.name === 'seller');
   const hasParticipant = roles.some(r => r.name === 'participant');
-  const hasBothRoles = hasSeller && hasParticipant;
 
-  if (!hasBothRoles) {
+  // 切り替え可能なロールの数をカウント
+  const availableRoles = [hasAdmin, hasSeller, hasParticipant].filter(Boolean).length;
+
+  // 2つ以上のロールがない場合は表示しない
+  if (availableRoles < 2) {
     return null;
   }
 
@@ -44,7 +54,9 @@ const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
   const handleSwitch = (roleName: string) => {
     handleClose();
     
-    if (roleName === 'seller') {
+    if (roleName === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (roleName === 'seller') {
       navigate('/seller/dashboard');
     } else if (roleName === 'participant') {
       navigate('/participant/home');
@@ -52,8 +64,36 @@ const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
   };
 
   // 現在の画面を判定
-  const isParticipantScreen = !currentPath.startsWith('/admin') && !currentPath.startsWith('/seller');
+  const isAdminScreen = currentPath.startsWith('/admin');
   const isSellerScreen = currentPath.startsWith('/seller');
+  const isParticipantScreen = !isAdminScreen && !isSellerScreen;
+
+  const roleItems = [
+    {
+      name: 'admin',
+      label: '管理者画面',
+      description: 'システム管理・設定',
+      icon: <AdminIcon sx={{ color: 'primary.main' }} />,
+      available: hasAdmin,
+      selected: isAdminScreen,
+    },
+    {
+      name: 'seller',
+      label: '出品者画面',
+      description: '商品管理・売上確認',
+      icon: <SellerIcon sx={{ color: 'success.main' }} />,
+      available: hasSeller,
+      selected: isSellerScreen,
+    },
+    {
+      name: 'participant',
+      label: '参加者画面',
+      description: 'オークション参加・落札管理',
+      icon: <ParticipantIcon sx={{ color: 'info.main' }} />,
+      available: hasParticipant,
+      selected: isParticipantScreen,
+    },
+  ].filter(item => item.available);
 
   return (
     <>
@@ -81,30 +121,41 @@ const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
           vertical: 'top',
           horizontal: 'right',
         }}
+        PaperProps={{
+          sx: { minWidth: 220 },
+        }}
       >
-        <MenuItem
-          onClick={() => handleSwitch('participant')}
-          selected={isParticipantScreen}
-        >
-          <Box>
-            <Typography variant="body1">参加者画面</Typography>
-            <Typography variant="caption" color="text.secondary">
-              オークション参加・落札管理
-            </Typography>
-          </Box>
-        </MenuItem>
-
-        <MenuItem
-          onClick={() => handleSwitch('seller')}
-          selected={isSellerScreen}
-        >
-          <Box>
-            <Typography variant="body1">出品者画面</Typography>
-            <Typography variant="caption" color="text.secondary">
-              商品管理・売上確認
-            </Typography>
-          </Box>
-        </MenuItem>
+        <Box sx={{ px: 2, py: 1 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+            画面を切り替え
+          </Typography>
+        </Box>
+        <Divider />
+        {roleItems.map((item, index) => (
+          <MenuItem
+            key={item.name}
+            onClick={() => handleSwitch(item.name)}
+            selected={item.selected}
+            sx={{
+              py: 1.5,
+              '&.Mui-selected': {
+                backgroundColor: 'action.selected',
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              {item.icon}
+              <Box>
+                <Typography variant="body2" fontWeight={item.selected ? 600 : 400}>
+                  {item.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {item.description}
+                </Typography>
+              </Box>
+            </Box>
+          </MenuItem>
+        ))}
       </Menu>
     </>
   );

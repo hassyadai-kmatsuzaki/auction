@@ -47,6 +47,7 @@ import {
   Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 const drawerWidth = 280;
 
@@ -71,7 +72,7 @@ function Logo() {
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [auctionMenuOpen, setAuctionMenuOpen] = React.useState(true);
   const [userMenuOpen, setUserMenuOpen] = React.useState(true);
@@ -115,8 +116,11 @@ export default function AdminLayout() {
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ロゴエリア */}
-      <Box sx={{ p: 2.5, pb: 2 }}>
-        <Logo />
+      <Box sx={{ p: 2.5, pb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ flex: 1 }}>
+          <Logo />
+        </Box>
+        {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
       </Box>
 
       <Divider sx={{ mx: 2 }} />
