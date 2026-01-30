@@ -23,7 +23,7 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        $query = User::with('roles');
+        $query = User::with(['roles', 'sellerProfile']);
 
         // フィルタ
         if ($request->has('status')) {

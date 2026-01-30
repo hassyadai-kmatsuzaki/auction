@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -15,8 +15,15 @@ import {
   TableHead,
   TableRow,
   Avatar,
-  Divider,
+  CircularProgress,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Pagination,
+  Stack,
+  CardActionArea,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -25,71 +32,12 @@ import {
   LocalShipping as ShippingIcon,
   Add as AddIcon,
   ArrowForward as ArrowForwardIcon,
-  Event as EventIcon,
   Campaign as CampaignIcon,
   Info as InfoIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
   NewReleases as NewReleasesIcon,
   OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
-
-// Mock データ
-const stats = {
-  total_items: 45,
-  items_this_month: 12,
-  total_sales: 580000,
-  sales_this_month: 185000,
-  pending_payment: 65000,
-  items_shipping: 3,
-};
-
-const upcomingAuctions = [
-  { id: 1, title: '2025年12月オークション', date: '2025-12-10', deadline: '2025-12-05', status: 'accepting' },
-  { id: 2, title: '2025年クリスマス特別', date: '2025-12-24', deadline: '2025-12-19', status: 'upcoming' },
-];
-
-const recentItems = [
-  { id: 1, species_name: '紅白ラメ 3ペア', auction: '2025年11月オークション', status: 'sold', price: 35000 },
-  { id: 2, species_name: '幹之フルボディ 5匹', auction: '2025年11月オークション', status: 'sold', price: 28000 },
-  { id: 3, species_name: '三色ラメ 2ペア', auction: '2025年11月オークション', status: 'shipping', price: 42000 },
-];
-
-// 出品者向けお知らせ
-const sellerAnnouncements = [
-  {
-    id: 1,
-    title: '【重要】12月オークション出品申込受付開始',
-    content: '2025年12月オークションの出品申込受付を開始しました。締切は12月5日(木)です。お早めにお申し込みください。',
-    date: '2025-12-01',
-    type: 'important',
-    isNew: true,
-  },
-  {
-    id: 2,
-    title: '11月オークション精算完了のお知らせ',
-    content: '11月オークションの精算処理が完了しました。ご登録の口座へ入金済みです。',
-    date: '2025-11-28',
-    type: 'success',
-    isNew: true,
-  },
-  {
-    id: 3,
-    title: '年末年始の配送スケジュールについて',
-    content: '年末年始期間（12/28〜1/5）は配送業者の都合により、生体の配送をお休みさせていただきます。',
-    date: '2025-11-25',
-    type: 'warning',
-    isNew: false,
-  },
-  {
-    id: 4,
-    title: '出品手数料改定のお知らせ',
-    content: '2026年1月より出品手数料を一部改定いたします。詳細は添付資料をご確認ください。',
-    date: '2025-11-20',
-    type: 'info',
-    isNew: false,
-  },
-];
+import axios from '../../lib/axios';
 
 // 出品者向け広告データ
 interface SponsoredAd {
@@ -114,8 +62,55 @@ const sellerSponsoredAds: SponsoredAd[] = [
   },
 ];
 
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  is_important: boolean;
+  published_at: string;
+}
+
+interface Stats {
+  total_items: number;
+  items_this_month: number;
+  total_sales: number;
+  sales_this_month: number;
+  pending_payment: number;
+  items_shipping: number;
+}
+
+interface UpcomingAuction {
+  id: number;
+  title: string;
+  date: string;
+  deadline: string;
+  status: string;
+}
+
+interface RecentItem {
+  id: number;
+  species_name: string;
+  quantity: string;
+  auction: string;
+  auction_date: string | null;
+  status: string;
+  start_price: number;
+  final_price: number | null;
+  submitted_at: string;
+}
+
+interface DashboardData {
+  profile: {
+    seller_name: string;
+    seller_code: string;
+  };
+  stats: Stats;
+  upcoming_auctions: UpcomingAuction[];
+  recent_items: RecentItem[];
+}
+
 // KPIカード
-function StatCard({ title, value, subValue, icon, color, trend }: any) {
+function StatCard({ title, value, subValue, icon, color }: any) {
   return (
     <Card>
       <CardContent sx={{ p: 2.5 }}>
@@ -155,6 +150,167 @@ function StatCard({ title, value, subValue, icon, color, trend }: any) {
 
 export default function SellerDashboard() {
   const navigate = useNavigate();
+  
+  // ダッシュボードデータ
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  
+  // お知らせ
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [errorAnnouncements, setErrorAnnouncements] = useState<string | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [allAnnouncementsOpen, setAllAnnouncementsOpen] = useState(false);
+  const [allAnnouncements, setAllAnnouncements] = useState<Announcement[]>([]);
+  const [allAnnouncementsCurrentPage, setAllAnnouncementsCurrentPage] = useState(1);
+  const [allAnnouncementsLastPage, setAllAnnouncementsLastPage] = useState(1);
+  const [allAnnouncementsTotal, setAllAnnouncementsTotal] = useState(0);
+
+  useEffect(() => {
+    fetchDashboardData();
+    fetchAnnouncements();
+  }, []);
+
+  useEffect(() => {
+    if (allAnnouncementsOpen) {
+      fetchAllAnnouncements();
+    }
+  }, [allAnnouncementsOpen, allAnnouncementsCurrentPage]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axios.get('/api/seller/dashboard');
+      if (response.data.success) {
+        setDashboardData(response.data.data);
+      }
+    } catch (err: any) {
+      console.error('ダッシュボードデータ取得エラー:', err);
+      setError(err.response?.data?.message || 'データの取得に失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      setLoadingAnnouncements(true);
+      setErrorAnnouncements(null);
+      const response = await axios.get('/api/announcements?per_page=3');
+      if (response.data.success) {
+        setAnnouncements(response.data.data.announcements);
+      }
+    } catch (err: any) {
+      console.error('お知らせ取得エラー:', err);
+      setErrorAnnouncements(err.response?.data?.message || 'お知らせの取得に失敗しました。');
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  };
+
+  const fetchAllAnnouncements = async () => {
+    try {
+      setLoadingAnnouncements(true);
+      setErrorAnnouncements(null);
+      const response = await axios.get(`/api/announcements?page=${allAnnouncementsCurrentPage}&per_page=20`);
+      if (response.data.success) {
+        setAllAnnouncements(response.data.data.announcements);
+        setAllAnnouncementsLastPage(response.data.data.pagination.last_page);
+        setAllAnnouncementsTotal(response.data.data.pagination.total);
+      }
+    } catch (err: any) {
+      console.error('全お知らせ取得エラー:', err);
+      setErrorAnnouncements(err.response?.data?.message || '全お知らせの取得に失敗しました。');
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  };
+
+  const handleCardClick = (announcement: Announcement) => {
+    setSelectedAnnouncement(announcement);
+    setDetailOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setDetailOpen(false);
+    setSelectedAnnouncement(null);
+  };
+
+  const handleOpenAllAnnouncements = () => {
+    setAllAnnouncementsOpen(true);
+    setAllAnnouncementsCurrentPage(1);
+  };
+
+  const handleCloseAllAnnouncements = () => {
+    setAllAnnouncementsOpen(false);
+    setAllAnnouncements([]);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'sold': return '落札済み';
+      case 'shipping': return '発送待ち';
+      case 'registered': return '出品予定';
+      case 'draft': return '下書き';
+      case 'unsold': return '不落札';
+      case 'cancelled': return 'キャンセル';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'sold': return { bgcolor: '#ECFDF5', color: '#059669' };
+      case 'shipping': return { bgcolor: '#FEF3C7', color: '#D97706' };
+      case 'registered': return { bgcolor: '#DBEAFE', color: '#2563EB' };
+      case 'draft': return { bgcolor: '#F3E8FF', color: '#9333EA' };
+      case 'unsold': return { bgcolor: '#FEE2E2', color: '#DC2626' };
+      case 'cancelled': return { bgcolor: '#F1F5F9', color: '#64748B' };
+      default: return { bgcolor: '#F1F5F9', color: '#64748B' };
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
+
+  const stats = dashboardData?.stats || {
+    total_items: 0,
+    items_this_month: 0,
+    total_sales: 0,
+    sales_this_month: 0,
+    pending_payment: 0,
+    items_shipping: 0,
+  };
+
+  const upcomingAuctions = dashboardData?.upcoming_auctions || [];
+  const recentItems = dashboardData?.recent_items || [];
+  const sellerName = dashboardData?.profile?.seller_name || '出品者';
 
   return (
     <Box>
@@ -162,7 +318,7 @@ export default function SellerDashboard() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
         <Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-            こんにちは、田中養魚場さん
+            こんにちは、{sellerName}さん
           </Typography>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
             ダッシュボード
@@ -186,164 +342,169 @@ export default function SellerDashboard() {
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 出品者向けお知らせ
               </Typography>
-              {sellerAnnouncements.filter(a => a.isNew).length > 0 && (
+              {announcements.filter(a => new Date(a.published_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length > 0 && (
                 <Chip
-                  label={`${sellerAnnouncements.filter(a => a.isNew).length}件の新着`}
+                  label={`${announcements.filter(a => new Date(a.published_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}件の新着`}
                   size="small"
                   color="error"
                   sx={{ height: 20, fontSize: '0.65rem' }}
                 />
               )}
             </Box>
-            <Button size="small" endIcon={<ArrowForwardIcon />}>
+            <Button size="small" endIcon={<ArrowForwardIcon />} onClick={handleOpenAllAnnouncements}>
               すべて見る
             </Button>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {sellerAnnouncements.slice(0, 3).map((announcement, index) => (
-              <React.Fragment key={announcement.id}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    bgcolor: announcement.type === 'important' ? '#FEF2F2' :
-                             announcement.type === 'success' ? '#F0FDF4' :
-                             announcement.type === 'warning' ? '#FFFBEB' : '#F0F9FF',
-                    border: '1px solid',
-                    borderColor: announcement.type === 'important' ? '#FECACA' :
-                                 announcement.type === 'success' ? '#BBF7D0' :
-                                 announcement.type === 'warning' ? '#FDE68A' : '#BAE6FD',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      transform: 'translateX(4px)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                    <Avatar
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        bgcolor: announcement.type === 'important' ? '#EF4444' :
-                                 announcement.type === 'success' ? '#10B981' :
-                                 announcement.type === 'warning' ? '#F59E0B' : '#3B82F6',
-                      }}
-                    >
-                      {announcement.type === 'important' ? <NewReleasesIcon sx={{ fontSize: 20 }} /> :
-                       announcement.type === 'success' ? <CheckCircleIcon sx={{ fontSize: 20 }} /> :
-                       announcement.type === 'warning' ? <WarningIcon sx={{ fontSize: 20 }} /> :
-                       <InfoIcon sx={{ fontSize: 20 }} />}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                          {announcement.title}
-                        </Typography>
-                        {announcement.isNew && (
-                          <Chip
-                            label="NEW"
-                            size="small"
-                            color="error"
-                            sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
-                          />
-                        )}
-                      </Box>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                        {announcement.content}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {new Date(announcement.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* 2番目のお知らせの後に広告を挿入 */}
-                {index === 1 && sellerSponsoredAds.length > 0 && (
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      bgcolor: '#FAFAFA',
-                      border: '1px solid',
-                      borderColor: 'grey.200',
-                      position: 'relative',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      '&:hover': {
-                        bgcolor: 'grey.100',
-                      },
-                    }}
-                    component="a"
-                    href={sellerSponsoredAds[0].link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+          {loadingAnnouncements && announcements.length === 0 ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : errorAnnouncements ? (
+            <Alert severity="error">{errorAnnouncements}</Alert>
+          ) : announcements.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" align="center" py={4}>
+              現在、お知らせはありません
+            </Typography>
+          ) : (
+            <Stack spacing={2}>
+              {announcements.map((announcement, index) => (
+                <React.Fragment key={announcement.id}>
+                  <CardActionArea onClick={() => handleCardClick(announcement)}>
                     <Box
                       sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        color: 'text.secondary',
-                        fontSize: '0.6rem',
-                        fontWeight: 600,
-                        letterSpacing: '0.05em',
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: announcement.is_important ? '#FEF2F2' : '#F0F9FF',
+                        border: '1px solid',
+                        borderColor: announcement.is_important ? '#FECACA' : '#BAE6FD',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          transform: 'translateX(4px)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        },
                       }}
                     >
-                      SPONSORED
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box
-                        component="img"
-                        src={sellerSponsoredAds[0].image_url}
-                        alt={sellerSponsoredAds[0].title}
-                        sx={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: 1,
-                          objectFit: 'cover',
-                        }}
-                      />
-                      <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                            {sellerSponsoredAds[0].title}
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                        <Avatar
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            bgcolor: announcement.is_important ? '#EF4444' : '#3B82F6',
+                          }}
+                        >
+                          {announcement.is_important ? <NewReleasesIcon sx={{ fontSize: 20 }} /> : <InfoIcon sx={{ fontSize: 20 }} />}
+                        </Avatar>
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              {announcement.title}
+                            </Typography>
+                            {new Date(announcement.published_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) && (
+                              <Chip
+                                label="NEW"
+                                size="small"
+                                color="error"
+                                sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
+                              />
+                            )}
+                          </Box>
+                          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                            {announcement.content.length > 100 ? announcement.content.substring(0, 100) + '...' : announcement.content}
                           </Typography>
-                          {sellerSponsoredAds[0].badge && (
-                            <Chip
-                              label={sellerSponsoredAds[0].badge}
-                              size="small"
-                              sx={{
-                                height: 18,
-                                fontSize: '0.6rem',
-                                fontWeight: 600,
-                                bgcolor: '#FEF3C7',
-                                color: '#B45309',
-                              }}
-                            />
-                          )}
-                        </Box>
-                        <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
-                          {sellerSponsoredAds[0].description}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
                           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            提供: {sellerSponsoredAds[0].advertiser}
+                            公開日時: {formatDate(announcement.published_at)}
                           </Typography>
-                          <OpenInNewIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                         </Box>
                       </Box>
                     </Box>
-                  </Box>
-                )}
-              </React.Fragment>
-            ))}
-          </Box>
+                  </CardActionArea>
+
+                  {/* 2番目のお知らせの後に広告を挿入 */}
+                  {index === 1 && sellerSponsoredAds.length > 0 && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: '#FAFAFA',
+                        border: '1px solid',
+                        borderColor: 'grey.200',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        '&:hover': {
+                          bgcolor: 'grey.100',
+                        },
+                      }}
+                      component="a"
+                      href={sellerSponsoredAds[0].link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          color: 'text.secondary',
+                          fontSize: '0.6rem',
+                          fontWeight: 600,
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        SPONSORED
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box
+                          component="img"
+                          src={sellerSponsoredAds[0].image_url}
+                          alt={sellerSponsoredAds[0].title}
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            objectFit: 'cover',
+                          }}
+                        />
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              {sellerSponsoredAds[0].title}
+                            </Typography>
+                            {sellerSponsoredAds[0].badge && (
+                              <Chip
+                                label={sellerSponsoredAds[0].badge}
+                                size="small"
+                                sx={{
+                                  height: 18,
+                                  fontSize: '0.6rem',
+                                  fontWeight: 600,
+                                  bgcolor: '#FEF3C7',
+                                  color: '#B45309',
+                                }}
+                              />
+                            )}
+                          </Box>
+                          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
+                            {sellerSponsoredAds[0].description}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              提供: {sellerSponsoredAds[0].advertiser}
+                            </Typography>
+                            <OpenInNewIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+                </React.Fragment>
+              ))}
+            </Stack>
+          )}
         </CardContent>
       </Card>
 
@@ -396,52 +557,58 @@ export default function SellerDashboard() {
                 </Typography>
               </Box>
 
-              {upcomingAuctions.map((auction) => (
-                <Box
-                  key={auction.id}
-                  sx={{
-                    p: 2,
-                    mb: 2,
-                    borderRadius: 2,
-                    bgcolor: auction.status === 'accepting' ? '#F0FDF4' : 'grey.50',
-                    border: '1px solid',
-                    borderColor: auction.status === 'accepting' ? '#059669' : 'grey.200',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                        {auction.title}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        開催日: {new Date(auction.date).toLocaleDateString('ja-JP')}
-                      </Typography>
+              {upcomingAuctions.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" align="center" py={4}>
+                  現在、開催予定のオークションはありません
+                </Typography>
+              ) : (
+                upcomingAuctions.map((auction) => (
+                  <Box
+                    key={auction.id}
+                    sx={{
+                      p: 2,
+                      mb: 2,
+                      borderRadius: 2,
+                      bgcolor: auction.status === 'accepting' ? '#F0FDF4' : 'grey.50',
+                      border: '1px solid',
+                      borderColor: auction.status === 'accepting' ? '#059669' : 'grey.200',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {auction.title}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          開催日: {new Date(auction.date).toLocaleDateString('ja-JP')}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        size="small"
+                        label={auction.status === 'accepting' ? '受付中' : '受付前'}
+                        sx={{
+                          bgcolor: auction.status === 'accepting' ? '#059669' : '#64748B',
+                          color: 'white',
+                          fontWeight: 600,
+                        }}
+                      />
                     </Box>
-                    <Chip
-                      size="small"
-                      label={auction.status === 'accepting' ? '受付中' : '受付前'}
-                      sx={{
-                        bgcolor: auction.status === 'accepting' ? '#059669' : '#64748B',
-                        color: 'white',
-                        fontWeight: 600,
-                      }}
-                    />
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      出品申込締切: {new Date(auction.deadline).toLocaleDateString('ja-JP')}
+                    </Typography>
+                    {auction.status === 'accepting' && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{ mt: 1.5 }}
+                        onClick={() => navigate('/seller/submit')}
+                      >
+                        出品申込へ
+                      </Button>
+                    )}
                   </Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    出品申込締切: {new Date(auction.deadline).toLocaleDateString('ja-JP')}
-                  </Typography>
-                  {auction.status === 'accepting' && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      sx={{ mt: 1.5 }}
-                      onClick={() => navigate('/seller/submit')}
-                    >
-                      出品申込へ
-                    </Button>
-                  )}
-                </Box>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -459,56 +626,198 @@ export default function SellerDashboard() {
                 </Button>
               </Box>
 
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>品種名</TableCell>
-                      <TableCell>オークション</TableCell>
-                      <TableCell align="center">ステータス</TableCell>
-                      <TableCell align="right">落札価格</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentItems.map((item) => (
-                      <TableRow key={item.id} hover>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {item.species_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                            {item.auction}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            size="small"
-                            label={item.status === 'sold' ? '落札済' : '発送中'}
-                            sx={{
-                              bgcolor: item.status === 'sold' ? '#ECFDF5' : '#FEF3C7',
-                              color: item.status === 'sold' ? '#059669' : '#F59E0B',
-                              fontWeight: 600,
-                              fontSize: '0.7rem',
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            ¥{item.price.toLocaleString()}
-                          </Typography>
-                        </TableCell>
+              {recentItems.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" align="center" py={4}>
+                  まだ出品がありません
+                </Typography>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>品種名</TableCell>
+                        <TableCell>オークション</TableCell>
+                        <TableCell align="center">ステータス</TableCell>
+                        <TableCell align="right">落札価格</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {recentItems.slice(0, 5).map((item) => (
+                        <TableRow key={item.id} hover>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.species_name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                              {item.auction}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              size="small"
+                              label={getStatusLabel(item.status)}
+                              sx={{
+                                ...getStatusColor(item.status),
+                                fontWeight: 600,
+                                fontSize: '0.7rem',
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            {item.final_price ? (
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                ¥{item.final_price.toLocaleString()}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                -
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      {/* 詳細ダイアログ */}
+      <Dialog
+        open={detailOpen}
+        onClose={handleCloseDetail}
+        maxWidth="md"
+        fullWidth
+      >
+        {selectedAnnouncement && (
+          <>
+            <DialogTitle>
+              {selectedAnnouncement.is_important && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  重要なお知らせ
+                </Alert>
+              )}
+              <Typography variant="h6">
+                {selectedAnnouncement.title}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                公開日時: {formatDate(selectedAnnouncement.published_at)}
+              </Typography>
+            </DialogTitle>
+            <DialogContent dividers>
+              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                {selectedAnnouncement.content}
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDetail}>閉じる</Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* 全お知らせ一覧ダイアログ */}
+      <Dialog
+        open={allAnnouncementsOpen}
+        onClose={handleCloseAllAnnouncements}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CampaignIcon />
+            すべてのお知らせ
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {loadingAnnouncements && allAnnouncements.length === 0 ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : errorAnnouncements ? (
+            <Alert severity="error">{errorAnnouncements}</Alert>
+          ) : allAnnouncements.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" align="center" py={4}>
+              現在、お知らせはありません
+            </Typography>
+          ) : (
+            <Stack spacing={2}>
+              {allAnnouncements.map((announcement) => (
+                <Card
+                  key={announcement.id}
+                  sx={{
+                    border: announcement.is_important ? 2 : 0,
+                    borderColor: 'error.main',
+                    bgcolor: announcement.is_important ? 'error.50' : 'background.paper',
+                  }}
+                >
+                  <CardActionArea onClick={() => handleCardClick(announcement)}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                        {announcement.is_important && (
+                          <Chip label="重要" size="small" color="error" />
+                        )}
+                        <Typography
+                          variant="h6"
+                          component="div"
+                          sx={{
+                            flex: 1,
+                            fontWeight: announcement.is_important ? 600 : 500,
+                          }}
+                        >
+                          {announcement.title}
+                        </Typography>
+                      </Box>
+                      
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          mb: 1,
+                        }}
+                      >
+                        {announcement.content}
+                      </Typography>
+                      
+                      <Typography variant="caption" color="text.secondary">
+                        公開日時: {formatDate(announcement.published_at)}
+                      </Typography>
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              ))}
+
+              {allAnnouncementsLastPage > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                  <Pagination
+                    count={allAnnouncementsLastPage}
+                    page={allAnnouncementsCurrentPage}
+                    onChange={(_, page) => setAllAnnouncementsCurrentPage(page)}
+                    color="primary"
+                  />
+                </Box>
+              )}
+
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                全{allAnnouncementsTotal}件
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAllAnnouncements}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
-

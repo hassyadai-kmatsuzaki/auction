@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -7,10 +7,20 @@ import {
   Button,
   TextField,
   Grid,
-  Divider,
   Alert,
   Avatar,
   Chip,
+  CircularProgress,
+  Snackbar,
+  Tabs,
+  Tab,
+  FormControlLabel,
+  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Divider,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -18,76 +28,268 @@ import {
   Store as StoreIcon,
   Instagram as InstagramIcon,
   Language as WebIcon,
+  AccountBalance as BankIcon,
+  Notifications as NotificationsIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div role="tabpanel" hidden={value !== index} {...other}>
+      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+interface SellerProfile {
+  id: number;
+  seller_code: string;
+  seller_name: string;
+  corporate_name: string | null;
+  business_type: string | null;
+  business_registration_number: string | null;
+  contact_name: string;
+  email: string;
+  phone: string;
+  postal_code: string | null;
+  prefecture: string | null;
+  city: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  instagram: string | null;
+  twitter: string | null;
+  youtube: string | null;
+  website: string | null;
+  other_sns: string | null;
+  sales_channels: string | null;
+  event_history: string | null;
+  event_hosting: string | null;
+  shop_address: string | null;
+  notes: string | null;
+  bank_name: string | null;
+  bank_branch: string | null;
+  account_type: string | null;
+  account_number: string | null;
+  account_holder: string | null;
+  notification_settings: {
+    email_new_auction?: boolean;
+    email_item_sold?: boolean;
+    email_payment_received?: boolean;
+    email_shipping_reminder?: boolean;
+  } | null;
+  display_settings: {
+    show_sns?: boolean;
+    show_sales_channels?: boolean;
+    show_event_history?: boolean;
+  } | null;
+}
 
 export default function SellerProfile() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [formData, setFormData] = useState({
-    // 基本情報
-    seller_id: 'S-0001',
-    trade_name: '田中養魚場',
+    seller_name: '',
     corporate_name: '',
-    representative_name: '田中太郎',
-    
-    // 連絡先
-    email: 'tanaka@example.com',
-    phone: '090-1234-5678',
-    postal_code: '140-0001',
-    address: '東京都品川区xxx 1-2-3',
-    
-    // SNS・Web
-    instagram: '@tanaka_medaka',
+    business_type: '',
+    business_registration_number: '',
+    contact_name: '',
+    email: '',
+    phone: '',
+    postal_code: '',
+    prefecture: '',
+    city: '',
+    address_line1: '',
+    address_line2: '',
+    instagram: '',
     twitter: '',
     youtube: '',
-    website: 'https://tanaka-medaka.example.com',
+    website: '',
     other_sns: '',
-    
-    // 事業者情報
-    business_registration_number: '12345678901234',
-    business_type: '個人事業主',
-    
-    // 任意情報
-    sales_channels: 'ヤフオク、メルカリ、自社EC',
-    event_history: '2024年 全国メダカ品評会出展',
-    event_hosting: '2023年 東京メダカ交換会主催',
+    sales_channels: '',
+    event_history: '',
+    event_hosting: '',
     shop_address: '',
-    
-    // 備考
-    notes: 'まじり無し品質管理徹底。生後6ヶ月以上の成魚のみ出品。',
+    notes: '',
   });
+
+  const [bankData, setBankData] = useState({
+    bank_name: '',
+    bank_branch: '',
+    account_type: 'savings',
+    account_number: '',
+    account_holder: '',
+  });
+
+  const [notificationSettings, setNotificationSettings] = useState({
+    email_new_auction: true,
+    email_item_sold: true,
+    email_payment_received: true,
+    email_shipping_reminder: true,
+  });
+
+  const [displaySettings, setDisplaySettings] = useState({
+    show_sns: true,
+    show_sales_channels: true,
+    show_event_history: true,
+  });
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/seller/profile');
+      if (response.data.success) {
+        const p = response.data.data.profile;
+        setProfile(p);
+        setFormData({
+          seller_name: p.seller_name || '',
+          corporate_name: p.corporate_name || '',
+          business_type: p.business_type || '',
+          business_registration_number: p.business_registration_number || '',
+          contact_name: p.contact_name || '',
+          email: p.email || '',
+          phone: p.phone || '',
+          postal_code: p.postal_code || '',
+          prefecture: p.prefecture || '',
+          city: p.city || '',
+          address_line1: p.address_line1 || '',
+          address_line2: p.address_line2 || '',
+          instagram: p.instagram || '',
+          twitter: p.twitter || '',
+          youtube: p.youtube || '',
+          website: p.website || '',
+          other_sns: p.other_sns || '',
+          sales_channels: p.sales_channels || '',
+          event_history: p.event_history || '',
+          event_hosting: p.event_hosting || '',
+          shop_address: p.shop_address || '',
+          notes: p.notes || '',
+        });
+        setBankData({
+          bank_name: p.bank_name || '',
+          bank_branch: p.bank_branch || '',
+          account_type: p.account_type || 'savings',
+          account_number: p.account_number || '',
+          account_holder: p.account_holder || '',
+        });
+        if (p.notification_settings) {
+          setNotificationSettings({
+            email_new_auction: p.notification_settings.email_new_auction ?? true,
+            email_item_sold: p.notification_settings.email_item_sold ?? true,
+            email_payment_received: p.notification_settings.email_payment_received ?? true,
+            email_shipping_reminder: p.notification_settings.email_shipping_reminder ?? true,
+          });
+        }
+        if (p.display_settings) {
+          setDisplaySettings({
+            show_sns: p.display_settings.show_sns ?? true,
+            show_sales_channels: p.display_settings.show_sales_channels ?? true,
+            show_event_history: p.display_settings.show_event_history ?? true,
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('プロフィール取得エラー:', err);
+      setSnackbar({ open: true, message: 'プロフィールの取得に失敗しました。', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [field]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert('プロフィールを保存しました');
+  const handleBankChange = (field: string) => (e: any) => {
+    setBankData({ ...bankData, [field]: e.target.value });
   };
+
+  const handleSaveProfile = async () => {
+    try {
+      setSaving(true);
+      await axios.put('/api/seller/profile', formData);
+      setSnackbar({ open: true, message: 'プロフィールを保存しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveBank = async () => {
+    try {
+      setSaving(true);
+      await axios.put('/api/seller/profile/bank', bankData);
+      setSnackbar({ open: true, message: '口座情報を保存しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    try {
+      setSaving(true);
+      await axios.put('/api/seller/profile/notifications', notificationSettings);
+      setSnackbar({ open: true, message: '通知設定を保存しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveDisplay = async () => {
+    try {
+      setSaving(true);
+      await axios.put('/api/seller/profile/display', displaySettings);
+      setSnackbar({ open: true, message: '表示設定を保存しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
       {/* ヘッダー */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            出品者情報
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            出品者として表示される情報を管理します
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<SaveIcon />}
-          onClick={handleSubmit}
-        >
-          保存
-        </Button>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          出品者情報・設定
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          出品者として表示される情報と各種設定を管理します
+        </Typography>
       </Box>
 
       <Grid container spacing={3}>
         {/* 左側：プロフィールカード */}
-        <Grid item xs={12} lg={4}>
+        <Grid item xs={12} lg={3}>
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ p: 3, textAlign: 'center' }}>
               <Avatar
@@ -100,45 +302,56 @@ export default function SellerProfile() {
                   mb: 2,
                 }}
               >
-                {formData.trade_name.charAt(0)}
+                {formData.seller_name.charAt(0)}
               </Avatar>
               <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                {formData.trade_name}
+                {formData.seller_name}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                {formData.representative_name}
+                {formData.contact_name}
               </Typography>
-              <Chip label={formData.seller_id} size="small" sx={{ bgcolor: '#F0FDF4', color: '#059669' }} />
+              <Chip label={profile?.seller_code || ''} size="small" sx={{ bgcolor: '#F0FDF4', color: '#059669' }} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                SNS・Webサイト
-              </Typography>
-              {formData.instagram && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                  <InstagramIcon sx={{ color: '#E4405F', fontSize: 20 }} />
-                  <Typography variant="body2">{formData.instagram}</Typography>
-                </Box>
-              )}
-              {formData.website && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <WebIcon sx={{ color: '#64748B', fontSize: 20 }} />
-                  <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{formData.website}</Typography>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
+          {(formData.instagram || formData.website) && (
+            <Card>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                  SNS・Webサイト
+                </Typography>
+                {formData.instagram && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <InstagramIcon sx={{ color: '#E4405F', fontSize: 20 }} />
+                    <Typography variant="body2">{formData.instagram}</Typography>
+                  </Box>
+                )}
+                {formData.website && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WebIcon sx={{ color: '#64748B', fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{formData.website}</Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </Grid>
 
-        {/* 右側：フォーム */}
-        <Grid item xs={12} lg={8}>
-          <Box component="form" onSubmit={handleSubmit}>
-            {/* 基本情報 */}
-            <Card sx={{ mb: 3 }}>
+        {/* 右側：タブ */}
+        <Grid item xs={12} lg={9}>
+          <Card>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+                <Tab icon={<StoreIcon />} label="基本情報" iconPosition="start" />
+                <Tab icon={<BankIcon />} label="口座情報" iconPosition="start" />
+                <Tab icon={<SettingsIcon />} label="設定" iconPosition="start" />
+              </Tabs>
+            </Box>
+
+            {/* 基本情報タブ */}
+            <TabPanel value={tabValue} index={0}>
               <CardContent sx={{ p: 3 }}>
+                {/* 基本情報 */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <StoreIcon sx={{ color: '#059669' }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -152,8 +365,8 @@ export default function SellerProfile() {
                       fullWidth
                       required
                       label="屋号・店舗名"
-                      value={formData.trade_name}
-                      onChange={handleChange('trade_name')}
+                      value={formData.seller_name}
+                      onChange={handleChange('seller_name')}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -170,8 +383,8 @@ export default function SellerProfile() {
                       fullWidth
                       required
                       label="代表者名"
-                      value={formData.representative_name}
-                      onChange={handleChange('representative_name')}
+                      value={formData.contact_name}
+                      onChange={handleChange('contact_name')}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -184,12 +397,10 @@ export default function SellerProfile() {
                     />
                   </Grid>
                 </Grid>
-              </CardContent>
-            </Card>
 
-            {/* 連絡先 */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
+                <Divider sx={{ my: 4 }} />
+
+                {/* 連絡先 */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <PersonIcon sx={{ color: '#3B82F6' }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -217,31 +428,51 @@ export default function SellerProfile() {
                       onChange={handleChange('phone')}
                     />
                   </Grid>
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
-                      required
                       label="郵便番号"
                       value={formData.postal_code}
                       onChange={handleChange('postal_code')}
                     />
                   </Grid>
-                  <Grid item xs={12} md={8}>
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
-                      required
-                      label="住所"
-                      value={formData.address}
-                      onChange={handleChange('address')}
+                      label="都道府県"
+                      value={formData.prefecture}
+                      onChange={handleChange('prefecture')}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="市区町村"
+                      value={formData.city}
+                      onChange={handleChange('city')}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="住所1"
+                      value={formData.address_line1}
+                      onChange={handleChange('address_line1')}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="住所2（建物名など）"
+                      value={formData.address_line2}
+                      onChange={handleChange('address_line2')}
                     />
                   </Grid>
                 </Grid>
-              </CardContent>
-            </Card>
 
-            {/* SNS・Web */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
+                <Divider sx={{ my: 4 }} />
+
+                {/* SNS・Web */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <InstagramIcon sx={{ color: '#E4405F' }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -296,12 +527,10 @@ export default function SellerProfile() {
                     />
                   </Grid>
                 </Grid>
-              </CardContent>
-            </Card>
 
-            {/* 事業者情報 */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
+                <Divider sx={{ my: 4 }} />
+
+                {/* 事業者情報 */}
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                   事業者登録情報
                 </Typography>
@@ -314,7 +543,6 @@ export default function SellerProfile() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      required
                       label="事業者登録番号"
                       value={formData.business_registration_number}
                       onChange={handleChange('business_registration_number')}
@@ -322,12 +550,10 @@ export default function SellerProfile() {
                     />
                   </Grid>
                 </Grid>
-              </CardContent>
-            </Card>
 
-            {/* 任意情報 */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
+                <Divider sx={{ my: 4 }} />
+
+                {/* 任意情報 */}
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
                   任意情報
                 </Typography>
@@ -343,7 +569,6 @@ export default function SellerProfile() {
                       value={formData.sales_channels}
                       onChange={handleChange('sales_channels')}
                       placeholder="ヤフオク、メルカリ、自社ECなど"
-                      helperText="他に出品している場所があれば"
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -381,27 +606,262 @@ export default function SellerProfile() {
                       value={formData.notes}
                       onChange={handleChange('notes')}
                       placeholder="まじり有無、品質管理、出荷時期など"
-                      helperText="出品時に参照される情報"
                     />
                   </Grid>
                 </Grid>
-              </CardContent>
-            </Card>
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                startIcon={<SaveIcon />}
-              >
-                変更を保存
-              </Button>
-            </Box>
-          </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                    onClick={handleSaveProfile}
+                    disabled={saving}
+                  >
+                    変更を保存
+                  </Button>
+                </Box>
+              </CardContent>
+            </TabPanel>
+
+            {/* 口座情報タブ */}
+            <TabPanel value={tabValue} index={1}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <BankIcon sx={{ color: '#059669' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    振込先口座情報
+                  </Typography>
+                </Box>
+
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  落札代金の振込先として使用されます。正確にご入力ください。
+                </Alert>
+
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="銀行名"
+                      value={bankData.bank_name}
+                      onChange={handleBankChange('bank_name')}
+                      placeholder="○○銀行"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="支店名"
+                      value={bankData.bank_branch}
+                      onChange={handleBankChange('bank_branch')}
+                      placeholder="○○支店"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <FormControl fullWidth required>
+                      <InputLabel>口座種別</InputLabel>
+                      <Select
+                        value={bankData.account_type}
+                        label="口座種別"
+                        onChange={handleBankChange('account_type')}
+                      >
+                        <MenuItem value="savings">普通</MenuItem>
+                        <MenuItem value="checking">当座</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="口座番号"
+                      value={bankData.account_number}
+                      onChange={handleBankChange('account_number')}
+                      placeholder="1234567"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="口座名義（カナ）"
+                      value={bankData.account_holder}
+                      onChange={handleBankChange('account_holder')}
+                      placeholder="タナカ タロウ"
+                    />
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                    onClick={handleSaveBank}
+                    disabled={saving}
+                  >
+                    口座情報を保存
+                  </Button>
+                </Box>
+              </CardContent>
+            </TabPanel>
+
+            {/* 設定タブ */}
+            <TabPanel value={tabValue} index={2}>
+              <CardContent sx={{ p: 3 }}>
+                {/* 通知設定 */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <NotificationsIcon sx={{ color: '#F59E0B' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    通知設定
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notificationSettings.email_new_auction}
+                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_new_auction: e.target.checked })}
+                      />
+                    }
+                    label="新規オークション開催のお知らせ"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
+                    新しいオークションが開催される際にメールでお知らせします
+                  </Typography>
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notificationSettings.email_item_sold}
+                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_item_sold: e.target.checked })}
+                      />
+                    }
+                    label="出品商品の落札通知"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
+                    出品した商品が落札された際にメールでお知らせします
+                  </Typography>
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notificationSettings.email_payment_received}
+                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_payment_received: e.target.checked })}
+                      />
+                    }
+                    label="入金確認通知"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
+                    落札者からの入金が確認された際にメールでお知らせします
+                  </Typography>
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notificationSettings.email_shipping_reminder}
+                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_shipping_reminder: e.target.checked })}
+                      />
+                    }
+                    label="発送リマインダー"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6 }}>
+                    発送期限が近づいた際にリマインドメールを送信します
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                    onClick={handleSaveNotifications}
+                    disabled={saving}
+                  >
+                    通知設定を保存
+                  </Button>
+                </Box>
+
+                <Divider sx={{ my: 4 }} />
+
+                {/* 表示設定 */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <SettingsIcon sx={{ color: '#8B5CF6' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    プロフィール表示設定
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={displaySettings.show_sns}
+                        onChange={(e) => setDisplaySettings({ ...displaySettings, show_sns: e.target.checked })}
+                      />
+                    }
+                    label="SNS情報を公開する"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
+                    Instagram、Twitter等のSNS情報を出品者プロフィールに表示します
+                  </Typography>
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={displaySettings.show_sales_channels}
+                        onChange={(e) => setDisplaySettings({ ...displaySettings, show_sales_channels: e.target.checked })}
+                      />
+                    }
+                    label="販売チャネルを公開する"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
+                    他の販売チャネル情報を出品者プロフィールに表示します
+                  </Typography>
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={displaySettings.show_event_history}
+                        onChange={(e) => setDisplaySettings({ ...displaySettings, show_event_history: e.target.checked })}
+                      />
+                    }
+                    label="イベント履歴を公開する"
+                  />
+                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6 }}>
+                    イベント出店・開催歴を出品者プロフィールに表示します
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                    onClick={handleSaveDisplay}
+                    disabled={saving}
+                  >
+                    表示設定を保存
+                  </Button>
+                </Box>
+              </CardContent>
+            </TabPanel>
+          </Card>
         </Grid>
       </Grid>
+
+      {/* スナックバー */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
-

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -10,18 +10,19 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Chip,
   IconButton,
   Button,
   TextField,
   InputAdornment,
-  Card,
-  CardContent,
-  Avatar,
-  Tabs,
-  Tab,
-  Menu,
+  FormControl,
+  InputLabel,
+  Select,
   MenuItem,
+  CircularProgress,
+  Alert,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -30,352 +31,387 @@ import {
 import {
   Search as SearchIcon,
   Visibility as VisibilityIcon,
-  Edit as EditIcon,
-  MoreVert as MoreVertIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Store as StoreIcon,
-  Add as AddIcon,
-  FileDownload as ExportIcon,
+  Refresh as RefreshIcon,
+  PersonAdd as PersonAddIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
-// Mock データ
-const sellers = [
-  {
-    id: 1,
-    name: '田中養魚場',
-    representative: '田中太郎',
-    email: 'tanaka@example.com',
-    phone: '090-1234-5678',
-    address: '東京都品川区xxx',
-    status: 'approved',
-    commission_rate: 10,
-    total_items: 45,
-    total_sales: 580000,
-    created_at: '2025-08-15T10:00:00Z',
-  },
-  {
-    id: 2,
-    name: 'メダカの佐藤',
-    representative: '佐藤花子',
-    email: 'sato@example.com',
-    phone: '090-2345-6789',
-    address: '埼玉県さいたま市xxx',
-    status: 'pending',
-    commission_rate: 10,
-    total_items: 0,
-    total_sales: 0,
-    created_at: '2025-11-10T15:00:00Z',
-  },
-  {
-    id: 3,
-    name: '鈴木メダカファーム',
-    representative: '鈴木一郎',
-    email: 'suzuki@example.com',
-    phone: '090-3456-7890',
-    address: '千葉県千葉市xxx',
-    status: 'approved',
-    commission_rate: 8,
-    total_items: 120,
-    total_sales: 1250000,
-    created_at: '2025-06-20T11:00:00Z',
-  },
-  {
-    id: 4,
-    name: '高橋養殖',
-    representative: '高橋美咲',
-    email: 'takahashi@example.com',
-    phone: '090-4567-8901',
-    address: '神奈川県横浜市xxx',
-    status: 'suspended',
-    commission_rate: 10,
-    total_items: 30,
-    total_sales: 320000,
-    created_at: '2025-07-05T09:00:00Z',
-  },
-];
+interface Role {
+  id: number;
+  name: string;
+  display_name: string;
+}
 
-// KPIカードコンポーネント
-function StatCard({ title, value, icon, color }: { title: string; value: string | number; icon: React.ReactNode; color: string }) {
-  return (
-    <Card sx={{ height: '100%' }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-              {title}
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {value}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 2,
-              bgcolor: `${color}15`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: color,
-            }}
-          >
-            {icon}
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
-  );
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  status: 'pending' | 'approved' | 'suspended' | 'rejected';
+  is_active: boolean;
+  roles: Role[];
+  last_login_at: string | null;
+  created_at: string;
+}
+
+interface PaginatedResponse {
+  current_page: number;
+  data: User[];
+  total: number;
+  per_page: number;
+  last_page: number;
 }
 
 export default function SellerManagement() {
   const navigate = useNavigate();
-  const [tabValue, setTabValue] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedSeller, setSelectedSeller] = useState<typeof sellers[0] | null>(null);
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  // ページネーション
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [total, setTotal] = useState(0);
+  
+  // フィルタ
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  
+  // 権限付与ダイアログ
+  const [grantDialogOpen, setGrantDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const filteredSellers = sellers.filter((seller) => {
-    const matchesSearch =
-      seller.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      seller.representative.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      seller.email.toLowerCase().includes(searchQuery.toLowerCase());
+  useEffect(() => {
+    fetchUsers();
+  }, [page, rowsPerPage, statusFilter]);
 
-    if (tabValue === 0) return matchesSearch;
-    if (tabValue === 1) return matchesSearch && seller.status === 'pending';
-    if (tabValue === 2) return matchesSearch && seller.status === 'approved';
-    if (tabValue === 3) return matchesSearch && seller.status === 'suspended';
-    return matchesSearch;
-  });
+  const fetchUsers = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const params = new URLSearchParams({
+        page: String(page + 1),
+        per_page: String(rowsPerPage),
+        role: 'seller', // 出品者のみ取得
+      });
 
-  const pendingCount = sellers.filter((s) => s.status === 'pending').length;
-  const approvedCount = sellers.filter((s) => s.status === 'approved').length;
-  const suspendedCount = sellers.filter((s) => s.status === 'suspended').length;
+      if (search) params.append('search', search);
+      if (statusFilter) params.append('status', statusFilter);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, seller: typeof sellers[0]) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedSeller(seller);
+      const response = await axios.get(`/api/admin/users?${params.toString()}`);
+      
+      if (response.data.success) {
+        const data: PaginatedResponse = response.data.data;
+        setUsers(data.data);
+        setTotal(data.total);
+      }
+    } catch (err: any) {
+      console.error('出品者一覧取得エラー:', err);
+      setError(err.response?.data?.message || '出品者一覧の取得に失敗しました');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
+  const handleSearch = () => {
+    setPage(0);
+    fetchUsers();
   };
 
-  const handleApprove = () => {
-    setApproveDialogOpen(true);
-    handleMenuClose();
+  const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
-  const getStatusChip = (status: string) => {
-    const config = {
-      pending: { label: '承認待ち', color: '#F59E0B', bgcolor: '#FEF3C7' },
-      approved: { label: '有効', color: '#059669', bgcolor: '#ECFDF5' },
-      suspended: { label: '停止中', color: '#DC2626', bgcolor: '#FEF2F2' },
-    }[status] || { label: status, color: '#64748B', bgcolor: '#F1F5F9' };
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
 
-    return (
-      <Chip
-        size="small"
-        label={config.label}
-        sx={{
-          bgcolor: config.bgcolor,
-          color: config.color,
-          fontWeight: 600,
-          fontSize: '0.75rem',
-        }}
-      />
-    );
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleGrantParticipantRole = async () => {
+    if (!selectedUser) return;
+
+    try {
+      // 現在のロールに participant を追加
+      const newRoles = [...selectedUser.roles.map(r => r.name), 'participant'];
+      
+      const response = await axios.put(`/api/admin/users/${selectedUser.id}`, {
+        roles: newRoles,
+      });
+      
+      if (response.data.success) {
+        setSuccess(`${selectedUser.name} さんに参加者権限を付与しました`);
+        setGrantDialogOpen(false);
+        setSelectedUser(null);
+        fetchUsers();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || '権限の付与に失敗しました');
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: '申請中',
+      approved: '承認済み',
+      suspended: '停止中',
+      rejected: '拒否',
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {
+      pending: 'default',
+      approved: 'success',
+      suspended: 'warning',
+      rejected: 'error',
+    };
+    return colors[status] || 'default';
+  };
+
+  const hasParticipantRole = (user: User) => {
+    return user.roles.some(r => r.name === 'participant');
   };
 
   return (
     <Box>
-      {/* ヘッダー */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            出品者登録一覧
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            出品者の登録情報を管理します
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
-          <Button variant="outlined" startIcon={<ExportIcon />}>
-            エクスポート
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />}>
-            新規登録
-          </Button>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4">
+          出品者登録一覧
+        </Typography>
+        <Button
+          variant="contained"
+          color="secondary"
+          startIcon={<PersonAddIcon />}
+          onClick={() => navigate('/admin/users/create?role=seller')}
+        >
+          新規作成
+        </Button>
       </Box>
 
-      {/* KPIカード */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, mb: 4 }}>
-        <StatCard title="総出品者数" value={sellers.length} icon={<StoreIcon />} color="#3B82F6" />
-        <StatCard title="承認待ち" value={pendingCount} icon={<CheckCircleIcon />} color="#F59E0B" />
-        <StatCard title="有効" value={approvedCount} icon={<CheckCircleIcon />} color="#059669" />
-        <StatCard title="停止中" value={suspendedCount} icon={<CancelIcon />} color="#DC2626" />
-      </Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
 
-      {/* フィルター・検索 */}
-      <Card sx={{ mb: 3 }}>
-        <Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
-            <Tab label={`すべて (${sellers.length})`} />
-            <Tab label={`承認待ち (${pendingCount})`} />
-            <Tab label={`有効 (${approvedCount})`} />
-            <Tab label={`停止中 (${suspendedCount})`} />
-          </Tabs>
-        </Box>
-        <Box sx={{ p: 2 }}>
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
+
+      {/* 検索・フィルタ */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <TextField
-            size="small"
-            placeholder="出品者名、代表者名、メールアドレスで検索..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ width: 350 }}
+            placeholder="名前・メールアドレスで検索"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyPress={handleSearchKeyPress}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                  <SearchIcon />
                 </InputAdornment>
               ),
             }}
+            sx={{ flexGrow: 1, minWidth: 300 }}
           />
+          
+          <FormControl sx={{ minWidth: 150 }}>
+            <InputLabel>ステータス</InputLabel>
+            <Select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
+              label="ステータス"
+            >
+              <MenuItem value="">全て</MenuItem>
+              <MenuItem value="pending">申請中</MenuItem>
+              <MenuItem value="approved">承認済み</MenuItem>
+              <MenuItem value="suspended">停止中</MenuItem>
+              <MenuItem value="rejected">拒否</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Button
+            variant="outlined"
+            startIcon={<SearchIcon />}
+            onClick={handleSearch}
+          >
+            検索
+          </Button>
+
+          <Tooltip title="リロード">
+            <IconButton onClick={fetchUsers}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
-      </Card>
+      </Paper>
 
-      {/* テーブル */}
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>出品者名</TableCell>
-                <TableCell>代表者</TableCell>
-                <TableCell>連絡先</TableCell>
-                <TableCell align="center">手数料率</TableCell>
-                <TableCell align="right">出品数</TableCell>
-                <TableCell align="right">総売上</TableCell>
-                <TableCell align="center">ステータス</TableCell>
-                <TableCell align="center">操作</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredSellers.map((seller) => (
-                <TableRow key={seller.id} hover sx={{ cursor: 'pointer' }}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Avatar
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          bgcolor: '#F0FDF4',
-                          color: '#059669',
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        {seller.name.charAt(0)}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {seller.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          ID: {seller.id}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{seller.representative}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{seller.email}</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {seller.phone}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {seller.commission_rate}%
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {seller.total_items}点
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      ¥{seller.total_sales.toLocaleString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">{getStatusChip(seller.status)}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={() => navigate(`/admin/sellers/${seller.id}`)}
-                    >
-                      <VisibilityIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => navigate(`/admin/sellers/${seller.id}/edit`)}
-                    >
-                      <EditIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                    <IconButton size="small" onClick={(e) => handleMenuOpen(e, seller)}>
-                      <MoreVertIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </TableCell>
+      {/* ユーザー一覧テーブル */}
+      <TableContainer component={Paper}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>名前</TableCell>
+                  <TableCell>メールアドレス</TableCell>
+                  <TableCell>ロール</TableCell>
+                  <TableCell align="center">ステータス</TableCell>
+                  <TableCell>最終ログイン</TableCell>
+                  <TableCell>登録日</TableCell>
+                  <TableCell align="center">操作</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
+              </TableHead>
+              <TableBody>
+                {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        出品者が見つかりませんでした
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.id} hover>
+                      <TableCell>{user.id}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {user.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.email}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {user.roles.map((role) => (
+                            <Chip
+                              key={role.id}
+                              label={role.display_name}
+                              color={role.name === 'seller' ? 'secondary' : 'info'}
+                              size="small"
+                            />
+                          ))}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={getStatusLabel(user.status)}
+                          color={getStatusColor(user.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.last_login_at
+                            ? new Date(user.last_login_at).toLocaleString('ja-JP', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {new Date(user.created_at).toLocaleString('ja-JP', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                          })}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="詳細">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => navigate(`/admin/users/${user.id}`)}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {!hasParticipantRole(user) && user.status === 'approved' && (
+                          <Tooltip title="参加者権限を付与">
+                            <IconButton
+                              size="small"
+                              color="info"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setGrantDialogOpen(true);
+                              }}
+                            >
+                              <PersonIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            <TablePagination
+              component="div"
+              count={total}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              labelRowsPerPage="表示件数:"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}件`}
+            />
+          </>
+        )}
+      </TableContainer>
 
-      {/* アクションメニュー */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        {selectedSeller?.status === 'pending' && (
-          <MenuItem onClick={handleApprove}>
-            <CheckCircleIcon sx={{ mr: 1, fontSize: 18, color: 'success.main' }} />
-            承認する
-          </MenuItem>
-        )}
-        {selectedSeller?.status === 'approved' && (
-          <MenuItem onClick={handleMenuClose}>
-            <CancelIcon sx={{ mr: 1, fontSize: 18, color: 'error.main' }} />
-            停止する
-          </MenuItem>
-        )}
-        {selectedSeller?.status === 'suspended' && (
-          <MenuItem onClick={handleMenuClose}>
-            <CheckCircleIcon sx={{ mr: 1, fontSize: 18, color: 'success.main' }} />
-            再有効化
-          </MenuItem>
-        )}
-      </Menu>
-
-      {/* 承認ダイアログ */}
-      <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)}>
-        <DialogTitle>出品者を承認</DialogTitle>
+      {/* 権限付与確認ダイアログ */}
+      <Dialog open={grantDialogOpen} onClose={() => setGrantDialogOpen(false)}>
+        <DialogTitle>参加者権限の付与</DialogTitle>
         <DialogContent>
-          <Typography>
-            「{selectedSeller?.name}」を承認しますか？承認後、出品者はオークションに出品できるようになります。
+          <Typography variant="body1" gutterBottom>
+            {selectedUser?.name} さんに参加者権限を付与しますか？
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            付与後は、出品者と参加者の両方の権限を持つことになります。
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setApproveDialogOpen(false)}>キャンセル</Button>
-          <Button variant="contained" color="success" onClick={() => setApproveDialogOpen(false)}>
-            承認する
+          <Button onClick={() => setGrantDialogOpen(false)}>
+            キャンセル
+          </Button>
+          <Button onClick={handleGrantParticipantRole} variant="contained" color="info">
+            付与
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 }
-

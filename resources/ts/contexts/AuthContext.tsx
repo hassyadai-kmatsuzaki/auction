@@ -1,22 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from '../lib/axios';
+import type { Role, User } from '../types';
 
-interface Role {
-  id: number;
-  name: string;
-  display_name: string;
-}
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  status: string;
+// 認証済みユーザー型（rolesが必須）
+interface AuthUser extends Omit<User, 'roles'> {
   roles: Role[];
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,7 +23,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

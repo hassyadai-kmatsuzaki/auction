@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Console\Scheduling\Schedule;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,6 +21,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // 公開予約されたお知らせを1分ごとに自動公開
+        $schedule->command('announcements:publish-scheduled')->everyMinute();
+        
+        // 予定されたオークションを1分ごとに自動開始
+        $schedule->command('auctions:start-scheduled')->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

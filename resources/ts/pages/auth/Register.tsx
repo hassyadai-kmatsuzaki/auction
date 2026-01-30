@@ -10,8 +10,10 @@ import {
   Link,
   Alert,
   Grid,
+  CircularProgress,
 } from '@mui/material';
 import { PersonAdd as PersonAddIcon } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -19,22 +21,46 @@ export default function Register() {
     name: '',
     email: '',
     password: '',
-    passwordConfirmation: '',
+    password_confirmation: '',
     phone: '',
-    postalCode: '',
-    address: '',
+    postal_code: '',
+    prefecture: '',
+    city: '',
+    address_line1: '',
+    address_line2: '',
   });
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [field]: e.target.value });
+    // フィールドのエラーをクリア
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: [] });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Mock: 実際はAPIを呼び出す
-    setSuccess(true);
+    setLoading(true);
+    setError(null);
+    setErrors({});
+
+    try {
+      await axios.post('/api/auth/register', formData);
+      setSuccess(true);
+    } catch (err: any) {
+      console.error('登録エラー:', err);
+      if (err.response?.data?.errors) {
+        setErrors(err.response.data.errors);
+      } else {
+        setError(err.response?.data?.message || '登録に失敗しました。');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (success) {
@@ -85,6 +111,12 @@ export default function Register() {
             </Typography>
           </Box>
 
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
           <Box component="form" onSubmit={handleSubmit}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
@@ -94,6 +126,8 @@ export default function Register() {
                   value={formData.name}
                   onChange={handleChange('name')}
                   required
+                  error={!!errors.name}
+                  helperText={errors.name?.[0]}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -104,6 +138,8 @@ export default function Register() {
                   value={formData.email}
                   onChange={handleChange('email')}
                   required
+                  error={!!errors.email}
+                  helperText={errors.email?.[0]}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -114,6 +150,8 @@ export default function Register() {
                   value={formData.password}
                   onChange={handleChange('password')}
                   required
+                  error={!!errors.password}
+                  helperText={errors.password?.[0] || '8文字以上'}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -121,8 +159,8 @@ export default function Register() {
                   fullWidth
                   label="パスワード（確認）"
                   type="password"
-                  value={formData.passwordConfirmation}
-                  onChange={handleChange('passwordConfirmation')}
+                  value={formData.password_confirmation}
+                  onChange={handleChange('password_confirmation')}
                   required
                 />
               </Grid>
@@ -133,25 +171,66 @@ export default function Register() {
                   value={formData.phone}
                   onChange={handleChange('phone')}
                   placeholder="090-1234-5678"
+                  required
+                  error={!!errors.phone}
+                  helperText={errors.phone?.[0]}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="郵便番号"
-                  value={formData.postalCode}
-                  onChange={handleChange('postalCode')}
+                  value={formData.postal_code}
+                  onChange={handleChange('postal_code')}
                   placeholder="123-4567"
+                  required
+                  error={!!errors.postal_code}
+                  helperText={errors.postal_code?.[0]}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="都道府県"
+                  value={formData.prefecture}
+                  onChange={handleChange('prefecture')}
+                  placeholder="東京都"
+                  required
+                  error={!!errors.prefecture}
+                  helperText={errors.prefecture?.[0]}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="市区町村"
+                  value={formData.city}
+                  onChange={handleChange('city')}
+                  placeholder="渋谷区"
+                  required
+                  error={!!errors.city}
+                  helperText={errors.city?.[0]}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="住所"
-                  value={formData.address}
-                  onChange={handleChange('address')}
-                  multiline
-                  rows={2}
+                  label="番地"
+                  value={formData.address_line1}
+                  onChange={handleChange('address_line1')}
+                  placeholder="1-2-3"
+                  required
+                  error={!!errors.address_line1}
+                  helperText={errors.address_line1?.[0]}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="建物名・部屋番号（任意）"
+                  value={formData.address_line2}
+                  onChange={handleChange('address_line2')}
+                  placeholder="メダカハイツ101号室"
                 />
               </Grid>
             </Grid>
@@ -162,8 +241,9 @@ export default function Register() {
               variant="contained"
               size="large"
               sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
             >
-              登録申請する
+              {loading ? <CircularProgress size={24} /> : '登録申請する'}
             </Button>
           </Box>
 

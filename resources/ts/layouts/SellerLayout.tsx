@@ -24,16 +24,15 @@ import {
   Pets as PetsIcon,
   Receipt as ReceiptIcon,
   LocalShipping as ShippingIcon,
-  Person as PersonIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
-  Search as SearchIcon,
   Notifications as NotificationsIcon,
   HelpOutline as HelpIcon,
   Add as AddIcon,
   History as HistoryIcon,
-  AccountBalance as BankIcon,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 const drawerWidth = 280;
 
@@ -58,13 +57,15 @@ function Logo() {
 export default function SellerLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -77,9 +78,7 @@ export default function SellerLayout() {
   ];
 
   const bottomMenuItems = [
-    { text: '出品者情報', icon: <PersonIcon />, path: '/seller/profile' },
-    { text: '口座情報', icon: <BankIcon />, path: '/seller/bank' },
-    { text: '設定', icon: <SettingsIcon />, path: '/seller/settings' },
+    { text: '出品者情報・設定', icon: <SettingsIcon />, path: '/seller/profile' },
   ];
 
   const isPathActive = (path: string) => {
@@ -96,8 +95,11 @@ export default function SellerLayout() {
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ロゴエリア */}
-      <Box sx={{ p: 2.5, pb: 2 }}>
-        <Logo />
+      <Box sx={{ p: 2.5, pb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ flex: 1 }}>
+          <Logo />
+        </Box>
+        {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
       </Box>
 
       <Divider sx={{ mx: 2 }} />

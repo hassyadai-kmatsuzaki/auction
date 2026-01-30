@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -6,149 +6,444 @@ import {
   Paper,
   TextField,
   Button,
-  Grid,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   FormControlLabel,
-  Switch,
+  FormGroup,
+  Checkbox,
+  RadioGroup,
+  Radio,
+  FormLabel,
+  CircularProgress,
+  Alert,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
 } from '@mui/material';
-import { Save as SaveIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import {
+  Save as SaveIcon,
+  ArrowBack as ArrowBackIcon,
+  Visibility as VisibilityIcon,
+  Send as SendIcon,
+} from '@mui/icons-material';
+import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ja } from 'date-fns/locale';
+import axios from '../../lib/axios';
+
+interface FormData {
+  title: string;
+  content: string;
+  target_roles: string[];
+  is_important: boolean;
+  publish_type: 'immediate' | 'scheduled' | 'draft';
+  published_at: Date | null;
+}
 
 export default function AnnouncementForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     content: '',
-    priority: 'normal',
-    is_published: false,
-    published_at: '',
-    expires_at: '',
+    target_roles: ['participant'],
+    is_important: false,
+    publish_type: 'immediate',
+    published_at: null,
   });
 
-  const handleChange = (field: string) => (e: any) => {
-    setFormData({ ...formData, [field]: e.target.value });
+  const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(isEdit);
+  const [error, setError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [canEdit, setCanEdit] = useState(true);
+
+  useEffect(() => {
+    if (isEdit) {
+      fetchAnnouncement();
+    }
+  }, [id]);
+
+  const fetchAnnouncement = async () => {
+    try {
+      setFetchLoading(true);
+      const response = await axios.get(`/api/admin/announcements/${id}`);
+      
+      if (response.data.success) {
+        const announcement = response.data.data.announcement;
+        
+        // 公開済みの場合は編集不可
+        if (announcement.status === 'published') {
+          setCanEdit(false);
+        }
+        
+        let publishType: 'immediate' | 'scheduled' | 'draft' = 'draft';
+        if (announcement.status === 'published') {
+          publishType = 'immediate';
+        } else if (announcement.status === 'scheduled') {
+          publishType = 'scheduled';
+        }
+        
+        setFormData({
+          title: announcement.title,
+          content: announcement.content,
+          target_roles: announcement.target_roles,
+          is_important: announcement.is_important,
+          publish_type: publishType,
+          published_at: announcement.published_at ? new Date(announcement.published_at) : null,
+        });
+      }
+    } catch (err: any) {
+      console.error('お知らせ取得エラー:', err);
+      setError(err.response?.data?.message || 'お知らせの取得に失敗しました。');
+    } finally {
+      setFetchLoading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Mock: 実際はAPIを呼び出す
-    navigate('/admin/announcements');
+  const handleTargetRoleChange = (role: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      target_roles: prev.target_roles.includes(role)
+        ? prev.target_roles.filter((r) => r !== role)
+        : [...prev.target_roles, role],
+    }));
   };
+
+  const validate = (): string | null => {
+    if (!formData.title.trim()) {
+      return 'タイトルを入力してください。';
+    }
+    if (formData.title.length > 200) {
+      return 'タイトルは200文字以内で入力してください。';
+    }
+    if (!formData.content.trim()) {
+      return '本文を入力してください。';
+    }
+    if (formData.target_roles.length === 0) {
+      return '対象ユーザーを選択してください。';
+    }
+    if (formData.publish_type === 'scheduled' && !formData.published_at) {
+      return '公開日時を選択してください。';
+    }
+    return null;
+  };
+
+  const handleSubmit = async (asDraft: boolean = false) => {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      let status = 'draft';
+      let publishedAt = null;
+
+      if (!asDraft) {
+        if (formData.publish_type === 'immediate') {
+          status = 'published';
+          publishedAt = new Date().toISOString();
+        } else if (formData.publish_type === 'scheduled') {
+          status = 'scheduled';
+          publishedAt = formData.published_at?.toISOString() || null;
+        }
+      }
+
+      const payload = {
+        title: formData.title,
+        content: formData.content,
+        target_roles: formData.target_roles,
+        is_important: formData.is_important,
+        status,
+        published_at: publishedAt,
+      };
+
+      if (isEdit) {
+        await axios.put(`/api/admin/announcements/${id}`, payload);
+      } else {
+        await axios.post('/api/admin/announcements', payload);
+      }
+
+      navigate('/admin/announcements');
+    } catch (err: any) {
+      console.error('保存エラー:', err);
+      setError(err.response?.data?.message || '保存に失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreview = () => {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setPreviewOpen(true);
+  };
+
+  if (fetchLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!canEdit) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/announcements')}
+            sx={{ mr: 2 }}
+          >
+            戻る
+          </Button>
+          <Typography variant="h4">お知らせ詳細</Typography>
+        </Box>
+
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          公開済みのお知らせは編集できません。非表示にする場合は、お知らせ一覧から操作してください。
+        </Alert>
+
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            {formData.title}
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+            {formData.content}
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/announcements')}
-          sx={{ mr: 2 }}
-        >
-          戻る
-        </Button>
-        <Typography variant="h4">
-          {isEdit ? 'お知らせ編集' : 'お知らせ新規作成'}
-        </Typography>
-      </Box>
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ja}>
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/admin/announcements')}
+            sx={{ mr: 2 }}
+          >
+            戻る
+          </Button>
+          <Typography variant="h4">
+            {isEdit ? 'お知らせ編集' : 'お知らせ作成'}
+          </Typography>
+        </Box>
 
-      <Paper sx={{ p: 3 }}>
-        <Box component="form" onSubmit={handleSubmit}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                label="タイトル"
-                value={formData.title}
-                onChange={handleChange('title')}
-              />
-            </Grid>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                label="本文"
-                value={formData.content}
-                onChange={handleChange('content')}
-                multiline
-                rows={10}
-              />
-            </Grid>
+        <Paper sx={{ p: 3 }}>
+          <Stack spacing={3}>
+            {/* タイトル */}
+            <TextField
+              label="タイトル"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              required
+              fullWidth
+              inputProps={{ maxLength: 200 }}
+              helperText={`${formData.title.length}/200文字`}
+            />
 
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>優先度</InputLabel>
-                <Select
-                  value={formData.priority}
-                  label="優先度"
-                  onChange={handleChange('priority')}
-                >
-                  <MenuItem value="low">参考</MenuItem>
-                  <MenuItem value="normal">通常</MenuItem>
-                  <MenuItem value="high">重要</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+            {/* 本文 */}
+            <TextField
+              label="本文"
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              required
+              fullWidth
+              multiline
+              rows={10}
+              helperText="お知らせの本文を入力してください"
+            />
 
-            <Grid item xs={12} sm={6}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.is_published}
-                    onChange={(e) =>
-                      setFormData({ ...formData, is_published: e.target.checked })
-                    }
-                  />
+            {/* 対象ユーザー */}
+            <FormControl component="fieldset">
+              <FormLabel component="legend">対象ユーザー *</FormLabel>
+              <FormGroup row>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.target_roles.includes('admin')}
+                      onChange={() => handleTargetRoleChange('admin')}
+                    />
+                  }
+                  label="管理者"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.target_roles.includes('seller')}
+                      onChange={() => handleTargetRoleChange('seller')}
+                    />
+                  }
+                  label="出品者"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.target_roles.includes('participant')}
+                      onChange={() => handleTargetRoleChange('participant')}
+                    />
+                  }
+                  label="参加者"
+                />
+              </FormGroup>
+            </FormControl>
+
+            {/* 重要度 */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.is_important}
+                  onChange={(e) => setFormData({ ...formData, is_important: e.target.checked })}
+                />
+              }
+              label="重要なお知らせとして表示"
+            />
+
+            <Divider />
+
+            {/* 公開設定 */}
+            <FormControl component="fieldset">
+              <FormLabel component="legend">公開設定</FormLabel>
+              <RadioGroup
+                value={formData.publish_type}
+                onChange={(e) =>
+                  setFormData({ ...formData, publish_type: e.target.value as any })
                 }
-                label="公開する"
+              >
+                <FormControlLabel
+                  value="immediate"
+                  control={<Radio />}
+                  label="すぐに公開"
+                />
+                <FormControlLabel
+                  value="scheduled"
+                  control={<Radio />}
+                  label="公開日時を指定"
+                />
+                <FormControlLabel value="draft" control={<Radio />} label="下書き保存" />
+              </RadioGroup>
+            </FormControl>
+
+            {/* 公開日時 */}
+            {formData.publish_type === 'scheduled' && (
+              <DateTimePicker
+                label="公開日時"
+                value={formData.published_at}
+                onChange={(date) => setFormData({ ...formData, published_at: date })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    required: true,
+                  },
+                }}
+                minDateTime={new Date()}
               />
-            </Grid>
-
-            {formData.is_published && (
-              <>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    type="datetime-local"
-                    label="公開開始日時"
-                    value={formData.published_at}
-                    onChange={handleChange('published_at')}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    type="datetime-local"
-                    label="公開終了日時"
-                    value={formData.expires_at}
-                    onChange={handleChange('expires_at')}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </>
             )}
 
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                <Button onClick={() => navigate('/admin/announcements')}>
-                  キャンセル
+            {/* ボタン */}
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button onClick={handlePreview} startIcon={<VisibilityIcon />}>
+                プレビュー
+              </Button>
+              
+              {formData.publish_type !== 'draft' && (
+                <Button
+                  variant="outlined"
+                  onClick={() => handleSubmit(true)}
+                  disabled={loading}
+                >
+                  下書き保存
                 </Button>
-                <Button type="submit" variant="contained" startIcon={<SaveIcon />}>
-                  保存
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </Box>
-      </Paper>
-    </Box>
+              )}
+              
+              <Button
+                variant="contained"
+                onClick={() => handleSubmit(false)}
+                disabled={loading}
+                startIcon={
+                  loading ? (
+                    <CircularProgress size={20} />
+                  ) : formData.publish_type === 'draft' ? (
+                    <SaveIcon />
+                  ) : (
+                    <SendIcon />
+                  )
+                }
+              >
+                {formData.publish_type === 'draft'
+                  ? '下書き保存'
+                  : formData.publish_type === 'immediate'
+                  ? '公開'
+                  : '公開予約'}
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+
+        {/* プレビューダイアログ */}
+        <Dialog
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            プレビュー
+            {formData.is_important && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                重要なお知らせ
+              </Alert>
+            )}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="h6" gutterBottom>
+              {formData.title}
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              gutterBottom
+              sx={{ mb: 2 }}
+            >
+              対象: {formData.target_roles.map((r) => {
+                if (r === 'admin') return '管理者';
+                if (r === 'seller') return '出品者';
+                if (r === 'participant') return '参加者';
+                return r;
+              }).join(', ')}
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+              {formData.content}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPreviewOpen(false)}>閉じる</Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </LocalizationProvider>
   );
 }
-

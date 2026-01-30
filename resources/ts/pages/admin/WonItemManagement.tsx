@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -26,6 +26,10 @@ import {
   DialogActions,
   Grid,
   Tooltip,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  TablePagination,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -37,73 +41,57 @@ import {
   Edit as EditIcon,
   ContentCopy as CopyIcon,
   AttachMoney as MoneyIcon,
+  Refresh as RefreshIcon,
+  Done as DoneIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
-// Mock データ
-const wonItems = [
-  {
-    id: 1,
-    item: { item_number: 1, species_name: '幹之メダカ フルボディ', quantity: 5 },
-    seller: { id: 1, name: '田中養魚場' },
-    winner: { id: 1, name: '山田一郎', nickname: 'やまちゃん', email: 'yamada@example.com', phone: '090-1111-2222' },
-    winning_price: 12000,
-    buyer_fee: 600,
-    total_amount: 12600,
-    payment_status: 'paid',
-    delivery_status: 'shipped',
-    tracking_number: '1234-5678-9012',
-    shipping_company: 'ヤマト運輸',
-    paid_at: '2025-11-13T10:30:00Z',
-    shipped_at: '2025-11-14T14:00:00Z',
-  },
-  {
-    id: 2,
-    item: { item_number: 2, species_name: '紅白ラメ', quantity: 3 },
-    seller: { id: 1, name: '田中養魚場' },
-    winner: { id: 2, name: '伊藤美穂', nickname: 'メダカ好き美穂', email: 'ito@example.com', phone: '090-2222-3333' },
-    winning_price: 35000,
-    buyer_fee: 1750,
-    total_amount: 36750,
-    payment_status: 'paid',
-    delivery_status: 'pending',
-    tracking_number: '',
-    shipping_company: '',
-    paid_at: '2025-11-13T15:00:00Z',
-    shipped_at: null,
-  },
-  {
-    id: 3,
-    item: { item_number: 3, species_name: 'オロチメダカ', quantity: 4 },
-    seller: { id: 3, name: '鈴木メダカファーム' },
-    winner: { id: 3, name: '渡辺健太', nickname: 'けんた', email: 'watanabe@example.com', phone: '090-3333-4444' },
-    winning_price: 15000,
-    buyer_fee: 750,
-    total_amount: 15750,
-    payment_status: 'pending',
-    delivery_status: 'pending',
-    tracking_number: '',
-    shipping_company: '',
-    paid_at: null,
-    shipped_at: null,
-  },
-  {
-    id: 4,
-    item: { item_number: 4, species_name: '三色ラメ', quantity: 2 },
-    seller: { id: 3, name: '鈴木メダカファーム' },
-    winner: { id: 1, name: '山田一郎', nickname: 'やまちゃん', email: 'yamada@example.com', phone: '090-1111-2222' },
-    winning_price: 42000,
-    buyer_fee: 2100,
-    total_amount: 44100,
-    payment_status: 'paid',
-    delivery_status: 'shipped',
-    tracking_number: '9876-5432-1098',
-    shipping_company: '佐川急便',
-    paid_at: '2025-11-13T11:00:00Z',
-    shipped_at: '2025-11-14T16:30:00Z',
-  },
-];
+interface WonItem {
+  id: number;
+  item: {
+    id: number;
+    item_number: number;
+    species_name: string;
+    quantity: number;
+    thumbnail_path?: string;
+  };
+  winner: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+  } | null;
+  winning_price: number;
+  quantity: number;
+  total_amount: number;
+  commission_amount: number;
+  payment_status: string;
+  payment_deadline?: string;
+  delivery_status: string;
+  delivery_method?: string;
+  shipping_address?: string;
+  tracking_number?: string;
+  shipped_at?: string;
+  created_at: string;
+}
 
-// KPIカード
+interface Statistics {
+  total_items: number;
+  total_sales: number;
+  pending_count: number;
+  pending_amount: number;
+  paid_count: number;
+  paid_amount: number;
+  shipped_count: number;
+  completed_count: number;
+}
+
+interface AuctionInfo {
+  id: number;
+  title: string;
+  event_date: string;
+}
+
 function StatCard({ title, value, subValue, icon, color }: { title: string; value: string; subValue?: string; icon: React.ReactNode; color: string }) {
   return (
     <Card>
@@ -144,84 +132,184 @@ function StatCard({ title, value, subValue, icon, color }: { title: string; valu
 
 export default function WonItemManagement() {
   const navigate = useNavigate();
-  const { auctionId } = useParams();
+  const { auctionId } = useParams<{ auctionId: string }>();
+  const [auction, setAuction] = useState<AuctionInfo | null>(null);
+  const [wonItems, setWonItems] = useState<WonItem[]>([]);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<typeof wonItems[0] | null>(null);
+  const [selectedItem, setSelectedItem] = useState<WonItem | null>(null);
   const [trackingForm, setTrackingForm] = useState({ tracking_number: '', shipping_company: 'ヤマト運輸' });
-
-  // 統計
-  const totalSales = wonItems.reduce((sum, item) => sum + item.total_amount, 0);
-  const paidAmount = wonItems
-    .filter((item) => item.payment_status === 'paid')
-    .reduce((sum, item) => sum + item.total_amount, 0);
-  const shippedCount = wonItems.filter((item) => item.delivery_status === 'shipped').length;
-  const pendingPaymentCount = wonItems.filter((item) => item.payment_status === 'pending').length;
-
-  // フィルタリング
-  const filteredItems = wonItems.filter((item) => {
-    const matchesSearch =
-      item.item.species_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.winner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.tracking_number.includes(searchQuery);
-
-    if (tabValue === 0) return matchesSearch;
-    if (tabValue === 1) return matchesSearch && item.payment_status === 'pending';
-    if (tabValue === 2) return matchesSearch && item.payment_status === 'paid' && item.delivery_status === 'pending';
-    if (tabValue === 3) return matchesSearch && item.delivery_status === 'shipped';
-    return matchesSearch;
+  const [actionLoading, setActionLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
   });
 
-  const handleOpenTrackingDialog = (item: typeof wonItems[0]) => {
+  // データ取得
+  const fetchWonItems = useCallback(async () => {
+    try {
+      const paymentFilter = tabValue === 1 ? 'pending' : tabValue === 2 ? 'confirmed' : tabValue === 3 ? 'confirmed' : undefined;
+      const deliveryFilter = tabValue === 2 ? 'preparing' : tabValue === 3 ? 'shipped' : undefined;
+
+      const response = await axios.get(`/api/admin/auctions/${auctionId}/won-items`, {
+        params: {
+          page: page + 1,
+          per_page: rowsPerPage,
+          payment_status: paymentFilter,
+          delivery_status: deliveryFilter,
+        },
+      });
+
+      if (response.data.success) {
+        setAuction(response.data.data.auction);
+        setWonItems(response.data.data.won_items);
+        setStatistics(response.data.data.statistics);
+        setTotalItems(response.data.data.pagination.total);
+        setError(null);
+      }
+    } catch (err: any) {
+      console.error('落札商品取得エラー:', err);
+      setError('データの取得に失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  }, [auctionId, page, rowsPerPage, tabValue]);
+
+  useEffect(() => {
+    fetchWonItems();
+  }, [fetchWonItems]);
+
+  // 入金確認
+  const handleConfirmPayment = async (id: number) => {
+    setActionLoading(true);
+    try {
+      const response = await axios.post(`/api/admin/won-items/${id}/confirm-payment`);
+      if (response.data.success) {
+        setSnackbar({ open: true, message: '入金を確認しました', severity: 'success' });
+        fetchWonItems();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '入金確認に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 発送登録
+  const handleShip = async () => {
+    if (!selectedItem) return;
+    setActionLoading(true);
+    try {
+      const response = await axios.post(`/api/admin/won-items/${selectedItem.id}/ship`, {
+        shipping_company: trackingForm.shipping_company,
+        tracking_number: trackingForm.tracking_number,
+      });
+      if (response.data.success) {
+        setSnackbar({ open: true, message: '発送を登録しました', severity: 'success' });
+        setTrackingDialogOpen(false);
+        fetchWonItems();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '発送登録に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 配達完了
+  const handleComplete = async (id: number) => {
+    setActionLoading(true);
+    try {
+      const response = await axios.post(`/api/admin/won-items/${id}/complete`);
+      if (response.data.success) {
+        setSnackbar({ open: true, message: '配達完了を登録しました', severity: 'success' });
+        fetchWonItems();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '配達完了登録に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleOpenTrackingDialog = (item: WonItem) => {
     setSelectedItem(item);
-    setTrackingForm({ tracking_number: item.tracking_number || '', shipping_company: item.shipping_company || 'ヤマト運輸' });
+    setTrackingForm({ tracking_number: item.tracking_number || '', shipping_company: 'ヤマト運輸' });
     setTrackingDialogOpen(true);
   };
 
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
+    setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
   };
 
   const getPaymentStatusChip = (status: string) => {
-    const config = {
-      paid: { label: '入金済み', color: '#059669', bgcolor: '#ECFDF5' },
+    const config: Record<string, { label: string; color: string; bgcolor: string }> = {
+      confirmed: { label: '入金確認済', color: '#059669', bgcolor: '#ECFDF5' },
+      paid: { label: '入金済み', color: '#3B82F6', bgcolor: '#DBEAFE' },
       pending: { label: '未入金', color: '#F59E0B', bgcolor: '#FEF3C7' },
-    }[status] || { label: status, color: '#64748B', bgcolor: '#F1F5F9' };
-
+    };
+    const c = config[status] || { label: status, color: '#64748B', bgcolor: '#F1F5F9' };
     return (
-      <Chip
-        size="small"
-        label={config.label}
-        sx={{ bgcolor: config.bgcolor, color: config.color, fontWeight: 600, fontSize: '0.7rem' }}
-      />
+      <Chip size="small" label={c.label} sx={{ bgcolor: c.bgcolor, color: c.color, fontWeight: 600, fontSize: '0.7rem' }} />
     );
   };
 
   const getDeliveryStatusChip = (status: string) => {
-    const config = {
-      shipped: { label: '発送済み', color: '#059669', bgcolor: '#ECFDF5' },
-      pending: { label: '発送待ち', color: '#64748B', bgcolor: '#F1F5F9' },
-    }[status] || { label: status, color: '#64748B', bgcolor: '#F1F5F9' };
-
+    const config: Record<string, { label: string; color: string; bgcolor: string }> = {
+      completed: { label: '配達完了', color: '#059669', bgcolor: '#ECFDF5' },
+      shipped: { label: '発送済み', color: '#3B82F6', bgcolor: '#DBEAFE' },
+      preparing: { label: '発送準備中', color: '#F59E0B', bgcolor: '#FEF3C7' },
+      pending: { label: '入金待ち', color: '#64748B', bgcolor: '#F1F5F9' },
+    };
+    const c = config[status] || { label: status, color: '#64748B', bgcolor: '#F1F5F9' };
     return (
-      <Chip
-        size="small"
-        label={config.label}
-        sx={{ bgcolor: config.bgcolor, color: config.color, fontWeight: 600, fontSize: '0.7rem' }}
-      />
+      <Chip size="small" label={c.label} sx={{ bgcolor: c.bgcolor, color: c.color, fontWeight: 600, fontSize: '0.7rem' }} />
     );
   };
+
+  // フィルタリング（検索）
+  const filteredItems = wonItems.filter((item) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      item.item.species_name.toLowerCase().includes(query) ||
+      (item.winner?.name || '').toLowerCase().includes(query) ||
+      (item.tracking_number || '').includes(query)
+    );
+  });
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Button onClick={() => navigate('/admin/auctions')}>オークション一覧に戻る</Button>
+      </Box>
+    );
+  }
 
   return (
     <Box>
       {/* ヘッダー */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/admin/auctions')}
-          >
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/admin/auctions')}>
             戻る
           </Button>
           <Box>
@@ -229,54 +317,62 @@ export default function WonItemManagement() {
               落札者管理
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              2025年11月オークション
+              {auction?.title}
             </Typography>
           </Box>
         </Box>
-        <Button variant="outlined" startIcon={<ExportIcon />}>
-          CSVエクスポート
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton onClick={fetchWonItems} title="更新">
+            <RefreshIcon />
+          </IconButton>
+          <Button variant="outlined" startIcon={<ExportIcon />}>
+            CSVエクスポート
+          </Button>
+        </Box>
       </Box>
 
       {/* KPIカード */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, mb: 4 }}>
-        <StatCard
-          title="総売上"
-          value={`¥${totalSales.toLocaleString()}`}
-          subValue={`${wonItems.length}件`}
-          icon={<MoneyIcon />}
-          color="#3B82F6"
-        />
-        <StatCard
-          title="入金済み"
-          value={`¥${paidAmount.toLocaleString()}`}
-          subValue={`${wonItems.filter(i => i.payment_status === 'paid').length}件`}
-          icon={<CheckCircleIcon />}
-          color="#059669"
-        />
-        <StatCard
-          title="未入金"
-          value={`${pendingPaymentCount}件`}
-          icon={<ReceiptIcon />}
-          color="#F59E0B"
-        />
-        <StatCard
-          title="発送済み"
-          value={`${shippedCount}件`}
-          subValue={`/ ${wonItems.length}件`}
-          icon={<LocalShippingIcon />}
-          color="#8B5CF6"
-        />
-      </Box>
+      {statistics && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, mb: 4 }}>
+          <StatCard
+            title="総売上"
+            value={`¥${Number(statistics.total_sales).toLocaleString()}`}
+            subValue={`${statistics.total_items}件`}
+            icon={<MoneyIcon />}
+            color="#3B82F6"
+          />
+          <StatCard
+            title="入金確認済"
+            value={`¥${Number(statistics.paid_amount).toLocaleString()}`}
+            subValue={`${statistics.paid_count}件`}
+            icon={<CheckCircleIcon />}
+            color="#059669"
+          />
+          <StatCard
+            title="未入金"
+            value={`${statistics.pending_count}件`}
+            subValue={`¥${Number(statistics.pending_amount).toLocaleString()}`}
+            icon={<ReceiptIcon />}
+            color="#F59E0B"
+          />
+          <StatCard
+            title="発送済み"
+            value={`${statistics.shipped_count}件`}
+            subValue={`完了: ${statistics.completed_count}件`}
+            icon={<LocalShippingIcon />}
+            color="#8B5CF6"
+          />
+        </Box>
+      )}
 
       {/* フィルター */}
       <Card sx={{ mb: 3 }}>
         <Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
-            <Tab label={`すべて (${wonItems.length})`} />
-            <Tab label={`支払い待ち (${pendingPaymentCount})`} />
-            <Tab label={`発送待ち (${wonItems.filter(i => i.payment_status === 'paid' && i.delivery_status === 'pending').length})`} />
-            <Tab label={`発送済み (${shippedCount})`} />
+          <Tabs value={tabValue} onChange={(_, v) => { setTabValue(v); setPage(0); }}>
+            <Tab label={`すべて (${statistics?.total_items || 0})`} />
+            <Tab label={`支払い待ち (${statistics?.pending_count || 0})`} />
+            <Tab label={`発送準備中`} />
+            <Tab label={`発送済み (${statistics?.shipped_count || 0})`} />
           </Tabs>
         </Box>
         <Box sx={{ p: 2 }}>
@@ -305,7 +401,6 @@ export default function WonItemManagement() {
               <TableRow>
                 <TableCell>No.</TableCell>
                 <TableCell>品種名</TableCell>
-                <TableCell>出品者</TableCell>
                 <TableCell>落札者</TableCell>
                 <TableCell align="right">落札金額</TableCell>
                 <TableCell align="center">支払い</TableCell>
@@ -315,129 +410,157 @@ export default function WonItemManagement() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredItems.map((item) => (
-                <TableRow key={item.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {item.item.item_number}
-                    </Typography>
+              {filteredItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">落札商品がありません</Typography>
                   </TableCell>
-                  <TableCell>
-                    <Box>
+                </TableRow>
+              ) : (
+                filteredItems.map((item) => (
+                  <TableRow key={item.id} hover>
+                    <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {item.item.species_name}
+                        {item.item.item_number}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {item.item.quantity}匹
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{item.seller.name}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 28, height: 28, bgcolor: '#EFF6FF', color: '#3B82F6', fontSize: '0.75rem' }}>
-                        {item.winner.name.charAt(0)}
-                      </Avatar>
+                    </TableCell>
+                    <TableCell>
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {item.winner.name}
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {item.item.species_name}
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          @{item.winner.nickname}
+                          {item.quantity}匹
                         </Typography>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      ¥{item.total_amount.toLocaleString()}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      (税込 手数料¥{item.buyer_fee.toLocaleString()})
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    {getPaymentStatusChip(item.payment_status)}
-                    {item.paid_at && (
-                      <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-                        {new Date(item.paid_at).toLocaleDateString('ja-JP')}
+                    </TableCell>
+                    <TableCell>
+                      {item.winner ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: '#EFF6FF', color: '#3B82F6', fontSize: '0.75rem' }}>
+                            {item.winner.name.charAt(0)}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.winner.name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {item.winner.email}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">—</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        ¥{Number(item.total_amount).toLocaleString()}
                       </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="center">
-                    {getDeliveryStatusChip(item.delivery_status)}
-                    {item.shipped_at && (
-                      <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-                        {new Date(item.shipped_at).toLocaleDateString('ja-JP')}
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        (手数料¥{Number(item.commission_amount).toLocaleString()})
                       </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {item.tracking_number ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      {getPaymentStatusChip(item.payment_status)}
+                    </TableCell>
+                    <TableCell align="center">
+                      {getDeliveryStatusChip(item.delivery_status)}
+                      {item.shipped_at && (
+                        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
+                          {new Date(item.shipped_at).toLocaleDateString('ja-JP')}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {item.tracking_number ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
                             {item.tracking_number}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {item.shipping_company}
-                          </Typography>
+                          <Tooltip title="コピー">
+                            <IconButton size="small" onClick={() => handleCopyTrackingNumber(item.tracking_number!)}>
+                              <CopyIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
                         </Box>
-                        <Tooltip title="コピー">
-                          <IconButton size="small" onClick={() => handleCopyTrackingNumber(item.tracking_number)}>
-                            <CopyIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Tooltip>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                        {item.payment_status === 'pending' && (
+                          <Tooltip title="入金確認">
+                            <IconButton
+                              size="small"
+                              sx={{ color: 'success.main' }}
+                              onClick={() => handleConfirmPayment(item.id)}
+                              disabled={actionLoading}
+                            >
+                              <CheckCircleIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {item.payment_status === 'confirmed' && item.delivery_status === 'preparing' && (
+                          <Tooltip title="発送登録">
+                            <IconButton
+                              size="small"
+                              sx={{ color: 'primary.main' }}
+                              onClick={() => handleOpenTrackingDialog(item)}
+                            >
+                              <LocalShippingIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {item.delivery_status === 'shipped' && (
+                          <Tooltip title="配達完了">
+                            <IconButton
+                              size="small"
+                              sx={{ color: 'success.main' }}
+                              onClick={() => handleComplete(item.id)}
+                              disabled={actionLoading}
+                            >
+                              <DoneIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        —
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                      {item.payment_status === 'pending' && (
-                        <Tooltip title="入金確認">
-                          <IconButton size="small" sx={{ color: 'success.main' }}>
-                            <CheckCircleIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {item.payment_status === 'paid' && (
-                        <Tooltip title="伝票番号を登録">
-                          <IconButton
-                            size="small"
-                            sx={{ color: 'primary.main' }}
-                            onClick={() => handleOpenTrackingDialog(item)}
-                          >
-                            {item.tracking_number ? <EditIcon sx={{ fontSize: 18 }} /> : <LocalShippingIcon sx={{ fontSize: 18 }} />}
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={totalItems}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+          labelRowsPerPage="表示件数"
+        />
       </Card>
 
-      {/* 伝票番号登録ダイアログ */}
+      {/* 発送登録ダイアログ */}
       <Dialog open={trackingDialogOpen} onClose={() => setTrackingDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>伝票番号を登録</DialogTitle>
+        <DialogTitle>発送登録</DialogTitle>
         <DialogContent>
           {selectedItem && (
             <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                {selectedItem.item.species_name} ({selectedItem.item.quantity}匹)
+                {selectedItem.item.species_name} ({selectedItem.quantity}匹)
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                落札者: {selectedItem.winner.name} ({selectedItem.winner.email})
+                落札者: {selectedItem.winner?.name} ({selectedItem.winner?.email})
               </Typography>
+              {selectedItem.shipping_address && (
+                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
+                  配送先: {selectedItem.shipping_address}
+                </Typography>
+              )}
             </Box>
           )}
           <Grid container spacing={2}>
@@ -463,21 +586,37 @@ export default function WonItemManagement() {
                 value={trackingForm.tracking_number}
                 onChange={(e) => setTrackingForm({ ...trackingForm, tracking_number: e.target.value })}
                 placeholder="1234-5678-9012"
+                required
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTrackingDialogOpen(false)}>キャンセル</Button>
+          <Button onClick={() => setTrackingDialogOpen(false)} disabled={actionLoading}>
+            キャンセル
+          </Button>
           <Button
             variant="contained"
-            onClick={() => setTrackingDialogOpen(false)}
-            startIcon={<LocalShippingIcon />}
+            onClick={handleShip}
+            startIcon={actionLoading ? <CircularProgress size={20} /> : <LocalShippingIcon />}
+            disabled={actionLoading || !trackingForm.tracking_number}
           >
-            登録して発送済みにする
+            発送登録
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* スナックバー */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

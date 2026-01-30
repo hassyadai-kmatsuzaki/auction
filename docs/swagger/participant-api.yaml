@@ -1,0 +1,888 @@
+openapi: 3.0.3
+info:
+  title: メダカライブオークション - 参加者API
+  description: |
+    メダカライブオークションシステムの参加者（購入者）向けAPI仕様書
+    
+    ## 認証
+    すべてのエンドポイントは`Bearer`トークン認証が必要です。
+    また、`participant`ロールを持つユーザーのみアクセス可能です。
+    
+    ## リアルタイム通信
+    ライブオークション参加時は、WebSocket（Laravel Echo + Pusher）を使用して
+    リアルタイムで価格更新・入札状況を受信します。
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: /api
+    description: Development server
+
+tags:
+  - name: Auctions
+    description: オークション関連
+  - name: Bids
+    description: 入札関連
+  - name: WonItems
+    description: 落札商品関連
+  - name: Announcements
+    description: お知らせ
+
+paths:
+  # ==================== Auctions ====================
+  /participant/auctions:
+    get:
+      tags:
+        - Auctions
+      summary: オークション一覧取得
+      description: 参加者向けのオークション一覧を取得（準備中は非表示）
+      operationId: getParticipantAuctions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [scheduled, live, finished]
+          description: ステータスフィルター
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuctionSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /participant/auctions/{id}:
+    get:
+      tags:
+        - Auctions
+      summary: オークション詳細取得
+      operationId: getParticipantAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auction:
+                        $ref: '#/components/schemas/AuctionDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/auctions/{id}/live:
+    get:
+      tags:
+        - Auctions
+      summary: ライブ状態取得
+      description: |
+        ライブオークション中の現在状態を取得。
+        各レーンの現在出品中商品、価格、入札者数、カウントダウン等を含む。
+        
+        **注意**: このAPIはポーリングにも使用できますが、
+        リアルタイム更新にはWebSocket（Laravel Echo）の使用を推奨します。
+      operationId: getAuctionLiveState
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auction:
+                        $ref: '#/components/schemas/AuctionLiveSummary'
+                      lanes:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LaneState'
+                      my_bids:
+                        type: array
+                        items:
+                          type: integer
+                        description: 自分が入札中のアイテムID一覧
+        '400':
+          description: オークションが開催中ではない
+
+  /participant/auctions/{id}/items:
+    get:
+      tags:
+        - Auctions
+      summary: 出品一覧取得（レーン別）
+      description: オークションの出品一覧をレーン別に取得
+      operationId: getAuctionItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: オークションID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auction:
+                        $ref: '#/components/schemas/AuctionSummary'
+                      lanes:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LaneWithItems'
+                      total_items:
+                        type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Bids ====================
+  /participant/bids:
+    post:
+      tags:
+        - Bids
+      summary: 入札ON/OFF切り替え
+      description: |
+        指定したアイテムへの入札をON/OFFで切り替える。
+        
+        入札ONの場合、現在の価格で入札に参加。
+        入札OFFの場合、入札から離脱。
+        
+        **WebSocketイベント**: 
+        - `bidder.updated`: 入札者数の変化を通知
+        - `price.updated`: 価格変更時に通知（最後の1人になった場合など）
+      operationId: toggleBid
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - item_id
+              properties:
+                item_id:
+                  type: integer
+                  description: 対象アイテムID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: 入札に参加しました
+                  data:
+                    type: object
+                    properties:
+                      action:
+                        type: string
+                        enum: [joined, left]
+                      item_id:
+                        type: integer
+                      current_price:
+                        type: number
+                      active_bidders:
+                        type: integer
+        '400':
+          description: 入札不可（アイテムがlive状態でない等）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: このアイテムは現在入札できません。
+
+  /participant/bids/my-active:
+    get:
+      tags:
+        - Bids
+      summary: 入札中アイテム一覧取得
+      description: 現在入札参加中のアイテム一覧を取得
+      operationId: getMyActiveBids
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      bids:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ActiveBid'
+
+  # ==================== Won Items ====================
+  /participant/won-items:
+    get:
+      tags:
+        - WonItems
+      summary: 落札商品一覧取得
+      description: 自分が落札した商品の一覧を取得
+      operationId: getWonItems
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      won_items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WonItem'
+                      summary:
+                        type: object
+                        properties:
+                          total_amount:
+                            type: number
+                            description: 合計落札金額
+                          payment_pending:
+                            type: integer
+                            description: 支払い待ち件数
+                          payment_confirmed:
+                            type: integer
+                            description: 入金確認済み件数
+                          shipping_pending:
+                            type: integer
+                            description: 発送待ち件数
+                          shipped:
+                            type: integer
+                            description: 配送中件数
+                          completed:
+                            type: integer
+                            description: 完了件数
+
+  /participant/won-items/{id}:
+    get:
+      tags:
+        - WonItems
+      summary: 落札商品詳細取得
+      operationId: getWonItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      won_item:
+                        $ref: '#/components/schemas/WonItemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/won-items/{id}/address:
+    put:
+      tags:
+        - WonItems
+      summary: 配送先住所更新
+      description: 落札商品の配送先住所を更新（発送前のみ）
+      operationId: updateShippingAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShippingAddressUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: 更新不可（発送済み等）
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ==================== Announcements ====================
+  /announcements:
+    get:
+      tags:
+        - Announcements
+      summary: お知らせ一覧取得
+      description: 自分のロールに対象のお知らせ一覧を取得
+      operationId: getAnnouncements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      announcements:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Announcement'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+  /announcements/{id}:
+    get:
+      tags:
+        - Announcements
+      summary: お知らせ詳細取得
+      operationId: getAnnouncement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      announcement:
+                        $ref: '#/components/schemas/AnnouncementDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: 認証エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Unauthenticated.
+    Forbidden:
+      description: 権限エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: アクセス権限がありません。
+    NotFound:
+      description: リソースが見つからない
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: リソースが見つかりません。
+    ValidationError:
+      description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+
+    AuctionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        event_date:
+          type: string
+          format: date
+        start_time:
+          type: string
+          nullable: true
+          description: "HH:mm形式"
+        status:
+          type: string
+          enum: [scheduled, live, finished]
+        description:
+          type: string
+          nullable: true
+        lane_count:
+          type: integer
+
+    AuctionDetail:
+      allOf:
+        - $ref: '#/components/schemas/AuctionSummary'
+        - type: object
+          properties:
+            countdown_seconds:
+              type: integer
+              description: カウントダウン秒数
+
+    AuctionLiveSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        status:
+          type: string
+        countdown_seconds:
+          type: integer
+
+    LaneState:
+      type: object
+      properties:
+        id:
+          type: integer
+        lane_number:
+          type: integer
+        status:
+          type: string
+          enum: [waiting, active, paused, finished]
+        current_item:
+          $ref: '#/components/schemas/CurrentItem'
+        active_bidders:
+          type: integer
+          description: 現在の入札者数
+        remaining_items:
+          type: integer
+          description: 残りアイテム数
+
+    CurrentItem:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        item_number:
+          type: integer
+        species_name:
+          type: string
+        quantity:
+          type: integer
+        start_price:
+          type: number
+        current_price:
+          type: number
+        is_premium:
+          type: boolean
+        thumbnail_path:
+          type: string
+          nullable: true
+        inspection_info:
+          type: string
+          nullable: true
+
+    LaneWithItems:
+      type: object
+      properties:
+        lane_number:
+          type: integer
+        lane_name:
+          type: string
+        status:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemInLane'
+
+    ItemInLane:
+      type: object
+      properties:
+        id:
+          type: integer
+        item_number:
+          type: integer
+        species_name:
+          type: string
+        quantity:
+          type: integer
+        start_price:
+          type: number
+        current_price:
+          type: number
+        estimated_price:
+          type: number
+          nullable: true
+        inspection_info:
+          type: string
+          nullable: true
+        individual_info:
+          type: string
+          nullable: true
+        is_premium:
+          type: boolean
+        thumbnail_path:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [registered, live, sold, unsold]
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemMedia'
+
+    ItemMedia:
+      type: object
+      properties:
+        id:
+          type: integer
+        media_type:
+          type: string
+        file_path:
+          type: string
+        thumbnail_path:
+          type: string
+          nullable: true
+        is_thumbnail:
+          type: boolean
+        display_order:
+          type: integer
+
+    ActiveBid:
+      type: object
+      properties:
+        item_id:
+          type: integer
+        item:
+          $ref: '#/components/schemas/CurrentItem'
+        lane_id:
+          type: integer
+        lane_number:
+          type: integer
+        current_price:
+          type: number
+        active_bidders:
+          type: integer
+        joined_at:
+          type: string
+          format: date-time
+
+    WonItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        item:
+          type: object
+          properties:
+            id:
+              type: integer
+            item_number:
+              type: integer
+            species_name:
+              type: string
+            quantity:
+              type: integer
+            thumbnail_path:
+              type: string
+              nullable: true
+        auction:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            event_date:
+              type: string
+              format: date
+        winning_price:
+          type: number
+        shipping_fee:
+          type: number
+        total_amount:
+          type: number
+        payment_status:
+          type: string
+          enum: [pending, paid, confirmed]
+          description: |
+            - pending: 支払い待ち
+            - paid: 支払い済み（確認待ち）
+            - confirmed: 入金確認済み
+        delivery_status:
+          type: string
+          enum: [pending, preparing, shipped, completed]
+          description: |
+            - pending: 準備中
+            - preparing: 発送準備中
+            - shipped: 発送済み
+            - completed: 配達完了
+        tracking_number:
+          type: string
+          nullable: true
+        shipping_company:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    WonItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/WonItem'
+        - type: object
+          properties:
+            seller:
+              type: object
+              properties:
+                id:
+                  type: integer
+                farm_name:
+                  type: string
+                  nullable: true
+            shipping_address:
+              type: object
+              nullable: true
+              properties:
+                postal_code:
+                  type: string
+                prefecture:
+                  type: string
+                city:
+                  type: string
+                address_line1:
+                  type: string
+                address_line2:
+                  type: string
+                  nullable: true
+            payment_deadline:
+              type: string
+              format: date
+              nullable: true
+            shipped_at:
+              type: string
+              format: date-time
+              nullable: true
+            delivered_at:
+              type: string
+              format: date-time
+              nullable: true
+            can_update_address:
+              type: boolean
+              description: 住所変更可能かどうか
+
+    ShippingAddressUpdate:
+      type: object
+      required:
+        - postal_code
+        - prefecture
+        - city
+        - address_line1
+      properties:
+        postal_code:
+          type: string
+          description: 郵便番号
+          example: "123-4567"
+        prefecture:
+          type: string
+          description: 都道府県
+          example: 東京都
+        city:
+          type: string
+          description: 市区町村
+          example: 渋谷区
+        address_line1:
+          type: string
+          description: 住所1
+          example: 渋谷1-2-3
+        address_line2:
+          type: string
+          nullable: true
+          description: 住所2（建物名等）
+          example: ABCビル101
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        is_important:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+
+    AnnouncementDetail:
+      allOf:
+        - $ref: '#/components/schemas/Announcement'
+        - type: object
+          properties:
+            target_roles:
+              type: array
+              items:
+                type: string

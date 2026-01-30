@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -7,39 +7,39 @@ import {
   TextField,
   Button,
   Grid,
-  Card,
-  CardContent,
+  FormControl,
+  FormControlLabel,
+  Checkbox,
+  CircularProgress,
+  Alert,
+  Stack,
   Divider,
   InputAdornment,
-  Alert,
-  FormHelperText,
-  Switch,
-  FormControlLabel,
   Tabs,
   Tab,
-  IconButton,
+  Card,
+  CardContent,
+  Switch,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Select,
-  MenuItem,
-  FormControl,
+  Chip,
 } from '@mui/material';
 import {
   Save as SaveIcon,
   ArrowBack as ArrowBackIcon,
-  Event as EventIcon,
-  AttachMoney as MoneyIcon,
-  Info as InfoIcon,
+  Settings as SettingsIcon,
   Gavel as GavelIcon,
-  ViewColumn as LaneIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
+  AttachMoney as MoneyIcon,
+  LocalShipping as ShippingIcon,
 } from '@mui/icons-material';
+import { LocalizationProvider, DatePicker, TimePicker, DateTimePicker } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ja } from 'date-fns/locale';
+import axios from '../../lib/axios';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -55,641 +55,938 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   );
 }
 
+interface FormData {
+  title: string;
+  event_date: Date | null;
+  start_time: Date | null;
+  description: string;
+  lane_count: number;
+  default_bid_increment: number;
+  countdown_seconds: number;
+  deposit_required: boolean;
+  upload_deadline: Date | null;
+  payment_deadline_hours: number;
+  shipping_deadline_hours: number;
+  // カスタム設定
+  use_custom_settings: boolean;
+  custom_auction_settings: {
+    price_increment_rate: number;
+    price_increment_min: number;
+    countdown_seconds: number;
+    auto_extend_seconds: number;
+  };
+  custom_fee_settings: {
+    seller_commission_rate: number;
+    seller_commission_min: number;
+    buyer_commission_rate: number;
+    buyer_commission_min: number;
+    base_listing_fee: number;
+    premium_listing_fee: number;
+  };
+  custom_shipping_settings: {
+    packaging_fee: number;
+    handling_fee: number;
+    insurance_fee_rate: number;
+    cooling_fee_summer: number;
+    heating_fee_winter: number;
+    shipping_discount_rate: number;
+  };
+}
+
+interface DefaultSettings {
+  auction_settings: {
+    price_increment_rate: number;
+    price_increment_min: number;
+    countdown_seconds: number;
+    max_lanes: number;
+    auto_extend_seconds: number;
+  };
+  fee_settings: {
+    seller_commission_rate: number;
+    seller_commission_min: number;
+    buyer_commission_rate: number;
+    buyer_commission_min: number;
+    base_listing_fee: number;
+    premium_listing_fee: number;
+  };
+  shipping_settings: {
+    packaging_fee: number;
+    handling_fee: number;
+    insurance_fee_rate: number;
+    cooling_fee_summer: number;
+    heating_fee_winter: number;
+    shipping_rates: Array<{
+      region: string;
+      size_60: number;
+      size_80: number;
+      size_100: number;
+    }>;
+  };
+}
+
 export default function AuctionForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
+
   const [tabValue, setTabValue] = useState(0);
-
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
-    event_date: '',
-    start_time: '10:00',
+    event_date: null,
+    start_time: new Date(0, 0, 0, 10, 0),
     description: '',
-    commission_rate: '10',
-    buyer_fee_rate: '5',
-    min_commission: '500',
-    notes: '',
+    lane_count: 6,
+    default_bid_increment: 100,
+    countdown_seconds: 3,
+    deposit_required: false,
+    upload_deadline: null,
+    payment_deadline_hours: 24,
+    shipping_deadline_hours: 48,
+    use_custom_settings: false,
+    custom_auction_settings: {
+      price_increment_rate: 10,
+      price_increment_min: 50,
+      countdown_seconds: 3,
+      auto_extend_seconds: 10,
+    },
+    custom_fee_settings: {
+      seller_commission_rate: 10,
+      seller_commission_min: 500,
+      buyer_commission_rate: 5,
+      buyer_commission_min: 300,
+      base_listing_fee: 500,
+      premium_listing_fee: 800,
+    },
+    custom_shipping_settings: {
+      packaging_fee: 500,
+      handling_fee: 300,
+      insurance_fee_rate: 3,
+      cooling_fee_summer: 300,
+      heating_fee_winter: 300,
+      shipping_discount_rate: 0,
+    },
   });
 
-  // デフォルト設定を使用するかどうか
-  const [useDefaultBidRules, setUseDefaultBidRules] = useState(true);
-  const [useDefaultSellerFees, setUseDefaultSellerFees] = useState(true);
-  const [useDefaultBuyerFees, setUseDefaultBuyerFees] = useState(true);
+  const [defaultSettings, setDefaultSettings] = useState<DefaultSettings | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(isEdit);
+  const [error, setError] = useState<string | null>(null);
+  const [canEdit, setCanEdit] = useState(true);
 
-  // 入札ルール（オークション個別設定）
-  const [bidRules, setBidRules] = useState({
-    price_increment_rate: '10',
-    price_increment_min: '50',
-    countdown_seconds: '3',
-    auto_extend_seconds: '10',
-  });
+  useEffect(() => {
+    fetchDefaultSettings();
+    if (isEdit) {
+      fetchAuction();
+    }
+  }, [id]);
 
-  // 出品者向け料金（オークション個別設定）
-  const [sellerFees, setSellerFees] = useState({
-    base_listing_fee: '500',
-    premium_listing_fee: '800',
-    seller_commission_rate: '10',
-    seller_commission_min: '500',
-  });
-
-  // 買受者向け料金（オークション個別設定）
-  const [buyerFees, setBuyerFees] = useState({
-    buyer_commission_rate: '5',
-    buyer_commission_min: '300',
-  });
-
-  // レーン設定
-  // bidder_display: 'count' = 何人入札中, 'simple' = 入札中, 'hidden' = 非表示
-  const [lanes, setLanes] = useState([
-    { id: 1, name: 'レーン1', description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' },
-    { id: 2, name: 'レーン2', description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' },
-    { id: 3, name: 'レーン3', description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' },
-    { id: 4, name: 'レーン4', description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' },
-    { id: 5, name: 'レーン5', description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' },
-    { id: 6, name: 'レーン6', description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' },
-  ]);
-
-  const handleBidRuleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBidRules({ ...bidRules, [field]: e.target.value });
-  };
-
-  const handleSellerFeeChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSellerFees({ ...sellerFees, [field]: e.target.value });
-  };
-
-  const handleBuyerFeeChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBuyerFees({ ...buyerFees, [field]: e.target.value });
-  };
-
-  const handleLaneChange = (id: number, field: string, value: string) => {
-    setLanes(lanes.map(lane => 
-      lane.id === id ? { ...lane, [field]: value } : lane
-    ));
-  };
-
-  const addLane = () => {
-    const newId = Math.max(...lanes.map(l => l.id)) + 1;
-    setLanes([...lanes, { id: newId, name: `レーン${newId}`, description: '', bidder_display: 'count' as 'count' | 'simple' | 'hidden' }]);
-  };
-
-  const removeLane = (id: number) => {
-    if (lanes.length > 1) {
-      setLanes(lanes.filter(lane => lane.id !== id));
+  const fetchDefaultSettings = async () => {
+    try {
+      const response = await axios.get('/api/admin/settings/defaults');
+      if (response.data.success) {
+        setDefaultSettings(response.data.data);
+        // デフォルト設定でフォームを初期化
+        if (!isEdit) {
+          setFormData(prev => ({
+            ...prev,
+            custom_auction_settings: {
+              price_increment_rate: response.data.data.auction_settings.price_increment_rate,
+              price_increment_min: response.data.data.auction_settings.price_increment_min || 50,
+              countdown_seconds: response.data.data.auction_settings.countdown_seconds,
+              auto_extend_seconds: response.data.data.auction_settings.auto_extend_seconds || 10,
+            },
+            custom_fee_settings: {
+              seller_commission_rate: response.data.data.fee_settings.seller_commission_rate,
+              seller_commission_min: response.data.data.fee_settings.seller_commission_min,
+              buyer_commission_rate: response.data.data.fee_settings.buyer_commission_rate,
+              buyer_commission_min: response.data.data.fee_settings.buyer_commission_min,
+              base_listing_fee: response.data.data.fee_settings.base_listing_fee,
+              premium_listing_fee: response.data.data.fee_settings.premium_listing_fee,
+            },
+            custom_shipping_settings: {
+              packaging_fee: response.data.data.shipping_settings.packaging_fee,
+              handling_fee: response.data.data.shipping_settings.handling_fee,
+              insurance_fee_rate: response.data.data.shipping_settings.insurance_fee_rate,
+              cooling_fee_summer: response.data.data.shipping_settings.cooling_fee_summer,
+              heating_fee_winter: response.data.data.shipping_settings.heating_fee_winter,
+              shipping_discount_rate: 0,
+            },
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('デフォルト設定取得エラー:', err);
     }
   };
 
-  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [field]: e.target.value });
+  const fetchAuction = async () => {
+    try {
+      setFetchLoading(true);
+      const response = await axios.get(`/api/admin/auctions/${id}`);
+      
+      if (response.data.success) {
+        const auction = response.data.data.auction;
+        
+        if (!['preparing', 'scheduled'].includes(auction.status)) {
+          setCanEdit(false);
+        }
+        
+        const startTime = new Date(0, 0, 0);
+        if (auction.start_time) {
+          const [hours, minutes] = auction.start_time.split(':');
+          startTime.setHours(parseInt(hours), parseInt(minutes));
+        }
+        
+        setFormData({
+          title: auction.title,
+          event_date: auction.event_date ? new Date(auction.event_date) : null,
+          start_time: startTime,
+          description: auction.description || '',
+          lane_count: auction.lane_count,
+          default_bid_increment: parseFloat(auction.default_bid_increment),
+          countdown_seconds: auction.countdown_seconds,
+          deposit_required: auction.deposit_required,
+          upload_deadline: auction.upload_deadline ? new Date(auction.upload_deadline) : null,
+          payment_deadline_hours: auction.payment_deadline_hours,
+          shipping_deadline_hours: auction.shipping_deadline_hours,
+          use_custom_settings: auction.use_custom_settings || false,
+          custom_auction_settings: auction.custom_auction_settings || formData.custom_auction_settings,
+          custom_fee_settings: auction.custom_fee_settings || formData.custom_fee_settings,
+          custom_shipping_settings: auction.custom_shipping_settings || formData.custom_shipping_settings,
+        });
+      }
+    } catch (err: any) {
+      console.error('オークション取得エラー:', err);
+      setError(err.response?.data?.message || 'オークションの取得に失敗しました。');
+    } finally {
+      setFetchLoading(false);
+    }
   };
 
-  const handleSubmit = () => {
-    // 設定内容をまとめて保存
-    const auctionData = {
-      ...formData,
-      bidRules: useDefaultBidRules ? null : bidRules,
-      sellerFees: useDefaultSellerFees ? null : sellerFees,
-      buyerFees: useDefaultBuyerFees ? null : buyerFees,
-      lanes,
-    };
-    console.log('Saving auction:', auctionData);
-    alert('オークションを保存しました');
-    navigate('/admin/auctions');
+  const validate = (): string | null => {
+    if (!formData.title.trim()) return 'オークション名を入力してください。';
+    if (formData.title.length > 255) return 'オークション名は255文字以内で入力してください。';
+    if (!formData.event_date) return '開催日を選択してください。';
+    if (formData.event_date < new Date(new Date().setHours(0, 0, 0, 0))) return '開催日は本日以降を指定してください。';
+    if (!formData.start_time) return '開始時刻を選択してください。';
+    if (formData.lane_count < 1 || formData.lane_count > 10) return 'レーン数は1〜10の範囲で指定してください。';
+    if (formData.default_bid_increment < 1) return 'デフォルト入札単位は1円以上を指定してください。';
+    if (formData.countdown_seconds < 1 || formData.countdown_seconds > 60) return 'カウントダウン秒数は1〜60秒の範囲で指定してください。';
+    if (formData.payment_deadline_hours < 1) return '入金期限は1時間以上を指定してください。';
+    if (formData.shipping_deadline_hours < 1) return '発送期限は1時間以上を指定してください。';
+    if (formData.upload_deadline && formData.event_date && formData.upload_deadline >= formData.event_date) {
+      return 'アップロード期限は開催日より前に設定してください。';
+    }
+    return null;
   };
 
-  // 手数料の計算例を表示
-  const calculateCommissionExample = (price: number) => {
-    const rate = useDefaultSellerFees 
-      ? parseFloat(formData.commission_rate) 
-      : parseFloat(sellerFees.seller_commission_rate);
-    const minFee = useDefaultSellerFees 
-      ? parseFloat(formData.min_commission) 
-      : parseFloat(sellerFees.seller_commission_min);
-    const commission = Math.max(
-      price * (rate / 100),
-      minFee || 0
+  const handleSubmit = async () => {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const startTime = formData.start_time
+        ? `${formData.start_time.getHours().toString().padStart(2, '0')}:${formData.start_time.getMinutes().toString().padStart(2, '0')}`
+        : '10:00';
+
+      const payload = {
+        title: formData.title,
+        event_date: formData.event_date?.toISOString().split('T')[0],
+        start_time: startTime,
+        description: formData.description,
+        lane_count: formData.lane_count,
+        default_bid_increment: formData.default_bid_increment,
+        countdown_seconds: formData.countdown_seconds,
+        deposit_required: formData.deposit_required,
+        upload_deadline: formData.upload_deadline?.toISOString(),
+        payment_deadline_hours: formData.payment_deadline_hours,
+        shipping_deadline_hours: formData.shipping_deadline_hours,
+        use_custom_settings: formData.use_custom_settings,
+        custom_auction_settings: formData.use_custom_settings ? formData.custom_auction_settings : null,
+        custom_fee_settings: formData.use_custom_settings ? formData.custom_fee_settings : null,
+        custom_shipping_settings: formData.use_custom_settings ? formData.custom_shipping_settings : null,
+      };
+
+      if (isEdit) {
+        await axios.put(`/api/admin/auctions/${id}`, payload);
+      } else {
+        await axios.post('/api/admin/auctions', payload);
+      }
+
+      navigate('/admin/auctions');
+    } catch (err: any) {
+      console.error('保存エラー:', err);
+      setError(err.response?.data?.message || '保存に失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetchLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
     );
-    return commission;
-  };
+  }
+
+  if (!canEdit && isEdit) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/admin/auctions')} sx={{ mr: 2 }}>
+            戻る
+          </Button>
+          <Typography variant="h4">オークション詳細</Typography>
+        </Box>
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          このオークションは編集できません。
+        </Alert>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>{formData.title}</Typography>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{formData.description}</Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/auctions')}
-          sx={{ mr: 2 }}
-        >
-          戻る
-        </Button>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            {isEdit ? 'オークション編集' : 'オークション新規作成'}
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            オークションの基本情報と手数料を設定します
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ja}>
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/admin/auctions')} sx={{ mr: 2 }}>
+            戻る
+          </Button>
+          <Typography variant="h4">
+            {isEdit ? 'オークション編集' : 'オークション作成'}
           </Typography>
         </Box>
-      </Box>
 
-      <Grid container spacing={3}>
-        {/* メインコンテンツ */}
-        <Grid item xs={12} lg={8}>
-          <Paper sx={{ mb: 3 }}>
-            <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
-              <Tab icon={<EventIcon />} iconPosition="start" label="基本情報" />
-              <Tab icon={<GavelIcon />} iconPosition="start" label="入札ルール" />
-              <Tab icon={<MoneyIcon />} iconPosition="start" label="料金設定" />
-              <Tab icon={<LaneIcon />} iconPosition="start" label="レーン設定" />
-            </Tabs>
-          </Paper>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-          {/* 基本情報タブ */}
-          <TabPanel value={tabValue} index={0}>
-            <Card>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                  <EventIcon sx={{ color: 'primary.main' }} />
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    基本情報
-                  </Typography>
-                </Box>
+        <Paper sx={{ mb: 3 }}>
+          <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+            <Tab icon={<SettingsIcon />} iconPosition="start" label="基本情報" />
+            <Tab icon={<GavelIcon />} iconPosition="start" label="オークション設定" />
+            <Tab icon={<MoneyIcon />} iconPosition="start" label="料金設定" />
+            <Tab icon={<ShippingIcon />} iconPosition="start" label="配送・梱包" />
+          </Tabs>
+        </Paper>
 
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      required
-                      label="オークション名"
-                      value={formData.title}
-                      onChange={handleChange('title')}
-                      placeholder="2025年12月オークション"
-                    />
+        {/* 基本情報タブ */}
+        <TabPanel value={tabValue} index={0}>
+          <Paper sx={{ p: 3 }}>
+            <Stack spacing={4}>
+              <Box>
+                <Typography variant="h6" gutterBottom>基本情報</Typography>
+                <Stack spacing={3} sx={{ mt: 2 }}>
+                  <TextField
+                    label="オークション名"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required
+                    fullWidth
+                    inputProps={{ maxLength: 255 }}
+                    helperText={`${formData.title.length}/255文字`}
+                  />
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <DatePicker
+                        label="開催日"
+                        value={formData.event_date}
+                        onChange={(date) => setFormData({ ...formData, event_date: date })}
+                        minDate={new Date()}
+                        slotProps={{ textField: { fullWidth: true, required: true } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TimePicker
+                        label="開始時刻"
+                        value={formData.start_time}
+                        onChange={(time) => setFormData({ ...formData, start_time: time })}
+                        slotProps={{ textField: { fullWidth: true, required: true } }}
+                      />
+                    </Grid>
                   </Grid>
 
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      required
-                      type="date"
-                      label="開催日"
-                      value={formData.event_date}
-                      onChange={handleChange('event_date')}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
+                  <TextField
+                    label="説明"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    fullWidth
+                    multiline
+                    rows={4}
+                  />
+                </Stack>
+              </Box>
 
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      required
-                      type="time"
-                      label="開始時刻"
-                      value={formData.start_time}
-                      onChange={handleChange('start_time')}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
+              <Divider />
 
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="説明"
-                      value={formData.description}
-                      onChange={handleChange('description')}
-                      multiline
-                      rows={4}
-                      placeholder="オークションの説明を入力..."
-                    />
+              <Box>
+                <Typography variant="h6" gutterBottom>オークション設定</Typography>
+                <Stack spacing={3} sx={{ mt: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        label="レーン数"
+                        type="number"
+                        value={formData.lane_count}
+                        onChange={(e) => setFormData({ ...formData, lane_count: parseInt(e.target.value) || 0 })}
+                        required
+                        fullWidth
+                        InputProps={{ inputProps: { min: 1, max: 10 } }}
+                        helperText="1〜10"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        label="デフォルト入札単位"
+                        type="number"
+                        value={formData.default_bid_increment}
+                        onChange={(e) => setFormData({ ...formData, default_bid_increment: parseInt(e.target.value) || 0 })}
+                        required
+                        fullWidth
+                        InputProps={{
+                          endAdornment: <InputAdornment position="end">円</InputAdornment>,
+                          inputProps: { min: 1 },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        label="カウントダウン秒数"
+                        type="number"
+                        value={formData.countdown_seconds}
+                        onChange={(e) => setFormData({ ...formData, countdown_seconds: parseInt(e.target.value) || 0 })}
+                        required
+                        fullWidth
+                        InputProps={{
+                          endAdornment: <InputAdornment position="end">秒</InputAdornment>,
+                          inputProps: { min: 1, max: 60 },
+                        }}
+                        helperText="1〜60"
+                      />
+                    </Grid>
                   </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </TabPanel>
-
-          {/* 入札ルールタブ */}
-          <TabPanel value={tabValue} index={1}>
-            <Card>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <GavelIcon sx={{ color: '#7C3AED' }} />
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      入札ルール
-                    </Typography>
-                  </Box>
                   <FormControlLabel
                     control={
-                      <Switch
-                        checked={useDefaultBidRules}
-                        onChange={(e) => setUseDefaultBidRules(e.target.checked)}
+                      <Checkbox
+                        checked={formData.deposit_required}
+                        onChange={(e) => setFormData({ ...formData, deposit_required: e.target.checked })}
                       />
                     }
-                    label="システムデフォルトを使用"
+                    label="保証金必須"
                   />
-                </Box>
+                </Stack>
+              </Box>
 
-                {useDefaultBidRules ? (
-                  <Alert severity="info">
-                    システム設定のデフォルト入札ルールが適用されます。このオークション専用のルールを設定する場合は、スイッチをオフにしてください。
-                  </Alert>
-                ) : (
+              <Divider />
+
+              <Box>
+                <Typography variant="h6" gutterBottom>期限設定</Typography>
+                <Stack spacing={3} sx={{ mt: 2 }}>
+                  <DateTimePicker
+                    label="商品アップロード期限"
+                    value={formData.upload_deadline}
+                    onChange={(date) => setFormData({ ...formData, upload_deadline: date })}
+                    maxDateTime={formData.event_date || undefined}
+                    slotProps={{
+                      textField: { fullWidth: true, helperText: '出品者が生体情報をアップロードできる期限' },
+                    }}
+                  />
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        label="入金期限"
+                        type="number"
+                        value={formData.payment_deadline_hours}
+                        onChange={(e) => setFormData({ ...formData, payment_deadline_hours: parseInt(e.target.value) || 0 })}
+                        required
+                        fullWidth
+                        InputProps={{
+                          endAdornment: <InputAdornment position="end">時間</InputAdornment>,
+                          inputProps: { min: 1 },
+                        }}
+                        helperText="落札後の入金期限"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        label="発送期限"
+                        type="number"
+                        value={formData.shipping_deadline_hours}
+                        onChange={(e) => setFormData({ ...formData, shipping_deadline_hours: parseInt(e.target.value) || 0 })}
+                        required
+                        fullWidth
+                        InputProps={{
+                          endAdornment: <InputAdornment position="end">時間</InputAdornment>,
+                          inputProps: { min: 1 },
+                        }}
+                        helperText="入金確認後の発送期限"
+                      />
+                    </Grid>
+                  </Grid>
+                </Stack>
+              </Box>
+            </Stack>
+          </Paper>
+        </TabPanel>
+
+        {/* オークション設定タブ */}
+        <TabPanel value={tabValue} index={1}>
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>カスタム設定</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    このオークション専用の設定を使用する場合はONにしてください
+                  </Typography>
+                </Box>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.use_custom_settings}
+                      onChange={(e) => setFormData({ ...formData, use_custom_settings: e.target.checked })}
+                    />
+                  }
+                  label={formData.use_custom_settings ? 'カスタム' : 'システムデフォルト'}
+                />
+              </Box>
+
+              {!formData.use_custom_settings && (
+                <Alert severity="info">
+                  システムデフォルト設定を使用しています。カスタム設定を使用する場合はスイッチをONにしてください。
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>入札ルール</Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="価格上昇率"
+                    value={formData.custom_auction_settings.price_increment_rate}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        price_increment_rate: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${defaultSettings.auction_settings.price_increment_rate}%` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="最低上昇金額"
+                    value={formData.custom_auction_settings.price_increment_min}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        price_increment_min: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.auction_settings.price_increment_min || 50}` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="カウントダウン秒数"
+                    value={formData.custom_auction_settings.countdown_seconds}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        countdown_seconds: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${defaultSettings.auction_settings.countdown_seconds}秒` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="自動延長秒数"
+                    value={formData.custom_auction_settings.auto_extend_seconds}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        auto_extend_seconds: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${defaultSettings.auction_settings.auto_extend_seconds || 10}秒` : ''}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </TabPanel>
+
+        {/* 料金設定タブ */}
+        <TabPanel value={tabValue} index={2}>
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {formData.use_custom_settings ? 'カスタム設定を使用中' : 'システムデフォルト設定を使用中'}
+                </Typography>
+                <Chip
+                  label={formData.use_custom_settings ? 'カスタム' : 'デフォルト'}
+                  color={formData.use_custom_settings ? 'primary' : 'default'}
+                  size="small"
+                />
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#059669' }}>
+                    出品者向け料金
+                  </Typography>
                   <Grid container spacing={3}>
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
                         type="number"
-                        label="価格上昇率"
-                        value={bidRules.price_increment_rate}
-                        onChange={handleBidRuleChange('price_increment_rate')}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                        }}
-                        helperText="複数人入札時の価格上昇率"
+                        label="基本出品料"
+                        value={formData.custom_fee_settings.base_listing_fee}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_fee_settings: {
+                            ...formData.custom_fee_settings,
+                            base_listing_fee: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.base_listing_fee}` : ''}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
                         type="number"
-                        label="最低上昇金額"
-                        value={bidRules.price_increment_min}
-                        onChange={handleBidRuleChange('price_increment_min')}
-                        InputProps={{
-                          startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                        }}
-                        helperText="最低でもこの金額は上昇"
+                        label="プレミアム出品料"
+                        value={formData.custom_fee_settings.premium_listing_fee}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_fee_settings: {
+                            ...formData.custom_fee_settings,
+                            premium_listing_fee: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.premium_listing_fee}` : ''}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
                         type="number"
-                        label="カウントダウン秒数"
-                        value={bidRules.countdown_seconds}
-                        onChange={handleBidRuleChange('countdown_seconds')}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                        }}
-                        helperText="価格上昇までの待機時間"
+                        label="販売手数料率"
+                        value={formData.custom_fee_settings.seller_commission_rate}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_fee_settings: {
+                            ...formData.custom_fee_settings,
+                            seller_commission_rate: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ${defaultSettings.fee_settings.seller_commission_rate}%` : ''}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
                         type="number"
-                        label="自動延長秒数"
-                        value={bidRules.auto_extend_seconds}
-                        onChange={handleBidRuleChange('auto_extend_seconds')}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                        }}
-                        helperText="終了直前の入札で延長"
+                        label="最低手数料"
+                        value={formData.custom_fee_settings.seller_commission_min}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_fee_settings: {
+                            ...formData.custom_fee_settings,
+                            seller_commission_min: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.seller_commission_min}` : ''}
                       />
                     </Grid>
                   </Grid>
-                )}
-              </CardContent>
-            </Card>
-          </TabPanel>
-
-          {/* 料金設定タブ */}
-          <TabPanel value={tabValue} index={2}>
-            <Grid container spacing={3}>
-              {/* 出品者向け料金 */}
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <MoneyIcon sx={{ color: '#059669' }} />
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          出品者向け料金
-                        </Typography>
-                      </Box>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={useDefaultSellerFees}
-                            onChange={(e) => setUseDefaultSellerFees(e.target.checked)}
-                          />
-                        }
-                        label="システムデフォルトを使用"
-                      />
-                    </Box>
-
-                    {useDefaultSellerFees ? (
-                      <Alert severity="info">
-                        システム設定のデフォルト料金が適用されます。このオークション専用の料金を設定する場合は、スイッチをオフにしてください。
-                      </Alert>
-                    ) : (
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="基本出品料"
-                            value={sellerFees.base_listing_fee}
-                            onChange={handleSellerFeeChange('base_listing_fee')}
-                            InputProps={{
-                              startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                            }}
-                            helperText="1点あたりの出品料"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="プレミアム出品料"
-                            value={sellerFees.premium_listing_fee}
-                            onChange={handleSellerFeeChange('premium_listing_fee')}
-                            InputProps={{
-                              startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                            }}
-                            helperText="個別撮影付きの出品料"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="販売手数料率"
-                            value={sellerFees.seller_commission_rate}
-                            onChange={handleSellerFeeChange('seller_commission_rate')}
-                            InputProps={{
-                              endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                            }}
-                            helperText="落札金額に対する手数料"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="最低手数料"
-                            value={sellerFees.seller_commission_min}
-                            onChange={handleSellerFeeChange('seller_commission_min')}
-                            InputProps={{
-                              startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                            }}
-                            helperText="1点あたりの最低手数料"
-                          />
-                        </Grid>
-                      </Grid>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* 買受者向け料金 */}
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <MoneyIcon sx={{ color: '#3B82F6' }} />
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          買受者向け料金
-                        </Typography>
-                      </Box>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={useDefaultBuyerFees}
-                            onChange={(e) => setUseDefaultBuyerFees(e.target.checked)}
-                          />
-                        }
-                        label="システムデフォルトを使用"
-                      />
-                    </Box>
-
-                    {useDefaultBuyerFees ? (
-                      <Alert severity="info">
-                        システム設定のデフォルト料金が適用されます。このオークション専用の料金を設定する場合は、スイッチをオフにしてください。
-                      </Alert>
-                    ) : (
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="落札手数料率"
-                            value={buyerFees.buyer_commission_rate}
-                            onChange={handleBuyerFeeChange('buyer_commission_rate')}
-                            InputProps={{
-                              endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                            }}
-                            helperText="落札金額に対する手数料"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="最低手数料"
-                            value={buyerFees.buyer_commission_min}
-                            onChange={handleBuyerFeeChange('buyer_commission_min')}
-                            InputProps={{
-                              startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                            }}
-                            helperText="1点あたりの最低手数料"
-                          />
-                        </Grid>
-                      </Grid>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-
-            {/* 手数料計算例 */}
-            {(!useDefaultSellerFees || !useDefaultBuyerFees) && (
-              <Card sx={{ mt: 3 }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                    手数料計算例
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {[5000, 10000, 30000, 50000].map((price) => (
-                      <Box
-                        key={price}
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          p: 1.5,
-                          bgcolor: 'grey.50',
-                          borderRadius: 1,
-                        }}
-                      >
-                        <Typography variant="body2">
-                          落札価格 ¥{price.toLocaleString()}
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#059669' }}>
-                          手数料 ¥{calculateCommissionExample(price).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
                 </CardContent>
               </Card>
-            )}
-          </TabPanel>
+            </Grid>
 
-          {/* レーン設定タブ */}
-          <TabPanel value={tabValue} index={3}>
-            <Card>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <LaneIcon sx={{ color: '#F59E0B' }} />
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      レーン設定
-                    </Typography>
-                  </Box>
-                  <Button
-                    variant="outlined"
-                    startIcon={<AddIcon />}
-                    onClick={addLane}
-                    size="small"
-                  >
-                    レーン追加
-                  </Button>
-                </Box>
-
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  レーン名をカスタマイズして、品種や出品カテゴリを分かりやすく表示できます。
-                </Alert>
-
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell width={60}>番号</TableCell>
-                        <TableCell>レーン名</TableCell>
-                        <TableCell>説明（任意）</TableCell>
-                        <TableCell width={160}>入札者数表示</TableCell>
-                        <TableCell width={60} align="center">操作</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {lanes.map((lane, index) => (
-                        <TableRow key={lane.id}>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {index + 1}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={lane.name}
-                              onChange={(e) => handleLaneChange(lane.id, 'name', e.target.value)}
-                              placeholder={`レーン${index + 1}`}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={lane.description}
-                              onChange={(e) => handleLaneChange(lane.id, 'description', e.target.value)}
-                              placeholder="例: 幹之系、楊貴妃系など"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <FormControl fullWidth size="small">
-                              <Select
-                                value={lane.bidder_display}
-                                onChange={(e) => handleLaneChange(lane.id, 'bidder_display', e.target.value)}
-                              >
-                                <MenuItem value="count">何人入札中</MenuItem>
-                                <MenuItem value="simple">入札中</MenuItem>
-                                <MenuItem value="hidden">非表示</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </TableCell>
-                          <TableCell align="center">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => removeLane(lane.id)}
-                              disabled={lanes.length <= 1}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
-          </TabPanel>
-        </Grid>
-
-        {/* サイドバー */}
-        <Grid item xs={12} lg={4}>
-          <Card sx={{ position: 'sticky', top: 80 }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                アクション
-              </Typography>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  startIcon={<SaveIcon />}
-                  fullWidth
-                  onClick={handleSubmit}
-                >
-                  {isEdit ? '変更を保存' : 'オークションを作成'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate('/admin/auctions')}
-                  fullWidth
-                >
-                  キャンセル
-                </Button>
-              </Box>
-
-              <Divider sx={{ my: 3 }} />
-
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
-                <InfoIcon sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2 }} />
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    設定について
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#3B82F6' }}>
+                    買受者向け料金
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                    「システムデフォルトを使用」がオンの場合、システム設定画面の値が適用されます。
-                    オークションごとに異なる設定が必要な場合はオフにして個別設定してください。
-                  </Typography>
-                </Box>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="落札手数料率"
+                        value={formData.custom_fee_settings.buyer_commission_rate}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_fee_settings: {
+                            ...formData.custom_fee_settings,
+                            buyer_commission_rate: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ${defaultSettings.fee_settings.buyer_commission_rate}%` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="最低手数料"
+                        value={formData.custom_fee_settings.buyer_commission_min}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_fee_settings: {
+                            ...formData.custom_fee_settings,
+                            buyer_commission_min: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.buyer_commission_min}` : ''}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* 配送・梱包設定タブ */}
+        <TabPanel value={tabValue} index={3}>
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {formData.use_custom_settings ? 'カスタム設定を使用中' : 'システムデフォルト設定を使用中'}
+                </Typography>
+                <Chip
+                  label={formData.use_custom_settings ? 'カスタム' : 'デフォルト'}
+                  color={formData.use_custom_settings ? 'primary' : 'default'}
+                  size="small"
+                />
               </Box>
-
-              <Divider sx={{ my: 3 }} />
-
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="管理者メモ"
-                value={formData.notes}
-                onChange={handleChange('notes')}
-                placeholder="内部向けのメモを入力..."
-                size="small"
-              />
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
-    </Box>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>梱包・手数料</Typography>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="梱包料金"
+                        value={formData.custom_shipping_settings.packaging_fee}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_shipping_settings: {
+                            ...formData.custom_shipping_settings,
+                            packaging_fee: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.packaging_fee}` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="取扱手数料"
+                        value={formData.custom_shipping_settings.handling_fee}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_shipping_settings: {
+                            ...formData.custom_shipping_settings,
+                            handling_fee: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.handling_fee}` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="保険料率"
+                        value={formData.custom_shipping_settings.insurance_fee_rate}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_shipping_settings: {
+                            ...formData.custom_shipping_settings,
+                            insurance_fee_rate: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ${defaultSettings.shipping_settings.insurance_fee_rate}%` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="配送料割引率"
+                        value={formData.custom_shipping_settings.shipping_discount_rate}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_shipping_settings: {
+                            ...formData.custom_shipping_settings,
+                            shipping_discount_rate: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ endAdornment: <InputAdornment position="end">%OFF</InputAdornment> }}
+                        helperText="このオークション限定の配送料割引"
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>季節料金</Typography>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="夏季クール便料金"
+                        value={formData.custom_shipping_settings.cooling_fee_summer}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_shipping_settings: {
+                            ...formData.custom_shipping_settings,
+                            cooling_fee_summer: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.cooling_fee_summer}（6-9月）` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="冬季保温料金"
+                        value={formData.custom_shipping_settings.heating_fee_winter}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          custom_shipping_settings: {
+                            ...formData.custom_shipping_settings,
+                            heating_fee_winter: parseInt(e.target.value) || 0,
+                          },
+                        })}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.heating_fee_winter}（12-2月）` : ''}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              {defaultSettings?.shipping_settings.shipping_rates && (
+                <Card sx={{ mt: 3 }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>地域別配送料金（参考）</Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>地域</TableCell>
+                            <TableCell align="right">60サイズ</TableCell>
+                            <TableCell align="right">80サイズ</TableCell>
+                            <TableCell align="right">100サイズ</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {defaultSettings.shipping_settings.shipping_rates.map((rate, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{rate.region}</TableCell>
+                              <TableCell align="right">¥{rate.size_60?.toLocaleString()}</TableCell>
+                              <TableCell align="right">¥{rate.size_80?.toLocaleString()}</TableCell>
+                              <TableCell align="right">¥{rate.size_100?.toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      ※ 配送料金テーブルはシステム設定で変更できます
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* 保存ボタン */}
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Button variant="outlined" onClick={() => navigate('/admin/auctions')}>
+            キャンセル
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
+          >
+            {isEdit ? '更新' : '作成'}
+          </Button>
+        </Box>
+      </Box>
+    </LocalizationProvider>
   );
 }

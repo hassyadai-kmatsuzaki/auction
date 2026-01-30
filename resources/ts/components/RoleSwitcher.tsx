@@ -45,9 +45,9 @@ const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
     handleClose();
     
     if (roleName === 'seller') {
-      navigate('/seller');
+      navigate('/seller/dashboard');
     } else if (roleName === 'participant') {
-      navigate('/');
+      navigate('/participant/home');
     }
   };
 

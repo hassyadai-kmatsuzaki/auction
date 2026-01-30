@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -21,124 +21,128 @@ import {
   Select,
   MenuItem,
   Grid,
-  Paper,
   IconButton,
   Tabs,
   Tab,
+  CircularProgress,
+  Alert,
+  Pagination,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Visibility as VisibilityIcon,
-  Edit as EditIcon,
   History as HistoryIcon,
   TrendingUp as TrendingUpIcon,
   Pets as PetsIcon,
   CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Cancel as CancelIcon,
-  FilterList as FilterIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
-// Mock データ
-const itemHistory = [
-  {
-    id: 1,
-    species_name: '紅白ラメ',
-    quantity: '3ペア',
-    auction: '2025年11月オークション',
-    auction_date: '2025-11-12',
-    status: 'sold',
-    start_price: 5000,
-    final_price: 35000,
-    buyer: '佐々木様',
-    submitted_at: '2025-11-05',
-  },
-  {
-    id: 2,
-    species_name: '幹之フルボディ',
-    quantity: '5匹',
-    auction: '2025年11月オークション',
-    auction_date: '2025-11-12',
-    status: 'sold',
-    start_price: 3000,
-    final_price: 28000,
-    buyer: '伊藤様',
-    submitted_at: '2025-11-05',
-  },
-  {
-    id: 3,
-    species_name: '三色ラメ',
-    quantity: '2ペア',
-    auction: '2025年11月オークション',
-    auction_date: '2025-11-12',
-    status: 'shipping',
-    start_price: 8000,
-    final_price: 42000,
-    buyer: '渡辺様',
-    submitted_at: '2025-11-05',
-  },
-  {
-    id: 4,
-    species_name: 'オロチ',
-    quantity: '4匹',
-    auction: '2025年12月オークション',
-    auction_date: '2025-12-10',
-    status: 'pending',
-    start_price: 4000,
-    final_price: null,
-    buyer: null,
-    submitted_at: '2025-12-01',
-  },
-  {
-    id: 5,
-    species_name: 'サファイア',
-    quantity: '3匹',
-    auction: '2025年12月オークション',
-    auction_date: '2025-12-10',
-    status: 'reviewing',
-    start_price: 6000,
-    final_price: null,
-    buyer: null,
-    submitted_at: '2025-12-03',
-  },
-  {
-    id: 6,
-    species_name: '楊貴妃',
-    quantity: '10匹',
-    auction: '2025年10月オークション',
-    auction_date: '2025-10-15',
-    status: 'unsold',
-    start_price: 2000,
-    final_price: null,
-    buyer: null,
-    submitted_at: '2025-10-08',
-  },
-  {
-    id: 7,
-    species_name: '紅帝',
-    quantity: '2ペア',
-    auction: '2025年10月オークション',
-    auction_date: '2025-10-15',
-    status: 'cancelled',
-    start_price: 5000,
-    final_price: null,
-    buyer: null,
-    submitted_at: '2025-10-08',
-  },
-];
+interface Item {
+  id: number;
+  item_number: number;
+  species_name: string;
+  quantity: number;
+  start_price: number;
+  current_price: number;
+  estimated_price: number | null;
+  is_premium: boolean;
+  status: string;
+  thumbnail_path: string | null;
+  auction: {
+    id: number;
+    title: string;
+    event_date: string;
+    status: string;
+  } | null;
+  won_item: {
+    winning_price: number;
+    quantity: number;
+    payment_status: string;
+    delivery_status: string;
+  } | null;
+  created_at: string;
+}
+
+interface Stats {
+  total_items: number;
+  items_this_month: number;
+  total_sales: number;
+  sales_this_month: number;
+  pending_payment: number;
+  items_shipping: number;
+}
 
 export default function ItemHistory() {
   const navigate = useNavigate();
+  const [items, setItems] = useState<Item[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    total_items: 0,
+    items_this_month: 0,
+    total_sales: 0,
+    sales_this_month: 0,
+    pending_payment: 0,
+    items_shipping: 0,
+  });
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [tabValue, setTabValue] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    fetchItems();
+    fetchStats();
+  }, [currentPage, filterStatus, searchTerm]);
+
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        per_page: '20',
+      });
+      
+      if (filterStatus !== 'all') {
+        params.append('status', filterStatus);
+      }
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+      
+      const response = await axios.get(`/api/seller/items?${params}`);
+      if (response.data.success) {
+        setItems(response.data.data.items);
+        setLastPage(response.data.data.pagination.last_page);
+        setTotal(response.data.data.pagination.total);
+      }
+    } catch (err) {
+      console.error('出品履歴取得エラー:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get('/api/seller/items/stats');
+      if (response.data.success) {
+        setStats(response.data.data.stats);
+      }
+    } catch (err) {
+      console.error('統計取得エラー:', err);
+    }
+  };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
+      case 'draft': return '下書き';
+      case 'registered': return '登録済み';
+      case 'live': return 'オークション中';
       case 'sold': return '落札済み';
-      case 'shipping': return '発送待ち';
-      case 'pending': return '出品予定';
-      case 'reviewing': return '審査中';
       case 'unsold': return '不落札';
       case 'cancelled': return 'キャンセル';
       default: return status;
@@ -148,32 +152,28 @@ export default function ItemHistory() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'sold': return { bgcolor: '#ECFDF5', color: '#059669' };
-      case 'shipping': return { bgcolor: '#FEF3C7', color: '#D97706' };
-      case 'pending': return { bgcolor: '#DBEAFE', color: '#2563EB' };
-      case 'reviewing': return { bgcolor: '#F3E8FF', color: '#9333EA' };
+      case 'live': return { bgcolor: '#FEF3C7', color: '#D97706' };
+      case 'registered': return { bgcolor: '#DBEAFE', color: '#2563EB' };
+      case 'draft': return { bgcolor: '#F3E8FF', color: '#9333EA' };
       case 'unsold': return { bgcolor: '#FEE2E2', color: '#DC2626' };
       case 'cancelled': return { bgcolor: '#F1F5F9', color: '#64748B' };
       default: return { bgcolor: '#F1F5F9', color: '#64748B' };
     }
   };
 
-  const filteredItems = itemHistory.filter(item => {
-    const matchesSearch = item.species_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.auction.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
+  const filteredItems = items.filter(item => {
     const matchesTab = tabValue === 0 || 
-                       (tabValue === 1 && ['pending', 'reviewing'].includes(item.status)) ||
-                       (tabValue === 2 && ['sold', 'shipping'].includes(item.status)) ||
+                       (tabValue === 1 && ['draft', 'registered'].includes(item.status)) ||
+                       (tabValue === 2 && ['sold', 'live'].includes(item.status)) ||
                        (tabValue === 3 && ['unsold', 'cancelled'].includes(item.status));
-    return matchesSearch && matchesStatus && matchesTab;
+    return matchesTab;
   });
 
-  // 統計
-  const totalItems = itemHistory.length;
-  const soldItems = itemHistory.filter(i => i.status === 'sold' || i.status === 'shipping').length;
-  const totalSales = itemHistory
-    .filter(i => i.final_price)
-    .reduce((sum, i) => sum + (i.final_price || 0), 0);
+  // 統計計算
+  const soldItems = items.filter(i => i.status === 'sold').length;
+  const totalSales = items
+    .filter(i => i.won_item)
+    .reduce((sum, i) => sum + (i.won_item?.winning_price || 0) * (i.won_item?.quantity || 0), 0);
   const avgPrice = soldItems > 0 ? Math.round(totalSales / soldItems) : 0;
 
   return (
@@ -190,7 +190,8 @@ export default function ItemHistory() {
         </Box>
         <Button
           variant="contained"
-          onClick={() => navigate('/seller/submit')}
+          startIcon={<AddIcon />}
+          onClick={() => navigate('/seller/items/create')}
         >
           新規出品申込
         </Button>
@@ -210,7 +211,7 @@ export default function ItemHistory() {
                     総出品数
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    {totalItems}件
+                    {stats.total_items}件
                   </Typography>
                 </Box>
               </Box>
@@ -226,10 +227,10 @@ export default function ItemHistory() {
                 </Avatar>
                 <Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    落札数
+                    今月の出品
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    {soldItems}件
+                    {stats.items_this_month}件
                   </Typography>
                 </Box>
               </Box>
@@ -248,7 +249,7 @@ export default function ItemHistory() {
                     総売上
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    ¥{totalSales.toLocaleString()}
+                    ¥{stats.total_sales.toLocaleString()}
                   </Typography>
                 </Box>
               </Box>
@@ -264,10 +265,10 @@ export default function ItemHistory() {
                 </Avatar>
                 <Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    平均落札価格
+                    発送待ち
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    ¥{avgPrice.toLocaleString()}
+                    {stats.items_shipping}件
                   </Typography>
                 </Box>
               </Box>
@@ -284,7 +285,7 @@ export default function ItemHistory() {
           sx={{ px: 2, pt: 1 }}
         >
           <Tab label="すべて" />
-          <Tab label="出品予定・審査中" />
+          <Tab label="出品予定" />
           <Tab label="落札済み" />
           <Tab label="不落札・キャンセル" />
         </Tabs>
@@ -296,7 +297,7 @@ export default function ItemHistory() {
           <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
             <TextField
               size="small"
-              placeholder="品種名・オークション名で検索..."
+              placeholder="品種名で検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -316,99 +317,128 @@ export default function ItemHistory() {
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
                 <MenuItem value="all">すべて</MenuItem>
+                <MenuItem value="draft">下書き</MenuItem>
+                <MenuItem value="registered">登録済み</MenuItem>
+                <MenuItem value="live">オークション中</MenuItem>
                 <MenuItem value="sold">落札済み</MenuItem>
-                <MenuItem value="shipping">発送待ち</MenuItem>
-                <MenuItem value="pending">出品予定</MenuItem>
-                <MenuItem value="reviewing">審査中</MenuItem>
                 <MenuItem value="unsold">不落札</MenuItem>
                 <MenuItem value="cancelled">キャンセル</MenuItem>
               </Select>
             </FormControl>
           </Box>
 
-          {/* テーブル */}
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>品種名</TableCell>
-                  <TableCell>オークション</TableCell>
-                  <TableCell align="center">数量</TableCell>
-                  <TableCell align="right">開始価格</TableCell>
-                  <TableCell align="right">落札価格</TableCell>
-                  <TableCell align="center">ステータス</TableCell>
-                  <TableCell>落札者</TableCell>
-                  <TableCell align="center">操作</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredItems.map((item) => (
-                  <TableRow key={item.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ width: 36, height: 36, bgcolor: '#F0FDF4' }}>
-                          <PetsIcon sx={{ fontSize: 18, color: '#059669' }} />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item.species_name}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            申請日: {new Date(item.submitted_at).toLocaleDateString('ja-JP')}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{item.auction}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {new Date(item.auction_date).toLocaleDateString('ja-JP')}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">{item.quantity}</TableCell>
-                    <TableCell align="right">¥{item.start_price.toLocaleString()}</TableCell>
-                    <TableCell align="right">
-                      {item.final_price ? (
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          ¥{item.final_price.toLocaleString()}
-                        </Typography>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={getStatusLabel(item.status)}
-                        size="small"
-                        sx={{
-                          ...getStatusColor(item.status),
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>{item.buyer || '-'}</TableCell>
-                    <TableCell align="center">
-                      <IconButton size="small" color="primary">
-                        <VisibilityIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {filteredItems.length === 0 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                該当する出品がありません
-              </Typography>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
             </Box>
+          ) : filteredItems.length === 0 ? (
+            <Alert severity="info">
+              {items.length === 0 
+                ? '出品履歴がありません。新規出品申込から出品を始めましょう！' 
+                : '該当する出品がありません'}
+            </Alert>
+          ) : (
+            <>
+              {/* テーブル */}
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>品種名</TableCell>
+                      <TableCell>オークション</TableCell>
+                      <TableCell align="center">数量</TableCell>
+                      <TableCell align="right">開始価格</TableCell>
+                      <TableCell align="right">落札価格</TableCell>
+                      <TableCell align="center">ステータス</TableCell>
+                      <TableCell align="center">操作</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredItems.map((item) => (
+                      <TableRow key={item.id} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Avatar sx={{ width: 36, height: 36, bgcolor: '#F0FDF4' }}>
+                              <PetsIcon sx={{ fontSize: 18, color: '#059669' }} />
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {item.species_name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                #{item.item_number} | {new Date(item.created_at).toLocaleDateString('ja-JP')}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          {item.auction ? (
+                            <>
+                              <Typography variant="body2">{item.auction.title}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {new Date(item.auction.event_date).toLocaleDateString('ja-JP')}
+                              </Typography>
+                            </>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell align="center">{item.quantity}匹</TableCell>
+                        <TableCell align="right">¥{item.start_price.toLocaleString()}</TableCell>
+                        <TableCell align="right">
+                          {item.won_item ? (
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              ¥{item.won_item.winning_price.toLocaleString()}
+                            </Typography>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={getStatusLabel(item.status)}
+                            size="small"
+                            sx={{
+                              ...getStatusColor(item.status),
+                              fontWeight: 600,
+                              fontSize: '0.7rem',
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => navigate(`/seller/items/${item.id}`)}
+                          >
+                            <VisibilityIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* ページネーション */}
+              {lastPage > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                  <Pagination
+                    count={lastPage}
+                    page={currentPage}
+                    onChange={(_, page) => setCurrentPage(page)}
+                    color="primary"
+                  />
+                </Box>
+              )}
+              
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
+                全{total}件
+              </Typography>
+            </>
           )}
         </CardContent>
       </Card>
     </Box>
   );
 }
-

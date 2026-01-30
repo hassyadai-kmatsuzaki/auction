@@ -32,6 +32,7 @@ import LiveControl from './pages/admin/LiveControl';
 import WonItemManagement from './pages/admin/WonItemManagement';
 import UserManagement from './pages/admin/UserManagement';
 import UserDetail from './pages/admin/UserDetail';
+import UserCreate from './pages/admin/UserCreate';
 import Settings from './pages/admin/Settings';
 import SellerManagement from './pages/admin/SellerManagement';
 import SellerDetail from './pages/admin/SellerDetail';
@@ -46,6 +47,7 @@ import AIPricePrediction from './pages/admin/AIPricePrediction';
 import AIFraudDetection from './pages/admin/AIFraudDetection';
 import AIRecommendations from './pages/admin/AIRecommendations';
 import Reports from './pages/admin/Reports';
+import DesignSystem from './pages/admin/DesignSystem';
 
 // Seller pages
 import SellerLayout from './layouts/SellerLayout';
@@ -54,6 +56,7 @@ import SubmitItem from './pages/seller/SubmitItem';
 import SellerProfile from './pages/seller/Profile';
 import SellerShipping from './pages/seller/Shipping';
 import ItemHistory from './pages/seller/ItemHistory';
+import SellerItemDetail from './pages/seller/ItemDetail';
 import SalesSettlement from './pages/seller/SalesSettlement';
 
 // Legal pages
@@ -102,6 +105,8 @@ function App() {
             <Route path="dashboard" element={<SellerDashboard />} />
             <Route path="submit" element={<SubmitItem />} />
             <Route path="items" element={<ItemHistory />} />
+            <Route path="items/create" element={<SubmitItem />} />
+            <Route path="items/:id" element={<SellerItemDetail />} />
             <Route path="sales" element={<SalesSettlement />} />
             <Route path="shipping" element={<SellerShipping />} />
             <Route path="profile" element={<SellerProfile />} />
@@ -160,12 +165,16 @@ function App() {
             <Route path="ai/recommendations" element={<AIRecommendations />} />
             <Route path="reports" element={<Reports />} />
             
-            {/* ユーザー管理（旧） */}
+            {/* ユーザー管理 */}
             <Route path="users" element={<UserManagement />} />
+            <Route path="users/create" element={<UserCreate />} />
             <Route path="users/:id" element={<UserDetail />} />
             
             {/* 設定 */}
             <Route path="settings" element={<Settings />} />
+            
+            {/* デザインシステム */}
+            <Route path="design-system" element={<DesignSystem />} />
           </Route>
 
           {/* デフォルトリダイレクト（認証必須） */}

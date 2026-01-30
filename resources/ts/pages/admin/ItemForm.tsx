@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -20,6 +20,9 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  CircularProgress,
+  Snackbar,
+  LinearProgress,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -30,162 +33,298 @@ import {
   Info as InfoIcon,
   Close as CloseIcon,
   Image as ImageIcon,
+  Star as StarIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
-// Mock 出品者データ
-const sellers = [
-  {
-    id: 1,
-    name: '田中養魚場',
-    representative: '田中太郎',
-    email: 'tanaka@example.com',
-    phone: '090-1234-5678',
-    commission_rate: 10,
-  },
-  {
-    id: 2,
-    name: 'メダカの佐藤',
-    representative: '佐藤花子',
-    email: 'sato@example.com',
-    phone: '090-2345-6789',
-    commission_rate: 10,
-  },
-  {
-    id: 3,
-    name: '鈴木メダカファーム',
-    representative: '鈴木一郎',
-    email: 'suzuki@example.com',
-    phone: '090-3456-7890',
-    commission_rate: 8,
-  },
-];
+interface SellerProfile {
+  id: number;
+  seller_name: string;
+  contact_name: string | null;
+  email: string;
+  phone: string;
+  commission_rate: number;
+}
 
-// Mock 出品者からの出品申請データ（転記元）
-const sellerSubmissions = [
-  {
-    seller_id: 1,
-    species_name: '紅白ラメ',
-    quantity: '3ペア',
-    individual_info: '親魚は自家繁殖2代目。体長約4cm、ラメの乗りが良好。オス・メスともに健康状態良好。',
-    seller_notes: '発送は落札日から3日以内に対応可能です。',
-    submitted_at: '2025-11-10',
-  },
-  {
-    seller_id: 1,
-    species_name: '幹之フルボディ',
-    quantity: '5匹',
-    individual_info: '当歳魚、体長3-3.5cm。フルボディタイプ、背中の光がしっかり入っています。',
-    seller_notes: '元気な個体を厳選してお送りします。',
-    submitted_at: '2025-11-10',
-  },
-  {
-    seller_id: 3,
-    species_name: '三色ラメ',
-    quantity: '2ペア',
-    individual_info: '自家繁殖3代目。赤・黒・白のバランスが良い個体。ラメも綺麗に乗っています。体長約3.5cm。',
-    seller_notes: '死着保証あり。到着後24時間以内にご連絡ください。',
-    submitted_at: '2025-11-08',
-  },
-];
+interface MediaItem {
+  id: number;
+  media_type: string;
+  file_path: string;
+  file_url: string | null;
+  is_thumbnail: boolean;
+  display_order: number;
+}
+
+interface UploadingFile {
+  file: File;
+  preview: string;
+  progress: number;
+  uploading: boolean;
+  error?: string;
+}
 
 export default function ItemForm() {
   const navigate = useNavigate();
-  const { auctionId, id } = useParams();
+  const { auctionId, id } = useParams<{ auctionId: string; id: string }>();
   const isEdit = Boolean(id);
 
-  const [selectedSeller, setSelectedSeller] = useState<typeof sellers[0] | null>(null);
-  const [selectedSubmission, setSelectedSubmission] = useState<typeof sellerSubmissions[0] | null>(null);
+  const [loading, setLoading] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
+  const [sellers, setSellers] = useState<SellerProfile[]>([]);
+  const [selectedSeller, setSelectedSeller] = useState<SellerProfile | null>(null);
+  const [sellerLocked, setSellerLocked] = useState(false); // 出品者が既に紐づいている場合true
+  const [existingMedia, setExistingMedia] = useState<MediaItem[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
   const [formData, setFormData] = useState({
     species_name: '',
     quantity: '',
     start_price: '',
+    reserve_price: '',
     estimated_price: '',
+    bid_increment: '100',
     inspection_info: '',
     individual_info: '',
-    seller_notes: '',
-    admin_notes: '',
+    notes: '',
     is_premium: false,
-    bidder_display: 'lane_default' as 'lane_default' | 'count' | 'simple' | 'hidden',
+    unsold_action: 'return',
+    status: 'registered',
   });
 
-  // 画像アップロード用の状態
-  const [uploadedImages, setUploadedImages] = useState<{ file: File; preview: string }[]>([]);
   const MAX_IMAGES = 20;
 
-  // 画像ファイル選択時の処理
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  useEffect(() => {
+    fetchSellers();
+    if (isEdit) {
+      fetchItem();
+    }
+  }, [auctionId, id]);
 
-    const newImages: { file: File; preview: string }[] = [];
-    const remainingSlots = MAX_IMAGES - uploadedImages.length;
-    const filesToAdd = Math.min(files.length, remainingSlots);
+  const fetchSellers = async () => {
+    try {
+      // 出品者一覧を取得（seller_profilesテーブルから）
+      const response = await axios.get('/api/admin/users?role=seller&per_page=100');
+      if (response.data.success) {
+        // APIレスポンス構造: { success: true, data: { current_page, data: [...users...], ... } }
+        const users = response.data.data?.data || response.data.data || [];
+        
+        // ユーザーからseller_profileを取得する形に変換
+        const sellerProfiles: SellerProfile[] = (Array.isArray(users) ? users : [])
+          .filter((u: any) => u.seller_profile)
+          .map((u: any) => ({
+            id: u.seller_profile.id,
+            seller_name: u.seller_profile.seller_name || u.name,
+            contact_name: u.seller_profile.contact_name,
+            email: u.email,
+            phone: u.phone || '',
+            commission_rate: u.seller_profile.commission_rate || 10,
+          }));
+        setSellers(sellerProfiles);
+      }
+    } catch (err) {
+      console.error('出品者一覧取得エラー:', err);
+    }
+  };
 
-    for (let i = 0; i < filesToAdd; i++) {
-      const file = files[i];
-      if (file.type.startsWith('image/')) {
-        newImages.push({
-          file,
-          preview: URL.createObjectURL(file),
+  const fetchItem = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/admin/auctions/${auctionId}/items/${id}`);
+      if (response.data.success) {
+        const item = response.data.data.item;
+        setFormData({
+          species_name: item.species_name || '',
+          quantity: item.quantity?.toString() || '',
+          start_price: item.start_price?.toString() || '',
+          reserve_price: item.reserve_price?.toString() || '',
+          estimated_price: item.estimated_price?.toString() || '',
+          bid_increment: item.bid_increment?.toString() || '100',
+          inspection_info: item.inspection_info || '',
+          individual_info: item.individual_info || '',
+          notes: item.notes || '',
+          is_premium: item.is_premium || false,
+          unsold_action: item.unsold_action || 'return',
+          status: item.status || 'registered',
         });
+        setExistingMedia(item.media || []);
+        
+        if (item.seller) {
+          // 出品者が既に紐づいている場合（出品者からの申請）
+          setSellerLocked(true);
+          
+          // 出品者プロファイル情報を直接設定（sellers一覧にない場合も対応）
+          setSelectedSeller({
+            id: item.seller.id,
+            seller_name: item.seller.name,
+            contact_name: null,
+            email: '',
+            phone: '',
+            commission_rate: 10,
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('生体取得エラー:', err);
+      setSnackbar({ open: true, message: '生体情報の取得に失敗しました。', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (field: string) => (e: any) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData({ ...formData, [field]: value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      setSaving(true);
+      
+      const payload = {
+        species_name: formData.species_name,
+        quantity: parseInt(formData.quantity),
+        start_price: parseFloat(formData.start_price),
+        reserve_price: formData.reserve_price ? parseFloat(formData.reserve_price) : null,
+        estimated_price: formData.estimated_price ? parseFloat(formData.estimated_price) : null,
+        bid_increment: parseFloat(formData.bid_increment),
+        inspection_info: formData.inspection_info || null,
+        individual_info: formData.individual_info || null,
+        notes: formData.notes || null,
+        is_premium: formData.is_premium,
+        unsold_action: formData.unsold_action,
+        seller_profile_id: selectedSeller?.id || null,
+        status: formData.status,
+      };
+      
+      if (isEdit) {
+        await axios.put(`/api/admin/auctions/${auctionId}/items/${id}`, payload);
+        setSnackbar({ open: true, message: '生体情報を更新しました。', severity: 'success' });
+      } else {
+        const response = await axios.post(`/api/admin/auctions/${auctionId}/items`, payload);
+        if (response.data.success) {
+          setSnackbar({ open: true, message: '生体を登録しました。', severity: 'success' });
+          // 新規作成時は編集画面に遷移してメディアアップロードできるようにする
+          const newItemId = response.data.data.item.id;
+          navigate(`/admin/auctions/${auctionId}/items/${newItemId}/edit`, { replace: true });
+          return;
+        }
+      }
+      
+      setTimeout(() => {
+        navigate(`/admin/auctions/${auctionId}/items`);
+      }, 1000);
+    } catch (err: any) {
+      console.error('保存エラー:', err);
+      setSnackbar({ 
+        open: true, 
+        message: err.response?.data?.message || '保存に失敗しました。', 
+        severity: 'error' 
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, mediaType: 'image' | 'video') => {
+    const files = e.target.files;
+    if (!files || !id) return;
+
+    const newUploadingFiles: UploadingFile[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      newUploadingFiles.push({
+        file,
+        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
+        progress: 0,
+        uploading: true,
+      });
+    }
+    
+    setUploadingFiles(prev => [...prev, ...newUploadingFiles]);
+    
+    // 各ファイルをアップロード
+    for (let i = 0; i < newUploadingFiles.length; i++) {
+      const uploadFile = newUploadingFiles[i];
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', uploadFile.file);
+      formDataUpload.append('media_type', mediaType);
+      formDataUpload.append('is_thumbnail', (existingMedia.length === 0 && i === 0).toString());
+      
+      try {
+        const response = await axios.post(
+          `/api/admin/auctions/${auctionId}/items/${id}/media`,
+          formDataUpload,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: (progressEvent) => {
+              const progress = progressEvent.total 
+                ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                : 0;
+              setUploadingFiles(prev => 
+                prev.map((f, idx) => 
+                  f === uploadFile ? { ...f, progress } : f
+                )
+              );
+            },
+          }
+        );
+        
+        if (response.data.success) {
+          setExistingMedia(prev => [...prev, response.data.data.media]);
+        }
+      } catch (err: any) {
+        console.error('アップロードエラー:', err);
+        setUploadingFiles(prev => 
+          prev.map(f => 
+            f === uploadFile ? { ...f, uploading: false, error: 'アップロード失敗' } : f
+          )
+        );
       }
     }
-
-    setUploadedImages([...uploadedImages, ...newImages]);
-    // inputをリセット
+    
+    // アップロード完了後にクリア
+    setUploadingFiles(prev => prev.filter(f => f.uploading && !f.error));
     e.target.value = '';
   };
 
-  // 画像削除時の処理
-  const handleRemoveImage = (index: number) => {
-    const newImages = [...uploadedImages];
-    URL.revokeObjectURL(newImages[index].preview); // メモリリーク防止
-    newImages.splice(index, 1);
-    setUploadedImages(newImages);
-  };
-
-  // 出品者選択時の処理
-  const handleSellerChange = (seller: typeof sellers[0] | null) => {
-    setSelectedSeller(seller);
-    setSelectedSubmission(null);
-    // 出品者が変わったらフォームをリセット
-    setFormData({
-      ...formData,
-      species_name: '',
-      quantity: '',
-      individual_info: '',
-      seller_notes: '',
-    });
-  };
-
-  // 出品申請データ選択時の処理（転記）
-  const handleSubmissionSelect = (submission: typeof sellerSubmissions[0] | null) => {
-    setSelectedSubmission(submission);
-    if (submission) {
-      // 出品者からの情報を転記
-      setFormData({
-        ...formData,
-        species_name: submission.species_name,
-        quantity: submission.quantity,
-        individual_info: submission.individual_info,
-        seller_notes: submission.seller_notes,
-      });
+  const handleDeleteMedia = async (mediaId: number) => {
+    if (!id) return;
+    
+    try {
+      await axios.delete(`/api/admin/auctions/${auctionId}/items/${id}/media/${mediaId}`);
+      setExistingMedia(prev => prev.filter(m => m.id !== mediaId));
+      setSnackbar({ open: true, message: 'メディアを削除しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: 'メディアの削除に失敗しました。', severity: 'error' });
     }
   };
 
-  // 選択中の出品者の出品申請データをフィルタ
-  const filteredSubmissions = selectedSeller
-    ? sellerSubmissions.filter((s) => s.seller_id === selectedSeller.id)
-    : [];
-
-  const handleChange = (field: string) => (e: any) => {
-    setFormData({ ...formData, [field]: e.target.value });
+  const handleSetThumbnail = async (mediaId: number) => {
+    if (!id) return;
+    
+    try {
+      await axios.patch(`/api/admin/auctions/${auctionId}/items/${id}/media/${mediaId}/thumbnail`);
+      setExistingMedia(prev => 
+        prev.map(m => ({ ...m, is_thumbnail: m.id === mediaId }))
+      );
+      setSnackbar({ open: true, message: 'サムネイルを設定しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: 'サムネイルの設定に失敗しました。', severity: 'error' });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate(`/admin/auctions/${auctionId}/items`);
-  };
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -202,7 +341,7 @@ export default function ItemForm() {
             {isEdit ? '生体編集' : '生体新規登録'}
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            出品者からの申請情報を元に生体を登録します
+            {isEdit ? '生体情報を編集します' : '新しい生体を登録します'}
           </Typography>
         </Box>
       </Box>
@@ -219,68 +358,51 @@ export default function ItemForm() {
                 </Typography>
               </Box>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Autocomplete
-                    options={sellers}
-                    getOptionLabel={(option) => `${option.name} (${option.representative})`}
-                    value={selectedSeller}
-                    onChange={(_, value) => handleSellerChange(value)}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Avatar sx={{ width: 32, height: 32, mr: 1.5, bgcolor: '#F0FDF4', color: '#059669', fontSize: '0.875rem' }}>
-                          {option.name.charAt(0)}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.name}</Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>{option.representative}</Typography>
-                        </Box>
-                      </Box>
-                    )}
-                    renderInput={(params) => (
-                      <TextField {...params} label="出品者を選択" required />
-                    )}
+              {sellerLocked ? (
+                // 出品者が既に紐づいている場合（出品者からの申請）
+                <Box>
+                  <TextField
+                    fullWidth
+                    disabled
+                    value={selectedSeller?.seller_name || ''}
+                    label="出品者"
+                    helperText="出品者からの申請のため変更できません"
                   />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Autocomplete
-                    options={filteredSubmissions}
-                    getOptionLabel={(option) => `${option.species_name} (${option.quantity})`}
-                    value={selectedSubmission}
-                    onChange={(_, value) => handleSubmissionSelect(value)}
-                    disabled={!selectedSeller}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.species_name}</Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {option.quantity} - 申請日: {option.submitted_at}
-                          </Typography>
-                        </Box>
+                </Box>
+              ) : (
+                <Autocomplete
+                  options={sellers}
+                  getOptionLabel={(option) => `${option.seller_name} (${option.contact_name || option.email})`}
+                  value={selectedSeller}
+                  onChange={(_, value) => setSelectedSeller(value)}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Avatar sx={{ width: 32, height: 32, mr: 1.5, bgcolor: '#F0FDF4', color: '#059669', fontSize: '0.875rem' }}>
+                        {option.seller_name.charAt(0)}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{option.seller_name}</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{option.email}</Typography>
                       </Box>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="出品申請データを選択（転記）"
-                        placeholder={selectedSeller ? '選択してください' : '先に出品者を選択'}
-                      />
-                    )}
-                  />
-                </Grid>
-              </Grid>
+                    </Box>
+                  )}
+                  renderInput={(params) => (
+                    <TextField {...params} label="出品者を選択（任意）" />
+                  )}
+                />
+              )}
 
-              {selectedSeller && (
+              {selectedSeller && !sellerLocked && (
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
                     出品者情報
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                     <Typography variant="body2">
-                      <strong>連絡先:</strong> {selectedSeller.email}
+                      <strong>連絡先:</strong> {selectedSeller.email || '-'}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>電話:</strong> {selectedSeller.phone}
+                      <strong>電話:</strong> {selectedSeller.phone || '-'}
                     </Typography>
                     <Typography variant="body2">
                       <strong>手数料率:</strong> {selectedSeller.commission_rate}%
@@ -291,27 +413,15 @@ export default function ItemForm() {
             </CardContent>
           </Card>
 
-          {/* 個体情報（出品者からの転記） */}
+          {/* 基本情報 */}
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                 <PetsIcon sx={{ color: '#3B82F6' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  個体情報
+                  基本情報
                 </Typography>
-                <Chip label="出品者からの転記" size="small" sx={{ ml: 1, bgcolor: '#DBEAFE', color: '#2563EB' }} />
               </Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-                出品者から申請された情報です。必要に応じて編集できます。
-              </Typography>
-
-              {selectedSubmission && (
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  <Typography variant="body2">
-                    「{selectedSubmission.species_name}」の申請データを転記しました。内容を確認・編集してください。
-                  </Typography>
-                </Alert>
-              )}
 
               <Box component="form" onSubmit={handleSubmit}>
                 <Grid container spacing={3}>
@@ -326,44 +436,32 @@ export default function ItemForm() {
                     />
                   </Grid>
 
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
                       required
-                      label="匹数・数量"
+                      type="number"
+                      label="匹数"
                       value={formData.quantity}
                       onChange={handleChange('quantity')}
-                      placeholder="5匹 または 3ペア"
+                      inputProps={{ min: 1 }}
                     />
                   </Grid>
 
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="個体情報（出品者からの説明）"
-                      value={formData.individual_info}
-                      onChange={handleChange('individual_info')}
-                      multiline
-                      rows={4}
-                      placeholder="体長、色、特徴など出品者からの個体説明"
-                      helperText="出品者から申請された個体の詳細情報です"
-                    />
+                  <Grid item xs={12} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel>ステータス</InputLabel>
+                      <Select
+                        value={formData.status}
+                        label="ステータス"
+                        onChange={handleChange('status')}
+                      >
+                        <MenuItem value="draft">下書き</MenuItem>
+                        <MenuItem value="registered">登録済み</MenuItem>
+                        <MenuItem value="cancelled">キャンセル</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Grid>
-
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="出品者メモ・備考"
-                      value={formData.seller_notes}
-                      onChange={handleChange('seller_notes')}
-                      multiline
-                      rows={2}
-                      placeholder="発送対応、死着保証など出品者からの備考"
-                      helperText="出品者からの備考・連絡事項"
-                    />
-                  </Grid>
-
-                  <Divider sx={{ width: '100%', my: 2 }} />
 
                   <Grid item xs={12} md={4}>
                     <TextField
@@ -373,6 +471,20 @@ export default function ItemForm() {
                       label="開始価格"
                       value={formData.start_price}
                       onChange={handleChange('start_price')}
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
+                      }}
+                      inputProps={{ min: 1 }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="最低落札価格"
+                      value={formData.reserve_price}
+                      onChange={handleChange('reserve_price')}
                       InputProps={{
                         startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
                       }}
@@ -393,34 +505,44 @@ export default function ItemForm() {
                   </Grid>
 
                   <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="入札単位"
+                      value={formData.bid_increment}
+                      onChange={handleChange('bid_increment')}
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <FormControl fullWidth>
+                      <InputLabel>未落札時の対応</InputLabel>
+                      <Select
+                        value={formData.unsold_action}
+                        label="未落札時の対応"
+                        onChange={handleChange('unsold_action')}
+                      >
+                        <MenuItem value="return">返却</MenuItem>
+                        <MenuItem value="free_pickup">無料引取</MenuItem>
+                        <MenuItem value="relist">次回再出品</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
                     <FormControlLabel
                       control={
                         <Checkbox
                           checked={formData.is_premium}
-                          onChange={(e) =>
-                            setFormData({ ...formData, is_premium: e.target.checked })
-                          }
+                          onChange={handleChange('is_premium')}
                         />
                       }
-                      label="プレミアムプラン（+300円）"
+                      label="プレミアムプラン"
                       sx={{ mt: 1 }}
                     />
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>入札者数表示</InputLabel>
-                      <Select
-                        value={formData.bidder_display}
-                        label="入札者数表示"
-                        onChange={(e) => setFormData({ ...formData, bidder_display: e.target.value as typeof formData.bidder_display })}
-                      >
-                        <MenuItem value="lane_default">レーン設定に従う</MenuItem>
-                        <MenuItem value="count">何人入札中</MenuItem>
-                        <MenuItem value="simple">入札中</MenuItem>
-                        <MenuItem value="hidden">非表示</MenuItem>
-                      </Select>
-                    </FormControl>
                   </Grid>
 
                   <Grid item xs={12}>
@@ -431,17 +553,29 @@ export default function ItemForm() {
                       onChange={handleChange('inspection_info')}
                       multiline
                       rows={3}
-                      placeholder="買受者に表示される個体の特徴・情報を入力してください"
-                      helperText="ここで入力した内容がオークション参加者に表示されます"
+                      placeholder="買受者に表示される個体の特徴・情報"
+                      helperText="オークション参加者に表示されます"
                     />
                   </Grid>
 
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="管理者メモ"
-                      value={formData.admin_notes}
-                      onChange={handleChange('admin_notes')}
+                      label="個体情報（出品者からの説明）"
+                      value={formData.individual_info}
+                      onChange={handleChange('individual_info')}
+                      multiline
+                      rows={3}
+                      placeholder="出品者からの個体説明"
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="備考"
+                      value={formData.notes}
+                      onChange={handleChange('notes')}
                       multiline
                       rows={2}
                       placeholder="内部向けメモ"
@@ -457,14 +591,16 @@ export default function ItemForm() {
             <Button
               variant="outlined"
               onClick={() => navigate(`/admin/auctions/${auctionId}/items`)}
+              disabled={saving}
             >
               キャンセル
             </Button>
             <Button
               type="submit"
               variant="contained"
-              startIcon={<SaveIcon />}
+              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
               onClick={handleSubmit}
+              disabled={saving || !formData.species_name || !formData.quantity || !formData.start_price}
             >
               {isEdit ? '変更を保存' : '生体を登録'}
             </Button>
@@ -479,168 +615,224 @@ export default function ItemForm() {
                 メディア
               </Typography>
 
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  上見動画（30秒）
-                </Typography>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<UploadIcon />}
-                  component="label"
-                  sx={{ py: 1.5, borderStyle: 'dashed' }}
-                >
-                  動画をアップロード
-                  <input type="file" accept="video/*" hidden />
-                </Button>
-              </Box>
+              {!isEdit && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  メディアのアップロードは生体登録後に行えます。
+                </Alert>
+              )}
 
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  横見動画（30秒）
-                </Typography>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<UploadIcon />}
-                  component="label"
-                  sx={{ py: 1.5, borderStyle: 'dashed' }}
-                >
-                  動画をアップロード
-                  <input type="file" accept="video/*" hidden />
-                </Button>
-              </Box>
-
-              <Divider sx={{ my: 3 }} />
-
-              {/* 画像アップロードセクション */}
-              <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <ImageIcon sx={{ fontSize: 20, color: '#059669' }} />
-                    <Typography variant="subtitle2">
-                      画像
+              {isEdit && (
+                <>
+                  {/* 動画アップロード */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      動画
                     </Typography>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<UploadIcon />}
+                      component="label"
+                      sx={{ py: 1.5, borderStyle: 'dashed' }}
+                    >
+                      動画をアップロード
+                      <input 
+                        type="file" 
+                        accept="video/*" 
+                        hidden 
+                        onChange={(e) => handleFileUpload(e, 'video')}
+                      />
+                    </Button>
                   </Box>
-                  <Chip 
-                    label={`${uploadedImages.length} / ${MAX_IMAGES}`} 
-                    size="small" 
-                    color={uploadedImages.length >= MAX_IMAGES ? 'error' : 'default'}
-                  />
-                </Box>
-                
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<UploadIcon />}
-                  component="label"
-                  disabled={uploadedImages.length >= MAX_IMAGES}
-                  sx={{ py: 1.5, borderStyle: 'dashed', mb: 2 }}
-                >
-                  画像をアップロード（最大{MAX_IMAGES}枚）
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    multiple 
-                    hidden 
-                    onChange={handleImageUpload}
-                  />
-                </Button>
 
-                {/* アップロード済み画像のプレビュー */}
-                {uploadedImages.length > 0 && (
-                  <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(3, 1fr)', 
-                    gap: 1,
-                    maxHeight: 300,
-                    overflowY: 'auto',
-                    p: 1,
-                    bgcolor: 'grey.50',
-                    borderRadius: 2,
-                  }}>
-                    {uploadedImages.map((image, index) => (
-                      <Box 
-                        key={index} 
-                        sx={{ 
-                          position: 'relative',
-                          aspectRatio: '1',
-                          borderRadius: 1,
-                          overflow: 'hidden',
-                          border: '1px solid',
-                          borderColor: 'grey.200',
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={image.preview}
-                          alt={`uploaded-${index}`}
-                          sx={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                        />
-                        <Box
-                          onClick={() => handleRemoveImage(index)}
-                          sx={{
-                            position: 'absolute',
-                            top: 2,
-                            right: 2,
-                            width: 20,
-                            height: 20,
-                            borderRadius: '50%',
-                            bgcolor: 'rgba(0,0,0,0.6)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            '&:hover': {
-                              bgcolor: 'error.main',
-                            },
-                          }}
-                        >
-                          <CloseIcon sx={{ fontSize: 14 }} />
-                        </Box>
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            bottom: 2,
-                            left: 2,
-                            bgcolor: 'rgba(0,0,0,0.6)',
-                            color: 'white',
-                            fontSize: '0.65rem',
-                            px: 0.5,
-                            borderRadius: 0.5,
-                          }}
-                        >
-                          {index + 1}
-                        </Box>
+                  <Divider sx={{ my: 3 }} />
+
+                  {/* 画像アップロード */}
+                  <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <ImageIcon sx={{ fontSize: 20, color: '#059669' }} />
+                        <Typography variant="subtitle2">画像</Typography>
+                      </Box>
+                      <Chip 
+                        label={`${existingMedia.filter(m => m.media_type.startsWith('photo')).length} / ${MAX_IMAGES}`} 
+                        size="small" 
+                      />
+                    </Box>
+                    
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<UploadIcon />}
+                      component="label"
+                      sx={{ py: 1.5, borderStyle: 'dashed', mb: 2 }}
+                    >
+                      画像をアップロード
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple 
+                        hidden 
+                        onChange={(e) => handleFileUpload(e, 'image')}
+                      />
+                    </Button>
+
+                    {/* アップロード中のファイル */}
+                    {uploadingFiles.map((file, index) => (
+                      <Box key={index} sx={{ mb: 1 }}>
+                        <Typography variant="caption">{file.file.name}</Typography>
+                        <LinearProgress variant="determinate" value={file.progress} />
                       </Box>
                     ))}
+
+                    {/* 既存メディア */}
+                    {existingMedia.length > 0 && (
+                      <Box sx={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(3, 1fr)', 
+                        gap: 1,
+                        maxHeight: 300,
+                        overflowY: 'auto',
+                        p: 1,
+                        bgcolor: 'grey.50',
+                        borderRadius: 2,
+                      }}>
+                        {existingMedia.map((media) => (
+                          <Box 
+                            key={media.id} 
+                            sx={{ 
+                              position: 'relative',
+                              aspectRatio: '1',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                              border: media.is_thumbnail ? '2px solid' : '1px solid',
+                              borderColor: media.is_thumbnail ? 'warning.main' : 'grey.200',
+                            }}
+                          >
+                            {media.file_url && media.media_type.startsWith('photo') ? (
+                              <Box
+                                component="img"
+                                src={media.file_url}
+                                alt=""
+                                sx={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            ) : (
+                              <Box sx={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                bgcolor: 'grey.200',
+                              }}>
+                                <Typography variant="caption">動画</Typography>
+                              </Box>
+                            )}
+                            
+                            {/* サムネイルバッジ */}
+                            {media.is_thumbnail && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 2,
+                                  left: 2,
+                                  bgcolor: 'warning.main',
+                                  color: 'white',
+                                  borderRadius: 0.5,
+                                  px: 0.5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.25,
+                                }}
+                              >
+                                <StarIcon sx={{ fontSize: 12 }} />
+                                <Typography sx={{ fontSize: '0.6rem' }}>サムネ</Typography>
+                              </Box>
+                            )}
+                            
+                            {/* 操作ボタン */}
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: 2,
+                                right: 2,
+                                display: 'flex',
+                                gap: 0.5,
+                              }}
+                            >
+                              {!media.is_thumbnail && media.media_type.startsWith('photo') && (
+                                <Box
+                                  onClick={() => handleSetThumbnail(media.id)}
+                                  sx={{
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: '50%',
+                                    bgcolor: 'rgba(0,0,0,0.6)',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    '&:hover': { bgcolor: 'warning.main' },
+                                  }}
+                                >
+                                  <StarIcon sx={{ fontSize: 12 }} />
+                                </Box>
+                              )}
+                              <Box
+                                onClick={() => handleDeleteMedia(media.id)}
+                                sx={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  bgcolor: 'rgba(0,0,0,0.6)',
+                                  color: 'white',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  '&:hover': { bgcolor: 'error.main' },
+                                }}
+                              >
+                                <CloseIcon sx={{ fontSize: 14 }} />
+                              </Box>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
                   </Box>
-                )}
-              </Box>
+                </>
+              )}
 
               <Divider sx={{ my: 3 }} />
 
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
                 <InfoIcon sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2 }} />
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  動画は30秒以内、ファイルサイズ50MB以下でアップロードしてください。
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                <InfoIcon sx={{ color: 'text.secondary', fontSize: 18, mt: 0.2 }} />
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  画像は最大{MAX_IMAGES}枚まで、1枚あたり10MB以下でアップロードしてください。
+                  動画は100MB以下、画像は10MB以下でアップロードしてください。
                 </Typography>
               </Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      {/* スナックバー */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -22,6 +22,12 @@ import {
   IconButton,
   Switch,
   FormControlLabel,
+  CircularProgress,
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -32,7 +38,9 @@ import {
   Gavel as GavelIcon,
   Edit as EditIcon,
   Add as AddIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -48,76 +56,232 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   );
 }
 
+interface ShippingRate {
+  region: string;
+  size_60: number;
+  size_80: number;
+  size_100: number;
+}
+
 export default function Settings() {
   const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   
   // システム設定
   const [systemSettings, setSystemSettings] = useState({
-    site_name: 'メダカライブオークション',
-    contact_email: 'info@example.com',
-    contact_phone: '03-1234-5678',
-    business_hours: '平日 10:00-18:00',
+    site_name: '',
+    contact_email: '',
+    contact_phone: '',
+    business_hours: '',
   });
 
   // オークション設定
   const [auctionSettings, setAuctionSettings] = useState({
-    price_increment_rate: '10',
-    price_increment_min: '50',
-    countdown_seconds: '3',
-    max_lanes: '6',
-    auto_extend_seconds: '10',
+    price_increment_rate: '',
+    price_increment_min: '',
+    countdown_seconds: '',
+    default_lane_count: '',
+    auto_extend_seconds: '',
+    default_bid_increment: '',
   });
 
   // 料金設定
   const [feeSettings, setFeeSettings] = useState({
-    // 出品者向け
-    seller_registration_fee: '3000',
-    seller_annual_fee: '0',
-    base_listing_fee: '500',
-    premium_listing_fee: '800',
-    seller_commission_rate: '10',
-    seller_commission_min: '500',
-    // 買受者向け
-    buyer_registration_fee: '0',
-    buyer_commission_rate: '5',
-    buyer_commission_min: '300',
+    seller_registration_fee: '',
+    seller_annual_fee: '',
+    base_listing_fee: '',
+    premium_plan_fee: '',
+    default_commission_rate: '',
+    seller_commission_min: '',
+    buyer_registration_fee: '',
+    buyer_commission_rate: '',
+    buyer_commission_min: '',
   });
 
   // 配送・梱包料金
   const [shippingSettings, setShippingSettings] = useState({
-    packaging_fee: '500',
-    handling_fee: '300',
-    insurance_fee_rate: '3',
-    cooling_fee_summer: '300',
-    heating_fee_winter: '300',
+    packaging_fee: '',
+    handling_fee: '',
+    insurance_fee_rate: '',
+    cooling_fee_summer: '',
+    heating_fee_winter: '',
   });
 
   // 配送料金テーブル
-  const [shippingRates, setShippingRates] = useState([
-    { region: '関東', size_60: '800', size_80: '1000', size_100: '1200' },
-    { region: '関西', size_60: '900', size_80: '1100', size_100: '1300' },
-    { region: '北海道', size_60: '1500', size_80: '1800', size_100: '2100' },
-    { region: '沖縄', size_60: '1800', size_80: '2200', size_100: '2600' },
-    { region: 'その他', size_60: '1000', size_80: '1200', size_100: '1500' },
-  ]);
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
+  const [editShippingDialog, setEditShippingDialog] = useState(false);
 
   // 帳票設定
   const [documentSettings, setDocumentSettings] = useState({
-    company_name: '株式会社メダカオークション',
-    company_address: '東京都渋谷区xxx 1-2-3',
-    company_phone: '03-1234-5678',
-    company_email: 'info@example.com',
-    bank_name: '三菱UFJ銀行',
-    bank_branch: '渋谷支店',
-    bank_account_type: '普通',
-    bank_account_number: '1234567',
-    bank_account_holder: 'カ）メダカオークション',
-    invoice_prefix: 'INV-',
-    payment_notice_prefix: 'PAY-',
-    warranty_validity_days: '14',
-    auto_generate_invoice: true,
-    auto_generate_payment_notice: true,
+    company_name: '',
+    company_address: '',
+    company_phone: '',
+    company_email: '',
+    bank_name: '',
+    bank_branch: '',
+    bank_account_type: '',
+    bank_account_number: '',
+    bank_account_holder: '',
+    invoice_prefix: '',
+    payment_notice_prefix: '',
+    warranty_validity_days: '',
+    auto_generate_invoice: false,
+    auto_generate_payment_notice: false,
   });
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/admin/settings');
+      
+      if (response.data.success) {
+        const data = response.data.data.settings;
+        
+        // システム設定
+        if (data.site) {
+          setSystemSettings({
+            site_name: data.site.site_name?.value || '',
+            contact_email: data.site.contact_email?.value || '',
+            contact_phone: data.site.contact_phone?.value || '',
+            business_hours: data.site.business_hours?.value || '',
+          });
+        }
+        
+        // オークション設定
+        if (data.auction) {
+          setAuctionSettings({
+            price_increment_rate: String(data.auction.price_increment_rate?.value || '10'),
+            price_increment_min: String(data.auction.price_increment_min?.value || '50'),
+            countdown_seconds: String(data.auction.countdown_seconds?.value || '3'),
+            default_lane_count: String(data.auction.default_lane_count?.value || '6'),
+            auto_extend_seconds: String(data.auction.auto_extend_seconds?.value || '10'),
+            default_bid_increment: String(data.auction.default_bid_increment?.value || '100'),
+          });
+        }
+        
+        // 料金設定
+        if (data.premium || data.payment) {
+          setFeeSettings({
+            seller_registration_fee: String(data.payment?.seller_registration_fee?.value || '3000'),
+            seller_annual_fee: String(data.payment?.seller_annual_fee?.value || '0'),
+            base_listing_fee: String(data.payment?.base_listing_fee?.value || '500'),
+            premium_plan_fee: String(data.premium?.premium_plan_fee?.value || '300'),
+            default_commission_rate: String(data.payment?.default_commission_rate?.value || '10'),
+            seller_commission_min: String(data.payment?.seller_commission_min?.value || '500'),
+            buyer_registration_fee: String(data.payment?.buyer_registration_fee?.value || '0'),
+            buyer_commission_rate: String(data.payment?.buyer_commission_rate?.value || '5'),
+            buyer_commission_min: String(data.payment?.buyer_commission_min?.value || '300'),
+          });
+        }
+        
+        // 配送設定
+        if (data.shipping) {
+          setShippingSettings({
+            packaging_fee: String(data.shipping.packaging_fee?.value || '500'),
+            handling_fee: String(data.shipping.handling_fee?.value || '300'),
+            insurance_fee_rate: String(data.shipping.insurance_fee_rate?.value || '3'),
+            cooling_fee_summer: String(data.shipping.cooling_fee_summer?.value || '300'),
+            heating_fee_winter: String(data.shipping.heating_fee_winter?.value || '300'),
+          });
+          
+          if (data.shipping.shipping_rates?.value) {
+            setShippingRates(data.shipping.shipping_rates.value);
+          }
+        }
+        
+        // 帳票設定
+        if (data.document) {
+          setDocumentSettings({
+            company_name: data.document.company_name?.value || '',
+            company_address: data.document.company_address?.value || '',
+            company_phone: data.document.company_phone?.value || '',
+            company_email: data.document.company_email?.value || '',
+            bank_name: data.document.bank_name?.value || '',
+            bank_branch: data.document.bank_branch?.value || '',
+            bank_account_type: data.document.bank_account_type?.value || '',
+            bank_account_number: data.document.bank_account_number?.value || '',
+            bank_account_holder: data.document.bank_account_holder?.value || '',
+            invoice_prefix: data.document.invoice_prefix?.value || '',
+            payment_notice_prefix: data.document.payment_notice_prefix?.value || '',
+            warranty_validity_days: String(data.document.warranty_validity_days?.value || '14'),
+            auto_generate_invoice: data.document.auto_generate_invoice?.value || false,
+            auto_generate_payment_notice: data.document.auto_generate_payment_notice?.value || false,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('設定取得エラー:', err);
+      setSnackbar({ open: true, message: '設定の取得に失敗しました', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setSaving(true);
+      
+      const settings = {
+        // システム設定
+        site_name: systemSettings.site_name,
+        contact_email: systemSettings.contact_email,
+        contact_phone: systemSettings.contact_phone,
+        business_hours: systemSettings.business_hours,
+        // オークション設定
+        price_increment_rate: auctionSettings.price_increment_rate,
+        price_increment_min: auctionSettings.price_increment_min,
+        countdown_seconds: auctionSettings.countdown_seconds,
+        default_lane_count: auctionSettings.default_lane_count,
+        auto_extend_seconds: auctionSettings.auto_extend_seconds,
+        default_bid_increment: auctionSettings.default_bid_increment,
+        // 料金設定
+        seller_registration_fee: feeSettings.seller_registration_fee,
+        seller_annual_fee: feeSettings.seller_annual_fee,
+        base_listing_fee: feeSettings.base_listing_fee,
+        premium_plan_fee: feeSettings.premium_plan_fee,
+        default_commission_rate: feeSettings.default_commission_rate,
+        seller_commission_min: feeSettings.seller_commission_min,
+        buyer_registration_fee: feeSettings.buyer_registration_fee,
+        buyer_commission_rate: feeSettings.buyer_commission_rate,
+        buyer_commission_min: feeSettings.buyer_commission_min,
+        // 配送設定
+        packaging_fee: shippingSettings.packaging_fee,
+        handling_fee: shippingSettings.handling_fee,
+        insurance_fee_rate: shippingSettings.insurance_fee_rate,
+        cooling_fee_summer: shippingSettings.cooling_fee_summer,
+        heating_fee_winter: shippingSettings.heating_fee_winter,
+        // 帳票設定
+        company_name: documentSettings.company_name,
+        company_address: documentSettings.company_address,
+        company_phone: documentSettings.company_phone,
+        company_email: documentSettings.company_email,
+        bank_name: documentSettings.bank_name,
+        bank_branch: documentSettings.bank_branch,
+        bank_account_type: documentSettings.bank_account_type,
+        bank_account_number: documentSettings.bank_account_number,
+        bank_account_holder: documentSettings.bank_account_holder,
+        invoice_prefix: documentSettings.invoice_prefix,
+        payment_notice_prefix: documentSettings.payment_notice_prefix,
+        warranty_validity_days: documentSettings.warranty_validity_days,
+        auto_generate_invoice: documentSettings.auto_generate_invoice,
+        auto_generate_payment_notice: documentSettings.auto_generate_payment_notice,
+      };
+      
+      await axios.put('/api/admin/settings', { settings });
+      setSnackbar({ open: true, message: '設定を保存しました', severity: 'success' });
+    } catch (err) {
+      console.error('設定保存エラー:', err);
+      setSnackbar({ open: true, message: '設定の保存に失敗しました', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSystemChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setSystemSettings({ ...systemSettings, [field]: e.target.value });
@@ -139,10 +303,13 @@ export default function Settings() {
     setDocumentSettings({ ...documentSettings, [field]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert('設定を保存しました');
-  };
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -158,8 +325,9 @@ export default function Settings() {
         <Button
           variant="contained"
           size="large"
-          startIcon={<SaveIcon />}
+          startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
           onClick={handleSubmit}
+          disabled={saving}
         >
           すべて保存
         </Button>
@@ -226,8 +394,11 @@ export default function Settings() {
         <Card>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-              入札ルール
+              入札ルール（システムデフォルト）
             </Typography>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。
+            </Alert>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6} md={4}>
                 <TextField
@@ -272,9 +443,9 @@ export default function Settings() {
                 <TextField
                   fullWidth
                   type="number"
-                  label="最大レーン数"
-                  value={auctionSettings.max_lanes}
-                  onChange={handleAuctionChange('max_lanes')}
+                  label="デフォルトレーン数"
+                  value={auctionSettings.default_lane_count}
+                  onChange={handleAuctionChange('default_lane_count')}
                   helperText="同時進行できるレーン数"
                 />
               </Grid>
@@ -291,6 +462,19 @@ export default function Settings() {
                   helperText="終了直前の入札で延長"
                 />
               </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="デフォルト入札単位"
+                  value={auctionSettings.default_bid_increment}
+                  onChange={handleAuctionChange('default_bid_increment')}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">¥</InputAdornment>,
+                  }}
+                  helperText="価格上昇の単位"
+                />
+              </Grid>
             </Grid>
           </CardContent>
         </Card>
@@ -298,6 +482,9 @@ export default function Settings() {
 
       {/* 料金設定 */}
       <TabPanel value={tabValue} index={2}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。
+        </Alert>
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
             <Card>
@@ -350,8 +537,8 @@ export default function Settings() {
                       fullWidth
                       type="number"
                       label="プレミアム出品料"
-                      value={feeSettings.premium_listing_fee}
-                      onChange={handleFeeChange('premium_listing_fee')}
+                      value={feeSettings.premium_plan_fee}
+                      onChange={handleFeeChange('premium_plan_fee')}
                       InputProps={{
                         startAdornment: <InputAdornment position="start">¥</InputAdornment>,
                       }}
@@ -363,8 +550,8 @@ export default function Settings() {
                       fullWidth
                       type="number"
                       label="販売手数料率"
-                      value={feeSettings.seller_commission_rate}
-                      onChange={handleFeeChange('seller_commission_rate')}
+                      value={feeSettings.default_commission_rate}
+                      onChange={handleFeeChange('default_commission_rate')}
                       InputProps={{
                         endAdornment: <InputAdornment position="end">%</InputAdornment>,
                       }}
@@ -444,6 +631,9 @@ export default function Settings() {
 
       {/* 配送・梱包設定 */}
       <TabPanel value={tabValue} index={3}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。
+        </Alert>
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
             <Card sx={{ mb: 3 }}>
@@ -527,9 +717,9 @@ export default function Settings() {
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    地域別配送料金（ヤマト運輸）
+                    地域別配送料金
                   </Typography>
-                  <Button size="small" startIcon={<EditIcon />}>
+                  <Button size="small" startIcon={<EditIcon />} onClick={() => setEditShippingDialog(true)}>
                     編集
                   </Button>
                 </Box>
@@ -547,9 +737,9 @@ export default function Settings() {
                       {shippingRates.map((rate, index) => (
                         <TableRow key={index}>
                           <TableCell>{rate.region}</TableCell>
-                          <TableCell align="right">¥{parseInt(rate.size_60).toLocaleString()}</TableCell>
-                          <TableCell align="right">¥{parseInt(rate.size_80).toLocaleString()}</TableCell>
-                          <TableCell align="right">¥{parseInt(rate.size_100).toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{rate.size_60?.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{rate.size_80?.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{rate.size_100?.toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -735,6 +925,31 @@ export default function Settings() {
           </Grid>
         </Grid>
       </TabPanel>
+
+      {/* スナックバー */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* 配送料金編集ダイアログ */}
+      <Dialog open={editShippingDialog} onClose={() => setEditShippingDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>地域別配送料金の編集</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            配送料金テーブルは現在のバージョンでは編集できません。今後のアップデートで対応予定です。
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditShippingDialog(false)}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

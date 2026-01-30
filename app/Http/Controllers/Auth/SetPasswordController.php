@@ -76,10 +76,11 @@ class SetPasswordController extends Controller
         try {
             $user = $verificationToken->user;
 
-            // パスワードを設定
+            // パスワードを設定し、ステータスを承認済みに変更
             $user->update([
                 'password' => Hash::make($request->password),
                 'email_verified_at' => now(),
+                'status' => 'approved',
             ]);
 
             // トークンを検証済みにする

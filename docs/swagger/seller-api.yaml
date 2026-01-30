@@ -1,0 +1,1172 @@
+openapi: 3.0.3
+info:
+  title: メダカライブオークション - 出品者API
+  description: |
+    メダカライブオークションシステムの出品者向けAPI仕様書
+    
+    ## 認証
+    すべてのエンドポイントは`Bearer`トークン認証が必要です。
+    また、`seller`ロールを持つユーザーのみアクセス可能です。
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: /api
+    description: Development server
+
+tags:
+  - name: Dashboard
+    description: ダッシュボード関連
+  - name: Profile
+    description: プロフィール管理
+  - name: Items
+    description: 出品管理
+  - name: Shipping
+    description: 発送管理
+  - name: Settlements
+    description: 売上・精算
+
+paths:
+  # ==================== Dashboard ====================
+  /seller/dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: ダッシュボード情報取得
+      description: 出品者ダッシュボードに表示する統計情報を取得
+      operationId: getSellerDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      statistics:
+                        type: object
+                        properties:
+                          total_items:
+                            type: integer
+                            description: 総出品数
+                          total_sales:
+                            type: number
+                            description: 総売上
+                          pending_payment:
+                            type: integer
+                            description: 入金待ち件数
+                          pending_shipping:
+                            type: integer
+                            description: 発送待ち件数
+                      recent_items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ItemSummary'
+                      upcoming_auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuctionSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ==================== Profile ====================
+  /seller/profile:
+    get:
+      tags:
+        - Profile
+      summary: プロフィール取得
+      operationId: getSellerProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      profile:
+                        $ref: '#/components/schemas/SellerProfile'
+                      user:
+                        $ref: '#/components/schemas/UserBasic'
+        '404':
+          description: プロフィールが見つからない
+    put:
+      tags:
+        - Profile
+      summary: 基本情報更新
+      operationId: updateSellerProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/profile/bank:
+    put:
+      tags:
+        - Profile
+      summary: 口座情報更新
+      operationId: updateBankAccount
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BankAccountUpdate'
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/profile/notifications:
+    put:
+      tags:
+        - Profile
+      summary: 通知設定更新
+      operationId: updateNotificationSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettingsUpdate'
+      responses:
+        '200':
+          description: 更新成功
+
+  /seller/profile/display:
+    put:
+      tags:
+        - Profile
+      summary: 表示設定更新
+      operationId: updateDisplaySettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisplaySettingsUpdate'
+      responses:
+        '200':
+          description: 更新成功
+
+  # ==================== Items ====================
+  /seller/items:
+    get:
+      tags:
+        - Items
+      summary: 出品履歴一覧取得
+      operationId: getSellerItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: 品種名で検索
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, draft, pending, approved, rejected, registered, live, sold, unsold, cancelled]
+          description: ステータスフィルター
+        - name: auction_id
+          in: query
+          schema:
+            type: integer
+          description: オークションIDフィルター
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SellerItem'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+    post:
+      tags:
+        - Items
+      summary: 出品申込
+      operationId: submitItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemSubmit'
+      responses:
+        '201':
+          description: 申込成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      item:
+                        $ref: '#/components/schemas/SellerItem'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/items/stats:
+    get:
+      tags:
+        - Items
+      summary: 出品統計取得
+      operationId: getItemStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: 総出品数
+                      this_month:
+                        type: integer
+                        description: 今月の出品数
+                      total_sales:
+                        type: number
+                        description: 総売上
+                      pending_shipping:
+                        type: integer
+                        description: 発送待ち
+
+  /seller/items/auctions:
+    get:
+      tags:
+        - Items
+      summary: 出品可能オークション一覧取得
+      operationId: getAvailableAuctions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuctionSummary'
+
+  /seller/items/{id}:
+    get:
+      tags:
+        - Items
+      summary: 出品詳細取得
+      operationId: getSellerItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      item:
+                        $ref: '#/components/schemas/SellerItemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Items
+      summary: 出品更新
+      description: ステータスがdraftまたはpendingの場合のみ更新可能
+      operationId: updateSellerItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemSubmit'
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 更新不可（ステータスによる）
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+        - Items
+      summary: 出品キャンセル
+      description: ステータスがdraft、pending、approvedの場合のみキャンセル可能
+      operationId: cancelSellerItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: キャンセル成功
+        '400':
+          description: キャンセル不可
+
+  # ==================== Shipping ====================
+  /seller/shipping:
+    get:
+      tags:
+        - Shipping
+      summary: 発送管理一覧取得
+      operationId: getShippingItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, pending, shipped, delivered]
+          description: ステータスフィルター
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ShippingItem'
+                      statistics:
+                        type: object
+                        properties:
+                          pending:
+                            type: integer
+                          shipped:
+                            type: integer
+                          delivered:
+                            type: integer
+
+  /seller/shipping/{id}/ship:
+    post:
+      tags:
+        - Shipping
+      summary: 発送登録
+      operationId: registerShipping
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: WonItem ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - shipping_company
+                - tracking_number
+              properties:
+                shipping_company:
+                  type: string
+                  description: 配送業者
+                  example: ヤマト運輸
+                tracking_number:
+                  type: string
+                  description: 伝票番号
+                  example: "1234-5678-9012"
+      responses:
+        '200':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      delivery_status:
+                        type: string
+                      tracking_number:
+                        type: string
+                      shipped_at:
+                        type: string
+                        format: date-time
+        '400':
+          description: 発送登録不可（入金未確認など）
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /seller/shipping/{id}/tracking:
+    put:
+      tags:
+        - Shipping
+      summary: 伝票番号更新
+      operationId: updateTracking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - shipping_company
+                - tracking_number
+              properties:
+                shipping_company:
+                  type: string
+                tracking_number:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ==================== Settlements ====================
+  /seller/settlements:
+    get:
+      tags:
+        - Settlements
+      summary: 精算一覧取得
+      operationId: getSettlements
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      settlements:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Settlement'
+                      statistics:
+                        type: object
+                        properties:
+                          total_net_amount:
+                            type: number
+                            description: 累計受取金額
+                          total_sales:
+                            type: number
+                            description: 累計売上
+                          total_commission:
+                            type: number
+                            description: 累計手数料
+                          completed_count:
+                            type: integer
+                            description: 精算完了回数
+                      monthly_sales:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            month:
+                              type: string
+                            sales:
+                              type: number
+                            net:
+                              type: number
+                      bank_info:
+                        $ref: '#/components/schemas/BankInfo'
+                      next_settlement:
+                        $ref: '#/components/schemas/NextSettlement'
+
+  /seller/settlements/{auctionId}:
+    get:
+      tags:
+        - Settlements
+      summary: 精算詳細取得
+      operationId: getSettlementDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      settlement:
+                        $ref: '#/components/schemas/SettlementDetail'
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SettlementItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: 認証エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Unauthenticated.
+    Forbidden:
+      description: 権限エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: アクセス権限がありません。
+    NotFound:
+      description: リソースが見つからない
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: リソースが見つかりません。
+    ValidationError:
+      description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+
+    UserBasic:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        postal_code:
+          type: string
+        prefecture:
+          type: string
+        city:
+          type: string
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+
+    SellerProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        farm_name:
+          type: string
+          description: 養魚場名
+        description:
+          type: string
+          description: 説明・PR
+        bank_name:
+          type: string
+        bank_branch:
+          type: string
+        bank_account_type:
+          type: string
+          enum: [ordinary, current]
+        bank_account_number:
+          type: string
+        bank_account_holder:
+          type: string
+        notification_email:
+          type: boolean
+        notification_sms:
+          type: boolean
+        display_farm_name:
+          type: boolean
+        display_stats:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    ProfileUpdate:
+      type: object
+      properties:
+        farm_name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        phone:
+          type: string
+        postal_code:
+          type: string
+        prefecture:
+          type: string
+        city:
+          type: string
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+
+    BankAccountUpdate:
+      type: object
+      required:
+        - bank_name
+        - bank_branch
+        - bank_account_type
+        - bank_account_number
+        - bank_account_holder
+      properties:
+        bank_name:
+          type: string
+          description: 銀行名
+        bank_branch:
+          type: string
+          description: 支店名
+        bank_account_type:
+          type: string
+          enum: [ordinary, current]
+          description: 口座種別
+        bank_account_number:
+          type: string
+          description: 口座番号
+        bank_account_holder:
+          type: string
+          description: 口座名義（カナ）
+
+    NotificationSettingsUpdate:
+      type: object
+      properties:
+        notification_email:
+          type: boolean
+        notification_sms:
+          type: boolean
+
+    DisplaySettingsUpdate:
+      type: object
+      properties:
+        display_farm_name:
+          type: boolean
+        display_stats:
+          type: boolean
+
+    AuctionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        event_date:
+          type: string
+          format: date
+        status:
+          type: string
+        entry_deadline:
+          type: string
+          format: date-time
+
+    ItemSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        item_number:
+          type: integer
+        species_name:
+          type: string
+        current_price:
+          type: number
+        thumbnail_path:
+          type: string
+
+    SellerItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        auction:
+          $ref: '#/components/schemas/AuctionSummary'
+        item_number:
+          type: integer
+        species_name:
+          type: string
+        quantity:
+          type: integer
+        start_price:
+          type: number
+        current_price:
+          type: number
+        status:
+          type: string
+          enum: [draft, pending, approved, rejected, registered, live, sold, unsold, cancelled]
+        is_premium:
+          type: boolean
+        thumbnail_path:
+          type: string
+        winning_price:
+          type: number
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    SellerItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/SellerItem'
+        - type: object
+          properties:
+            estimated_price:
+              type: number
+            bid_increment:
+              type: number
+            inspection_info:
+              type: string
+            individual_info:
+              type: string
+            notes:
+              type: string
+            unsold_action:
+              type: string
+              enum: [return, keep, dispose]
+            premium_fee:
+              type: number
+            storage_fee:
+              type: number
+            won_item:
+              $ref: '#/components/schemas/WonItemSummary'
+            media:
+              type: array
+              items:
+                $ref: '#/components/schemas/ItemMedia'
+
+    ItemSubmit:
+      type: object
+      required:
+        - auction_id
+        - species_name
+        - quantity
+        - start_price
+      properties:
+        auction_id:
+          type: integer
+          description: 出品先オークションID
+        species_name:
+          type: string
+          description: 品種名
+          maxLength: 100
+        quantity:
+          type: integer
+          description: 匹数
+          minimum: 1
+        start_price:
+          type: number
+          description: 開始価格
+          minimum: 100
+        estimated_price:
+          type: number
+          description: 推定価格
+        is_premium:
+          type: boolean
+          description: プレミアム出品
+        individual_info:
+          type: string
+          description: 個体情報
+        unsold_action:
+          type: string
+          enum: [return, keep, dispose]
+          description: 未落札時の対応
+        warranty_type:
+          type: string
+          description: 保証タイプ
+
+    ItemMedia:
+      type: object
+      properties:
+        id:
+          type: integer
+        media_type:
+          type: string
+        file_path:
+          type: string
+        thumbnail_path:
+          type: string
+        is_thumbnail:
+          type: boolean
+        display_order:
+          type: integer
+
+    WonItemSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        winning_price:
+          type: number
+        payment_status:
+          type: string
+        delivery_status:
+          type: string
+        winner_name:
+          type: string
+
+    ShippingItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: WonItem ID
+        item:
+          type: object
+          properties:
+            id:
+              type: integer
+            item_number:
+              type: integer
+            species_name:
+              type: string
+            quantity:
+              type: integer
+            thumbnail_path:
+              type: string
+        auction:
+          type: object
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+        buyer:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            address:
+              type: string
+        price:
+          type: number
+          description: 落札価格
+        total_amount:
+          type: number
+          description: 合計金額
+        payment_status:
+          type: string
+          enum: [pending, paid, confirmed]
+        delivery_status:
+          type: string
+          enum: [pending, shipped, delivered]
+        tracking_number:
+          type: string
+          nullable: true
+        shipping_company:
+          type: string
+          nullable: true
+        sold_at:
+          type: string
+          format: date-time
+        shipped_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Settlement:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: オークションID
+        auction:
+          type: string
+          description: オークション名
+        auction_date:
+          type: string
+          format: date
+        total_sales:
+          type: number
+          description: 売上金額
+        commission:
+          type: number
+          description: 手数料
+        shipping_fee:
+          type: number
+          description: 配送料
+        packing_fee:
+          type: number
+          description: 梱包料
+        net_amount:
+          type: number
+          description: 受取金額
+        status:
+          type: string
+          enum: [pending, completed]
+          description: 精算ステータス
+        paid_at:
+          type: string
+          format: date
+          nullable: true
+        items_count:
+          type: integer
+          description: 出品数
+
+    SettlementDetail:
+      allOf:
+        - $ref: '#/components/schemas/Settlement'
+
+    SettlementItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        item:
+          type: object
+          properties:
+            id:
+              type: integer
+            item_number:
+              type: integer
+            species_name:
+              type: string
+            quantity:
+              type: integer
+        buyer:
+          type: string
+        winning_price:
+          type: number
+        commission:
+          type: number
+        seller_amount:
+          type: number
+
+    BankInfo:
+      type: object
+      properties:
+        bank_name:
+          type: string
+        branch_name:
+          type: string
+        account_type:
+          type: string
+        account_number:
+          type: string
+        account_holder:
+          type: string
+
+    NextSettlement:
+      type: object
+      nullable: true
+      properties:
+        auction:
+          type: string
+        auction_date:
+          type: string
+          format: date
+        items_count:
+          type: integer
+        expected_payment_date:
+          type: string
+          format: date

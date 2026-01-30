@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -29,6 +29,9 @@ import {
   DialogActions,
   TextField,
   InputAdornment,
+  CircularProgress,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -53,6 +56,8 @@ import {
   Person as PersonIcon,
   Email as EmailIcon,
   Phone as PhoneIcon,
+  Refresh as RefreshIcon,
+  LocalShipping as LocalShippingIcon,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -62,55 +67,62 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
 } from 'recharts';
+import axios from '../../lib/axios';
 
-// Mock データ
-const stats = {
-  thisMonthAuctions: 2,
-  totalSales: 1850000,
-  totalItems: 245,
-  totalUsers: 156,
-  pendingUsers: 8,
-  activeAuctions: 1,
-};
+interface Statistics {
+  auctions: {
+    total: number;
+    this_month: number;
+    live: number;
+    upcoming: number;
+  };
+  sales: {
+    total: number;
+    this_month: number;
+    today: number;
+  };
+  won_items: {
+    total: number;
+    this_month: number;
+    pending_payment: number;
+    pending_shipment: number;
+  };
+  users: {
+    total: number;
+    pending_approval: number;
+    active: number;
+  };
+}
 
-// 月間売上データ
-const monthlyData = [
-  { month: '7月', sales: 1200000, items: 180 },
-  { month: '8月', sales: 980000, items: 145 },
-  { month: '9月', sales: 1450000, items: 210 },
-  { month: '10月', sales: 1650000, items: 235 },
-  { month: '11月', sales: 1850000, items: 245 },
-  { month: '12月', sales: 1200000, items: 180 },
-];
+interface PendingUser {
+  id: number;
+  name: string;
+  email: string;
+  created_at: string;
+}
 
-const recentActivities = [
-  { id: 1, type: 'auction', text: '11月12日オークションが終了しました', time: '2時間前', icon: <EventIcon /> },
-  { id: 2, type: 'user', text: '新規ユーザー登録申請が8件あります', time: '3時間前', icon: <PeopleIcon /> },
-  { id: 3, type: 'item', text: '生体120個体の登録が完了しました', time: '1日前', icon: <PetsIcon /> },
-  { id: 4, type: 'payment', text: '落札者30名の入金確認が完了', time: '1日前', icon: <MoneyIcon /> },
-];
+interface UpcomingAuction {
+  id: number;
+  title: string;
+  event_date: string;
+  start_time: string | null;
+  status: string;
+  items_count: number;
+}
 
-const upcomingAuctions = [
-  { id: 1, title: '2025年12月オークション', date: '2025-12-10', items: 120, status: 'preparing' },
-  { id: 2, title: '2025年クリスマス特別', date: '2025-12-24', items: 80, status: 'draft' },
-];
+interface MonthlySale {
+  month: string;
+  total: number;
+  count: number;
+}
 
-// 承認待ちユーザーのMockデータ
-const pendingUsers = [
-  { id: 1, name: '田中養魚場', type: 'seller', email: 'tanaka@example.com', phone: '090-1234-5678', appliedAt: '2025-12-10', representative: '田中太郎' },
-  { id: 2, name: '佐藤メダカ園', type: 'seller', email: 'sato@example.com', phone: '090-2345-6789', appliedAt: '2025-12-10', representative: '佐藤花子' },
-  { id: 3, name: '山田一郎', type: 'buyer', email: 'yamada@example.com', phone: '090-3456-7890', appliedAt: '2025-12-09', representative: null },
-  { id: 4, name: '鈴木メダカファーム', type: 'seller', email: 'suzuki@example.com', phone: '090-4567-8901', appliedAt: '2025-12-09', representative: '鈴木次郎' },
-  { id: 5, name: '高橋美咲', type: 'buyer', email: 'takahashi@example.com', phone: '090-5678-9012', appliedAt: '2025-12-08', representative: null },
-  { id: 6, name: '伊藤ブリーダー', type: 'seller', email: 'ito@example.com', phone: '090-6789-0123', appliedAt: '2025-12-08', representative: '伊藤三郎' },
-  { id: 7, name: '渡辺健太', type: 'buyer', email: 'watanabe@example.com', phone: '090-7890-1234', appliedAt: '2025-12-07', representative: null },
-  { id: 8, name: '中村めだか屋', type: 'seller', email: 'nakamura@example.com', phone: '090-8901-2345', appliedAt: '2025-12-07', representative: '中村四郎' },
-];
+interface RecentActivity {
+  type: string;
+  message: string;
+  amount?: number;
+  created_at: string;
+}
 
 // KPIカードコンポーネント
 interface StatCardProps {
@@ -121,11 +133,22 @@ interface StatCardProps {
   trendLabel?: string;
   icon: React.ReactNode;
   color?: string;
+  loading?: boolean;
 }
 
-function StatCard({ title, value, subtitle, trend, trendLabel, icon, color = '#059669' }: StatCardProps) {
+function StatCard({ title, value, subtitle, trend, trendLabel, icon, color = '#059669', loading = false }: StatCardProps) {
   const isPositive = trend && trend > 0;
-  
+
+  if (loading) {
+    return (
+      <Card sx={{ height: '100%' }}>
+        <CardContent sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 150 }}>
+          <CircularProgress size={24} />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent sx={{ p: 3 }}>
@@ -161,15 +184,15 @@ function StatCard({ title, value, subtitle, trend, trendLabel, icon, color = '#0
             />
           )}
         </Box>
-        
+
         <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5, fontSize: '2rem' }}>
           {value}
         </Typography>
-        
+
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
           {title}
         </Typography>
-        
+
         {(subtitle || trendLabel) && (
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {trendLabel && <span style={{ color: isPositive ? '#059669' : '#DC2626' }}>前月比 {trendLabel}</span>}
@@ -186,40 +209,135 @@ export default function Dashboard() {
   const today = new Date();
   const greeting = today.getHours() < 12 ? 'おはようございます' : today.getHours() < 18 ? 'こんにちは' : 'お疲れ様です';
 
-  // 承認モーダルの状態
+  // 状態
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [upcomingAuctions, setUpcomingAuctions] = useState<UpcomingAuction[]>([]);
+  const [monthlySales, setMonthlySales] = useState<MonthlySale[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<typeof pendingUsers[0] | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'seller' | 'buyer'>('all');
-
-  // フィルタリングされた承認待ちユーザー
-  const filteredPendingUsers = pendingUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || user.type === filterType;
-    return matchesSearch && matchesType;
+  const [actionLoading, setActionLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
   });
 
-  // 承認処理
-  const handleApprove = (userId: number) => {
-    alert(`ユーザーID: ${userId} を承認しました（デモ）`);
+  // データ取得
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/admin/dashboard');
+      if (response.data.success) {
+        setStatistics(response.data.data.statistics);
+        setPendingUsers(response.data.data.pending_users || []);
+        setUpcomingAuctions(response.data.data.upcoming_auctions || []);
+        setMonthlySales(response.data.data.monthly_sales || []);
+        setRecentActivity(response.data.data.recent_activity || []);
+        setError(null);
+      }
+    } catch (err: any) {
+      console.error('ダッシュボード取得エラー:', err);
+      setError('データの取得に失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  // ユーザー承認
+  const handleApprove = async (userId: number) => {
+    setActionLoading(true);
+    try {
+      const response = await axios.patch(`/api/admin/users/${userId}`, {
+        status: 'approved',
+      });
+      if (response.data.success) {
+        setSnackbar({ open: true, message: 'ユーザーを承認しました', severity: 'success' });
+        fetchDashboard();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '承認に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  // 却下処理
-  const handleReject = (userId: number) => {
-    alert(`ユーザーID: ${userId} を却下しました（デモ）`);
+  // ユーザー却下
+  const handleReject = async (userId: number) => {
+    setActionLoading(true);
+    try {
+      const response = await axios.patch(`/api/admin/users/${userId}`, {
+        status: 'rejected',
+      });
+      if (response.data.success) {
+        setSnackbar({ open: true, message: 'ユーザーを却下しました', severity: 'success' });
+        fetchDashboard();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '却下に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
   };
+
+  // フィルタリングされた承認待ちユーザー
+  const filteredPendingUsers = pendingUsers.filter((user) => {
+    if (!searchTerm) return true;
+    const query = searchTerm.toLowerCase();
+    return user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query);
+  });
+
+  // グラフデータの変換
+  const chartData = monthlySales.map((item) => ({
+    month: item.month,
+    sales: Number(item.total),
+    items: item.count,
+  }));
+
+  // アクティビティのアイコン取得
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'won_item':
+        return <MoneyIcon sx={{ fontSize: 16 }} />;
+      case 'user_registration':
+        return <PeopleIcon sx={{ fontSize: 16 }} />;
+      case 'auction':
+        return <EventIcon sx={{ fontSize: 16 }} />;
+      default:
+        return <NotificationsIcon sx={{ fontSize: 16 }} />;
+    }
+  };
+
+  if (error) {
+    return (
+      <Box>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Button onClick={fetchDashboard}>再読み込み</Button>
+      </Box>
+    );
+  }
 
   return (
     <Box>
       {/* ヘッダー */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-          {greeting}、管理者さん
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          ダッシュボード
-        </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+            {greeting}、管理者さん
+          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            ダッシュボード
+          </Typography>
+        </Box>
+        <IconButton onClick={fetchDashboard} title="更新">
+          <RefreshIcon />
+        </IconButton>
       </Box>
 
       {/* KPIカード */}
@@ -227,41 +345,41 @@ export default function Dashboard() {
         <Grid item xs={12} sm={6} lg={3}>
           <StatCard
             title="今月の開催回数"
-            value={stats.thisMonthAuctions}
+            value={statistics?.auctions.this_month || 0}
             icon={<EventIcon />}
-            trend={50}
-            trendLabel="+1回"
             color="#3B82F6"
+            loading={loading}
+            subtitle={`ライブ中: ${statistics?.auctions.live || 0}`}
           />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
           <StatCard
-            title="総売上金額"
-            value={`¥${(stats.totalSales / 10000).toFixed(0)}万`}
+            title="今月の売上"
+            value={`¥${((statistics?.sales.this_month || 0) / 10000).toFixed(0)}万`}
             icon={<MoneyIcon />}
-            trend={12.1}
-            trendLabel="¥20万"
             color="#059669"
+            loading={loading}
+            subtitle={`本日: ¥${((statistics?.sales.today || 0) / 10000).toFixed(1)}万`}
           />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
           <StatCard
-            title="総出品数"
-            value={stats.totalItems}
+            title="今月の落札数"
+            value={statistics?.won_items.this_month || 0}
             icon={<PetsIcon />}
-            trend={4.3}
-            trendLabel="+10体"
             color="#F59E0B"
+            loading={loading}
+            subtitle={`未入金: ${statistics?.won_items.pending_payment || 0}件`}
           />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
           <StatCard
-            title="登録参加者数"
-            value={stats.totalUsers}
+            title="登録ユーザー数"
+            value={statistics?.users.total || 0}
             icon={<PeopleIcon />}
-            trend={7.2}
-            trendLabel="+11人"
             color="#8B5CF6"
+            loading={loading}
+            subtitle={`承認待ち: ${statistics?.users.pending_approval || 0}人`}
           />
         </Grid>
       </Grid>
@@ -281,49 +399,39 @@ export default function Dashboard() {
                     過去6ヶ月の月間売上
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#059669' }} />
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>売上</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#3B82F6' }} />
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>出品数</Typography>
-                  </Box>
-                </Box>
               </Box>
-              
+
               <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} barGap={8}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748B', fontSize: 12 }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748B', fontSize: 12 }}
-                      tickFormatter={(value) => `${value / 10000}万`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 8,
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      }}
-                      formatter={(value: number, name: string) => [
-                        name === 'sales' ? `¥${(value / 10000).toFixed(0)}万` : `${value}体`,
-                        name === 'sales' ? '売上' : '出品数'
-                      ]}
-                    />
-                    <Bar dataKey="sales" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {loading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                    <CircularProgress />
+                  </Box>
+                ) : chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barGap={8}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} tickFormatter={(value) => `${value / 10000}万`} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 8,
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        }}
+                        formatter={(value: number, name: string) => [
+                          name === 'sales' ? `¥${(value / 10000).toFixed(0)}万` : `${value}件`,
+                          name === 'sales' ? '売上' : '落札数',
+                        ]}
+                      />
+                      <Bar dataKey="sales" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                    <Typography color="text.secondary">データがありません</Typography>
+                  </Box>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -339,27 +447,21 @@ export default function Dashboard() {
                   承認待ち
                 </Typography>
                 <Chip
-                  label={stats.pendingUsers}
+                  label={statistics?.users.pending_approval || 0}
                   size="small"
-                  sx={{
-                    bgcolor: '#FEF3C7',
-                    color: '#D97706',
-                    fontWeight: 700,
-                  }}
+                  sx={{ bgcolor: '#FEF3C7', color: '#D97706', fontWeight: 700 }}
                 />
               </Box>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
-                {stats.pendingUsers}件の新規ユーザー登録申請があります
+                {statistics?.users.pending_approval || 0}件の新規ユーザー登録申請があります
               </Typography>
               <Button
                 variant="contained"
                 fullWidth
                 endIcon={<ArrowForwardIcon />}
                 onClick={() => setApprovalModalOpen(true)}
-                sx={{
-                  bgcolor: '#F59E0B',
-                  '&:hover': { bgcolor: '#D97706' },
-                }}
+                disabled={!statistics?.users.pending_approval}
+                sx={{ bgcolor: '#F59E0B', '&:hover': { bgcolor: '#D97706' } }}
               >
                 承認画面へ
               </Button>
@@ -372,45 +474,38 @@ export default function Dashboard() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                   最近のアクティビティ
                 </Typography>
-                <IconButton size="small">
-                  <MoreVertIcon sx={{ fontSize: 18 }} />
-                </IconButton>
               </Box>
-              
-              <List sx={{ p: 0 }}>
-                {recentActivities.map((activity, index) => (
-                  <React.Fragment key={activity.id}>
-                    <ListItem sx={{ px: 0, py: 1.5 }}>
-                      <ListItemAvatar sx={{ minWidth: 40 }}>
-                        <Avatar
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: '#F1F5F9',
-                            color: '#64748B',
-                          }}
-                        >
-                          {React.cloneElement(activity.icon as React.ReactElement, { sx: { fontSize: 16 } })}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={activity.text}
-                        secondary={activity.time}
-                        primaryTypographyProps={{
-                          variant: 'body2',
-                          fontWeight: 500,
-                          sx: { lineHeight: 1.4 },
-                        }}
-                        secondaryTypographyProps={{
-                          variant: 'caption',
-                          sx: { color: 'text.secondary' },
-                        }}
-                      />
-                    </ListItem>
-                    {index < recentActivities.length - 1 && <Divider component="li" />}
-                  </React.Fragment>
-                ))}
-              </List>
+
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : recentActivity.length > 0 ? (
+                <List sx={{ p: 0 }}>
+                  {recentActivity.slice(0, 5).map((activity, index) => (
+                    <React.Fragment key={index}>
+                      <ListItem sx={{ px: 0, py: 1.5 }}>
+                        <ListItemAvatar sx={{ minWidth: 40 }}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: '#F1F5F9', color: '#64748B' }}>
+                            {getActivityIcon(activity.type)}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={activity.message}
+                          secondary={new Date(activity.created_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          primaryTypographyProps={{ variant: 'body2', fontWeight: 500, sx: { lineHeight: 1.4 } }}
+                          secondaryTypographyProps={{ variant: 'caption', sx: { color: 'text.secondary' } }}
+                        />
+                      </ListItem>
+                      {index < recentActivity.slice(0, 5).length - 1 && <Divider component="li" />}
+                    </React.Fragment>
+                  ))}
+                </List>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                  最近のアクティビティはありません
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -428,11 +523,11 @@ export default function Dashboard() {
                     今後のオークションスケジュール
                   </Typography>
                 </Box>
-                <Button variant="outlined" size="small" endIcon={<ArrowForwardIcon />}>
+                <Button variant="outlined" size="small" endIcon={<ArrowForwardIcon />} onClick={() => navigate('/admin/auctions')}>
                   すべて表示
                 </Button>
               </Box>
-              
+
               <TableContainer>
                 <Table>
                   <TableHead>
@@ -445,70 +540,69 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {upcomingAuctions.map((auction) => (
-                      <TableRow
-                        key={auction.id}
-                        hover
-                        sx={{ '&:last-child td': { border: 0 } }}
-                      >
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Avatar
-                              variant="rounded"
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                bgcolor: '#F0FDF4',
-                                color: '#059669',
-                              }}
-                            >
-                              <EventIcon />
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {auction.title}
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                ID: {auction.id}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <ScheduleIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                            <Typography variant="body2">
-                              {new Date(auction.date).toLocaleDateString('ja-JP', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                              })}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {auction.items}体
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            size="small"
-                            label={auction.status === 'preparing' ? '準備中' : '下書き'}
-                            sx={{
-                              bgcolor: auction.status === 'preparing' ? '#DBEAFE' : '#F1F5F9',
-                              color: auction.status === 'preparing' ? '#2563EB' : '#64748B',
-                              fontWeight: 600,
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Button size="small" variant="outlined">
-                            管理
-                          </Button>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                          <CircularProgress size={24} />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : upcomingAuctions.length > 0 ? (
+                      upcomingAuctions.map((auction) => (
+                        <TableRow key={auction.id} hover sx={{ '&:last-child td': { border: 0 } }}>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar variant="rounded" sx={{ width: 40, height: 40, bgcolor: auction.status === 'live' ? '#FEF2F2' : '#F0FDF4', color: auction.status === 'live' ? '#DC2626' : '#059669' }}>
+                                <EventIcon />
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {auction.title}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  ID: {auction.id}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <ScheduleIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                              <Typography variant="body2">
+                                {new Date(auction.event_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                {auction.start_time && ` ${auction.start_time}`}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {auction.items_count}体
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              size="small"
+                              label={auction.status === 'live' ? '開催中' : auction.status === 'scheduled' ? '予定' : '準備中'}
+                              sx={{
+                                bgcolor: auction.status === 'live' ? '#FEF2F2' : auction.status === 'scheduled' ? '#DBEAFE' : '#F1F5F9',
+                                color: auction.status === 'live' ? '#DC2626' : auction.status === 'scheduled' ? '#2563EB' : '#64748B',
+                                fontWeight: 600,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button size="small" variant="outlined" onClick={() => navigate(`/admin/auctions/${auction.id}`)}>
+                              管理
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                          <Typography color="text.secondary">予定されたオークションはありません</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -518,12 +612,7 @@ export default function Dashboard() {
       </Grid>
 
       {/* 承認モーダル */}
-      <Dialog
-        open={approvalModalOpen}
-        onClose={() => setApprovalModalOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={approvalModalOpen} onClose={() => setApprovalModalOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -531,11 +620,7 @@ export default function Dashboard() {
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 新規ユーザー登録申請
               </Typography>
-              <Chip
-                label={`${pendingUsers.length}件`}
-                size="small"
-                sx={{ bgcolor: '#FEF3C7', color: '#D97706', fontWeight: 600 }}
-              />
+              <Chip label={`${pendingUsers.length}件`} size="small" sx={{ bgcolor: '#FEF3C7', color: '#D97706', fontWeight: 600 }} />
             </Box>
             <IconButton onClick={() => setApprovalModalOpen(false)}>
               <CloseIcon />
@@ -543,10 +628,11 @@ export default function Dashboard() {
           </Box>
         </DialogTitle>
         <DialogContent>
-          {/* 検索・フィルター */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 3, mt: 1 }}>
+          {/* 検索 */}
+          <Box sx={{ mb: 3, mt: 1 }}>
             <TextField
               size="small"
+              fullWidth
               placeholder="名前・メールで検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -557,30 +643,7 @@ export default function Dashboard() {
                   </InputAdornment>
                 ),
               }}
-              sx={{ flex: 1 }}
             />
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Chip
-                label="すべて"
-                onClick={() => setFilterType('all')}
-                color={filterType === 'all' ? 'primary' : 'default'}
-                variant={filterType === 'all' ? 'filled' : 'outlined'}
-              />
-              <Chip
-                label="出品者"
-                onClick={() => setFilterType('seller')}
-                color={filterType === 'seller' ? 'primary' : 'default'}
-                variant={filterType === 'seller' ? 'filled' : 'outlined'}
-                icon={<StoreIcon />}
-              />
-              <Chip
-                label="買受者"
-                onClick={() => setFilterType('buyer')}
-                color={filterType === 'buyer' ? 'primary' : 'default'}
-                variant={filterType === 'buyer' ? 'filled' : 'outlined'}
-                icon={<PersonIcon />}
-              />
-            </Box>
           </Box>
 
           {/* ユーザー一覧 */}
@@ -589,8 +652,7 @@ export default function Dashboard() {
               <TableHead>
                 <TableRow>
                   <TableCell>申請者</TableCell>
-                  <TableCell>種別</TableCell>
-                  <TableCell>連絡先</TableCell>
+                  <TableCell>メールアドレス</TableCell>
                   <TableCell>申請日</TableCell>
                   <TableCell align="center">アクション</TableCell>
                 </TableRow>
@@ -600,55 +662,20 @@ export default function Dashboard() {
                   <TableRow key={user.id} hover>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar
-                          sx={{
-                            width: 36,
-                            height: 36,
-                            bgcolor: user.type === 'seller' ? '#DBEAFE' : '#F3E8FF',
-                            color: user.type === 'seller' ? '#2563EB' : '#9333EA',
-                          }}
-                        >
-                          {user.type === 'seller' ? <StoreIcon sx={{ fontSize: 18 }} /> : <PersonIcon sx={{ fontSize: 18 }} />}
+                        <Avatar sx={{ width: 36, height: 36, bgcolor: '#F3E8FF', color: '#9333EA' }}>
+                          <PersonIcon sx={{ fontSize: 18 }} />
                         </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {user.name}
-                          </Typography>
-                          {user.representative && (
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              代表: {user.representative}
-                            </Typography>
-                          )}
-                        </Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {user.name}
+                        </Typography>
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={user.type === 'seller' ? '出品者' : '買受者'}
-                        size="small"
-                        sx={{
-                          bgcolor: user.type === 'seller' ? '#DBEAFE' : '#F3E8FF',
-                          color: user.type === 'seller' ? '#2563EB' : '#9333EA',
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <EmailIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                          <Typography variant="caption">{user.email}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <PhoneIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                          <Typography variant="caption">{user.phone}</Typography>
-                        </Box>
-                      </Box>
+                      <Typography variant="body2">{user.email}</Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {new Date(user.appliedAt).toLocaleDateString('ja-JP')}
+                        {new Date(user.created_at).toLocaleDateString('ja-JP')}
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
@@ -659,6 +686,7 @@ export default function Dashboard() {
                           color="success"
                           startIcon={<CheckIcon />}
                           onClick={() => handleApprove(user.id)}
+                          disabled={actionLoading}
                           sx={{ minWidth: 80 }}
                         >
                           承認
@@ -669,6 +697,7 @@ export default function Dashboard() {
                           color="error"
                           startIcon={<BlockIcon />}
                           onClick={() => handleReject(user.id)}
+                          disabled={actionLoading}
                           sx={{ minWidth: 80 }}
                         >
                           却下
@@ -690,29 +719,30 @@ export default function Dashboard() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button onClick={() => setApprovalModalOpen(false)}>
-            閉じる
-          </Button>
+          <Button onClick={() => setApprovalModalOpen(false)}>閉じる</Button>
           <Button
             variant="outlined"
             onClick={() => {
               setApprovalModalOpen(false);
-              navigate('/admin/sellers');
+              navigate('/admin/users');
             }}
           >
-            出品者管理へ
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => {
-              setApprovalModalOpen(false);
-              navigate('/admin/buyers');
-            }}
-          >
-            買受者管理へ
+            ユーザー管理へ
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* スナックバー */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

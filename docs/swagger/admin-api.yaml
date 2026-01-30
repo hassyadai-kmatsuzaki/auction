@@ -1,0 +1,1908 @@
+openapi: 3.0.3
+info:
+  title: メダカライブオークション - 管理者API
+  description: |
+    メダカライブオークションシステムの管理者向けAPI仕様書
+    
+    ## 認証
+    すべてのエンドポイントは`Bearer`トークン認証が必要です。
+    また、`admin`ロールを持つユーザーのみアクセス可能です。
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: /api
+    description: Development server
+
+tags:
+  - name: Dashboard
+    description: ダッシュボード関連
+  - name: Users
+    description: ユーザー管理
+  - name: Auctions
+    description: オークション管理
+  - name: Items
+    description: 出品生体管理
+  - name: Announcements
+    description: お知らせ管理
+  - name: Live
+    description: ライブオークション制御
+  - name: WonItems
+    description: 落札管理
+  - name: Settings
+    description: システム設定
+
+paths:
+  # ==================== Dashboard ====================
+  /admin/dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: ダッシュボード情報取得
+      description: 管理者ダッシュボードに表示する統計情報を取得
+      operationId: getDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      statistics:
+                        type: object
+                        properties:
+                          total_users:
+                            type: integer
+                          total_auctions:
+                            type: integer
+                          total_sales:
+                            type: number
+                          pending_users:
+                            type: integer
+                      pending_users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserSummary'
+                      upcoming_auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuctionSummary'
+                      monthly_sales:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            month:
+                              type: string
+                            sales:
+                              type: number
+                      recent_activity:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Activity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/dashboard/sales-summary:
+    get:
+      tags:
+        - Dashboard
+      summary: 売上サマリー取得
+      operationId: getSalesSummary
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year]
+            default: month
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      period:
+                        type: string
+                      total_sales:
+                        type: number
+                      total_commission:
+                        type: number
+                      items_sold:
+                        type: integer
+
+  # ==================== Users ====================
+  /admin/users:
+    get:
+      tags:
+        - Users
+      summary: ユーザー一覧取得
+      operationId: getUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: 検索キーワード（名前、メール）
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, seller, participant]
+          description: ロールフィルター
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+          description: ステータスフィルター
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+    post:
+      tags:
+        - Users
+      summary: ユーザー作成
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/users/{id}:
+    get:
+      tags:
+        - Users
+      summary: ユーザー詳細取得
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/UserDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Users
+      summary: ユーザー更新
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+        - Users
+      summary: ユーザー削除
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Auctions ====================
+  /admin/auctions:
+    get:
+      tags:
+        - Auctions
+      summary: オークション一覧取得
+      operationId: getAuctions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [preparing, scheduled, live, finished, cancelled]
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Auction'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+    post:
+      tags:
+        - Auctions
+      summary: オークション作成
+      operationId: createAuction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuctionCreate'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      auction:
+                        $ref: '#/components/schemas/Auction'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/auctions/{id}:
+    get:
+      tags:
+        - Auctions
+      summary: オークション詳細取得
+      operationId: getAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auction:
+                        $ref: '#/components/schemas/AuctionDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Auctions
+      summary: オークション更新
+      operationId: updateAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuctionUpdate'
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+        - Auctions
+      summary: オークション削除
+      operationId: deleteAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          description: 削除不可（開催中など）
+
+  /admin/auctions/{id}/status:
+    patch:
+      tags:
+        - Auctions
+      summary: オークションステータス変更
+      operationId: updateAuctionStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [preparing, scheduled, live, finished, cancelled]
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: ステータス変更不可
+
+  # ==================== Items ====================
+  /admin/auctions/{auctionId}/items:
+    get:
+      tags:
+        - Items
+      summary: 出品生体一覧取得
+      operationId: getItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, pending, approved, rejected, registered, live, sold, unsold, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Item'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+    post:
+      tags:
+        - Items
+      summary: 出品生体作成
+      operationId: createItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreate'
+      responses:
+        '201':
+          description: 作成成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/auctions/{auctionId}/items/{id}:
+    get:
+      tags:
+        - Items
+      summary: 出品生体詳細取得
+      operationId: getItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      item:
+                        $ref: '#/components/schemas/ItemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Items
+      summary: 出品生体更新
+      operationId: updateItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemUpdate'
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+        - Items
+      summary: 出品生体削除
+      operationId: deleteItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/auctions/{auctionId}/items/{id}/media:
+    post:
+      tags:
+        - Items
+      summary: メディアアップロード
+      operationId: uploadMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                media_type:
+                  type: string
+                  enum: [photo_top, photo_side, photo_other, video_top, video_swim]
+      responses:
+        '201':
+          description: アップロード成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      media:
+                        $ref: '#/components/schemas/ItemMedia'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/auctions/{auctionId}/items/{id}/media/{mediaId}:
+    delete:
+      tags:
+        - Items
+      summary: メディア削除
+      operationId: deleteMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/auctions/{auctionId}/items/{id}/media/{mediaId}/thumbnail:
+    patch:
+      tags:
+        - Items
+      summary: サムネイル設定
+      operationId: setThumbnail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 設定成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/auctions/{auctionId}/items/bulk-status:
+    patch:
+      tags:
+        - Items
+      summary: 一括ステータス更新
+      operationId: bulkUpdateStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+                - status
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                status:
+                  type: string
+                  enum: [approved, rejected, registered]
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ==================== Announcements ====================
+  /admin/announcements:
+    get:
+      tags:
+        - Announcements
+      summary: お知らせ一覧取得
+      operationId: getAnnouncements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: target_role
+          in: query
+          schema:
+            type: string
+            enum: [all, seller, participant]
+        - name: is_visible
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      announcements:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Announcement'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+    post:
+      tags:
+        - Announcements
+      summary: お知らせ作成
+      operationId: createAnnouncement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementCreate'
+      responses:
+        '201':
+          description: 作成成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/announcements/{id}:
+    get:
+      tags:
+        - Announcements
+      summary: お知らせ詳細取得
+      operationId: getAnnouncement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Announcements
+      summary: お知らせ更新
+      operationId: updateAnnouncement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementUpdate'
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+        - Announcements
+      summary: お知らせ削除
+      operationId: deleteAnnouncement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/announcements/{id}/toggle-visibility:
+    patch:
+      tags:
+        - Announcements
+      summary: 表示/非表示切り替え
+      operationId: toggleVisibility
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 切り替え成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Live ====================
+  /admin/auctions/{auctionId}/live:
+    get:
+      tags:
+        - Live
+      summary: ライブ状態取得
+      operationId: getLiveState
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auction:
+                        $ref: '#/components/schemas/AuctionSummary'
+                      lanes:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LaneState'
+
+  /admin/auctions/{auctionId}/live/start:
+    post:
+      tags:
+        - Live
+      summary: オークション開始
+      operationId: startAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 開始成功
+        '400':
+          description: 開始不可
+
+  /admin/auctions/{auctionId}/live/pause:
+    post:
+      tags:
+        - Live
+      summary: 一時停止
+      operationId: pauseAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 一時停止成功
+
+  /admin/auctions/{auctionId}/live/resume:
+    post:
+      tags:
+        - Live
+      summary: 再開
+      operationId: resumeAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 再開成功
+
+  /admin/auctions/{auctionId}/live/finish:
+    post:
+      tags:
+        - Live
+      summary: オークション終了
+      operationId: finishAuction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 終了成功
+
+  /admin/lanes/{laneId}/next-item:
+    post:
+      tags:
+        - Live
+      summary: 次の商品へ
+      operationId: nextItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: laneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 次の商品なし
+
+  /admin/items/{itemId}/price:
+    patch:
+      tags:
+        - Live
+      summary: 価格調整
+      operationId: adjustPrice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - price
+              properties:
+                price:
+                  type: number
+      responses:
+        '200':
+          description: 調整成功
+
+  # ==================== Won Items ====================
+  /admin/auctions/{auctionId}/won-items:
+    get:
+      tags:
+        - WonItems
+      summary: 落札一覧取得
+      operationId: getWonItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: payment_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, paid, confirmed]
+        - name: delivery_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, shipped, completed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      won_items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WonItem'
+                      statistics:
+                        type: object
+                        properties:
+                          total_count:
+                            type: integer
+                          payment_pending:
+                            type: integer
+                          shipping_pending:
+                            type: integer
+                          completed:
+                            type: integer
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+  /admin/won-items/{id}:
+    get:
+      tags:
+        - WonItems
+      summary: 落札詳細取得
+      operationId: getWonItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/won-items/{id}/confirm-payment:
+    post:
+      tags:
+        - WonItems
+      summary: 入金確認
+      operationId: confirmPayment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 確認成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/won-items/{id}/ship:
+    post:
+      tags:
+        - WonItems
+      summary: 発送登録
+      operationId: shipWonItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - shipping_company
+                - tracking_number
+              properties:
+                shipping_company:
+                  type: string
+                tracking_number:
+                  type: string
+      responses:
+        '200':
+          description: 登録成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/won-items/{id}/complete:
+    post:
+      tags:
+        - WonItems
+      summary: 配達完了
+      operationId: completeDelivery
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 完了成功
+
+  /admin/won-items/{id}/notes:
+    patch:
+      tags:
+        - WonItems
+      summary: 備考更新
+      operationId: updateNotes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin_notes:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  # ==================== Settings ====================
+  /admin/settings:
+    get:
+      tags:
+        - Settings
+      summary: 設定一覧取得
+      operationId: getSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      settings:
+                        type: object
+    put:
+      tags:
+        - Settings
+      summary: 設定更新
+      operationId: updateSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/settings/defaults:
+    get:
+      tags:
+        - Settings
+      summary: オークションデフォルト設定取得
+      operationId: getAuctionDefaults
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+
+  /admin/settings/shipping/rates:
+    get:
+      tags:
+        - Settings
+      summary: 配送料金取得
+      operationId: getShippingRates
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+    put:
+      tags:
+        - Settings
+      summary: 配送料金更新
+      operationId: updateShippingRates
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      region:
+                        type: string
+                      price:
+                        type: number
+      responses:
+        '200':
+          description: 更新成功
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: 認証エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Unauthenticated.
+    Forbidden:
+      description: 権限エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: アクセス権限がありません。
+    NotFound:
+      description: リソースが見つからない
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: リソースが見つかりません。
+    ValidationError:
+      description: バリデーションエラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+        - type: object
+          properties:
+            phone:
+              type: string
+            roles:
+              type: array
+              items:
+                type: string
+
+    UserDetail:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            postal_code:
+              type: string
+            prefecture:
+              type: string
+            city:
+              type: string
+            address_line1:
+              type: string
+            address_line2:
+              type: string
+            approved_at:
+              type: string
+              format: date-time
+            seller_profile:
+              $ref: '#/components/schemas/SellerProfile'
+
+    UserCreate:
+      type: object
+      required:
+        - name
+        - email
+        - roles
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        postal_code:
+          type: string
+        prefecture:
+          type: string
+        city:
+          type: string
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        roles:
+          type: array
+          items:
+            type: string
+
+    SellerProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        farm_name:
+          type: string
+        description:
+          type: string
+        bank_name:
+          type: string
+        bank_branch:
+          type: string
+        bank_account_type:
+          type: string
+        bank_account_number:
+          type: string
+        bank_account_holder:
+          type: string
+
+    AuctionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        event_date:
+          type: string
+          format: date
+        status:
+          type: string
+
+    Auction:
+      allOf:
+        - $ref: '#/components/schemas/AuctionSummary'
+        - type: object
+          properties:
+            start_time:
+              type: string
+            lane_count:
+              type: integer
+            items_count:
+              type: integer
+            created_at:
+              type: string
+              format: date-time
+
+    AuctionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Auction'
+        - type: object
+          properties:
+            description:
+              type: string
+            countdown_seconds:
+              type: integer
+            entry_deadline:
+              type: string
+              format: date-time
+            commission_rate:
+              type: number
+            payment_deadline_days:
+              type: integer
+            lanes:
+              type: array
+              items:
+                $ref: '#/components/schemas/Lane'
+
+    AuctionCreate:
+      type: object
+      required:
+        - title
+        - event_date
+      properties:
+        title:
+          type: string
+        event_date:
+          type: string
+          format: date
+        start_time:
+          type: string
+        description:
+          type: string
+        lane_count:
+          type: integer
+          minimum: 1
+          maximum: 10
+        countdown_seconds:
+          type: integer
+        bid_increment:
+          type: number
+        entry_deadline:
+          type: string
+          format: date-time
+        commission_rate:
+          type: number
+        payment_deadline_days:
+          type: integer
+
+    AuctionUpdate:
+      $ref: '#/components/schemas/AuctionCreate'
+
+    Lane:
+      type: object
+      properties:
+        id:
+          type: integer
+        lane_number:
+          type: integer
+        status:
+          type: string
+        current_item_id:
+          type: integer
+
+    LaneState:
+      type: object
+      properties:
+        id:
+          type: integer
+        lane_number:
+          type: integer
+        status:
+          type: string
+        current_item:
+          $ref: '#/components/schemas/ItemSummary'
+        active_bidders:
+          type: integer
+        remaining_items:
+          type: integer
+
+    ItemSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        item_number:
+          type: integer
+        species_name:
+          type: string
+        current_price:
+          type: number
+        thumbnail_path:
+          type: string
+
+    Item:
+      allOf:
+        - $ref: '#/components/schemas/ItemSummary'
+        - type: object
+          properties:
+            quantity:
+              type: integer
+            start_price:
+              type: number
+            status:
+              type: string
+            is_premium:
+              type: boolean
+            seller_name:
+              type: string
+
+    ItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/Item'
+        - type: object
+          properties:
+            estimated_price:
+              type: number
+            bid_increment:
+              type: number
+            inspection_info:
+              type: string
+            individual_info:
+              type: string
+            notes:
+              type: string
+            unsold_action:
+              type: string
+            media:
+              type: array
+              items:
+                $ref: '#/components/schemas/ItemMedia'
+
+    ItemCreate:
+      type: object
+      required:
+        - seller_profile_id
+        - species_name
+        - quantity
+        - start_price
+      properties:
+        seller_profile_id:
+          type: integer
+        species_name:
+          type: string
+        quantity:
+          type: integer
+        start_price:
+          type: number
+        estimated_price:
+          type: number
+        bid_increment:
+          type: number
+        inspection_info:
+          type: string
+        individual_info:
+          type: string
+        notes:
+          type: string
+        is_premium:
+          type: boolean
+        unsold_action:
+          type: string
+          enum: [return, keep, dispose]
+
+    ItemUpdate:
+      $ref: '#/components/schemas/ItemCreate'
+
+    ItemMedia:
+      type: object
+      properties:
+        id:
+          type: integer
+        item_id:
+          type: integer
+        media_type:
+          type: string
+        file_path:
+          type: string
+        thumbnail_path:
+          type: string
+        is_thumbnail:
+          type: boolean
+        display_order:
+          type: integer
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        target_roles:
+          type: array
+          items:
+            type: string
+        is_important:
+          type: boolean
+        is_visible:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    AnnouncementCreate:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        content:
+          type: string
+        target_roles:
+          type: array
+          items:
+            type: string
+        is_important:
+          type: boolean
+        is_visible:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+
+    AnnouncementUpdate:
+      $ref: '#/components/schemas/AnnouncementCreate'
+
+    WonItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        item:
+          $ref: '#/components/schemas/ItemSummary'
+        winner:
+          $ref: '#/components/schemas/UserSummary'
+        winning_price:
+          type: number
+        total_amount:
+          type: number
+        payment_status:
+          type: string
+          enum: [pending, paid, confirmed]
+        delivery_status:
+          type: string
+          enum: [pending, preparing, shipped, completed]
+        tracking_number:
+          type: string
+        shipping_company:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Activity:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        created_at:
+          type: string
+          format: date-time

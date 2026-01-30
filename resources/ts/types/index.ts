@@ -1,15 +1,25 @@
 // 共通型定義
 
+export interface Role {
+  id: number;
+  name: string;
+  display_name: string;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
-  user_type: 'admin' | 'participant';
-  status: 'pending' | 'approved' | 'suspended';
+  status: 'pending' | 'approved' | 'suspended' | 'rejected';
   phone?: string;
   postal_code?: string;
-  address?: string;
+  prefecture?: string;
+  city?: string;
+  address_line1?: string;
+  address_line2?: string;
+  roles?: Role[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Auction {
@@ -17,12 +27,24 @@ export interface Auction {
   title: string;
   event_date: string;
   start_time: string;
-  status: 'preparing' | 'live' | 'finished' | 'cancelled';
+  end_time?: string | null;
+  status: 'preparing' | 'scheduled' | 'live' | 'finished' | 'cancelled';
   description?: string;
+  lane_count?: number;
+  default_bid_increment?: number;
+  countdown_seconds?: number;
+  deposit_required?: boolean;
+  upload_deadline?: string | null;
+  payment_deadline_hours?: number;
+  shipping_deadline_hours?: number;
+  items_count?: number;
   total_items?: number;
   total_sold?: number;
   total_sales?: number;
   can_edit?: boolean;
+  created_by?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Item {
@@ -89,13 +111,15 @@ export interface Announcement {
   id: number;
   title: string;
   content: string;
-  is_published: boolean;
-  published_at?: string;
-  expires_at?: string;
-  priority: 'low' | 'normal' | 'high';
+  status: 'draft' | 'scheduled' | 'published' | 'hidden';
+  target_roles: string[];
+  is_important: boolean;
+  published_at: string | null;
   created_by: number;
+  updated_by?: number | null;
   is_read?: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface SystemSettings {
