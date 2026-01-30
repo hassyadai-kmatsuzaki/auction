@@ -173,8 +173,12 @@ class Announcement extends Model
         }
 
         // 重要度フィルター
-        if (isset($filters['is_important'])) {
-            $query->where('is_important', $filters['is_important']);
+        if (isset($filters['is_important']) && $filters['is_important'] !== '') {
+            // 文字列 'true'/'false' を boolean に変換
+            $isImportant = filter_var($filters['is_important'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isImportant !== null) {
+                $query->where('is_important', $isImportant);
+            }
         }
 
         // 検索
