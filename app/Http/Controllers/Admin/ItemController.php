@@ -415,7 +415,16 @@ class ItemController extends Controller
         try {
             // ファイルをアップロード
             if ($disk === 's3') {
+                // S3設定のデバッグ情報
+                \Log::info('S3アップロード開始', [
+                    'bucket' => config('filesystems.disks.s3.bucket'),
+                    'region' => config('filesystems.disks.s3.region'),
+                    'filename' => $filename,
+                ]);
+                
                 $path = Storage::disk('s3')->putFileAs('', $file, $filename, 'public');
+                
+                \Log::info('S3アップロード結果', ['path' => $path]);
             } else {
                 // ディレクトリを事前に作成
                 $directory = dirname($filename);
@@ -428,12 +437,25 @@ class ItemController extends Controller
             if (!$path) {
                 throw new \Exception('ファイルの保存に失敗しました。ディスク: ' . $disk);
             }
+        } catch (\Aws\S3\Exception\S3Exception $e) {
+            \Log::error('S3エラー: ' . $e->getMessage(), [
+                'aws_error_code' => $e->getAwsErrorCode(),
+                'aws_error_message' => $e->getAwsErrorMessage(),
+                'disk' => $disk,
+                'filename' => $filename,
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'S3アップロードエラー: ' . $e->getAwsErrorMessage(),
+            ], 500);
         } catch (\Exception $e) {
             \Log::error('メディアアップロードエラー: ' . $e->getMessage(), [
                 'disk' => $disk,
                 'filename' => $filename,
                 'file_size' => $file->getSize(),
                 'mime_type' => $file->getMimeType(),
+                'exception_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
                 'success' => false,
