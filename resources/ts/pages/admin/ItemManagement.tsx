@@ -29,7 +29,15 @@ import {
   DialogActions,
   Checkbox,
   Snackbar,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
+import {
+  CheckCircle as CheckCircleIcon,
+  HourglassEmpty as HourglassEmptyIcon,
+  Cancel as CancelIcon,
+} from '@mui/icons-material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -98,6 +106,11 @@ export default function ItemManagement() {
   
   // スナックバー
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  
+  // 個別ステータス変更メニュー
+  const [statusMenuAnchor, setStatusMenuAnchor] = useState<null | HTMLElement>(null);
+  const [statusChangeTarget, setStatusChangeTarget] = useState<Item | null>(null);
+  const [statusChanging, setStatusChanging] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -175,6 +188,37 @@ export default function ItemManagement() {
     }
   };
 
+  // 個別ステータス変更
+  const handleStatusMenuOpen = (event: React.MouseEvent<HTMLElement>, item: Item) => {
+    // オークション中、落札済みは変更不可
+    if (['live', 'sold'].includes(item.status)) return;
+    setStatusMenuAnchor(event.currentTarget);
+    setStatusChangeTarget(item);
+  };
+
+  const handleStatusMenuClose = () => {
+    setStatusMenuAnchor(null);
+    setStatusChangeTarget(null);
+  };
+
+  const handleSingleStatusChange = async (newStatus: string) => {
+    if (!statusChangeTarget) return;
+    
+    try {
+      setStatusChanging(true);
+      await axios.patch(`/api/admin/auctions/${auctionId}/items/${statusChangeTarget.id}`, {
+        status: newStatus,
+      });
+      setSnackbar({ open: true, message: `ステータスを「${getStatusLabel(newStatus)}」に変更しました。`, severity: 'success' });
+      handleStatusMenuClose();
+      fetchItems();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'ステータス変更に失敗しました。', severity: 'error' });
+    } finally {
+      setStatusChanging(false);
+    }
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(items.map(item => item.id));
@@ -193,8 +237,8 @@ export default function ItemManagement() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'draft': return '下書き';
-      case 'registered': return '登録済み';
+      case 'draft': return '審査中';
+      case 'registered': return '承認済み';
       case 'live': return 'オークション中';
       case 'sold': return '落札済み';
       case 'unsold': return '不落札';
@@ -288,8 +332,8 @@ export default function ItemManagement() {
               }}
             >
               <MenuItem value="all">すべて</MenuItem>
-              <MenuItem value="draft">下書き</MenuItem>
-              <MenuItem value="registered">登録済み</MenuItem>
+              <MenuItem value="draft">審査中</MenuItem>
+              <MenuItem value="registered">承認済み</MenuItem>
               <MenuItem value="live">オークション中</MenuItem>
               <MenuItem value="sold">落札済み</MenuItem>
               <MenuItem value="unsold">不落札</MenuItem>
@@ -399,6 +443,13 @@ export default function ItemManagement() {
                       label={getStatusLabel(item.status)}
                       color={getStatusColor(item.status) as any}
                       size="small"
+                      onClick={(e) => handleStatusMenuOpen(e, item)}
+                      sx={{
+                        cursor: ['live', 'sold'].includes(item.status) ? 'default' : 'pointer',
+                        '&:hover': {
+                          opacity: ['live', 'sold'].includes(item.status) ? 1 : 0.8,
+                        },
+                      }}
                     />
                   </TableCell>
                   <TableCell align="center">
@@ -427,6 +478,41 @@ export default function ItemManagement() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* 個別ステータス変更メニュー */}
+      <Menu
+        anchorEl={statusMenuAnchor}
+        open={Boolean(statusMenuAnchor)}
+        onClose={handleStatusMenuClose}
+      >
+        <MenuItem
+          onClick={() => handleSingleStatusChange('draft')}
+          disabled={statusChangeTarget?.status === 'draft' || statusChanging}
+        >
+          <ListItemIcon>
+            <HourglassEmptyIcon fontSize="small" sx={{ color: '#F59E0B' }} />
+          </ListItemIcon>
+          <ListItemText>審査中</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleSingleStatusChange('registered')}
+          disabled={statusChangeTarget?.status === 'registered' || statusChanging}
+        >
+          <ListItemIcon>
+            <CheckCircleIcon fontSize="small" sx={{ color: '#10B981' }} />
+          </ListItemIcon>
+          <ListItemText>承認済み</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleSingleStatusChange('cancelled')}
+          disabled={statusChangeTarget?.status === 'cancelled' || statusChanging}
+        >
+          <ListItemIcon>
+            <CancelIcon fontSize="small" sx={{ color: '#EF4444' }} />
+          </ListItemIcon>
+          <ListItemText>キャンセル</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* ページネーション */}
       {lastPage > 1 && (
@@ -479,8 +565,8 @@ export default function ItemManagement() {
               label="新しいステータス"
               onChange={(e) => setBulkStatus(e.target.value)}
             >
-              <MenuItem value="draft">下書き</MenuItem>
-              <MenuItem value="registered">登録済み</MenuItem>
+              <MenuItem value="draft">審査中</MenuItem>
+              <MenuItem value="registered">承認済み</MenuItem>
               <MenuItem value="cancelled">キャンセル</MenuItem>
             </Select>
           </FormControl>

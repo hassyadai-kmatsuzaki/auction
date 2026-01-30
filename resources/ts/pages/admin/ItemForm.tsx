@@ -456,8 +456,8 @@ export default function ItemForm() {
                         label="ステータス"
                         onChange={handleChange('status')}
                       >
-                        <MenuItem value="draft">下書き</MenuItem>
-                        <MenuItem value="registered">登録済み</MenuItem>
+                        <MenuItem value="draft">審査中</MenuItem>
+                        <MenuItem value="registered">承認済み</MenuItem>
                         <MenuItem value="cancelled">キャンセル</MenuItem>
                       </Select>
                     </FormControl>

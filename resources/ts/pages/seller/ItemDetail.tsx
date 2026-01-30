@@ -29,6 +29,9 @@ import {
   Event as EventIcon,
   AttachMoney as MoneyIcon,
   LocalShipping as ShippingIcon,
+  Image as ImageIcon,
+  VideoLibrary as VideoIcon,
+  PlayCircle as PlayCircleIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -57,6 +60,7 @@ interface ItemDetail {
     id: number;
     media_type: string;
     file_path: string;
+    file_url: string;
     is_thumbnail: boolean;
   }[];
   won_item: {
@@ -117,8 +121,8 @@ export default function ItemDetail() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'draft': return '下書き';
-      case 'registered': return '登録済み';
+      case 'draft': return '審査中';
+      case 'registered': return '承認済み';
       case 'live': return 'オークション中';
       case 'sold': return '落札済み';
       case 'unsold': return '不落札';
@@ -257,6 +261,131 @@ export default function ItemDetail() {
               </Table>
             </CardContent>
           </Card>
+
+          {/* メディアギャラリー */}
+          {item.media && item.media.length > 0 && (
+            <Card sx={{ mb: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <ImageIcon sx={{ color: '#3B82F6' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    画像・動画
+                  </Typography>
+                  <Chip label={`${item.media.length}件`} size="small" sx={{ ml: 'auto' }} />
+                </Box>
+                
+                <Grid container spacing={2}>
+                  {item.media.map((media) => {
+                    const isVideo = media.media_type.includes('video');
+                    return (
+                      <Grid item xs={6} sm={4} key={media.id}>
+                        <Box
+                          sx={{
+                            position: 'relative',
+                            paddingTop: '100%',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            bgcolor: '#F3F4F6',
+                            border: media.is_thumbnail ? '3px solid #059669' : '1px solid #E5E7EB',
+                          }}
+                        >
+                          {isVideo ? (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: '#1F2937',
+                              }}
+                            >
+                              <video
+                                src={media.file_url}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                              <PlayCircleIcon
+                                sx={{
+                                  position: 'absolute',
+                                  fontSize: 48,
+                                  color: 'white',
+                                  opacity: 0.8,
+                                }}
+                              />
+                            </Box>
+                          ) : (
+                            <Box
+                              component="img"
+                              src={media.file_url}
+                              alt="メディア"
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          )}
+                          {media.is_thumbnail && (
+                            <Chip
+                              label="サムネイル"
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: 8,
+                                left: 8,
+                                bgcolor: '#059669',
+                                color: 'white',
+                                fontSize: '0.65rem',
+                              }}
+                            />
+                          )}
+                          {isVideo && (
+                            <VideoIcon
+                              sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                color: 'white',
+                                fontSize: 20,
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 画像なしの場合 */}
+          {(!item.media || item.media.length === 0) && (
+            <Card sx={{ mb: 3, bgcolor: '#F9FAFB' }}>
+              <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                <ImageIcon sx={{ fontSize: 48, color: '#9CA3AF', mb: 1 }} />
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  画像・動画はまだ登録されていません
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
+                  管理者が画像を登録すると、ここに表示されます
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 個体情報 */}
           {item.individual_info && (

@@ -346,17 +346,16 @@ class ItemController extends Controller
      */
     protected function getStorageDisk()
     {
-        // S3パッケージがインストールされているかチェック
-        if (!class_exists(\League\Flysystem\AwsS3V3\AwsS3V3Adapter::class)) {
-            return 'public';
-        }
-        
         // AWS設定が有効な値である場合のみS3を使用
         $key = config('filesystems.disks.s3.key');
         $bucket = config('filesystems.disks.s3.bucket');
         
         if (!empty($key) && !empty($bucket) && $key !== '' && $bucket !== '') {
-            return 's3';
+            // S3パッケージがインストールされているかチェック
+            if (class_exists(\Aws\S3\S3Client::class)) {
+                return 's3';
+            }
+            \Log::warning('S3設定がありますが、aws/aws-sdk-phpがインストールされていません。publicディスクを使用します。');
         }
         
         return 'public';

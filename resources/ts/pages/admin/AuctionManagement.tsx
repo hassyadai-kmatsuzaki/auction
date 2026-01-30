@@ -28,6 +28,7 @@ import {
   CircularProgress,
   Alert,
   Stack,
+  Snackbar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -105,6 +106,10 @@ export default function AuctionManagement() {
   // ステータス変更ダイアログ
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('');
+  const [statusChanging, setStatusChanging] = useState(false);
+  
+  // 成功メッセージ
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAuctions();
@@ -198,13 +203,20 @@ export default function AuctionManagement() {
     if (!selectedAuction || !newStatus) return;
     
     try {
-      await axios.patch(`/api/admin/auctions/${selectedAuction.id}/status`, { status: newStatus });
+      setStatusChanging(true);
+      setError(null);
+      const response = await axios.patch(`/api/admin/auctions/${selectedAuction.id}/status`, { status: newStatus });
       setStatusDialogOpen(false);
       setSelectedAuction(null);
+      setSuccessMessage(response.data?.message || 'ステータスを変更しました。');
       fetchAuctions();
     } catch (err: any) {
       console.error('ステータス変更エラー:', err);
-      alert(err.response?.data?.message || 'ステータス変更に失敗しました。');
+      const errorMessage = err.response?.data?.message || 'ステータス変更に失敗しました。';
+      setError(errorMessage);
+      setStatusDialogOpen(false);
+    } finally {
+      setStatusChanging(false);
     }
   };
 
@@ -502,12 +514,24 @@ export default function AuctionManagement() {
             </Alert>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setStatusDialogOpen(false)}>キャンセル</Button>
-            <Button onClick={handleStatusChange} variant="contained" disabled={!newStatus}>
-              変更
+            <Button onClick={() => setStatusDialogOpen(false)} disabled={statusChanging}>キャンセル</Button>
+            <Button onClick={handleStatusChange} variant="contained" disabled={!newStatus || statusChanging}>
+              {statusChanging ? <CircularProgress size={20} /> : '変更'}
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* 成功メッセージSnackbar */}
+        <Snackbar
+          open={!!successMessage}
+          autoHideDuration={4000}
+          onClose={() => setSuccessMessage(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+            {successMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </LocalizationProvider>
   );

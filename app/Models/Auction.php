@@ -44,8 +44,7 @@ class Auction extends Model
      */
     protected $casts = [
         'event_date' => 'date',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
+        // start_time, end_time は時刻のみ（HH:mm形式）なのでキャストしない
         'upload_deadline' => 'datetime',
         'deposit_required' => 'boolean',
         'lane_count' => 'integer',
@@ -188,7 +187,7 @@ class Auction extends Model
      */
     public function getEventDateTimeAttribute(): Carbon
     {
-        return Carbon::parse($this->event_date->format('Y-m-d') . ' ' . $this->start_time->format('H:i:s'));
+        return Carbon::parse($this->event_date->format('Y-m-d') . ' ' . $this->start_time);
     }
 
     /**

@@ -139,8 +139,8 @@ export default function ItemHistory() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'draft': return '下書き';
-      case 'registered': return '登録済み';
+      case 'draft': return '審査中';
+      case 'registered': return '承認済み';
       case 'live': return 'オークション中';
       case 'sold': return '落札済み';
       case 'unsold': return '不落札';
@@ -317,8 +317,8 @@ export default function ItemHistory() {
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
                 <MenuItem value="all">すべて</MenuItem>
-                <MenuItem value="draft">下書き</MenuItem>
-                <MenuItem value="registered">登録済み</MenuItem>
+                <MenuItem value="draft">審査中</MenuItem>
+                <MenuItem value="registered">承認済み</MenuItem>
                 <MenuItem value="live">オークション中</MenuItem>
                 <MenuItem value="sold">落札済み</MenuItem>
                 <MenuItem value="unsold">不落札</MenuItem>

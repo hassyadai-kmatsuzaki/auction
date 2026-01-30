@@ -274,6 +274,7 @@ class ItemController extends Controller
                             'id' => $m->id,
                             'media_type' => $m->media_type,
                             'file_path' => $m->file_path,
+                            'file_url' => $this->getFileUrl($m->file_path),
                             'is_thumbnail' => $m->is_thumbnail,
                         ];
                     }),
@@ -541,5 +542,40 @@ class ItemController extends Controller
         }
         
         return $sellerProfile;
+    }
+
+    /**
+     * ストレージディスクを取得（S3またはpublic）
+     */
+    protected function getStorageDisk()
+    {
+        // AWS設定が有効な値である場合のみS3を使用
+        $key = config('filesystems.disks.s3.key');
+        $bucket = config('filesystems.disks.s3.bucket');
+        
+        if (!empty($key) && !empty($bucket) && $key !== '' && $bucket !== '') {
+            if (class_exists(\Aws\S3\S3Client::class)) {
+                return 's3';
+            }
+        }
+        
+        return 'public';
+    }
+
+    /**
+     * ファイルのURLを取得
+     */
+    protected function getFileUrl($path)
+    {
+        if (empty($path)) {
+            return null;
+        }
+        
+        $disk = $this->getStorageDisk();
+        if ($disk === 's3') {
+            return Storage::disk('s3')->url($path);
+        }
+        // publicディスクの場合はAPP_URLを使用
+        return config('app.url') . '/storage/' . $path;
     }
 }
