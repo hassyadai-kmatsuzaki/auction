@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // 管理者API
 Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(function () {
     Route::apiResource('users', UserController::class);
+    Route::post('users/{id}/restore', [UserController::class, 'restore']);
     
     // お知らせ管理
     Route::apiResource('announcements', AdminAnnouncementController::class);

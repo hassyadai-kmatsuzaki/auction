@@ -19,11 +19,25 @@ import {
   FormHelperText,
   List,
   ListItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
+  RestoreFromTrash as RestoreIcon,
+  DeleteForever as DeleteForeverIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+
+interface DeletedUser {
+  id: number;
+  name: string;
+  email: string;
+  deleted_at: string;
+}
 
 interface FormData {
   name: string;
@@ -68,6 +82,11 @@ export default function UserCreate() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  
+  // 削除済みユーザー復元ダイアログ
+  const [deletedUserDialogOpen, setDeletedUserDialogOpen] = useState(false);
+  const [deletedUser, setDeletedUser] = useState<DeletedUser | null>(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
 
   const prefectures = [
     '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
@@ -106,7 +125,7 @@ export default function UserCreate() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, forceCreate = false) => {
     e.preventDefault();
     
     if (!validate()) {
@@ -118,12 +137,17 @@ export default function UserCreate() {
 
     try {
       // 空文字列をnullに変換
-      const submitData: any = { ...formData };
+      const submitData: Record<string, unknown> = { ...formData };
       Object.keys(submitData).forEach(key => {
         if (submitData[key] === '') {
           submitData[key] = null;
         }
       });
+
+      // 強制作成フラグを追加
+      if (forceCreate) {
+        submitData.force_create = true;
+      }
 
       const response = await axios.post('/api/admin/users', submitData);
       
@@ -133,17 +157,65 @@ export default function UserCreate() {
           navigate('/admin/users');
         }, 2000);
       }
-    } catch (err: any) {
-      console.error('ユーザー作成エラー:', err);
-      setError(err.response?.data?.message || 'ユーザーの作成に失敗しました');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string; errors?: Record<string, string>; action_required?: string; deleted_user?: DeletedUser } } };
+      
+      // 削除済みユーザーが見つかった場合
+      if (axiosErr.response?.data?.action_required === 'restore_or_recreate') {
+        setDeletedUser(axiosErr.response.data.deleted_user || null);
+        setDeletedUserDialogOpen(true);
+        setLoading(false);
+        return;
+      }
+      
+      setError(axiosErr.response?.data?.message || 'ユーザーの作成に失敗しました');
       
       // バリデーションエラーを設定
-      if (err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+      if (axiosErr.response?.data?.errors) {
+        const errorObj: Record<string, string> = {};
+        const errorsData = axiosErr.response.data.errors;
+        Object.keys(errorsData).forEach(key => {
+          const value = errorsData[key];
+          errorObj[key] = Array.isArray(value) ? value[0] : value;
+        });
+        setErrors(errorObj);
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  // 削除済みユーザーを復元
+  const handleRestore = async () => {
+    if (!deletedUser) return;
+
+    setRestoreLoading(true);
+    setError('');
+
+    try {
+      const response = await axios.post(`/api/admin/users/${deletedUser.id}/restore`);
+      
+      if (response.data.success) {
+        setSuccess('ユーザーを復元しました。パスワード設定用のメールを送信しました。');
+        setDeletedUserDialogOpen(false);
+        setTimeout(() => {
+          navigate('/admin/users');
+        }, 2000);
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setError(axiosErr.response?.data?.message || 'ユーザーの復元に失敗しました');
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  // 削除済みユーザーを完全削除して再作成
+  const handleForceCreate = async () => {
+    setDeletedUserDialogOpen(false);
+    // フォームを再送信（force_create=true）
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    handleSubmit(fakeEvent, true);
   };
 
   const handleRoleToggle = (role: string) => {
@@ -348,6 +420,77 @@ export default function UserCreate() {
           </Box>
         </form>
       </Paper>
+
+      {/* 削除済みユーザー復元ダイアログ */}
+      <Dialog
+        open={deletedUserDialogOpen}
+        onClose={() => setDeletedUserDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>削除済みユーザーが見つかりました</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            このメールアドレスは過去に削除されたユーザーに使用されていました。
+          </Alert>
+          
+          {deletedUser && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">削除済みユーザー情報</Typography>
+              <Typography variant="body1" sx={{ mt: 1 }}>
+                <strong>名前:</strong> {deletedUser.name}
+              </Typography>
+              <Typography variant="body1">
+                <strong>メールアドレス:</strong> {deletedUser.email}
+              </Typography>
+              {deletedUser.deleted_at && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  削除日時: {new Date(deletedUser.deleted_at).toLocaleString('ja-JP')}
+                </Typography>
+              )}
+            </Paper>
+          )}
+
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            以下の操作を選択してください：
+          </Typography>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={restoreLoading ? <CircularProgress size={20} color="inherit" /> : <RestoreIcon />}
+              onClick={handleRestore}
+              disabled={restoreLoading}
+              fullWidth
+            >
+              ユーザーを復元する
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5, ml: 1 }}>
+              既存のユーザー情報を復元し、新しいパスワード設定メールを送信します
+            </Typography>
+
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteForeverIcon />}
+              onClick={handleForceCreate}
+              disabled={restoreLoading}
+              fullWidth
+            >
+              完全に削除して再作成する
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5, ml: 1 }}>
+              削除済みユーザーを完全に削除し、新しいユーザーとして作成します
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletedUserDialogOpen(false)} disabled={restoreLoading}>
+            キャンセル
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

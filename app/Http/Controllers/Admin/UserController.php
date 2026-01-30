@@ -91,7 +91,7 @@ class UserController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => 'required|email',
             'phone' => 'nullable|string|max:20',
             'postal_code' => 'nullable|string|max:10',
             'prefecture' => 'nullable|string|max:50',
@@ -100,7 +100,41 @@ class UserController extends Controller
             'address_line2' => 'nullable|string|max:255',
             'roles' => 'required|array|min:1',
             'roles.*' => 'required|string|in:admin,seller,participant',
+            'force_create' => 'nullable|boolean', // 削除済みユーザーを完全削除して再作成する場合
         ]);
+
+        // 既存ユーザーチェック（削除済み含む）
+        $existingUser = User::where('email', $request->email)->first();
+
+        if ($existingUser) {
+            // アクティブなユーザーが存在する場合
+            if ($existingUser->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'このメールアドレスは既に使用されています。',
+                    'errors' => ['email' => ['このメールアドレスは既に使用されています。']],
+                ], 422);
+            }
+
+            // 削除済みユーザーが存在する場合
+            if (!$request->force_create) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'このユーザーは過去に削除されています。',
+                    'deleted_user' => [
+                        'id' => $existingUser->id,
+                        'name' => $existingUser->name,
+                        'email' => $existingUser->email,
+                        'deleted_at' => $existingUser->updated_at,
+                    ],
+                    'action_required' => 'restore_or_recreate',
+                ], 409); // Conflict
+            }
+
+            // force_create=true の場合、完全削除して再作成
+            $existingUser->roles()->detach();
+            $existingUser->forceDelete();
+        }
 
         DB::beginTransaction();
         try {
@@ -274,5 +308,60 @@ class UserController extends Controller
             'success' => true,
             'message' => 'ユーザーを削除しました',
         ]);
+    }
+
+    /**
+     * 削除済みユーザーを復元
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function restore($id)
+    {
+        $user = User::where('id', $id)->where('is_active', false)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => '復元可能なユーザーが見つかりません。',
+            ], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            // ユーザーを復元
+            $user->update([
+                'is_active' => true,
+                'status' => 'approved',
+                'approved_at' => now(),
+                'approved_by' => auth()->id(),
+            ]);
+
+            // パスワード設定用トークンを生成（新しいパスワード設定を促す）
+            $token = Str::random(64);
+            EmailVerificationToken::create([
+                'user_id' => $user->id,
+                'token' => $token,
+                'expires_at' => now()->addDays(7),
+            ]);
+
+            // メール送信
+            $verificationUrl = config('app.frontend_url') . '/auth/set-password?token=' . $token;
+            Mail::to($user->email)->send(new SetPasswordMail($user, $verificationUrl));
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'user' => $user->fresh(['roles']),
+                ],
+                'message' => 'ユーザーを復元し、パスワード設定用のメールを送信しました。',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }
