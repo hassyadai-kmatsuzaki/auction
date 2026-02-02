@@ -29,6 +29,7 @@ import AnnouncementForm from './pages/admin/AnnouncementForm';
 import AuctionManagement from './pages/admin/AuctionManagement';
 import AuctionForm from './pages/admin/AuctionForm';
 import ItemManagement from './pages/admin/ItemManagement';
+import ItemManagementAuctions from './pages/admin/ItemManagementAuctions';
 import ItemForm from './pages/admin/ItemForm';
 import LiveControl from './pages/admin/LiveControl';
 import WonItemManagement from './pages/admin/WonItemManagement';
@@ -139,6 +140,7 @@ function App() {
             <Route path="auctions/:id/edit" element={<AuctionForm />} />
             
             {/* 生体管理 */}
+            <Route path="items" element={<ItemManagementAuctions />} />
             <Route path="auctions/:auctionId/items" element={<ItemManagement />} />
             <Route path="auctions/:auctionId/items/create" element={<ItemForm />} />
             <Route path="auctions/:auctionId/items/:id/edit" element={<ItemForm />} />

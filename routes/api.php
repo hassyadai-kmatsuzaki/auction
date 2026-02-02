@@ -66,6 +66,8 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     // オークション管理
     Route::apiResource('auctions', AdminAuctionController::class);
     Route::patch('auctions/{id}/status', [AdminAuctionController::class, 'updateStatus']);
+    Route::patch('auctions/{id}/lane-count', [AdminAuctionController::class, 'updateLaneCount']);
+    Route::get('auctions-item-management', [AdminAuctionController::class, 'itemManagementList']);
     
     // システム設定管理
     Route::get('settings', [SystemSettingController::class, 'index']);

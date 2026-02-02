@@ -25,9 +25,25 @@
 **伝票番号**: {{ $wonItem->tracking_number ?? '-' }}
 
 @if($wonItem->tracking_number)
-<x-mail::button :url="'https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=' . str_replace('-', '', $wonItem->tracking_number)">
+@php
+    $trackingUrl = '';
+    $company = $wonItem->shipping_company ?? '';
+    $trackingNumber = str_replace('-', '', $wonItem->tracking_number);
+    
+    if (str_contains($company, 'ヤマト') || str_contains($company, 'クロネコ')) {
+        $trackingUrl = 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno=' . $trackingNumber;
+    } elseif (str_contains($company, '佐川')) {
+        $trackingUrl = 'https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=' . $trackingNumber;
+    } elseif (str_contains($company, '郵便') || str_contains($company, 'ゆうパック')) {
+        $trackingUrl = 'https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=' . $trackingNumber;
+    }
+@endphp
+
+@if($trackingUrl)
+<x-mail::button :url="$trackingUrl">
 配送状況を確認する
 </x-mail::button>
+@endif
 @endif
 
 ---

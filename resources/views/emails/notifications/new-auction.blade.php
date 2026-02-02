@@ -22,11 +22,19 @@
 
 ---
 
+@if($user->hasRole('seller'))
+出品をご検討ください！
+
+<x-mail::button :url="config('app.frontend_url') . '/seller/submit'">
+生体登録ページへ
+</x-mail::button>
+@else
 ぜひご参加ください！
 
 <x-mail::button :url="config('app.frontend_url') . '/participant/auctions'">
 オークション一覧を見る
 </x-mail::button>
+@endif
 
 ---
 

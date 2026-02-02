@@ -391,4 +391,112 @@ class AuctionController extends Controller
         ];
         return $labels[$status] ?? $status;
     }
+
+    /**
+     * レーン数を更新
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateLaneCount(Request $request, $id)
+    {
+        $auction = Auction::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'lane_count' => 'required|integer|between:1,10',
+        ], [
+            'lane_count.required' => 'レーン数は必須です。',
+            'lane_count.between' => 'レーン数は1〜10の範囲で指定してください。',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // オークションが終了済みの場合は変更不可
+        if (in_array($auction->status, ['finished', 'cancelled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '終了済みまたはキャンセル済みのオークションは変更できません。',
+            ], 400);
+        }
+
+        $oldLaneCount = $auction->lane_count;
+        $newLaneCount = $request->lane_count;
+
+        $auction->update(['lane_count' => $newLaneCount]);
+
+        // レーン数が増えた場合、新しいレーンを作成
+        if ($newLaneCount > $oldLaneCount) {
+            for ($i = $oldLaneCount + 1; $i <= $newLaneCount; $i++) {
+                $auction->lanes()->firstOrCreate(
+                    ['lane_number' => $i],
+                    ['status' => 'pending']
+                );
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'レーン数を更新しました。',
+            'data' => [
+                'auction_id' => $auction->id,
+                'lane_count' => $newLaneCount,
+            ],
+        ]);
+    }
+
+    /**
+     * 生体管理用オークション一覧取得（アイテム統計付き）
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function itemManagementList(Request $request)
+    {
+        $auctions = Auction::whereIn('status', ['preparing', 'scheduled', 'live'])
+            ->orderBy('event_date', 'asc')
+            ->get();
+
+        $result = $auctions->map(function ($auction) {
+            // アイテム統計を取得
+            $items = $auction->items();
+            $totalItems = $items->count();
+            $pendingItems = $items->clone()->where('status', 'pending')->count();
+            $registeredItems = $items->clone()->where('status', 'registered')->count();
+
+            // レーン割り当て済みアイテム数
+            $assignedItems = $auction->lanes()
+                ->withCount('items')
+                ->get()
+                ->sum('items_count');
+
+            return [
+                'id' => $auction->id,
+                'title' => $auction->title,
+                'event_date' => $auction->event_date->format('Y-m-d'),
+                'start_time' => $auction->start_time,
+                'status' => $auction->status,
+                'lane_count' => $auction->lane_count,
+                'statistics' => [
+                    'total_items' => $totalItems,
+                    'pending_items' => $pendingItems,
+                    'registered_items' => $registeredItems,
+                    'assigned_items' => $assignedItems,
+                    'unassigned_items' => $registeredItems - $assignedItems,
+                ],
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'auctions' => $result,
+            ],
+        ]);
+    }
 }
