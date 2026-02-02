@@ -2,7 +2,6 @@ import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
-  Toolbar,
   Typography,
   IconButton,
   Drawer,
@@ -14,10 +13,8 @@ import {
   Divider,
   Collapse,
   Avatar,
-  Badge,
-  InputBase,
-  Paper,
   Tooltip,
+  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -30,9 +27,6 @@ import {
   Logout as LogoutIcon,
   ExpandLess,
   ExpandMore,
-  Search as SearchIcon,
-  Notifications as NotificationsIcon,
-  HelpOutline as HelpIcon,
   Gavel as GavelIcon,
   LiveTv as LiveTvIcon,
   EmojiEvents as TrophyIcon,
@@ -40,14 +34,11 @@ import {
   Person as PersonIcon,
   Receipt as ReceiptIcon,
   Psychology as AIIcon,
-  CameraAlt as CameraIcon,
-  Timeline as TimelineIcon,
-  Warning as WarningIcon,
-  Recommend as RecommendIcon,
-  Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
+import HeaderNotifications from '../components/HeaderNotifications';
+import HeaderHelp from '../components/HeaderHelp';
 
 const drawerWidth = 280;
 
@@ -470,57 +461,23 @@ export default function AdminLayout() {
             >
               <MenuIcon />
             </IconButton>
-
-            {/* 検索バー */}
-            <Paper
-              sx={{
-                display: { xs: 'none', md: 'flex' },
-                alignItems: 'center',
-                px: 2,
-                py: 0.75,
-                width: 320,
-                bgcolor: 'grey.50',
-                border: '1px solid',
-                borderColor: 'grey.200',
-                boxShadow: 'none',
-                borderRadius: 2.5,
-              }}
-            >
-              <SearchIcon sx={{ color: 'text.secondary', fontSize: 20, mr: 1 }} />
-              <InputBase
-                placeholder="検索..."
-                sx={{ flex: 1, fontSize: '0.875rem' }}
-              />
-              <Typography
-                variant="caption"
-                sx={{
-                  color: 'text.secondary',
-                  bgcolor: 'background.paper',
-                  px: 1,
-                  py: 0.25,
-                  borderRadius: 1,
-                  border: '1px solid',
-                  borderColor: 'grey.300',
-                  fontSize: '0.7rem',
-                }}
-              >
-                ⌘K
-              </Typography>
-            </Paper>
+            <Chip
+              label="管理者"
+              size="small"
+              sx={{ bgcolor: '#DBEAFE', color: '#2563EB', fontWeight: 600 }}
+            />
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Tooltip title="ヘルプ">
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <HelpIcon sx={{ fontSize: 20 }} />
-              </IconButton>
+              <span>
+                <HeaderHelp role="admin" />
+              </span>
             </Tooltip>
             <Tooltip title="通知">
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <Badge badgeContent={3} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                  <NotificationsIcon sx={{ fontSize: 20 }} />
-                </Badge>
-              </IconButton>
+              <span>
+                <HeaderNotifications role="admin" />
+              </span>
             </Tooltip>
           </Box>
         </Box>

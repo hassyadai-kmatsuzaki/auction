@@ -27,14 +27,14 @@ import {
   LocalShipping as ShippingIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
-  Notifications as NotificationsIcon,
-  HelpOutline as HelpIcon,
   Add as AddIcon,
   History as HistoryIcon,
   Person as PersonIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
+import HeaderNotifications from '../components/HeaderNotifications';
+import HeaderHelp from '../components/HeaderHelp';
 import axios from '../lib/axios';
 
 const drawerWidth = 280;
@@ -402,16 +402,14 @@ export default function SellerLayout() {
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Tooltip title="ヘルプ">
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <HelpIcon sx={{ fontSize: 20 }} />
-              </IconButton>
+              <span>
+                <HeaderHelp role="seller" />
+              </span>
             </Tooltip>
             <Tooltip title="通知">
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <Badge badgeContent={2} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.65rem', minWidth: 16, height: 16 } }}>
-                  <NotificationsIcon sx={{ fontSize: 20 }} />
-                </Badge>
-              </IconButton>
+              <span>
+                <HeaderNotifications role="seller" />
+              </span>
             </Tooltip>
           </Box>
         </Box>

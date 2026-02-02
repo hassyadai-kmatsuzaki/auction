@@ -90,6 +90,13 @@ class DashboardController extends Controller
             ->where('won_items.payment_status', 'pending')
             ->sum('won_items.winning_price');
 
+        // 入金待ち件数
+        $pendingPaymentCount = DB::table('items')
+            ->join('won_items', 'items.id', '=', 'won_items.item_id')
+            ->where('items.seller_profile_id', $profile->id)
+            ->where('won_items.payment_status', 'pending')
+            ->count();
+
         // 発送待ち件数
         $itemsShipping = DB::table('items')
             ->join('won_items', 'items.id', '=', 'won_items.item_id')
@@ -104,6 +111,7 @@ class DashboardController extends Controller
             'total_sales' => (int) $totalSales,
             'sales_this_month' => (int) $salesThisMonth,
             'pending_payment' => (int) $pendingPayment,
+            'pending_payment_count' => $pendingPaymentCount,
             'items_shipping' => $itemsShipping,
         ];
     }

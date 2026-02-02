@@ -76,6 +76,7 @@ interface Stats {
   total_sales: number;
   sales_this_month: number;
   pending_payment: number;
+  pending_payment_count: number;
   items_shipping: number;
 }
 
@@ -305,6 +306,7 @@ export default function SellerDashboard() {
     total_sales: 0,
     sales_this_month: 0,
     pending_payment: 0,
+    pending_payment_count: 0,
     items_shipping: 0,
   };
 
@@ -532,6 +534,7 @@ export default function SellerDashboard() {
           <StatCard
             title="入金待ち"
             value={`¥${stats.pending_payment.toLocaleString()}`}
+            subValue={`${stats.pending_payment_count}件`}
             icon={<ReceiptIcon />}
             color="#F59E0B"
           />

@@ -215,12 +215,31 @@ class SettlementController extends Controller
      */
     private function getBankInfo(User $seller): array
     {
+        $profile = $seller->sellerProfile;
+        
+        if (!$profile) {
+            return [
+                'bank_name' => '未登録',
+                'branch_name' => '未登録',
+                'account_type' => '普通',
+                'account_number' => '未登録',
+                'account_holder' => '未登録',
+            ];
+        }
+
+        // 非公開属性を取得
+        $accountType = match ($profile->account_type) {
+            'savings' => '普通',
+            'checking' => '当座',
+            default => $profile->account_type ?? '普通',
+        };
+
         return [
-            'bank_name' => $seller->bank_name ?? '未登録',
-            'branch_name' => $seller->bank_branch ?? '未登録',
-            'account_type' => $seller->bank_account_type ?? '普通',
-            'account_number' => $seller->bank_account_number ?? '未登録',
-            'account_holder' => $seller->bank_account_holder ?? '未登録',
+            'bank_name' => $profile->bank_name ?? '未登録',
+            'branch_name' => $profile->bank_branch ?? '未登録',
+            'account_type' => $accountType,
+            'account_number' => $profile->account_number ? '****' . substr($profile->account_number, -4) : '未登録',
+            'account_holder' => $profile->account_holder ?? '未登録',
         ];
     }
 

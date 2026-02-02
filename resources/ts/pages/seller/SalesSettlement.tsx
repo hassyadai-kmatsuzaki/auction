@@ -93,6 +93,25 @@ interface NextSettlement {
   expected_payment_date: string;
 }
 
+interface SettlementItem {
+  id: number;
+  item: {
+    id: number;
+    item_number: string;
+    species_name: string;
+    quantity: number;
+  };
+  buyer: string;
+  winning_price: number;
+  commission: number;
+  seller_amount: number;
+}
+
+interface SettlementDetail {
+  settlement: Settlement;
+  items: SettlementItem[];
+}
+
 export default function SalesSettlement() {
   const navigate = useNavigate();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
@@ -104,6 +123,8 @@ export default function SalesSettlement() {
   const [error, setError] = useState<string | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [settlementDetail, setSettlementDetail] = useState<SettlementDetail | null>(null);
 
   // データ取得
   const fetchSettlements = useCallback(async () => {
@@ -129,9 +150,26 @@ export default function SalesSettlement() {
     fetchSettlements();
   }, [fetchSettlements]);
 
-  const handleOpenDetail = (settlement: Settlement) => {
+  const handleOpenDetail = async (settlement: Settlement) => {
     setSelectedSettlement(settlement);
     setDetailDialogOpen(true);
+    setDetailLoading(true);
+    
+    try {
+      const response = await axios.get(`/api/seller/settlements/${settlement.id}`);
+      if (response.data.success) {
+        setSettlementDetail(response.data.data);
+      }
+    } catch (err) {
+      console.error('精算詳細取得エラー:', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setDetailDialogOpen(false);
+    setSettlementDetail(null);
   };
 
   if (loading) {
@@ -503,14 +541,18 @@ export default function SalesSettlement() {
       </Grid>
 
       {/* 詳細ダイアログ */}
-      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={detailDialogOpen} onClose={handleCloseDetail} maxWidth="md" fullWidth>
         <DialogTitle>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
             精算詳細
           </Typography>
         </DialogTitle>
         <DialogContent dividers>
-          {selectedSettlement && (
+          {detailLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : selectedSettlement && (
             <Box>
               <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
@@ -523,6 +565,45 @@ export default function SalesSettlement() {
                   開催日: {new Date(selectedSettlement.auction_date).toLocaleDateString('ja-JP')}
                 </Typography>
               </Paper>
+
+              {/* 落札アイテム一覧 */}
+              {settlementDetail?.items && settlementDetail.items.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                    落札アイテム明細（{settlementDetail.items.length}点）
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableCell>品番</TableCell>
+                          <TableCell>品種名</TableCell>
+                          <TableCell>落札者</TableCell>
+                          <TableCell align="right">落札価格</TableCell>
+                          <TableCell align="right">手数料</TableCell>
+                          <TableCell align="right">受取金額</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {settlementDetail.items.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>No.{item.item.item_number}</TableCell>
+                            <TableCell>{item.item.species_name}</TableCell>
+                            <TableCell>{item.buyer}</TableCell>
+                            <TableCell align="right">¥{Number(item.winning_price).toLocaleString()}</TableCell>
+                            <TableCell align="right" sx={{ color: 'error.main' }}>
+                              -¥{Number(item.commission).toLocaleString()}
+                            </TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              ¥{Number(item.seller_amount).toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
 
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
                 精算内訳
@@ -570,23 +651,38 @@ export default function SalesSettlement() {
               </List>
 
               <Box sx={{ mt: 3, p: 2, bgcolor: '#F8FAFC', borderRadius: 1 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-                  振込日
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {selectedSettlement.paid_at
-                    ? new Date(selectedSettlement.paid_at).toLocaleDateString('ja-JP')
-                    : '未振込'}
-                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+                      ステータス
+                    </Typography>
+                    <Chip
+                      label={selectedSettlement.status === 'completed' ? '振込済み' : '処理中'}
+                      size="small"
+                      sx={{
+                        bgcolor: selectedSettlement.status === 'completed' ? '#ECFDF5' : '#FEF3C7',
+                        color: selectedSettlement.status === 'completed' ? '#059669' : '#D97706',
+                        fontWeight: 600,
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+                      振込日
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {selectedSettlement.paid_at
+                        ? new Date(selectedSettlement.paid_at).toLocaleDateString('ja-JP')
+                        : '未振込'}
+                    </Typography>
+                  </Grid>
+                </Grid>
               </Box>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDetailDialogOpen(false)}>閉じる</Button>
-          <Button variant="contained" startIcon={<DownloadIcon />}>
-            明細書ダウンロード
-          </Button>
+          <Button onClick={handleCloseDetail}>閉じる</Button>
         </DialogActions>
       </Dialog>
     </Box>
