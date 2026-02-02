@@ -19,9 +19,11 @@ use App\Http\Controllers\Admin\ItemController as AdminItemController;
 use App\Http\Controllers\Admin\LiveController as AdminLiveController;
 use App\Http\Controllers\Admin\WonItemController as AdminWonItemController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\LaneController as AdminLaneController;
 use App\Http\Controllers\Participant\AuctionController as ParticipantAuctionController;
 use App\Http\Controllers\Participant\BidController as ParticipantBidController;
 use App\Http\Controllers\Participant\WonItemController as ParticipantWonItemController;
+use App\Http\Controllers\Participant\SettingsController as ParticipantSettingsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -87,6 +89,13 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     
     // 生体一括操作
     Route::patch('auctions/{auctionId}/items/bulk-status', [AdminItemController::class, 'bulkUpdateStatus']);
+    
+    // レーン管理
+    Route::get('auctions/{auctionId}/lanes', [AdminLaneController::class, 'index']);
+    Route::post('auctions/{auctionId}/lanes/{laneId}/items', [AdminLaneController::class, 'assignItem']);
+    Route::delete('auctions/{auctionId}/lanes/{laneId}/items/{itemId}', [AdminLaneController::class, 'removeItem']);
+    Route::put('auctions/{auctionId}/lanes/{laneId}/items/reorder', [AdminLaneController::class, 'reorderItems']);
+    Route::post('auctions/{auctionId}/lanes/auto-assign', [AdminLaneController::class, 'autoAssign']);
     
     // ダッシュボード
     Route::get('dashboard', [AdminDashboardController::class, 'index']);
@@ -163,4 +172,9 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
     Route::put('/won-items/{id}/address', [ParticipantWonItemController::class, 'updateAddress']);
+    
+    // 設定
+    Route::get('/settings', [ParticipantSettingsController::class, 'index']);
+    Route::put('/settings/profile', [ParticipantSettingsController::class, 'updateProfile']);
+    Route::put('/settings/notifications', [ParticipantSettingsController::class, 'updateNotificationSettings']);
 });

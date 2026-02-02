@@ -161,13 +161,13 @@ export default function AuctionItems() {
             <IconButton onClick={() => navigate('/participant')}>
               <ArrowBackIcon />
             </IconButton>
-            <Box>
-              <Typography variant="h5" fontWeight="bold">
+          <Box>
+            <Typography variant="h5" fontWeight="bold">
                 {auction?.title || '出品一覧'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                全{totalItems}点の出品があります
-              </Typography>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              全{totalItems}点の出品があります
+            </Typography>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -214,70 +214,70 @@ export default function AuctionItems() {
       ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
           {currentItems.map((item) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  position: 'relative',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                }}
+              <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    position: 'relative',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4,
+                    },
+                  }}
                 onClick={() => handleDetailOpen(item)}
-              >
-                {/* プレミアムバッジ */}
-                {item.is_premium && (
-                  <Chip
-                    label="プレミアム"
-                    color="warning"
-                    size="small"
-                    sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      zIndex: 1,
-                    }}
-                  />
-                )}
-
-                <CardMedia
-                  component="img"
-                  height="160"
-                  image={item.thumbnail_path || '/img/medaka/01.png'}
-                  alt={item.species_name}
-                />
-
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      No.{item.item_number}
-                    </Typography>
-                    {getStatusChip(item.status)}
-                  </Box>
-                  <Typography variant="subtitle1" fontWeight="bold" noWrap>
-                    {item.species_name}
-                  </Typography>
-
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="h6" color="primary.main" fontWeight="bold">
-                      ¥{Number(item.start_price).toLocaleString()}〜
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {item.quantity}匹セット
-                    </Typography>
-                  </Box>
-
-                  {item.inspection_info && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      {item.inspection_info}
-                    </Typography>
+                >
+                  {/* プレミアムバッジ */}
+                  {item.is_premium && (
+                    <Chip
+                      label="プレミアム"
+                      color="warning"
+                      size="small"
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        zIndex: 1,
+                      }}
+                    />
                   )}
-                </CardContent>
-              </Card>
-            </Grid>
+
+                  <CardMedia
+                    component="img"
+                    height="160"
+                  image={item.thumbnail_path || '/img/medaka/01.png'}
+                    alt={item.species_name}
+                  />
+
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        No.{item.item_number}
+                      </Typography>
+                    {getStatusChip(item.status)}
+                    </Box>
+                    <Typography variant="subtitle1" fontWeight="bold" noWrap>
+                      {item.species_name}
+                    </Typography>
+
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="h6" color="primary.main" fontWeight="bold">
+                      ¥{Number(item.start_price).toLocaleString()}〜
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.quantity}匹セット
+                      </Typography>
+                    </Box>
+
+                    {item.inspection_info && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        {item.inspection_info}
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
           ))}
         </Grid>
       ) : (
@@ -296,33 +296,33 @@ export default function AuctionItems() {
             </TableHead>
             <TableBody>
               {currentItems.map((item) => (
-                <TableRow
-                  key={item.id}
-                  hover
-                  sx={{ cursor: 'pointer' }}
+                  <TableRow
+                    key={item.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
                   onClick={() => handleDetailOpen(item)}
-                >
-                  <TableCell>{item.item_number}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {item.species_name}
-                      {item.is_premium && (
-                        <Chip label="プレミアム" color="warning" size="small" />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell align="center">{item.quantity}匹</TableCell>
+                  >
+                    <TableCell>{item.item_number}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {item.species_name}
+                        {item.is_premium && (
+                          <Chip label="プレミアム" color="warning" size="small" />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">{item.quantity}匹</TableCell>
                   <TableCell align="right">¥{Number(item.start_price).toLocaleString()}</TableCell>
-                  <TableCell>{item.inspection_info || '-'}</TableCell>
-                  <TableCell align="center">
+                    <TableCell>{item.inspection_info || '-'}</TableCell>
+                    <TableCell align="center">
                     {getStatusChip(item.status)}
-                  </TableCell>
-                  <TableCell align="center">
-                    <IconButton size="small" color="primary">
-                      <InfoIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton size="small" color="primary">
+                        <InfoIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
               ))}
             </TableBody>
           </Table>

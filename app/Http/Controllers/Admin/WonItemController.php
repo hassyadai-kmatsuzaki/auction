@@ -5,11 +5,18 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\WonItem;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class WonItemController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     /**
      * オークションの落札商品一覧
      *
@@ -198,6 +205,11 @@ class WonItemController extends Controller
             'delivery_status' => 'preparing',
         ]);
 
+        // 通知を送信
+        $wonItem->load(['item.seller', 'user']);
+        $this->notificationService->sendPaymentConfirmedNotification($wonItem);
+        $this->notificationService->sendSellerPaymentReceivedNotification($wonItem);
+
         return response()->json([
             'success' => true,
             'message' => '入金を確認しました。',
@@ -248,6 +260,10 @@ class WonItemController extends Controller
             'tracking_number' => $request->tracking_number,
             'shipped_at' => now(),
         ]);
+
+        // 発送通知を送信
+        $wonItem->load('user');
+        $this->notificationService->sendShippingNotification($wonItem);
 
         return response()->json([
             'success' => true,

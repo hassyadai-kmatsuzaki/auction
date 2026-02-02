@@ -19,6 +19,7 @@ import AuctionList from './pages/participant/AuctionList';
 import AuctionItems from './pages/participant/AuctionItems';
 import AuctionLive from './pages/participant/AuctionLive';
 import WonItems from './pages/participant/WonItems';
+import ParticipantSettings from './pages/participant/Settings';
 
 // Admin pages
 import AdminLayout from './layouts/AdminLayout';
@@ -49,6 +50,7 @@ import AIFraudDetection from './pages/admin/AIFraudDetection';
 import AIRecommendations from './pages/admin/AIRecommendations';
 import Reports from './pages/admin/Reports';
 import DesignSystem from './pages/admin/DesignSystem';
+import LaneAssignment from './pages/admin/LaneAssignment';
 
 // Seller pages
 import SellerLayout from './layouts/SellerLayout';
@@ -95,6 +97,7 @@ function App() {
             <Route path="auction/:auctionId/items" element={<AuctionItems />} />
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
             <Route path="won-items" element={<WonItems />} />
+            <Route path="settings" element={<ParticipantSettings />} />
           </Route>
 
           {/* 出品者ページ */}
@@ -139,6 +142,9 @@ function App() {
             <Route path="auctions/:auctionId/items" element={<ItemManagement />} />
             <Route path="auctions/:auctionId/items/create" element={<ItemForm />} />
             <Route path="auctions/:auctionId/items/:id/edit" element={<ItemForm />} />
+            
+            {/* レーン割り当て */}
+            <Route path="auctions/:auctionId/lanes" element={<LaneAssignment />} />
             
             {/* ライブ管理 */}
             <Route path="auctions/:auctionId/live" element={<LiveControl />} />

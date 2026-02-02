@@ -68,7 +68,7 @@ interface LiveState {
 }
 
 export default function AuctionLive() {
-  const { id } = useParams<{ id: string }>();
+  const { auctionId } = useParams<{ auctionId: string }>();
   const navigate = useNavigate();
   const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +86,7 @@ export default function AuctionLive() {
   // ライブ状態を取得
   const fetchLiveState = useCallback(async () => {
     try {
-      const response = await axios.get(`/api/participant/auctions/${id}/live`);
+      const response = await axios.get(`/api/participant/auctions/${auctionId}/live`);
       if (response.data.success) {
         setLiveState(response.data.data);
         setError(null);
@@ -101,7 +101,7 @@ export default function AuctionLive() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [auctionId]);
 
   useEffect(() => {
     fetchLiveState();

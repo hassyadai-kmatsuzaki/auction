@@ -39,6 +39,7 @@ class User extends Authenticatable
         'last_login_at',
         'is_active',
         'email_verified_at',
+        'notification_settings',
     ];
 
     /**
@@ -65,7 +66,32 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
             'password' => 'hashed',
+            'notification_settings' => 'array',
         ];
+    }
+
+    /**
+     * デフォルトの通知設定を取得
+     */
+    public function getDefaultNotificationSettings(): array
+    {
+        return [
+            'email_won_item' => true,
+            'email_payment_confirmed' => true,
+            'email_shipping' => true,
+            'email_new_auction' => true,
+            'email_auction_start' => true,
+        ];
+    }
+
+    /**
+     * 通知設定を取得（デフォルト値とマージ）
+     */
+    public function getNotificationSettingsAttribute($value): array
+    {
+        $default = $this->getDefaultNotificationSettings();
+        $settings = is_array($value) ? $value : json_decode($value ?? '{}', true);
+        return array_merge($default, $settings ?? []);
     }
 
     /**

@@ -4,12 +4,19 @@ namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
 use App\Models\WonItem;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class ShippingController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     /**
      * 発送待ちアイテム一覧取得
      *
@@ -152,6 +159,10 @@ class ShippingController extends Controller
             'tracking_number' => $request->tracking_number,
             'shipped_at' => now(),
         ]);
+
+        // 発送通知を送信
+        $wonItem->load('user');
+        $this->notificationService->sendShippingNotification($wonItem);
 
         return response()->json([
             'success' => true,

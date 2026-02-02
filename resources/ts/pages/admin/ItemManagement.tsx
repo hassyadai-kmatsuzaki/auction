@@ -48,6 +48,7 @@ import {
   Pets as PetsIcon,
   Visibility as VisibilityIcon,
   Image as ImageIcon,
+  ViewKanban as ViewKanbanIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -288,13 +289,22 @@ export default function ItemManagement() {
             </Typography>
           )}
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate(`/admin/auctions/${auctionId}/items/create`)}
-        >
-          新規登録
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ViewKanbanIcon />}
+            onClick={() => navigate(`/admin/auctions/${auctionId}/lanes`)}
+          >
+            レーン割り当て
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate(`/admin/auctions/${auctionId}/items/create`)}
+          >
+            新規登録
+          </Button>
+        </Box>
       </Box>
 
       {error && (
