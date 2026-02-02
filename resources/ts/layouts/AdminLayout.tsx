@@ -37,8 +37,6 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
-import HeaderNotifications from '../components/HeaderNotifications';
-import HeaderHelp from '../components/HeaderHelp';
 
 const drawerWidth = 280;
 
@@ -468,18 +466,6 @@ export default function AdminLayout() {
             />
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Tooltip title="ヘルプ">
-              <span>
-                <HeaderHelp role="admin" />
-              </span>
-            </Tooltip>
-            <Tooltip title="通知">
-              <span>
-                <HeaderNotifications role="admin" />
-              </span>
-            </Tooltip>
-          </Box>
         </Box>
 
         {/* コンテンツエリア */}
