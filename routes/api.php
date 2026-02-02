@@ -24,6 +24,7 @@ use App\Http\Controllers\Participant\AuctionController as ParticipantAuctionCont
 use App\Http\Controllers\Participant\BidController as ParticipantBidController;
 use App\Http\Controllers\Participant\WonItemController as ParticipantWonItemController;
 use App\Http\Controllers\Participant\SettingsController as ParticipantSettingsController;
+use App\Http\Controllers\NotificationTestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -136,6 +137,7 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     Route::put('/profile/bank', [SellerProfileController::class, 'updateBankAccount']);
     Route::put('/profile/notifications', [SellerProfileController::class, 'updateNotificationSettings']);
     Route::put('/profile/display', [SellerProfileController::class, 'updateDisplaySettings']);
+    Route::post('/profile/notifications/test', [NotificationTestController::class, 'sendSellerTest']);
     
     // 出品管理
     Route::get('/items', [SellerItemController::class, 'index']);
@@ -177,4 +179,5 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/settings', [ParticipantSettingsController::class, 'index']);
     Route::put('/settings/profile', [ParticipantSettingsController::class, 'updateProfile']);
     Route::put('/settings/notifications', [ParticipantSettingsController::class, 'updateNotificationSettings']);
+    Route::post('/settings/notifications/test', [NotificationTestController::class, 'sendParticipantTest']);
 });

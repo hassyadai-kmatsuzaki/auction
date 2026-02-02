@@ -24,6 +24,7 @@ import {
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Email as EmailIcon,
+  Send as SendIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -66,6 +67,7 @@ export default function ParticipantSettings() {
   const [saving, setSaving] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [testSending, setTestSending] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Profile>({
     name: '',
@@ -153,6 +155,20 @@ export default function ParticipantSettings() {
       setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendTestMail = async (type: string) => {
+    setTestSending(type);
+    try {
+      const response = await axios.post('/api/participant/settings/notifications/test', { type });
+      if (response.data.success) {
+        setSnackbar({ open: true, message: 'テストメールを送信しました。受信をご確認ください。', severity: 'success' });
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'テストメールの送信に失敗しました。', severity: 'error' });
+    } finally {
+      setTestSending(null);
     }
   };
 
@@ -349,41 +365,74 @@ export default function ParticipantSettings() {
                     取引に関する通知
                   </Typography>
 
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationSettings.email_won_item}
-                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_won_item: e.target.checked })}
-                      />
-                    }
-                    label="落札通知"
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={notificationSettings.email_won_item}
+                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_won_item: e.target.checked })}
+                        />
+                      }
+                      label="落札通知"
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={testSending === 'won_item' ? <CircularProgress size={14} /> : <SendIcon />}
+                      onClick={() => handleSendTestMail('won_item')}
+                      disabled={testSending !== null}
+                    >
+                      テスト送信
+                    </Button>
+                  </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
                     商品を落札した際にメールでお知らせします
                   </Typography>
 
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationSettings.email_payment_confirmed}
-                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_payment_confirmed: e.target.checked })}
-                      />
-                    }
-                    label="入金確認通知"
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={notificationSettings.email_payment_confirmed}
+                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_payment_confirmed: e.target.checked })}
+                        />
+                      }
+                      label="入金確認通知"
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={testSending === 'payment_confirmed' ? <CircularProgress size={14} /> : <SendIcon />}
+                      onClick={() => handleSendTestMail('payment_confirmed')}
+                      disabled={testSending !== null}
+                    >
+                      テスト送信
+                    </Button>
+                  </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
                     入金が確認された際にメールでお知らせします
                   </Typography>
 
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationSettings.email_shipping}
-                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_shipping: e.target.checked })}
-                      />
-                    }
-                    label="発送通知"
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={notificationSettings.email_shipping}
+                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_shipping: e.target.checked })}
+                        />
+                      }
+                      label="発送通知"
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={testSending === 'shipping' ? <CircularProgress size={14} /> : <SendIcon />}
+                      onClick={() => handleSendTestMail('shipping')}
+                      disabled={testSending !== null}
+                    >
+                      テスト送信
+                    </Button>
+                  </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
                     商品が発送された際にメールでお知らせします
                   </Typography>
@@ -396,28 +445,50 @@ export default function ParticipantSettings() {
                     オークションに関する通知
                   </Typography>
 
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationSettings.email_new_auction}
-                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_new_auction: e.target.checked })}
-                      />
-                    }
-                    label="新規オークション通知"
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={notificationSettings.email_new_auction}
+                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_new_auction: e.target.checked })}
+                        />
+                      }
+                      label="新規オークション通知"
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={testSending === 'new_auction' ? <CircularProgress size={14} /> : <SendIcon />}
+                      onClick={() => handleSendTestMail('new_auction')}
+                      disabled={testSending !== null}
+                    >
+                      テスト送信
+                    </Button>
+                  </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
                     新しいオークションが開催される際にメールでお知らせします
                   </Typography>
 
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationSettings.email_auction_start}
-                        onChange={(e) => setNotificationSettings({ ...notificationSettings, email_auction_start: e.target.checked })}
-                      />
-                    }
-                    label="オークション開始通知"
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={notificationSettings.email_auction_start}
+                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_auction_start: e.target.checked })}
+                        />
+                      }
+                      label="オークション開始通知"
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={testSending === 'auction_start' ? <CircularProgress size={14} /> : <SendIcon />}
+                      onClick={() => handleSendTestMail('auction_start')}
+                      disabled={testSending !== null}
+                    >
+                      テスト送信
+                    </Button>
+                  </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6 }}>
                     オークションが開始された際にメールでお知らせします
                   </Typography>
