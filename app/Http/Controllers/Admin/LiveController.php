@@ -151,6 +151,25 @@ class LiveController extends Controller
                     ];
                 });
 
+            // 全商品（sold/unsold含む）
+            $allItems = $lane->items()
+                ->orderBy('lane_items.sequence_order')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'item_number' => $item->item_number,
+                        'species_name' => $item->species_name,
+                        'quantity' => $item->quantity,
+                        'start_price' => $item->start_price,
+                        'current_price' => $item->current_price,
+                        'status' => $item->status,
+                        'is_premium' => $item->is_premium,
+                        'thumbnail_path' => $item->thumbnail_path,
+                        'sequence' => $item->pivot->sequence_order,
+                    ];
+                });
+
             $lanesData[] = [
                 'lane_id' => $lane->id,
                 'lane_number' => $lane->lane_number,
@@ -158,6 +177,8 @@ class LiveController extends Controller
                 'current_item' => $currentItemData,
                 'queued_items' => $queuedItems,
                 'queued_count' => $queuedItems->count(),
+                'all_items' => $allItems,
+                'all_items_count' => $allItems->count(),
             ];
         }
 

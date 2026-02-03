@@ -70,6 +70,19 @@ interface LaneItem {
   }>;
 }
 
+interface LaneItemDetail {
+  id: number;
+  item_number: number;
+  species_name: string;
+  quantity: number;
+  start_price: number;
+  current_price: number;
+  status: string;
+  is_premium: boolean;
+  thumbnail_path?: string;
+  sequence: number;
+}
+
 interface Lane {
   lane_id: number;
   lane_number: number;
@@ -83,6 +96,8 @@ interface Lane {
     sequence: number;
   }>;
   queued_count: number;
+  all_items: LaneItemDetail[];
+  all_items_count: number;
 }
 
 interface AuctionData {
@@ -579,38 +594,138 @@ export default function LiveControl() {
 
       {/* 商品統計タブ */}
       {tabValue === 1 && itemStats && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
-          <Card>
-            <CardContent sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>総商品数</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>{itemStats.total}点</Typography>
-            </CardContent>
-          </Card>
+        <>
+          {/* 統計カード */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 2, mb: 4 }}>
             <Card>
               <CardContent sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>登録済み</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>{itemStats.registered}点</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>総商品数</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>{itemStats.total}点</Typography>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>登録済み</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>{itemStats.registered}点</Typography>
               </CardContent>
             </Card>
             <Card>
               <CardContent sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>入札中</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669' }}>{itemStats.live}点</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669' }}>{itemStats.live}点</Typography>
               </CardContent>
             </Card>
             <Card>
               <CardContent sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札済み</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#3B82F6' }}>{itemStats.sold}点</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#3B82F6' }}>{itemStats.sold}点</Typography>
               </CardContent>
             </Card>
             <Card>
               <CardContent sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>不成立</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#DC2626' }}>{itemStats.unsold}点</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>不成立</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#DC2626' }}>{itemStats.unsold}点</Typography>
               </CardContent>
             </Card>
           </Box>
+
+          {/* レーン別商品一覧 */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+            レーン別商品一覧
+          </Typography>
+          <Grid container spacing={3}>
+            {lanes.map((lane) => (
+              <Grid item xs={12} md={6} key={lane.lane_id}>
+                <Card>
+                  <Box sx={{ bgcolor: 'primary.main', color: 'white', p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      レーン {lane.lane_number}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={`${lane.all_items_count}件`}
+                      sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                    />
+                  </Box>
+                  <TableContainer sx={{ maxHeight: 400 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ width: 50 }}>順</TableCell>
+                          <TableCell>商品名</TableCell>
+                          <TableCell align="right">開始価格</TableCell>
+                          <TableCell align="right">現在価格</TableCell>
+                          <TableCell align="center">状態</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {lane.all_items.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                              商品が割り当てられていません
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          lane.all_items.map((item) => (
+                            <TableRow
+                              key={item.id}
+                              sx={{
+                                bgcolor: item.status === 'live' ? 'success.50' : item.status === 'sold' ? 'primary.50' : 'inherit',
+                                '&:hover': { bgcolor: 'action.hover' },
+                              }}
+                            >
+                              <TableCell>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {item.sequence}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Avatar
+                                    src={item.thumbnail_path || '/img/medaka/01.png'}
+                                    variant="rounded"
+                                    sx={{ width: 32, height: 32 }}
+                                  />
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
+                                      {item.species_name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      No.{item.item_number} × {item.quantity}匹
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography variant="body2">
+                                  ¥{Number(item.start_price).toLocaleString()}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: item.status === 'sold' ? 700 : 400,
+                                    color: item.status === 'sold' ? 'primary.main' : 'inherit',
+                                  }}
+                                >
+                                  ¥{Number(item.current_price).toLocaleString()}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center">
+                                {getStatusChip(item.status)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </>
       )}
 
       {/* 確認ダイアログ */}
