@@ -77,6 +77,8 @@ class AnnouncementTest extends TestCase
             ->putJson("/api/admin/announcements/{$announcement->id}", [
                 'title' => '更新されたタイトル',
                 'content' => '更新された内容',
+                'target_roles' => ['seller', 'participant'],
+                'status' => 'draft',
             ]);
 
         $response->assertStatus(200)
@@ -98,9 +100,8 @@ class AnnouncementTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $this->assertDatabaseMissing('announcements', [
-            'id' => $announcement->id,
-        ]);
+        // 論理削除のため find では取得できない
+        $this->assertNull(Announcement::find($announcement->id));
     }
 
     public function test_admin_can_publish_announcement(): void
@@ -108,7 +109,13 @@ class AnnouncementTest extends TestCase
         $announcement = Announcement::factory()->draft()->create(['created_by' => $this->admin->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/announcements/{$announcement->id}/publish");
+            ->putJson("/api/admin/announcements/{$announcement->id}", [
+                'title' => $announcement->title,
+                'content' => $announcement->content,
+                'target_roles' => $announcement->target_roles ?? ['seller', 'participant'],
+                'status' => 'published',
+                'published_at' => now()->format('Y-m-d H:i:s'),
+            ]);
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);

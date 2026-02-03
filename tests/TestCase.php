@@ -6,10 +6,19 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 
 abstract class TestCase extends BaseTestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // テスト時のログを /tmp に書き出して storage のパーミッションエラーを防ぐ
+        Config::set('logging.channels.single.path', sys_get_temp_dir() . '/laravel-test.log');
+        Config::set('logging.default', 'single');
+    }
 
     /**
      * 管理者ユーザーを作成

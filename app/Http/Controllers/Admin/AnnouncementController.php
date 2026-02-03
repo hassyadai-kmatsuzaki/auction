@@ -208,10 +208,9 @@ class AnnouncementController extends Controller
     {
         $announcement = Announcement::whereNull('deleted_at')->findOrFail($id);
 
-        $announcement->update([
-            'deleted_at' => now(),
-            'deleted_by' => Auth::id(),
-        ]);
+        $announcement->deleted_at = now();
+        $announcement->deleted_by = Auth::id();
+        $announcement->saveQuietly();
 
         return response()->json([
             'success' => true,

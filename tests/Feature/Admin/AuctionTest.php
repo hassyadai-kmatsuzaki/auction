@@ -45,6 +45,10 @@ class AuctionTest extends TestCase
                 'start_time' => '10:00',
                 'description' => 'テスト説明',
                 'lane_count' => 3,
+                'default_bid_increment' => 100,
+                'countdown_seconds' => 10,
+                'payment_deadline_hours' => 72,
+                'shipping_deadline_hours' => 168,
             ]);
 
         $response->assertStatus(201)
@@ -80,6 +84,12 @@ class AuctionTest extends TestCase
                 'title' => '更新されたタイトル',
                 'event_date' => now()->addDays(14)->format('Y-m-d'),
                 'start_time' => '14:00',
+                'description' => $auction->description,
+                'lane_count' => $auction->lane_count,
+                'default_bid_increment' => $auction->default_bid_increment ?? 100,
+                'countdown_seconds' => $auction->countdown_seconds ?? 10,
+                'payment_deadline_hours' => $auction->payment_deadline_hours ?? 72,
+                'shipping_deadline_hours' => $auction->shipping_deadline_hours ?? 168,
             ]);
 
         $response->assertStatus(200)
@@ -114,7 +124,7 @@ class AuctionTest extends TestCase
         $response = $this->actingAs($this->admin, 'sanctum')
             ->deleteJson("/api/admin/auctions/{$auction->id}");
 
-        $response->assertStatus(422);
+        $response->assertStatus(403);
     }
 
     public function test_admin_can_start_scheduled_auction(): void
@@ -124,7 +134,7 @@ class AuctionTest extends TestCase
         Lane::factory()->create(['auction_id' => $auction->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/auctions/{$auction->id}/start");
+            ->postJson("/api/admin/auctions/{$auction->id}/live/start");
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
@@ -140,7 +150,7 @@ class AuctionTest extends TestCase
         $auction = Auction::factory()->live()->create(['created_by' => $this->admin->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/auctions/{$auction->id}/finish");
+            ->postJson("/api/admin/auctions/{$auction->id}/live/finish");
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
@@ -156,7 +166,7 @@ class AuctionTest extends TestCase
         $auction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/auctions/{$auction->id}/cancel");
+            ->patchJson("/api/admin/auctions/{$auction->id}/status", ['status' => 'cancelled']);
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);

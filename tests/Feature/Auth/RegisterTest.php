@@ -31,7 +31,7 @@ class RegisterTest extends TestCase
 
     public function test_user_can_register_as_participant(): void
     {
-        $response = $this->postJson('/api/register', $this->getValidRegistrationData());
+        $response = $this->postJson('/api/auth/register', $this->getValidRegistrationData());
 
         $response->assertStatus(201)
             ->assertJson(['success' => true]);
@@ -43,7 +43,7 @@ class RegisterTest extends TestCase
 
     public function test_user_can_register_with_full_data(): void
     {
-        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
+        $response = $this->postJson('/api/auth/register', $this->getValidRegistrationData([
             'email' => 'full@example.com',
             'address_line2' => 'ビル4F',
         ]));
@@ -61,7 +61,7 @@ class RegisterTest extends TestCase
         $data = $this->getValidRegistrationData();
         unset($data['name']);
 
-        $response = $this->postJson('/api/register', $data);
+        $response = $this->postJson('/api/auth/register', $data);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['name']);
@@ -69,7 +69,7 @@ class RegisterTest extends TestCase
 
     public function test_registration_requires_valid_email(): void
     {
-        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
+        $response = $this->postJson('/api/auth/register', $this->getValidRegistrationData([
             'email' => 'invalid-email',
         ]));
 
@@ -81,7 +81,7 @@ class RegisterTest extends TestCase
     {
         User::factory()->create(['email' => 'existing@example.com']);
 
-        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
+        $response = $this->postJson('/api/auth/register', $this->getValidRegistrationData([
             'email' => 'existing@example.com',
         ]));
 
@@ -91,7 +91,7 @@ class RegisterTest extends TestCase
 
     public function test_registration_requires_password_confirmation(): void
     {
-        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
+        $response = $this->postJson('/api/auth/register', $this->getValidRegistrationData([
             'password_confirmation' => 'different',
         ]));
 
@@ -101,7 +101,7 @@ class RegisterTest extends TestCase
 
     public function test_registration_requires_minimum_password_length(): void
     {
-        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
+        $response = $this->postJson('/api/auth/register', $this->getValidRegistrationData([
             'password' => 'short',
             'password_confirmation' => 'short',
         ]));
@@ -115,7 +115,7 @@ class RegisterTest extends TestCase
         $data = $this->getValidRegistrationData(['email' => 'phone@example.com']);
         unset($data['phone']);
 
-        $response = $this->postJson('/api/register', $data);
+        $response = $this->postJson('/api/auth/register', $data);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['phone']);
@@ -129,7 +129,7 @@ class RegisterTest extends TestCase
         unset($data['city']);
         unset($data['address_line1']);
 
-        $response = $this->postJson('/api/register', $data);
+        $response = $this->postJson('/api/auth/register', $data);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['postal_code', 'prefecture', 'city', 'address_line1']);

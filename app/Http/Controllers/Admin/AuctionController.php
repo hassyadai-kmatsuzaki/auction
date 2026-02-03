@@ -243,7 +243,7 @@ class AuctionController extends Controller
             for ($i = $oldLaneCount + 1; $i <= $newLaneCount; $i++) {
                 $auction->lanes()->firstOrCreate(
                     ['lane_number' => $i],
-                    ['status' => 'pending']
+                    ['status' => 'waiting']
                 );
             }
         }
@@ -440,7 +440,7 @@ class AuctionController extends Controller
             for ($i = $oldLaneCount + 1; $i <= $newLaneCount; $i++) {
                 $auction->lanes()->firstOrCreate(
                     ['lane_number' => $i],
-                    ['status' => 'pending']
+                    ['status' => 'waiting']
                 );
             }
         }

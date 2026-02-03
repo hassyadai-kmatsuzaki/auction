@@ -15,7 +15,7 @@ class LoginTest extends TestCase
             'is_active' => true,
         ]);
 
-        $response = $this->postJson('/api/login', [
+        $response = $this->postJson('/api/auth/login', [
             'email' => $user->email,
             'password' => 'password123',
         ]);
@@ -37,7 +37,7 @@ class LoginTest extends TestCase
             'status' => 'approved',
         ]);
 
-        $response = $this->postJson('/api/login', [
+        $response = $this->postJson('/api/auth/login', [
             'email' => $user->email,
             'password' => 'wrongpassword',
         ]);
@@ -47,7 +47,7 @@ class LoginTest extends TestCase
 
     public function test_user_cannot_login_with_nonexistent_email(): void
     {
-        $response = $this->postJson('/api/login', [
+        $response = $this->postJson('/api/auth/login', [
             'email' => 'nonexistent@example.com',
             'password' => 'password123',
         ]);
@@ -57,7 +57,7 @@ class LoginTest extends TestCase
 
     public function test_login_requires_email_and_password(): void
     {
-        $response = $this->postJson('/api/login', []);
+        $response = $this->postJson('/api/auth/login', []);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['email', 'password']);
@@ -81,7 +81,7 @@ class LoginTest extends TestCase
         $user->update(['status' => 'approved']);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/auth/user');
+            ->getJson('/api/auth/me');
 
         $response->assertStatus(200)
             ->assertJsonStructure([

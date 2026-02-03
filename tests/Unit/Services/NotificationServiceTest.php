@@ -51,10 +51,10 @@ class NotificationServiceTest extends TestCase
 
         $wonItem->load(['item.auction', 'winner']);
 
-        // 通知設定を有効にする
+        // 通知設定を有効にする（キーは NotificationService の email_won_item）
         $this->participant->update([
             'notification_settings' => [
-                'bid_result' => true,
+                'email_won_item' => true,
             ],
         ]);
 
@@ -75,7 +75,7 @@ class NotificationServiceTest extends TestCase
 
         $this->participant->update([
             'notification_settings' => [
-                'payment_result' => true,
+                'email_payment_confirmed' => true,
             ],
         ]);
 
@@ -95,7 +95,7 @@ class NotificationServiceTest extends TestCase
 
         $this->participant->update([
             'notification_settings' => [
-                'shipping_update' => true,
+                'email_shipping' => true,
             ],
         ]);
 
@@ -116,7 +116,7 @@ class NotificationServiceTest extends TestCase
         // 通知設定を無効にする
         $this->participant->update([
             'notification_settings' => [
-                'bid_result' => false,
+                'email_won_item' => false,
             ],
         ]);
 
@@ -132,7 +132,7 @@ class NotificationServiceTest extends TestCase
 
         $this->participant->update([
             'notification_settings' => [
-                'new_auction' => true,
+                'email_new_auction' => true,
             ],
         ]);
 

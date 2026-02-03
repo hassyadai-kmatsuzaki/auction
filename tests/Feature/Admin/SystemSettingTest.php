@@ -35,10 +35,17 @@ class SystemSettingTest extends TestCase
 
     public function test_admin_can_update_settings(): void
     {
-        SystemSetting::factory()->auctionSetting()->create([
-            'setting_key' => 'price_increment_rate',
-            'setting_value' => '10',
-        ]);
+        SystemSetting::updateOrCreate(
+            ['setting_key' => 'price_increment_rate'],
+            [
+                'category' => 'auction',
+                'setting_value' => '10',
+                'value_type' => 'integer',
+                'display_name' => '価格増加率',
+                'description' => 'テスト用',
+                'is_public' => false,
+            ]
+        );
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson('/api/admin/settings', [

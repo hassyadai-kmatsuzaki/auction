@@ -67,6 +67,21 @@ class Item extends Model
     }
 
     /**
+     * 出品者ユーザー（sellerProfile 経由）
+     */
+    public function seller()
+    {
+        return $this->hasOneThrough(
+            User::class,
+            SellerProfile::class,
+            'id',
+            'id',
+            'seller_profile_id',
+            'user_id'
+        );
+    }
+
+    /**
      * 入札とのリレーション
      */
     public function bids()

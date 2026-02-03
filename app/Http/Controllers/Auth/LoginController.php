@@ -80,7 +80,11 @@ class LoginController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        if ($token) {
+            $token->delete();
+        }
 
         return response()->json([
             'success' => true,

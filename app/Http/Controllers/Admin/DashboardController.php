@@ -93,9 +93,12 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 月別売上データ（過去6ヶ月）
+        // 月別売上データ（過去6ヶ月）（SQLite 互換）
+        $dateExpr = $driver === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : 'DATE_FORMAT(created_at, "%Y-%m")';
         $monthlySales = WonItem::select(
-            DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+            DB::raw("{$dateExpr} as month"),
             DB::raw('SUM(total_amount) as total'),
             DB::raw('COUNT(*) as count')
         )

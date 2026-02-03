@@ -90,6 +90,14 @@ class WonItem extends Model
     }
 
     /**
+     * 落札者（user は winner のエイリアス・NotificationService 等で使用）
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'winner_id');
+    }
+
+    /**
      * オークションを取得（itemを経由）
      */
     public function auction()

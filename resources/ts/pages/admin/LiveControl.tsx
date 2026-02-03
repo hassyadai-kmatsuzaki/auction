@@ -355,12 +355,12 @@ export default function LiveControl() {
             <RefreshIcon />
           </IconButton>
           {isLive ? (
-            <Chip
-              label="LIVE 開催中"
-              color="error"
-              icon={<RecordIcon sx={{ fontSize: 12 }} />}
-              sx={{ fontWeight: 600, animation: 'pulse 2s infinite' }}
-            />
+          <Chip
+            label="LIVE 開催中"
+            color="error"
+            icon={<RecordIcon sx={{ fontSize: 12 }} />}
+            sx={{ fontWeight: 600, animation: 'pulse 2s infinite' }}
+          />
           ) : (
             <Chip
               label={auction?.status === 'finished' ? '終了' : '準備中'}
@@ -409,19 +409,19 @@ export default function LiveControl() {
                   )}
                   {isLive && (
                     <>
-                      <Button
-                        variant={isPaused ? 'contained' : 'outlined'}
-                        color={isPaused ? 'success' : 'warning'}
-                        startIcon={isPaused ? <PlayArrowIcon /> : <PauseIcon />}
+                  <Button
+                    variant={isPaused ? 'contained' : 'outlined'}
+                    color={isPaused ? 'success' : 'warning'}
+                    startIcon={isPaused ? <PlayArrowIcon /> : <PauseIcon />}
                         onClick={isPaused ? handleResume : handlePause}
                         disabled={actionLoading}
-                      >
-                        {isPaused ? '再開' : '一時停止'}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        startIcon={<StopIcon />}
+                  >
+                    {isPaused ? '再開' : '一時停止'}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<StopIcon />}
                         onClick={() => setConfirmDialog({
                           open: true,
                           action: 'finish',
@@ -431,7 +431,7 @@ export default function LiveControl() {
                         disabled={actionLoading}
                       >
                         終了
-                      </Button>
+                  </Button>
                     </>
                   )}
                 </Box>
@@ -483,10 +483,10 @@ export default function LiveControl() {
                       レーン {lane.lane_number}
                     </Typography>
                   </Box>
-
+                  
                   {lane.current_item ? (
                     <>
-                      <CardMedia
+                  <CardMedia
                         component="img"
                         height={120}
                         image={lane.current_item.thumbnail_path || '/img/medaka/01.png'}
@@ -494,34 +494,34 @@ export default function LiveControl() {
                         sx={{ objectFit: 'cover' }}
                       />
 
-                      <CardContent sx={{ p: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  <CardContent sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                             No.{lane.current_item.item_number}
-                          </Typography>
+                      </Typography>
                           {getStatusChip(lane.current_item.status)}
-                        </Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, lineHeight: 1.3 }}>
+                    </Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, lineHeight: 1.3 }}>
                           {lane.current_item.species_name}
-                        </Typography>
+                    </Typography>
 
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="h4" sx={{ color: '#059669', fontWeight: 700 }}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="h4" sx={{ color: '#059669', fontWeight: 700 }}>
                             ¥{Number(lane.current_item.current_price).toLocaleString()}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                             開始 ¥{Number(lane.current_item.start_price).toLocaleString()} × {lane.current_item.quantity}匹
-                          </Typography>
-                        </Box>
+                      </Typography>
+                    </Box>
 
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Chip
-                            icon={<PeopleIcon sx={{ fontSize: 14 }} />}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip
+                        icon={<PeopleIcon sx={{ fontSize: 14 }} />}
                             label={`${lane.current_item.active_bidders_count}人入札中`}
                             color={lane.current_item.active_bidders_count > 0 ? 'primary' : 'default'}
-                            size="small"
-                            sx={{ fontSize: '0.7rem' }}
-                          />
+                        size="small"
+                        sx={{ fontSize: '0.7rem' }}
+                      />
                           {isLive && (
                             <Tooltip title="次の商品へ">
                               <IconButton
@@ -529,8 +529,8 @@ export default function LiveControl() {
                                 color="primary"
                                 onClick={() => handleNextItem(lane.lane_id)}
                               >
-                                <SkipNextIcon />
-                              </IconButton>
+                        <SkipNextIcon />
+                      </IconButton>
                             </Tooltip>
                           )}
                         </Box>
@@ -567,8 +567,8 @@ export default function LiveControl() {
                         <Typography variant="caption" color="text.secondary">
                           残り {lane.queued_count} 商品
                         </Typography>
-                      </Box>
-                    </CardContent>
+                    </Box>
+                  </CardContent>
                   )}
                 </Card>
               </Grid>
@@ -586,31 +586,31 @@ export default function LiveControl() {
               <Typography variant="h5" sx={{ fontWeight: 700 }}>{itemStats.total}点</Typography>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent sx={{ p: 2, textAlign: 'center' }}>
+            <Card>
+              <CardContent sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>登録済み</Typography>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>{itemStats.registered}点</Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>入札中</Typography>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>入札中</Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669' }}>{itemStats.live}点</Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札済み</Typography>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札済み</Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#3B82F6' }}>{itemStats.sold}点</Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent sx={{ p: 2, textAlign: 'center' }}>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>不成立</Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: '#DC2626' }}>{itemStats.unsold}点</Typography>
-            </CardContent>
-          </Card>
-        </Box>
+              </CardContent>
+            </Card>
+          </Box>
       )}
 
       {/* 確認ダイアログ */}
