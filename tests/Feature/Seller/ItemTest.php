@@ -183,4 +183,44 @@ class ItemTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_seller_can_get_item_stats(): void
+    {
+        // 複数のステータスのアイテムを作成
+        Item::factory()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+            'status' => 'pending',
+        ]);
+        Item::factory()->registered()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->getJson('/api/seller/items/stats');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data',
+            ]);
+    }
+
+    public function test_seller_can_get_available_auctions(): void
+    {
+        // 出品可能なオークションを作成
+        Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
+
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->getJson('/api/seller/items/auctions');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'auctions',
+                ],
+            ]);
+    }
 }

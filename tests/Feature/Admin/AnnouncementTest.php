@@ -162,4 +162,32 @@ class AnnouncementTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_admin_can_toggle_announcement_visibility(): void
+    {
+        $announcement = Announcement::factory()->published()->create(['created_by' => $this->admin->id]);
+
+        // 非表示に切り替え
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->patchJson("/api/admin/announcements/{$announcement->id}/toggle-visibility");
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('announcements', [
+            'id' => $announcement->id,
+            'status' => 'hidden',
+        ]);
+
+        // 再度公開
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->patchJson("/api/admin/announcements/{$announcement->id}/toggle-visibility");
+
+        $response->assertStatus(200);
+
+        $this->assertDatabaseHas('announcements', [
+            'id' => $announcement->id,
+            'status' => 'published',
+        ]);
+    }
 }

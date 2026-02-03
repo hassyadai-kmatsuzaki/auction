@@ -171,4 +171,43 @@ class UserTest extends TestCase
         // Admin middleware should reject non-admin users
         $response->assertStatus(403);
     }
+
+    public function test_admin_can_restore_deleted_user(): void
+    {
+        $buyer = $this->createParticipant();
+
+        // まず削除
+        $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/admin/users/{$buyer->id}");
+
+        // 削除されたことを確認
+        $this->assertDatabaseHas('users', [
+            'id' => $buyer->id,
+            'is_active' => false,
+        ]);
+
+        // 復元
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/users/{$buyer->id}/restore");
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        // 復元されたことを確認
+        $this->assertDatabaseHas('users', [
+            'id' => $buyer->id,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_admin_can_search_users(): void
+    {
+        User::factory()->create(['name' => '検索対象ユーザー']);
+        User::factory()->create(['name' => '別のユーザー']);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/users?search=検索対象');
+
+        $response->assertStatus(200);
+    }
 }

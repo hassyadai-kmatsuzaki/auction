@@ -88,4 +88,29 @@ class ProfileTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+    public function test_seller_can_update_notification_settings(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->putJson('/api/seller/profile/notifications', [
+                'email_item_sold' => true,
+                'email_payment_received' => true,
+                'email_settlement' => false,
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_seller_can_update_display_settings(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->putJson('/api/seller/profile/display', [
+                'show_shop_name' => true,
+                'show_contact_info' => false,
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+    }
 }

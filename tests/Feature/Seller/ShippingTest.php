@@ -115,4 +115,43 @@ class ShippingTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_seller_can_update_tracking_number(): void
+    {
+        // まず発送
+        $this->wonItem->update([
+            'delivery_status' => 'shipped',
+            'shipping_company' => 'ヤマト運輸',
+            'tracking_number' => '1111-2222-3333',
+        ]);
+
+        // トラッキング番号更新（shipping_company も必要）
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->putJson("/api/seller/shipping/{$this->wonItem->id}/tracking", [
+                'shipping_company' => 'ヤマト運輸',
+                'tracking_number' => '4444-5555-6666',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('won_items', [
+            'id' => $this->wonItem->id,
+            'tracking_number' => '4444-5555-6666',
+        ]);
+    }
+
+    public function test_seller_can_filter_shipping_by_status(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->getJson('/api/seller/shipping?status=pending');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'items',
+                ],
+            ]);
+    }
 }
