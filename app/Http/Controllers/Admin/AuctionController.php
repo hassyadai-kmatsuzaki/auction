@@ -216,13 +216,8 @@ class AuctionController extends Controller
             }
         }
 
-        // レーン数の変更チェック（商品が登録されている場合は変更不可）
-        if ($auction->items()->count() > 0 && $request->lane_count != $auction->lane_count) {
-            return response()->json([
-                'success' => false,
-                'message' => '商品が登録されているため、レーン数は変更できません。',
-            ], 400);
-        }
+        $oldLaneCount = $auction->lane_count;
+        $newLaneCount = $request->lane_count;
 
         $auction->update([
             'title' => $request->title,
@@ -242,6 +237,16 @@ class AuctionController extends Controller
             'custom_fee_settings' => $request->input('custom_fee_settings'),
             'custom_shipping_settings' => $request->input('custom_shipping_settings'),
         ]);
+
+        // レーン数が増えた場合、新しいレーンを作成
+        if ($newLaneCount > $oldLaneCount) {
+            for ($i = $oldLaneCount + 1; $i <= $newLaneCount; $i++) {
+                $auction->lanes()->firstOrCreate(
+                    ['lane_number' => $i],
+                    ['status' => 'pending']
+                );
+            }
+        }
 
         $auction->load(['creator:id,name']);
 
