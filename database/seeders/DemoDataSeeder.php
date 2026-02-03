@@ -380,7 +380,7 @@ class DemoDataSeeder extends Seeder
                 Lane::create([
                     'auction_id' => $auction->id,
                     'lane_number' => $j,
-                    'status' => $status === 'finished' ? 'completed' : 'waiting',
+                    'status' => $status === 'finished' ? 'finished' : 'waiting',
                 ]);
             }
 
