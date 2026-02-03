@@ -559,7 +559,7 @@ class DemoDataSeeder extends Seeder
                 if ($auction->status === 'finished') {
                     $status = rand(0, 1) ? 'sold' : 'unsold';
                 } elseif ($auction->status === 'scheduled') {
-                    $status = rand(0, 3) === 0 ? 'pending' : 'registered';
+                    $status = rand(0, 3) === 0 ? 'draft' : 'registered';
                 }
 
                 $item = Item::create([
