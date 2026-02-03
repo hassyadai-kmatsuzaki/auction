@@ -110,6 +110,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::get('dashboard/sales-summary', [AdminDashboardController::class, 'salesSummary']);
     
     // ライブオークション管理
+    Route::get('live-auctions', [AdminLiveController::class, 'auctionList']);
     Route::get('auctions/{auctionId}/live', [AdminLiveController::class, 'show']);
     Route::post('auctions/{auctionId}/live/start', [AdminLiveController::class, 'start']);
     Route::post('auctions/{auctionId}/live/pause', [AdminLiveController::class, 'pause']);
@@ -119,6 +120,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::patch('items/{itemId}/price', [AdminLiveController::class, 'adjustPrice']);
     
     // 落札者管理
+    Route::get('won-items-auctions', [AdminWonItemController::class, 'auctionList']);
     Route::get('auctions/{auctionId}/won-items', [AdminWonItemController::class, 'index']);
     Route::get('won-items/{id}', [AdminWonItemController::class, 'show']);
     Route::post('won-items/{id}/confirm-payment', [AdminWonItemController::class, 'confirmPayment']);

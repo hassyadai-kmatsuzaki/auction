@@ -83,8 +83,8 @@ export default function AdminLayout() {
   const auctionSubItems = [
     { text: 'オークション一覧', icon: <EventIcon />, path: '/admin/auctions' },
     { text: '生体管理', icon: <PetsIcon />, path: '/admin/items' },
-    { text: 'ライブ管理', icon: <LiveTvIcon />, path: '/admin/auctions/1/live' },
-    { text: '落札者管理', icon: <TrophyIcon />, path: '/admin/auctions/1/won-items' },
+    { text: 'ライブ管理', icon: <LiveTvIcon />, path: '/admin/live' },
+    { text: '落札者管理', icon: <TrophyIcon />, path: '/admin/won-items' },
   ];
 
   const userSubItems = [

@@ -32,7 +32,9 @@ import ItemManagement from './pages/admin/ItemManagement';
 import ItemManagementAuctions from './pages/admin/ItemManagementAuctions';
 import ItemForm from './pages/admin/ItemForm';
 import LiveControl from './pages/admin/LiveControl';
+import LiveAuctions from './pages/admin/LiveAuctions';
 import WonItemManagement from './pages/admin/WonItemManagement';
+import WonItemAuctions from './pages/admin/WonItemAuctions';
 import UserManagement from './pages/admin/UserManagement';
 import UserDetail from './pages/admin/UserDetail';
 import UserCreate from './pages/admin/UserCreate';
@@ -149,9 +151,11 @@ function App() {
             <Route path="auctions/:auctionId/lanes" element={<LaneAssignment />} />
             
             {/* ライブ管理 */}
+            <Route path="live" element={<LiveAuctions />} />
             <Route path="auctions/:auctionId/live" element={<LiveControl />} />
             
             {/* 落札者管理 */}
+            <Route path="won-items" element={<WonItemAuctions />} />
             <Route path="auctions/:auctionId/won-items" element={<WonItemManagement />} />
             
             {/* 出品者管理 */}

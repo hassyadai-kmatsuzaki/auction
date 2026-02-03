@@ -17,6 +17,63 @@ class WonItemController extends Controller
     {
         $this->notificationService = $notificationService;
     }
+
+    /**
+     * 落札者管理用オークション一覧
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function auctionList(Request $request)
+    {
+        $query = Auction::whereIn('status', ['finished', 'live'])
+            ->orderBy('event_date', 'desc');
+
+        $auctions = $query->get()->map(function ($auction) {
+            // 落札統計を取得
+            $wonItems = WonItem::whereHas('item', function ($q) use ($auction) {
+                $q->where('auction_id', $auction->id);
+            });
+
+            $totalCount = (clone $wonItems)->count();
+            $totalAmount = (clone $wonItems)->sum('total_amount');
+            
+            // 入金ステータス別
+            $pendingPayment = (clone $wonItems)->where('payment_status', 'pending')->count();
+            $paidCount = (clone $wonItems)->where('payment_status', 'paid')->count();
+            $confirmedPayment = (clone $wonItems)->where('payment_status', 'confirmed')->count();
+            
+            // 発送ステータス別
+            $preparingCount = (clone $wonItems)->where('delivery_status', 'preparing')->count();
+            $shippedCount = (clone $wonItems)->where('delivery_status', 'shipped')->count();
+            $completedCount = (clone $wonItems)->where('delivery_status', 'completed')->count();
+
+            return [
+                'id' => $auction->id,
+                'title' => $auction->title,
+                'event_date' => $auction->event_date->format('Y-m-d'),
+                'status' => $auction->status,
+                'statistics' => [
+                    'total_count' => $totalCount,
+                    'total_amount' => $totalAmount,
+                    'pending_payment' => $pendingPayment,
+                    'paid_count' => $paidCount,
+                    'confirmed_payment' => $confirmedPayment,
+                    'preparing_count' => $preparingCount,
+                    'shipped_count' => $shippedCount,
+                    'completed_count' => $completedCount,
+                ],
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'auctions' => $auctions,
+            ],
+        ]);
+    }
+
     /**
      * オークションの落札商品一覧
      *

@@ -24,6 +24,64 @@ class LiveController extends Controller
     }
 
     /**
+     * ライブ管理用オークション一覧
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function auctionList(Request $request)
+    {
+        $auctions = Auction::whereIn('status', ['preparing', 'scheduled', 'live'])
+            ->orderByRaw("FIELD(status, 'live', 'scheduled', 'preparing')")
+            ->orderBy('event_date', 'asc')
+            ->get()
+            ->map(function ($auction) {
+                // レーン情報
+                $lanes = Lane::where('auction_id', $auction->id)->get();
+                $activeLanes = $lanes->where('status', 'active')->count();
+                
+                // アイテム統計
+                $items = Item::where('auction_id', $auction->id);
+                $totalItems = (clone $items)->count();
+                $registeredItems = (clone $items)->where('status', 'registered')->count();
+                $liveItems = (clone $items)->where('status', 'live')->count();
+                $soldItems = (clone $items)->where('status', 'sold')->count();
+                $unsoldItems = (clone $items)->where('status', 'unsold')->count();
+
+                // レーンに割り当て済みのアイテム数
+                $assignedItems = DB::table('lane_items')
+                    ->join('lanes', 'lane_items.lane_id', '=', 'lanes.id')
+                    ->where('lanes.auction_id', $auction->id)
+                    ->count();
+
+                return [
+                    'id' => $auction->id,
+                    'title' => $auction->title,
+                    'event_date' => $auction->event_date->format('Y-m-d'),
+                    'start_time' => $auction->start_time,
+                    'status' => $auction->status,
+                    'statistics' => [
+                        'lane_count' => $lanes->count(),
+                        'active_lanes' => $activeLanes,
+                        'total_items' => $totalItems,
+                        'registered_items' => $registeredItems,
+                        'assigned_items' => $assignedItems,
+                        'live_items' => $liveItems,
+                        'sold_items' => $soldItems,
+                        'unsold_items' => $unsoldItems,
+                    ],
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'auctions' => $auctions,
+            ],
+        ]);
+    }
+
+    /**
      * ライブオークション状態取得（管理者用）
      *
      * @param int $auctionId
