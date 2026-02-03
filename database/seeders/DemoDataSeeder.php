@@ -276,38 +276,41 @@ class DemoDataSeeder extends Seeder
             [
                 'name' => '山田養殖場',
                 'email' => 'seller1@example.com',
-                'shop_name' => '山田養殖場',
-                'representative_name' => '山田太郎',
+                'seller_name' => '山田養殖場',
+                'contact_name' => '山田太郎',
                 'postal_code' => '123-4567',
                 'prefecture' => '東京都',
                 'city' => '渋谷区',
                 'address_line1' => '渋谷1-2-3',
                 'address_line2' => 'ビル4F',
                 'phone' => '03-1234-5678',
+                'seller_code' => 'S001',
             ],
             [
                 'name' => '佐藤ブリーダー',
                 'email' => 'seller2@example.com',
-                'shop_name' => '佐藤ブリーダー',
-                'representative_name' => '佐藤花子',
+                'seller_name' => '佐藤ブリーダー',
+                'contact_name' => '佐藤花子',
                 'postal_code' => '234-5678',
                 'prefecture' => '大阪府',
                 'city' => '大阪市北区',
                 'address_line1' => '梅田2-3-4',
                 'address_line2' => '',
                 'phone' => '06-2345-6789',
+                'seller_code' => 'S002',
             ],
             [
                 'name' => '鈴木水産',
                 'email' => 'seller3@example.com',
-                'shop_name' => '鈴木水産',
-                'representative_name' => '鈴木一郎',
+                'seller_name' => '鈴木水産',
+                'contact_name' => '鈴木一郎',
                 'postal_code' => '345-6789',
                 'prefecture' => '愛知県',
                 'city' => '名古屋市中区',
                 'address_line1' => '栄3-4-5',
                 'address_line2' => 'タワー10F',
                 'phone' => '052-3456-7890',
+                'seller_code' => 'S003',
             ],
         ];
 
@@ -328,8 +331,9 @@ class DemoDataSeeder extends Seeder
             $profile = SellerProfile::firstOrCreate(
                 ['user_id' => $user->id],
                 [
-                    'shop_name' => $data['shop_name'],
-                    'representative_name' => $data['representative_name'],
+                    'seller_code' => $data['seller_code'],
+                    'seller_name' => $data['seller_name'],
+                    'contact_name' => $data['contact_name'],
                     'postal_code' => $data['postal_code'],
                     'prefecture' => $data['prefecture'],
                     'city' => $data['city'],
@@ -337,12 +341,11 @@ class DemoDataSeeder extends Seeder
                     'address_line2' => $data['address_line2'],
                     'phone' => $data['phone'],
                     'bank_name' => 'みずほ銀行',
-                    'branch_name' => '渋谷支店',
+                    'bank_branch' => '渋谷支店',
                     'account_type' => 'ordinary',
                     'account_number' => '1234567',
-                    'account_holder' => $data['representative_name'],
-                    'status' => 'approved',
-                    'approved_at' => now(),
+                    'account_holder' => $data['contact_name'],
+                    'is_active' => true,
                 ]
             );
 
@@ -399,33 +402,33 @@ class DemoDataSeeder extends Seeder
             [
                 'title' => '【重要】システムメンテナンスのお知らせ',
                 'content' => "平素より当サービスをご利用いただき、誠にありがとうございます。\n\n下記の日程でシステムメンテナンスを実施いたします。\n\n■ 日時：2026年2月15日（日）午前2:00〜午前6:00\n■ 影響：上記時間帯はサービスをご利用いただけません\n\nご不便をおかけいたしますが、何卒ご理解のほどよろしくお願いいたします。",
-                'target_roles' => ['all'],
-                'priority' => 'high',
-                'is_visible' => true,
+                'target_roles' => ['admin', 'seller', 'participant'],
+                'is_important' => true,
+                'status' => 'published',
                 'published_at' => now()->subDays(3),
             ],
             [
                 'title' => '新機能リリースのお知らせ',
                 'content' => "いつも当サービスをご利用いただき、ありがとうございます。\n\nこの度、以下の新機能をリリースいたしました。\n\n【新機能】\n・リアルタイム入札通知機能\n・お気に入り登録機能\n・入札履歴のエクスポート機能\n\nぜひご活用ください！",
                 'target_roles' => ['participant'],
-                'priority' => 'normal',
-                'is_visible' => true,
+                'is_important' => false,
+                'status' => 'published',
                 'published_at' => now()->subDays(1),
             ],
             [
                 'title' => '出品者向け：手数料改定のお知らせ',
                 'content' => "出品者の皆様へ\n\n2026年3月1日より、手数料体系を一部改定いたします。\n詳細は管理画面の「料金設定」をご確認ください。\n\n今後ともよろしくお願いいたします。",
                 'target_roles' => ['seller'],
-                'priority' => 'normal',
-                'is_visible' => true,
+                'is_important' => false,
+                'status' => 'published',
                 'published_at' => now(),
             ],
             [
                 'title' => '次回オークション開催のお知らせ',
                 'content' => "次回オークションを下記日程で開催いたします。\n\n■ 日時：2026年2月20日（土）10:00〜\n■ 出品数：約50点予定\n\n皆様のご参加をお待ちしております！",
-                'target_roles' => ['all'],
-                'priority' => 'normal',
-                'is_visible' => true,
+                'target_roles' => ['admin', 'seller', 'participant'],
+                'is_important' => false,
+                'status' => 'scheduled',
                 'published_at' => now()->addDays(1),
             ],
         ];
@@ -436,8 +439,8 @@ class DemoDataSeeder extends Seeder
                 [
                     'content' => $data['content'],
                     'target_roles' => $data['target_roles'],
-                    'priority' => $data['priority'],
-                    'is_visible' => $data['is_visible'],
+                    'is_important' => $data['is_important'],
+                    'status' => $data['status'],
                     'published_at' => $data['published_at'],
                     'created_by' => $admin->id,
                 ]
@@ -621,10 +624,16 @@ class DemoDataSeeder extends Seeder
                     $orderInLane[$lane->id] = 1;
                 }
 
-                $item->update([
-                    'lane_id' => $lane->id,
-                    'order_in_lane' => $orderInLane[$lane->id]++,
-                ]);
+                // lane_items中間テーブルに挿入
+                \DB::table('lane_items')->updateOrInsert(
+                    ['item_id' => $item->id],
+                    [
+                        'lane_id' => $lane->id,
+                        'sequence_order' => $orderInLane[$lane->id]++,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
 
                 $assignedCount++;
                 $laneIndex++;

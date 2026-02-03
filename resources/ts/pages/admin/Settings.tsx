@@ -156,38 +156,38 @@ export default function Settings() {
         // オークション設定
         if (data.auction) {
           setAuctionSettings({
-            price_increment_rate: String(data.auction.price_increment_rate?.value || '10'),
-            price_increment_min: String(data.auction.price_increment_min?.value || '50'),
-            countdown_seconds: String(data.auction.countdown_seconds?.value || '3'),
-            default_lane_count: String(data.auction.default_lane_count?.value || '6'),
-            auto_extend_seconds: String(data.auction.auto_extend_seconds?.value || '10'),
-            default_bid_increment: String(data.auction.default_bid_increment?.value || '100'),
+            price_increment_rate: String(data.auction.price_increment_rate?.value ?? '10'),
+            price_increment_min: String(data.auction.price_increment_min?.value ?? '50'),
+            countdown_seconds: String(data.auction.countdown_seconds?.value ?? '3'),
+            default_lane_count: String(data.auction.default_lane_count?.value ?? '6'),
+            auto_extend_seconds: String(data.auction.auto_extend_seconds?.value ?? '10'),
+            default_bid_increment: String(data.auction.default_bid_increment?.value ?? '100'),
           });
         }
         
         // 料金設定
         if (data.premium || data.payment) {
           setFeeSettings({
-            seller_registration_fee: String(data.payment?.seller_registration_fee?.value || '3000'),
-            seller_annual_fee: String(data.payment?.seller_annual_fee?.value || '0'),
-            base_listing_fee: String(data.payment?.base_listing_fee?.value || '500'),
-            premium_plan_fee: String(data.premium?.premium_plan_fee?.value || '300'),
-            default_commission_rate: String(data.payment?.default_commission_rate?.value || '10'),
-            seller_commission_min: String(data.payment?.seller_commission_min?.value || '500'),
-            buyer_registration_fee: String(data.payment?.buyer_registration_fee?.value || '0'),
-            buyer_commission_rate: String(data.payment?.buyer_commission_rate?.value || '5'),
-            buyer_commission_min: String(data.payment?.buyer_commission_min?.value || '300'),
+            seller_registration_fee: String(data.payment?.seller_registration_fee?.value ?? '3000'),
+            seller_annual_fee: String(data.payment?.seller_annual_fee?.value ?? '0'),
+            base_listing_fee: String(data.payment?.base_listing_fee?.value ?? '500'),
+            premium_plan_fee: String(data.premium?.premium_plan_fee?.value ?? '300'),
+            default_commission_rate: String(data.payment?.default_commission_rate?.value ?? '10'),
+            seller_commission_min: String(data.payment?.seller_commission_min?.value ?? '500'),
+            buyer_registration_fee: String(data.payment?.buyer_registration_fee?.value ?? '0'),
+            buyer_commission_rate: String(data.payment?.buyer_commission_rate?.value ?? '5'),
+            buyer_commission_min: String(data.payment?.buyer_commission_min?.value ?? '300'),
           });
         }
         
         // 配送設定
         if (data.shipping) {
           setShippingSettings({
-            packaging_fee: String(data.shipping.packaging_fee?.value || '500'),
-            handling_fee: String(data.shipping.handling_fee?.value || '300'),
-            insurance_fee_rate: String(data.shipping.insurance_fee_rate?.value || '3'),
-            cooling_fee_summer: String(data.shipping.cooling_fee_summer?.value || '300'),
-            heating_fee_winter: String(data.shipping.heating_fee_winter?.value || '300'),
+            packaging_fee: String(data.shipping.packaging_fee?.value ?? '500'),
+            handling_fee: String(data.shipping.handling_fee?.value ?? '300'),
+            insurance_fee_rate: String(data.shipping.insurance_fee_rate?.value ?? '3'),
+            cooling_fee_summer: String(data.shipping.cooling_fee_summer?.value ?? '300'),
+            heating_fee_winter: String(data.shipping.heating_fee_winter?.value ?? '300'),
           });
           
           if (data.shipping.shipping_rates?.value) {
@@ -209,7 +209,7 @@ export default function Settings() {
             bank_account_holder: data.document.bank_account_holder?.value || '',
             invoice_prefix: data.document.invoice_prefix?.value || '',
             payment_notice_prefix: data.document.payment_notice_prefix?.value || '',
-            warranty_validity_days: String(data.document.warranty_validity_days?.value || '14'),
+            warranty_validity_days: String(data.document.warranty_validity_days?.value ?? '14'),
             auto_generate_invoice: data.document.auto_generate_invoice?.value || false,
             auto_generate_payment_notice: data.document.auto_generate_payment_notice?.value || false,
           });
