@@ -508,7 +508,7 @@ class DemoDataSeeder extends Seeder
             for ($i = 1; $i <= $data['lane_count']; $i++) {
                 Lane::firstOrCreate(
                     ['auction_id' => $auction->id, 'lane_number' => $i],
-                    ['status' => 'pending']
+                    ['status' => 'waiting']
                 );
             }
 
