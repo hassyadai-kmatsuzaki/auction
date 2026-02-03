@@ -21,4 +21,17 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
         ]);
     }
+
+    /**
+     * デモデータを含む完全なシードを実行
+     * 使用方法: php artisan db:seed --class=DatabaseSeeder
+     * または: php artisan db:seed --class=DemoDataSeeder
+     */
+    public function runWithDemoData(): void
+    {
+        $this->call([
+            RoleSeeder::class,
+            DemoDataSeeder::class,
+        ]);
+    }
 }

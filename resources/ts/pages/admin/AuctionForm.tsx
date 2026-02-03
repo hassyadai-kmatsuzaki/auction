@@ -398,9 +398,7 @@ export default function AuctionForm() {
         <Paper sx={{ mb: 3 }}>
           <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
             <Tab icon={<SettingsIcon />} iconPosition="start" label="基本情報" />
-            <Tab icon={<GavelIcon />} iconPosition="start" label="オークション設定" />
-            <Tab icon={<MoneyIcon />} iconPosition="start" label="料金設定" />
-            <Tab icon={<ShippingIcon />} iconPosition="start" label="配送・梱包" />
+            <Tab icon={<GavelIcon />} iconPosition="start" label="カスタム設定" />
           </Tabs>
         </Paper>
 
@@ -564,11 +562,12 @@ export default function AuctionForm() {
           </Paper>
         </TabPanel>
 
-        {/* オークション設定タブ */}
+        {/* カスタム設定タブ */}
         <TabPanel value={tabValue} index={1}>
+          {/* カスタム設定ON/OFF */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>カスタム設定</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -594,9 +593,13 @@ export default function AuctionForm() {
             </CardContent>
           </Card>
 
-          <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+          {/* オークション設定セクション */}
+          <Card sx={{ mb: 3, opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>入札ルール</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <GavelIcon sx={{ color: '#6366F1' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>オークション設定</Typography>
+              </Box>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={6} md={3}>
                   <TextField
@@ -669,327 +672,296 @@ export default function AuctionForm() {
               </Grid>
             </CardContent>
           </Card>
-        </TabPanel>
 
-        {/* 料金設定タブ */}
-        <TabPanel value={tabValue} index={2}>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  {formData.use_custom_settings ? 'カスタム設定を使用中' : 'システムデフォルト設定を使用中'}
-                </Typography>
-                <Chip
-                  label={formData.use_custom_settings ? 'カスタム' : 'デフォルト'}
-                  color={formData.use_custom_settings ? 'primary' : 'default'}
-                  size="small"
-                />
+          {/* 料金設定セクション */}
+          <Card sx={{ mb: 3, opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <MoneyIcon sx={{ color: '#059669' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>料金設定</Typography>
               </Box>
-            </CardContent>
-          </Card>
-
-          <Grid container spacing={3}>
-            <Grid item xs={12} lg={6}>
-              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#059669' }}>
+              <Grid container spacing={3}>
+                {/* 出品者向け */}
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#059669', mb: 2 }}>
                     出品者向け料金
                   </Typography>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="基本出品料"
-                        value={formData.custom_fee_settings.base_listing_fee}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_fee_settings: {
-                            ...formData.custom_fee_settings,
-                            base_listing_fee: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.base_listing_fee}` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="プレミアム出品料"
-                        value={formData.custom_fee_settings.premium_listing_fee}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_fee_settings: {
-                            ...formData.custom_fee_settings,
-                            premium_listing_fee: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.premium_listing_fee}` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="販売手数料率"
-                        value={formData.custom_fee_settings.seller_commission_rate}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_fee_settings: {
-                            ...formData.custom_fee_settings,
-                            seller_commission_rate: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ${defaultSettings.fee_settings.seller_commission_rate}%` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="最低手数料"
-                        value={formData.custom_fee_settings.seller_commission_min}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_fee_settings: {
-                            ...formData.custom_fee_settings,
-                            seller_commission_min: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.seller_commission_min}` : ''}
-                      />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="基本出品料"
+                    value={formData.custom_fee_settings.base_listing_fee}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fee_settings: {
+                        ...formData.custom_fee_settings,
+                        base_listing_fee: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.base_listing_fee}` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="プレミアム出品料"
+                    value={formData.custom_fee_settings.premium_listing_fee}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fee_settings: {
+                        ...formData.custom_fee_settings,
+                        premium_listing_fee: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.premium_listing_fee}` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="販売手数料率"
+                    value={formData.custom_fee_settings.seller_commission_rate}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fee_settings: {
+                        ...formData.custom_fee_settings,
+                        seller_commission_rate: parseFloat(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${defaultSettings.fee_settings.seller_commission_rate}%` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="最低手数料"
+                    value={formData.custom_fee_settings.seller_commission_min}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fee_settings: {
+                        ...formData.custom_fee_settings,
+                        seller_commission_min: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.seller_commission_min}` : ''}
+                  />
+                </Grid>
 
-            <Grid item xs={12} lg={6}>
-              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#3B82F6' }}>
+                {/* 買受者向け */}
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#3B82F6', mt: 2, mb: 2 }}>
                     買受者向け料金
                   </Typography>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="落札手数料率"
-                        value={formData.custom_fee_settings.buyer_commission_rate}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_fee_settings: {
-                            ...formData.custom_fee_settings,
-                            buyer_commission_rate: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ${defaultSettings.fee_settings.buyer_commission_rate}%` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="最低手数料"
-                        value={formData.custom_fee_settings.buyer_commission_min}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_fee_settings: {
-                            ...formData.custom_fee_settings,
-                            buyer_commission_min: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.buyer_commission_min}` : ''}
-                      />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </TabPanel>
-
-        {/* 配送・梱包設定タブ */}
-        <TabPanel value={tabValue} index={3}>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  {formData.use_custom_settings ? 'カスタム設定を使用中' : 'システムデフォルト設定を使用中'}
-                </Typography>
-                <Chip
-                  label={formData.use_custom_settings ? 'カスタム' : 'デフォルト'}
-                  color={formData.use_custom_settings ? 'primary' : 'default'}
-                  size="small"
-                />
-              </Box>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="落札手数料率"
+                    value={formData.custom_fee_settings.buyer_commission_rate}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fee_settings: {
+                        ...formData.custom_fee_settings,
+                        buyer_commission_rate: parseFloat(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${defaultSettings.fee_settings.buyer_commission_rate}%` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="最低手数料"
+                    value={formData.custom_fee_settings.buyer_commission_min}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fee_settings: {
+                        ...formData.custom_fee_settings,
+                        buyer_commission_min: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.fee_settings.buyer_commission_min}` : ''}
+                  />
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} lg={6}>
-              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>梱包・手数料</Typography>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="梱包料金"
-                        value={formData.custom_shipping_settings.packaging_fee}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_shipping_settings: {
-                            ...formData.custom_shipping_settings,
-                            packaging_fee: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.packaging_fee}` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="取扱手数料"
-                        value={formData.custom_shipping_settings.handling_fee}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_shipping_settings: {
-                            ...formData.custom_shipping_settings,
-                            handling_fee: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.handling_fee}` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="保険料率"
-                        value={formData.custom_shipping_settings.insurance_fee_rate}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_shipping_settings: {
-                            ...formData.custom_shipping_settings,
-                            insurance_fee_rate: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ${defaultSettings.shipping_settings.insurance_fee_rate}%` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="配送料割引率"
-                        value={formData.custom_shipping_settings.shipping_discount_rate}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_shipping_settings: {
-                            ...formData.custom_shipping_settings,
-                            shipping_discount_rate: parseFloat(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">%OFF</InputAdornment> }}
-                        helperText="このオークション限定の配送料割引"
-                      />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
+          {/* 配送・梱包設定セクション */}
+          <Card sx={{ mb: 3, opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <ShippingIcon sx={{ color: '#F59E0B' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>配送・梱包設定</Typography>
+              </Box>
+              <Grid container spacing={3}>
+                {/* 梱包・手数料 */}
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 2 }}>
+                    梱包・手数料
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="梱包料金"
+                    value={formData.custom_shipping_settings.packaging_fee}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_shipping_settings: {
+                        ...formData.custom_shipping_settings,
+                        packaging_fee: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.packaging_fee}` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="取扱手数料"
+                    value={formData.custom_shipping_settings.handling_fee}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_shipping_settings: {
+                        ...formData.custom_shipping_settings,
+                        handling_fee: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.handling_fee}` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="保険料率"
+                    value={formData.custom_shipping_settings.insurance_fee_rate}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_shipping_settings: {
+                        ...formData.custom_shipping_settings,
+                        insurance_fee_rate: parseFloat(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${defaultSettings.shipping_settings.insurance_fee_rate}%` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="配送料割引率"
+                    value={formData.custom_shipping_settings.shipping_discount_rate}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_shipping_settings: {
+                        ...formData.custom_shipping_settings,
+                        shipping_discount_rate: parseFloat(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%OFF</InputAdornment> }}
+                    helperText="このオークション限定の配送料割引"
+                  />
+                </Grid>
 
-            <Grid item xs={12} lg={6}>
-              <Card sx={{ opacity: formData.use_custom_settings ? 1 : 0.5, pointerEvents: formData.use_custom_settings ? 'auto' : 'none' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>季節料金</Typography>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="夏季クール便料金"
-                        value={formData.custom_shipping_settings.cooling_fee_summer}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_shipping_settings: {
-                            ...formData.custom_shipping_settings,
-                            cooling_fee_summer: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.cooling_fee_summer}（6-9月）` : ''}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="冬季保温料金"
-                        value={formData.custom_shipping_settings.heating_fee_winter}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          custom_shipping_settings: {
-                            ...formData.custom_shipping_settings,
-                            heating_fee_winter: parseInt(e.target.value) || 0,
-                          },
-                        })}
-                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                        helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.heating_fee_winter}（12-2月）` : ''}
-                      />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
+                {/* 季節料金 */}
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary', mt: 2, mb: 2 }}>
+                    季節料金
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="夏季クール便料金"
+                    value={formData.custom_shipping_settings.cooling_fee_summer}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_shipping_settings: {
+                        ...formData.custom_shipping_settings,
+                        cooling_fee_summer: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.cooling_fee_summer}（6-9月）` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="冬季保温料金"
+                    value={formData.custom_shipping_settings.heating_fee_winter}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_shipping_settings: {
+                        ...formData.custom_shipping_settings,
+                        heating_fee_winter: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ¥${defaultSettings.shipping_settings.heating_fee_winter}（12-2月）` : ''}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
 
-              {defaultSettings?.shipping_settings.shipping_rates && (
-                <Card sx={{ mt: 3 }}>
-                  <CardContent sx={{ p: 3 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>地域別配送料金（参考）</Typography>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>地域</TableCell>
-                            <TableCell align="right">60サイズ</TableCell>
-                            <TableCell align="right">80サイズ</TableCell>
-                            <TableCell align="right">100サイズ</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {defaultSettings.shipping_settings.shipping_rates.map((rate, index) => (
-                            <TableRow key={index}>
-                              <TableCell>{rate.region}</TableCell>
-                              <TableCell align="right">¥{rate.size_60?.toLocaleString()}</TableCell>
-                              <TableCell align="right">¥{rate.size_80?.toLocaleString()}</TableCell>
-                              <TableCell align="right">¥{rate.size_100?.toLocaleString()}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      ※ 配送料金テーブルはシステム設定で変更できます
-                    </Typography>
-                  </CardContent>
-                </Card>
-              )}
-            </Grid>
-          </Grid>
+          {/* 地域別配送料金（参考情報） */}
+          {defaultSettings?.shipping_settings.shipping_rates && (
+            <Card>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>地域別配送料金（参考）</Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>地域</TableCell>
+                        <TableCell align="right">60サイズ</TableCell>
+                        <TableCell align="right">80サイズ</TableCell>
+                        <TableCell align="right">100サイズ</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {defaultSettings.shipping_settings.shipping_rates.map((rate, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{rate.region}</TableCell>
+                          <TableCell align="right">¥{rate.size_60?.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{rate.size_80?.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{rate.size_100?.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  ※ 配送料金テーブルはシステム設定で変更できます
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
         </TabPanel>
 
         {/* 保存ボタン */}
