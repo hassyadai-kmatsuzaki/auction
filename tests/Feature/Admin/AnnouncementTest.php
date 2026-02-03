@@ -1,0 +1,158 @@
+<?php
+
+namespace Tests\Feature\Admin;
+
+use App\Models\Announcement;
+use App\Models\User;
+use Tests\TestCase;
+
+class AnnouncementTest extends TestCase
+{
+    protected User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seedRoles();
+        $this->admin = $this->createAdmin();
+    }
+
+    public function test_admin_can_list_announcements(): void
+    {
+        Announcement::factory()->count(5)->create(['created_by' => $this->admin->id]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/announcements');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'announcements',
+                    'pagination',
+                ],
+            ]);
+    }
+
+    public function test_admin_can_create_announcement(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/announcements', [
+                'title' => 'テストお知らせ',
+                'content' => 'テスト内容です',
+                'target_roles' => ['seller', 'participant'],
+                'is_important' => false,
+                'status' => 'draft',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('announcements', [
+            'title' => 'テストお知らせ',
+        ]);
+    }
+
+    public function test_admin_can_view_announcement_detail(): void
+    {
+        $announcement = Announcement::factory()->create(['created_by' => $this->admin->id]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/admin/announcements/{$announcement->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'announcement' => ['id', 'title', 'content', 'status'],
+                ],
+            ]);
+    }
+
+    public function test_admin_can_update_announcement(): void
+    {
+        $announcement = Announcement::factory()->draft()->create(['created_by' => $this->admin->id]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/announcements/{$announcement->id}", [
+                'title' => '更新されたタイトル',
+                'content' => '更新された内容',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('announcements', [
+            'id' => $announcement->id,
+            'title' => '更新されたタイトル',
+        ]);
+    }
+
+    public function test_admin_can_delete_announcement(): void
+    {
+        $announcement = Announcement::factory()->create(['created_by' => $this->admin->id]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/admin/announcements/{$announcement->id}");
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseMissing('announcements', [
+            'id' => $announcement->id,
+        ]);
+    }
+
+    public function test_admin_can_publish_announcement(): void
+    {
+        $announcement = Announcement::factory()->draft()->create(['created_by' => $this->admin->id]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/announcements/{$announcement->id}/publish");
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('announcements', [
+            'id' => $announcement->id,
+            'status' => 'published',
+        ]);
+    }
+
+    public function test_announcement_requires_title(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/announcements', [
+                'content' => 'テスト内容',
+                'target_roles' => ['seller'],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['title']);
+    }
+
+    public function test_announcement_requires_content(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/announcements', [
+                'title' => 'テストタイトル',
+                'target_roles' => ['seller'],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['content']);
+    }
+
+    public function test_non_admin_cannot_create_announcement(): void
+    {
+        $participant = $this->createParticipant();
+
+        $response = $this->actingAs($participant, 'sanctum')
+            ->postJson('/api/admin/announcements', [
+                'title' => 'テストお知らせ',
+                'content' => 'テスト内容',
+            ]);
+
+        $response->assertStatus(403);
+    }
+}
