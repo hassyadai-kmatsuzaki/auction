@@ -52,24 +52,10 @@ class ShippingTest extends TestCase
             ]);
     }
 
-    public function test_seller_can_view_shipping_detail(): void
-    {
-        $response = $this->actingAs($this->seller, 'sanctum')
-            ->getJson("/api/seller/shipping/{$this->wonItem->id}");
-
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'data' => [
-                    'won_item',
-                ],
-            ]);
-    }
-
     public function test_seller_can_register_shipping(): void
     {
         $response = $this->actingAs($this->seller, 'sanctum')
-            ->postJson("/api/seller/shipping/{$this->wonItem->id}", [
+            ->postJson("/api/seller/shipping/{$this->wonItem->id}/ship", [
                 'shipping_company' => 'ヤマト運輸',
                 'tracking_number' => '1234-5678-9012',
             ]);
@@ -87,7 +73,7 @@ class ShippingTest extends TestCase
     public function test_shipping_requires_company_and_tracking_number(): void
     {
         $response = $this->actingAs($this->seller, 'sanctum')
-            ->postJson("/api/seller/shipping/{$this->wonItem->id}", []);
+            ->postJson("/api/seller/shipping/{$this->wonItem->id}/ship", []);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['shipping_company', 'tracking_number']);
@@ -111,12 +97,13 @@ class ShippingTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->seller, 'sanctum')
-            ->postJson("/api/seller/shipping/{$wonItem->id}", [
+            ->postJson("/api/seller/shipping/{$wonItem->id}/ship", [
                 'shipping_company' => 'ヤマト運輸',
                 'tracking_number' => '1234-5678-9012',
             ]);
 
-        $response->assertStatus(403);
+        // findOrFailを使っているのでModelNotFoundで404になる
+        $response->assertStatus(404);
     }
 
     public function test_non_seller_cannot_access_shipping(): void

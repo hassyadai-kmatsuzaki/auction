@@ -31,9 +31,17 @@ class LiveController extends Controller
      */
     public function auctionList(Request $request)
     {
-        $auctions = Auction::whereIn('status', ['preparing', 'scheduled', 'live'])
-            ->orderByRaw("FIELD(status, 'live', 'scheduled', 'preparing')")
-            ->orderBy('event_date', 'asc')
+        // SQLite互換のorderBy
+        $driver = config('database.default');
+        $query = Auction::whereIn('status', ['preparing', 'scheduled', 'live']);
+        
+        if ($driver === 'sqlite') {
+            $query->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'preparing' THEN 2 ELSE 3 END");
+        } else {
+            $query->orderByRaw("FIELD(status, 'live', 'scheduled', 'preparing')");
+        }
+        
+        $auctions = $query->orderBy('event_date', 'asc')
             ->get()
             ->map(function ($auction) {
                 // レーン情報

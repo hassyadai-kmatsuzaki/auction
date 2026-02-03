@@ -14,15 +14,24 @@ class RegisterTest extends TestCase
         $this->seedRoles();
     }
 
-    public function test_user_can_register_as_participant(): void
+    private function getValidRegistrationData(array $overrides = []): array
     {
-        $response = $this->postJson('/api/register', [
+        return array_merge([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'role' => 'participant',
-        ]);
+            'phone' => '090-1234-5678',
+            'postal_code' => '123-4567',
+            'prefecture' => '東京都',
+            'city' => '渋谷区',
+            'address_line1' => '渋谷1-2-3',
+        ], $overrides);
+    }
+
+    public function test_user_can_register_as_participant(): void
+    {
+        $response = $this->postJson('/api/register', $this->getValidRegistrationData());
 
         $response->assertStatus(201)
             ->assertJson(['success' => true]);
@@ -32,32 +41,27 @@ class RegisterTest extends TestCase
         ]);
     }
 
-    public function test_user_can_register_as_seller(): void
+    public function test_user_can_register_with_full_data(): void
     {
-        $response = $this->postJson('/api/register', [
-            'name' => 'Seller User',
-            'email' => 'seller@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'role' => 'seller',
-        ]);
+        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
+            'email' => 'full@example.com',
+            'address_line2' => 'ビル4F',
+        ]));
 
         $response->assertStatus(201)
             ->assertJson(['success' => true]);
 
         $this->assertDatabaseHas('users', [
-            'email' => 'seller@example.com',
+            'email' => 'full@example.com',
         ]);
     }
 
     public function test_registration_requires_name(): void
     {
-        $response = $this->postJson('/api/register', [
-            'email' => 'test@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'role' => 'participant',
-        ]);
+        $data = $this->getValidRegistrationData();
+        unset($data['name']);
+
+        $response = $this->postJson('/api/register', $data);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['name']);
@@ -65,13 +69,9 @@ class RegisterTest extends TestCase
 
     public function test_registration_requires_valid_email(): void
     {
-        $response = $this->postJson('/api/register', [
-            'name' => 'Test User',
+        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
             'email' => 'invalid-email',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'role' => 'participant',
-        ]);
+        ]));
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
@@ -81,13 +81,9 @@ class RegisterTest extends TestCase
     {
         User::factory()->create(['email' => 'existing@example.com']);
 
-        $response = $this->postJson('/api/register', [
-            'name' => 'Test User',
+        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
             'email' => 'existing@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'role' => 'participant',
-        ]);
+        ]));
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
@@ -95,13 +91,9 @@ class RegisterTest extends TestCase
 
     public function test_registration_requires_password_confirmation(): void
     {
-        $response = $this->postJson('/api/register', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => 'password123',
+        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
             'password_confirmation' => 'different',
-            'role' => 'participant',
-        ]);
+        ]));
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['password']);
@@ -109,15 +101,37 @@ class RegisterTest extends TestCase
 
     public function test_registration_requires_minimum_password_length(): void
     {
-        $response = $this->postJson('/api/register', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $response = $this->postJson('/api/register', $this->getValidRegistrationData([
             'password' => 'short',
             'password_confirmation' => 'short',
-            'role' => 'participant',
-        ]);
+        ]));
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['password']);
+    }
+
+    public function test_registration_requires_phone(): void
+    {
+        $data = $this->getValidRegistrationData(['email' => 'phone@example.com']);
+        unset($data['phone']);
+
+        $response = $this->postJson('/api/register', $data);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+    }
+
+    public function test_registration_requires_address_fields(): void
+    {
+        $data = $this->getValidRegistrationData(['email' => 'address@example.com']);
+        unset($data['postal_code']);
+        unset($data['prefecture']);
+        unset($data['city']);
+        unset($data['address_line1']);
+
+        $response = $this->postJson('/api/register', $data);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['postal_code', 'prefecture', 'city', 'address_line1']);
     }
 }

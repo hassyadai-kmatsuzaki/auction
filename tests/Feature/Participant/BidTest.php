@@ -3,7 +3,7 @@
 namespace Tests\Feature\Participant;
 
 use App\Models\Auction;
-use App\Models\Bid;
+use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\SellerProfile;
@@ -42,56 +42,55 @@ class BidTest extends TestCase
         $this->lane->update(['current_item_id' => $this->item->id]);
     }
 
-    public function test_participant_can_place_bid(): void
+    public function test_participant_can_join_bid(): void
     {
         $response = $this->actingAs($this->participant, 'sanctum')
             ->postJson('/api/participant/bids', [
                 'item_id' => $this->item->id,
-                'lane_id' => $this->lane->id,
-                'bid_amount' => 10100,
+                'is_active' => true,
             ]);
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $this->assertDatabaseHas('bids', [
+        $this->assertDatabaseHas('bid_participants', [
             'item_id' => $this->item->id,
             'user_id' => $this->participant->id,
-            'bid_amount' => 10100,
+            'is_active' => true,
         ]);
     }
 
-    public function test_bid_must_be_higher_than_current_price(): void
+    public function test_participant_can_leave_bid(): void
     {
+        // First join
+        BidParticipant::create([
+            'item_id' => $this->item->id,
+            'user_id' => $this->participant->id,
+            'is_active' => true,
+        ]);
+
         $response = $this->actingAs($this->participant, 'sanctum')
             ->postJson('/api/participant/bids', [
                 'item_id' => $this->item->id,
-                'lane_id' => $this->lane->id,
-                'bid_amount' => 9000, // 現在価格より低い
+                'is_active' => false,
             ]);
 
-        $response->assertStatus(422);
-    }
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
 
-    public function test_bid_must_follow_increment_rules(): void
-    {
-        $response = $this->actingAs($this->participant, 'sanctum')
-            ->postJson('/api/participant/bids', [
-                'item_id' => $this->item->id,
-                'lane_id' => $this->lane->id,
-                'bid_amount' => 10050, // 入札単位に合わない
-            ]);
-
-        $response->assertStatus(422);
+        $this->assertDatabaseHas('bid_participants', [
+            'item_id' => $this->item->id,
+            'user_id' => $this->participant->id,
+            'is_active' => false,
+        ]);
     }
 
     public function test_participant_can_view_own_active_bids(): void
     {
-        Bid::factory()->create([
+        BidParticipant::create([
             'item_id' => $this->item->id,
-            'lane_id' => $this->lane->id,
             'user_id' => $this->participant->id,
-            'bid_amount' => 10100,
+            'is_active' => true,
         ]);
 
         $response = $this->actingAs($this->participant, 'sanctum')
@@ -101,7 +100,7 @@ class BidTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'bids',
+                    'active_bids',
                 ],
             ]);
     }
@@ -116,35 +115,32 @@ class BidTest extends TestCase
         $response = $this->actingAs($this->participant, 'sanctum')
             ->postJson('/api/participant/bids', [
                 'item_id' => $item->id,
-                'lane_id' => $this->lane->id,
-                'bid_amount' => 10100,
+                'is_active' => true,
             ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(400);
     }
 
     public function test_bid_requires_item_id(): void
     {
         $response = $this->actingAs($this->participant, 'sanctum')
             ->postJson('/api/participant/bids', [
-                'lane_id' => $this->lane->id,
-                'bid_amount' => 10100,
+                'is_active' => true,
             ]);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['item_id']);
     }
 
-    public function test_bid_requires_bid_amount(): void
+    public function test_bid_requires_is_active(): void
     {
         $response = $this->actingAs($this->participant, 'sanctum')
             ->postJson('/api/participant/bids', [
                 'item_id' => $this->item->id,
-                'lane_id' => $this->lane->id,
             ]);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['bid_amount']);
+            ->assertJsonValidationErrors(['is_active']);
     }
 
     public function test_non_participant_cannot_bid(): void
@@ -154,8 +150,7 @@ class BidTest extends TestCase
         $response = $this->actingAs($seller, 'sanctum')
             ->postJson('/api/participant/bids', [
                 'item_id' => $this->item->id,
-                'lane_id' => $this->lane->id,
-                'bid_amount' => 10100,
+                'is_active' => true,
             ]);
 
         $response->assertStatus(403);
@@ -165,8 +160,7 @@ class BidTest extends TestCase
     {
         $response = $this->postJson('/api/participant/bids', [
             'item_id' => $this->item->id,
-            'lane_id' => $this->lane->id,
-            'bid_amount' => 10100,
+            'is_active' => true,
         ]);
 
         $response->assertStatus(401);

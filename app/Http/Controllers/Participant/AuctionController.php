@@ -37,9 +37,17 @@ class AuctionController extends Controller
             $query->where('status', $status);
         }
         
-        $auctions = $query->orderByRaw("FIELD(status, 'live', 'scheduled', 'finished')")
-            ->orderBy('event_date', 'desc')
-            ->get();
+        // SQLite互換のorderBy（MySQLのFIELD関数の代替）
+        $driver = config('database.default');
+        if ($driver === 'sqlite') {
+            $auctions = $query->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'finished' THEN 2 ELSE 3 END")
+                ->orderBy('event_date', 'desc')
+                ->get();
+        } else {
+            $auctions = $query->orderByRaw("FIELD(status, 'live', 'scheduled', 'finished')")
+                ->orderBy('event_date', 'desc')
+                ->get();
+        }
         
         return response()->json([
             'success' => true,

@@ -11,6 +11,8 @@ class LoginTest extends TestCase
     {
         $user = User::factory()->create([
             'password' => bcrypt('password123'),
+            'status' => 'approved',
+            'is_active' => true,
         ]);
 
         $response = $this->postJson('/api/login', [
@@ -21,8 +23,10 @@ class LoginTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
-                'user' => ['id', 'name', 'email'],
-                'token',
+                'data' => [
+                    'user' => ['id', 'name', 'email'],
+                    'token',
+                ],
             ]);
     }
 
@@ -30,6 +34,7 @@ class LoginTest extends TestCase
     {
         $user = User::factory()->create([
             'password' => bcrypt('password123'),
+            'status' => 'approved',
         ]);
 
         $response = $this->postJson('/api/login', [
@@ -37,8 +42,7 @@ class LoginTest extends TestCase
             'password' => 'wrongpassword',
         ]);
 
-        $response->assertStatus(401)
-            ->assertJson(['success' => false]);
+        $response->assertStatus(422); // ValidationException
     }
 
     public function test_user_cannot_login_with_nonexistent_email(): void
@@ -48,8 +52,7 @@ class LoginTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertStatus(401)
-            ->assertJson(['success' => false]);
+        $response->assertStatus(422);
     }
 
     public function test_login_requires_email_and_password(): void
@@ -62,10 +65,10 @@ class LoginTest extends TestCase
 
     public function test_authenticated_user_can_logout(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'approved']);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->postJson('/api/logout');
+            ->postJson('/api/auth/logout');
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
@@ -75,13 +78,17 @@ class LoginTest extends TestCase
     {
         $this->seedRoles();
         $user = $this->createAdmin();
+        $user->update(['status' => 'approved']);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/user');
+            ->getJson('/api/auth/user');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'id', 'name', 'email', 'roles',
+                'success',
+                'data' => [
+                    'user' => ['id', 'name', 'email', 'roles'],
+                ],
             ]);
     }
 }

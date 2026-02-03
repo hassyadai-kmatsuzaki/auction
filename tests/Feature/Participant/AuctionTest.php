@@ -74,7 +74,9 @@ class AuctionTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'items',
+                    'auction',
+                    'lanes',
+                    'total_items',
                 ],
             ]);
     }

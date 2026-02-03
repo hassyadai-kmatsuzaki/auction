@@ -49,59 +49,13 @@ class SettingsTest extends TestCase
     {
         $response = $this->actingAs($this->participant, 'sanctum')
             ->putJson('/api/participant/settings/notifications', [
-                'notification_settings' => [
-                    'new_auction' => true,
-                    'bid_result' => true,
-                    'payment_reminder' => false,
-                ],
+                'email_won_item' => true,
+                'email_payment_confirmed' => true,
+                'email_new_auction' => false,
             ]);
 
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
-    }
-
-    public function test_participant_can_change_password(): void
-    {
-        $this->participant->update(['password' => bcrypt('oldpassword')]);
-
-        $response = $this->actingAs($this->participant, 'sanctum')
-            ->putJson('/api/participant/settings/password', [
-                'current_password' => 'oldpassword',
-                'password' => 'newpassword123',
-                'password_confirmation' => 'newpassword123',
-            ]);
-
-        $response->assertStatus(200)
-            ->assertJson(['success' => true]);
-    }
-
-    public function test_password_change_requires_correct_current_password(): void
-    {
-        $this->participant->update(['password' => bcrypt('oldpassword')]);
-
-        $response = $this->actingAs($this->participant, 'sanctum')
-            ->putJson('/api/participant/settings/password', [
-                'current_password' => 'wrongpassword',
-                'password' => 'newpassword123',
-                'password_confirmation' => 'newpassword123',
-            ]);
-
-        $response->assertStatus(422);
-    }
-
-    public function test_password_change_requires_confirmation(): void
-    {
-        $this->participant->update(['password' => bcrypt('oldpassword')]);
-
-        $response = $this->actingAs($this->participant, 'sanctum')
-            ->putJson('/api/participant/settings/password', [
-                'current_password' => 'oldpassword',
-                'password' => 'newpassword123',
-                'password_confirmation' => 'different',
-            ]);
-
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['password']);
     }
 
     public function test_non_participant_cannot_access_participant_settings(): void

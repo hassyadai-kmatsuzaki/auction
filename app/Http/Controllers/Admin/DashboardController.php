@@ -69,10 +69,17 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 開催予定・開催中のオークション
-        $upcomingAuctions = Auction::whereIn('status', ['scheduled', 'live'])
-            ->orderByRaw("FIELD(status, 'live', 'scheduled')")
-            ->orderBy('event_date')
+        // 開催予定・開催中のオークション（SQLite互換）
+        $driver = config('database.default');
+        $upcomingQuery = Auction::whereIn('status', ['scheduled', 'live']);
+        
+        if ($driver === 'sqlite') {
+            $upcomingQuery->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END");
+        } else {
+            $upcomingQuery->orderByRaw("FIELD(status, 'live', 'scheduled')");
+        }
+        
+        $upcomingAuctions = $upcomingQuery->orderBy('event_date')
             ->take(5)
             ->get()
             ->map(function ($auction) {

@@ -39,6 +39,8 @@ class ProfileTest extends TestCase
             ->putJson('/api/seller/profile', [
                 'seller_name' => '更新されたショップ名',
                 'contact_name' => '更新された担当者名',
+                'email' => $this->sellerProfile->email,
+                'phone' => $this->sellerProfile->phone,
             ]);
 
         $response->assertStatus(200)
@@ -53,10 +55,12 @@ class ProfileTest extends TestCase
     public function test_seller_can_update_bank_info(): void
     {
         $response = $this->actingAs($this->seller, 'sanctum')
-            ->putJson('/api/seller/profile', [
+            ->putJson('/api/seller/profile/bank', [
                 'bank_name' => '新しい銀行',
                 'bank_branch' => '新しい支店',
+                'account_type' => 'savings',
                 'account_number' => '9999999',
+                'account_holder' => 'テスト太郎',
             ]);
 
         $response->assertStatus(200)

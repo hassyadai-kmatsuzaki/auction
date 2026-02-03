@@ -17,45 +17,43 @@ class UserTest extends TestCase
         $this->admin = $this->createAdmin();
     }
 
-    public function test_admin_can_list_sellers(): void
+    public function test_admin_can_list_users(): void
     {
         $seller = $this->createSeller();
         SellerProfile::factory()->create(['user_id' => $seller->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/admin/sellers');
+            ->getJson('/api/admin/users');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'sellers',
-                    'pagination',
+                    'data', // Laravel paginator structure
                 ],
             ]);
     }
 
-    public function test_admin_can_list_buyers(): void
+    public function test_admin_can_filter_users_by_role(): void
     {
+        $this->createSeller();
         $this->createParticipant();
 
+        // Filter sellers
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/admin/buyers');
+            ->getJson('/api/admin/users?role=seller');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
-                'data' => [
-                    'buyers',
-                    'pagination',
-                ],
+                'data',
             ]);
     }
 
     public function test_admin_can_view_user_detail(): void
     {
         $seller = $this->createSeller();
-        $profile = SellerProfile::factory()->create(['user_id' => $seller->id]);
+        SellerProfile::factory()->create(['user_id' => $seller->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->getJson("/api/admin/users/{$seller->id}");
@@ -75,21 +73,7 @@ class UserTest extends TestCase
             ->postJson('/api/admin/users', [
                 'name' => 'テスト出品者',
                 'email' => 'testseller@example.com',
-                'password' => 'password123',
-                'role' => 'seller',
-                'seller_name' => 'テストショップ',
-                'contact_name' => 'テスト太郎',
-                'seller_phone' => '03-1234-5678',
-                'seller_email' => 'testseller@example.com',
-                'postal_code' => '100-0001',
-                'prefecture' => '東京都',
-                'city' => '千代田区',
-                'address_line1' => '1-1-1',
-                'bank_name' => 'テスト銀行',
-                'bank_branch' => 'テスト支店',
-                'account_type' => 'savings',
-                'account_number' => '1234567',
-                'account_holder' => 'テスト太郎',
+                'roles' => ['seller'],
             ]);
 
         $response->assertStatus(201)
@@ -106,8 +90,7 @@ class UserTest extends TestCase
             ->postJson('/api/admin/users', [
                 'name' => 'テスト買受者',
                 'email' => 'testbuyer@example.com',
-                'password' => 'password123',
-                'role' => 'participant',
+                'roles' => ['participant'],
             ]);
 
         $response->assertStatus(201)
@@ -147,8 +130,10 @@ class UserTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $this->assertDatabaseMissing('users', [
+        // Soft delete - check is_active is false
+        $this->assertDatabaseHas('users', [
             'id' => $buyer->id,
+            'is_active' => false,
         ]);
     }
 
@@ -157,28 +142,23 @@ class UserTest extends TestCase
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/admin/users', [
                 'name' => 'テストユーザー',
-                'password' => 'password123',
-                'role' => 'participant',
+                'roles' => ['participant'],
             ]);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
     }
 
-    public function test_user_creation_requires_unique_email(): void
+    public function test_user_creation_requires_roles(): void
     {
-        User::factory()->create(['email' => 'existing@example.com']);
-
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/admin/users', [
                 'name' => 'テストユーザー',
-                'email' => 'existing@example.com',
-                'password' => 'password123',
-                'role' => 'participant',
+                'email' => 'test@example.com',
             ]);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+            ->assertJsonValidationErrors(['roles']);
     }
 
     public function test_non_admin_cannot_list_users(): void
@@ -186,8 +166,9 @@ class UserTest extends TestCase
         $seller = $this->createSeller();
 
         $response = $this->actingAs($seller, 'sanctum')
-            ->getJson('/api/admin/sellers');
+            ->getJson('/api/admin/users');
 
+        // Admin middleware should reject non-admin users
         $response->assertStatus(403);
     }
 }

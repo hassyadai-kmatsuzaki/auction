@@ -108,10 +108,16 @@ class SettlementTest extends TestCase
             'seller_profile_id' => $otherProfile->id,
         ]);
 
+        $winner = $this->createParticipant();
+        WonItem::factory()->create([
+            'item_id' => $item->id,
+            'winner_id' => $winner->id,
+        ]);
+
         $response = $this->actingAs($this->seller, 'sanctum')
             ->getJson("/api/seller/settlements/{$auction->id}");
 
-        // 他の出品者のデータのみの場合は空の結果またはエラー
-        $response->assertStatus(200);
+        // Returns 404 because no won_items for this seller in this auction
+        $response->assertStatus(404);
     }
 }

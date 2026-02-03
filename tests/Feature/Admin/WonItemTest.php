@@ -13,6 +13,7 @@ class WonItemTest extends TestCase
 {
     protected User $admin;
     protected Auction $auction;
+    protected SellerProfile $sellerProfile;
     protected Item $item;
     protected WonItem $wonItem;
 
@@ -24,17 +25,39 @@ class WonItemTest extends TestCase
         $this->auction = Auction::factory()->finished()->create(['created_by' => $this->admin->id]);
         
         $seller = $this->createSeller();
-        $sellerProfile = SellerProfile::factory()->create(['user_id' => $seller->id]);
+        $this->sellerProfile = SellerProfile::factory()->create(['user_id' => $seller->id]);
         
         $this->item = Item::factory()->sold()->create([
             'auction_id' => $this->auction->id,
-            'seller_profile_id' => $sellerProfile->id,
+            'seller_profile_id' => $this->sellerProfile->id,
         ]);
 
         $winner = $this->createParticipant();
         $this->wonItem = WonItem::factory()->create([
             'item_id' => $this->item->id,
             'winner_id' => $winner->id,
+        ]);
+    }
+
+    protected function createNewItemWithWonItem(string $state = 'create'): WonItem
+    {
+        $item = Item::factory()->sold()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+
+        $factory = WonItem::factory();
+        if ($state === 'paid') {
+            $factory = $factory->paid();
+        } elseif ($state === 'confirmed') {
+            $factory = $factory->confirmed();
+        } elseif ($state === 'shipped') {
+            $factory = $factory->shipped();
+        }
+
+        return $factory->create([
+            'item_id' => $item->id,
+            'winner_id' => $this->createParticipant()->id,
         ]);
     }
 
@@ -85,10 +108,7 @@ class WonItemTest extends TestCase
 
     public function test_admin_can_confirm_payment(): void
     {
-        $wonItem = WonItem::factory()->paid()->create([
-            'item_id' => $this->item->id,
-            'winner_id' => $this->createParticipant()->id,
-        ]);
+        $wonItem = $this->createNewItemWithWonItem('paid');
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/won-items/{$wonItem->id}/confirm-payment");
@@ -104,10 +124,7 @@ class WonItemTest extends TestCase
 
     public function test_admin_can_ship_item(): void
     {
-        $wonItem = WonItem::factory()->confirmed()->create([
-            'item_id' => $this->item->id,
-            'winner_id' => $this->createParticipant()->id,
-        ]);
+        $wonItem = $this->createNewItemWithWonItem('confirmed');
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/won-items/{$wonItem->id}/ship", [
@@ -138,10 +155,7 @@ class WonItemTest extends TestCase
 
     public function test_admin_can_complete_delivery(): void
     {
-        $wonItem = WonItem::factory()->shipped()->create([
-            'item_id' => $this->item->id,
-            'winner_id' => $this->createParticipant()->id,
-        ]);
+        $wonItem = $this->createNewItemWithWonItem('shipped');
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/won-items/{$wonItem->id}/complete");
@@ -173,10 +187,7 @@ class WonItemTest extends TestCase
 
     public function test_shipping_requires_company_and_tracking_number(): void
     {
-        $wonItem = WonItem::factory()->confirmed()->create([
-            'item_id' => $this->item->id,
-            'winner_id' => $this->createParticipant()->id,
-        ]);
+        $wonItem = $this->createNewItemWithWonItem('confirmed');
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/won-items/{$wonItem->id}/ship", []);
