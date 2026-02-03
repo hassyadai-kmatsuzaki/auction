@@ -648,4 +648,241 @@ class ItemController extends Controller
             'message' => "{$updated}件の生体のステータスを更新しました。",
         ]);
     }
+
+    /**
+     * CSVテンプレートをダウンロード
+     *
+     * @param int $auctionId
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    public function downloadTemplate($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="items_template.csv"',
+        ];
+
+        $callback = function () use ($auction) {
+            $file = fopen('php://output', 'w');
+            
+            // BOM for UTF-8
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            
+            // ヘッダー行
+            fputcsv($file, [
+                '品種名（必須）',
+                '匹数（必須）',
+                '開始価格（必須）',
+                '最低落札価格',
+                '落札想定金額',
+                '入札単位',
+                '個体情報',
+                '審査情報',
+                '備考',
+                'プレミアム（0または1）',
+                '未落札時対応（return/free_pickup/relist）',
+            ]);
+            
+            // サンプルデータ
+            fputcsv($file, [
+                'ボールパイソン アルビノ',
+                '1',
+                '30000',
+                '25000',
+                '50000',
+                '100',
+                '性別：オス / 月齢：約12ヶ月 / 体長：約60cm / 体重：約300g',
+                '健康状態：良好 / 餌食い：良好',
+                '状態良好です。',
+                '0',
+                'return',
+            ]);
+            
+            fputcsv($file, [
+                'レオパードゲッコー タンジェリン',
+                '2',
+                '15000',
+                '12000',
+                '25000',
+                '100',
+                '性別：メス / 月齢：約6ヶ月 / 体長：約15cm',
+                '健康状態：良好 / 餌食い：良好',
+                '色彩鮮やかな個体です。',
+                '1',
+                'return',
+            ]);
+            
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * CSVから一括インポート
+     *
+     * @param Request $request
+     * @param int $auctionId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function import(Request $request, $auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:csv,txt|max:10240',
+            'seller_profile_id' => 'nullable|exists:seller_profiles,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $file = $request->file('file');
+        $sellerProfileId = $request->input('seller_profile_id');
+
+        try {
+            $path = $file->getRealPath();
+            $content = file_get_contents($path);
+            
+            // BOMを除去
+            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+            
+            // 一時ファイルに保存
+            $tempPath = tempnam(sys_get_temp_dir(), 'csv');
+            file_put_contents($tempPath, $content);
+            
+            $handle = fopen($tempPath, 'r');
+            
+            if (!$handle) {
+                throw new \Exception('ファイルを開けませんでした。');
+            }
+
+            // ヘッダー行をスキップ
+            $header = fgetcsv($handle);
+
+            $imported = 0;
+            $errors = [];
+            $rowNumber = 1;
+
+            // 現在の最大アイテム番号を取得
+            $maxItemNumber = Item::where('auction_id', $auctionId)->max('item_number') ?? 0;
+
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNumber++;
+                
+                // 空行をスキップ
+                if (empty($row[0])) {
+                    continue;
+                }
+
+                try {
+                    // データ検証
+                    if (count($row) < 3) {
+                        $errors[] = "行 {$rowNumber}: データが不足しています。";
+                        continue;
+                    }
+
+                    $speciesName = trim($row[0] ?? '');
+                    $quantity = (int) trim($row[1] ?? '1');
+                    $startPrice = (float) trim($row[2] ?? '0');
+
+                    if (empty($speciesName)) {
+                        $errors[] = "行 {$rowNumber}: 品種名は必須です。";
+                        continue;
+                    }
+
+                    if ($quantity < 1) {
+                        $errors[] = "行 {$rowNumber}: 匹数は1以上にしてください。";
+                        continue;
+                    }
+
+                    if ($startPrice < 1) {
+                        $errors[] = "行 {$rowNumber}: 開始価格は1円以上にしてください。";
+                        continue;
+                    }
+
+                    $maxItemNumber++;
+
+                    // 未落札時対応のバリデーション
+                    $unsoldAction = trim($row[10] ?? 'return');
+                    if (!in_array($unsoldAction, ['return', 'free_pickup', 'relist'])) {
+                        $unsoldAction = 'return';
+                    }
+
+                    Item::create([
+                        'auction_id' => $auctionId,
+                        'seller_profile_id' => $sellerProfileId,
+                        'item_number' => $maxItemNumber,
+                        'species_name' => $speciesName,
+                        'quantity' => $quantity,
+                        'start_price' => $startPrice,
+                        'current_price' => $startPrice,
+                        'reserve_price' => !empty($row[3]) ? (float) trim($row[3]) : null,
+                        'estimated_price' => !empty($row[4]) ? (float) trim($row[4]) : null,
+                        'bid_increment' => !empty($row[5]) ? (float) trim($row[5]) : 100,
+                        'individual_info' => trim($row[6] ?? ''),
+                        'inspection_info' => trim($row[7] ?? ''),
+                        'notes' => trim($row[8] ?? ''),
+                        'is_premium' => (bool) (int) trim($row[9] ?? '0'),
+                        'unsold_action' => $unsoldAction,
+                        'status' => 'draft',
+                    ]);
+
+                    $imported++;
+                } catch (\Exception $e) {
+                    $errors[] = "行 {$rowNumber}: " . $e->getMessage();
+                }
+            }
+
+            fclose($handle);
+            unlink($tempPath);
+
+            $message = "{$imported}件の生体をインポートしました。";
+            if (!empty($errors)) {
+                $message .= ' エラー: ' . count($errors) . '件';
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'imported' => $imported,
+                    'errors' => $errors,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('CSVインポートエラー: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'インポートに失敗しました: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * 出品者一覧を取得（インポート用）
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getSellers()
+    {
+        $sellers = \App\Models\SellerProfile::where('is_active', true)
+            ->select('id', 'seller_name', 'seller_code')
+            ->orderBy('seller_name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'sellers' => $sellers,
+            ],
+        ]);
+    }
 }

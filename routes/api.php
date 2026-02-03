@@ -92,6 +92,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     
     // 生体一括操作
     Route::patch('auctions/{auctionId}/items/bulk-status', [AdminItemController::class, 'bulkUpdateStatus']);
+    Route::get('auctions/{auctionId}/items/template', [AdminItemController::class, 'downloadTemplate']);
+    Route::post('auctions/{auctionId}/items/import', [AdminItemController::class, 'import']);
+    Route::get('sellers/list', [AdminItemController::class, 'getSellers']);
     
     // レーン管理
     Route::get('auctions/{auctionId}/lanes', [AdminLaneController::class, 'index']);

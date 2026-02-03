@@ -49,8 +49,17 @@ import {
   Visibility as VisibilityIcon,
   Image as ImageIcon,
   ViewKanban as ViewKanbanIcon,
+  Upload as UploadIcon,
+  Download as DownloadIcon,
+  FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+
+interface Seller {
+  id: number;
+  seller_name: string;
+  seller_code: string;
+}
 
 interface Auction {
   id: number;
@@ -113,9 +122,34 @@ export default function ItemManagement() {
   const [statusChangeTarget, setStatusChangeTarget] = useState<Item | null>(null);
   const [statusChanging, setStatusChanging] = useState(false);
 
+  // インポート
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSellerId, setImportSellerId] = useState<number | ''>('');
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
+
   useEffect(() => {
     fetchItems();
   }, [auctionId, currentPage, filterStatus]);
+
+  useEffect(() => {
+    if (importDialogOpen) {
+      fetchSellers();
+    }
+  }, [importDialogOpen]);
+
+  const fetchSellers = async () => {
+    try {
+      const response = await axios.get('/api/admin/sellers/list');
+      if (response.data.success) {
+        setSellers(response.data.data.sellers);
+      }
+    } catch (err) {
+      console.error('出品者一覧取得エラー:', err);
+    }
+  };
 
   const fetchItems = async () => {
     try {
@@ -228,6 +262,66 @@ export default function ItemManagement() {
     }
   };
 
+  // テンプレートダウンロード
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await axios.get(`/api/admin/auctions/${auctionId}/items/template`, {
+        responseType: 'blob',
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'items_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setSnackbar({ open: true, message: 'テンプレートのダウンロードに失敗しました。', severity: 'error' });
+    }
+  };
+
+  // CSVインポート
+  const handleImport = async () => {
+    if (!importFile) return;
+
+    try {
+      setImporting(true);
+      setImportResult(null);
+
+      const formData = new FormData();
+      formData.append('file', importFile);
+      if (importSellerId) {
+        formData.append('seller_profile_id', importSellerId.toString());
+      }
+
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/items/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (response.data.success) {
+        setImportResult({
+          imported: response.data.data.imported,
+          errors: response.data.data.errors || [],
+        });
+        setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+        fetchItems();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'インポートに失敗しました。', severity: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleCloseImportDialog = () => {
+    setImportDialogOpen(false);
+    setImportFile(null);
+    setImportSellerId('');
+    setImportResult(null);
+  };
+
   const handleSelectItem = (id: number, checked: boolean) => {
     if (checked) {
       setSelectedIds([...selectedIds, id]);
@@ -290,6 +384,20 @@ export default function ItemManagement() {
           )}
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadTemplate}
+          >
+            テンプレート
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<UploadIcon />}
+            onClick={() => setImportDialogOpen(true)}
+          >
+            一括インポート
+          </Button>
           <Button
             variant="outlined"
             startIcon={<ViewKanbanIcon />}
@@ -589,6 +697,139 @@ export default function ItemManagement() {
             disabled={!bulkStatus}
           >
             更新する
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* インポートダイアログ */}
+      <Dialog open={importDialogOpen} onClose={handleCloseImportDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FileUploadIcon color="primary" />
+            CSVから一括インポート
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              CSVファイルから生体情報を一括で登録できます。
+              <br />
+              まずテンプレートをダウンロードして、必要な情報を入力してください。
+            </Alert>
+
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>出品者（任意）</InputLabel>
+              <Select
+                value={importSellerId}
+                label="出品者（任意）"
+                onChange={(e) => setImportSellerId(e.target.value as number | '')}
+              >
+                <MenuItem value="">出品者を指定しない</MenuItem>
+                {sellers.map((seller) => (
+                  <MenuItem key={seller.id} value={seller.id}>
+                    [{seller.seller_code}] {seller.seller_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Box
+              sx={{
+                border: '2px dashed',
+                borderColor: importFile ? 'primary.main' : 'grey.300',
+                borderRadius: 2,
+                p: 3,
+                textAlign: 'center',
+                bgcolor: importFile ? 'primary.50' : 'grey.50',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: 'primary.50',
+                },
+              }}
+              onClick={() => document.getElementById('import-file-input')?.click()}
+            >
+              <input
+                id="import-file-input"
+                type="file"
+                accept=".csv"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImportFile(file);
+                    setImportResult(null);
+                  }
+                }}
+              />
+              {importFile ? (
+                <>
+                  <FileUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {importFile.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    クリックして別のファイルを選択
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                  <Typography variant="body1">
+                    クリックしてCSVファイルを選択
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    または、ファイルをドラッグ&ドロップ
+                  </Typography>
+                </>
+              )}
+            </Box>
+
+            {importResult && (
+              <Box sx={{ mt: 3 }}>
+                <Alert severity={importResult.errors.length > 0 ? 'warning' : 'success'}>
+                  {importResult.imported}件のインポートが完了しました。
+                  {importResult.errors.length > 0 && (
+                    <> （エラー: {importResult.errors.length}件）</>
+                  )}
+                </Alert>
+                {importResult.errors.length > 0 && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      maxHeight: 150,
+                      overflow: 'auto',
+                      bgcolor: 'grey.100',
+                      p: 2,
+                      borderRadius: 1,
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {importResult.errors.map((error, index) => (
+                      <Typography key={index} variant="body2" color="error">
+                        {error}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleDownloadTemplate} startIcon={<DownloadIcon />}>
+            テンプレートをダウンロード
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <Button onClick={handleCloseImportDialog}>閉じる</Button>
+          <Button
+            variant="contained"
+            onClick={handleImport}
+            disabled={!importFile || importing}
+            startIcon={importing ? <CircularProgress size={20} /> : <UploadIcon />}
+          >
+            {importing ? 'インポート中...' : 'インポート'}
           </Button>
         </DialogActions>
       </Dialog>

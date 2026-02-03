@@ -411,6 +411,11 @@ class DemoDataSeeder extends Seeder
                     $status = rand(0, 3) === 0 ? 'draft' : 'registered';
                 }
 
+                $sex = ['オス', 'メス', '不明'][rand(0, 2)];
+                $age = rand(1, 24);
+                $size = rand(10, 80);
+                $weight = rand(50, 500);
+
                 Item::create([
                     'auction_id' => $auction->id,
                     'seller_profile_id' => $sellers[$sellerIndex]['profile']->id,
@@ -422,15 +427,9 @@ class DemoDataSeeder extends Seeder
                     'reserve_price' => $species['price'] * 0.8,
                     'estimated_price' => $species['price'] * 1.5,
                     'bid_increment' => 100,
-                    'inspection_info' => json_encode([
-                        'health_status' => 'good',
-                        'feeding_status' => 'active',
-                    ]),
-                    'individual_info' => json_encode([
-                        'sex' => ['male', 'female', 'unknown'][rand(0, 2)],
-                        'age' => rand(1, 24) . 'ヶ月',
-                    ]),
-                    'notes' => '状態良好です。',
+                    'inspection_info' => "健康状態：良好\n餌食い：良好\n最終給餌日：" . now()->subDays(rand(1, 7))->format('Y年m月d日') . "\n特記事項：特になし",
+                    'individual_info' => "性別：{$sex}\n月齢：約{$age}ヶ月\n体長：約{$size}cm\n体重：約{$weight}g\n産地：CB（国内繁殖）",
+                    'notes' => '状態良好です。餌食い抜群。初心者の方にもおすすめです。',
                     'is_premium' => rand(0, 4) === 0,
                     'premium_fee' => 800,
                     'status' => $status,
