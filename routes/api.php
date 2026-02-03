@@ -80,6 +80,14 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     // 生体管理
     Route::get('auctions/{auctionId}/items', [AdminItemController::class, 'index']);
     Route::post('auctions/{auctionId}/items', [AdminItemController::class, 'store']);
+    
+    // 生体一括操作（{id}より前に定義する必要がある）
+    Route::patch('auctions/{auctionId}/items/bulk-status', [AdminItemController::class, 'bulkUpdateStatus']);
+    Route::get('auctions/{auctionId}/items/template', [AdminItemController::class, 'downloadTemplate']);
+    Route::post('auctions/{auctionId}/items/import', [AdminItemController::class, 'import']);
+    Route::get('sellers/list', [AdminItemController::class, 'getSellers']);
+    
+    // 生体個別操作
     Route::get('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'show']);
     Route::put('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'update']);
     Route::delete('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'destroy']);
@@ -89,12 +97,6 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::delete('auctions/{auctionId}/items/{id}/media/{mediaId}', [AdminItemController::class, 'deleteMedia']);
     Route::put('auctions/{auctionId}/items/{id}/media/reorder', [AdminItemController::class, 'reorderMedia']);
     Route::patch('auctions/{auctionId}/items/{id}/media/{mediaId}/thumbnail', [AdminItemController::class, 'setThumbnail']);
-    
-    // 生体一括操作
-    Route::patch('auctions/{auctionId}/items/bulk-status', [AdminItemController::class, 'bulkUpdateStatus']);
-    Route::get('auctions/{auctionId}/items/template', [AdminItemController::class, 'downloadTemplate']);
-    Route::post('auctions/{auctionId}/items/import', [AdminItemController::class, 'import']);
-    Route::get('sellers/list', [AdminItemController::class, 'getSellers']);
     
     // レーン管理
     Route::get('auctions/{auctionId}/lanes', [AdminLaneController::class, 'index']);
