@@ -49,8 +49,8 @@ abstract class TestCase extends BaseTestCase
      */
     protected function seedRoles(): void
     {
-        Role::firstOrCreate(['name' => 'admin', 'display_name' => '管理者']);
-        Role::firstOrCreate(['name' => 'seller', 'display_name' => '出品者']);
-        Role::firstOrCreate(['name' => 'participant', 'display_name' => '買受者']);
+        Role::firstOrCreate(['name' => 'admin'], ['display_name' => '管理者']);
+        Role::firstOrCreate(['name' => 'seller'], ['display_name' => '出品者']);
+        Role::firstOrCreate(['name' => 'participant'], ['display_name' => '買受者']);
     }
 }
