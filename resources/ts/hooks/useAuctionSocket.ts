@@ -38,6 +38,14 @@ export interface AuctionStatusEvent {
   message: string;
 }
 
+export interface CountdownTickEvent {
+  lane_id: number;
+  item_id: number;
+  remaining_seconds: number;
+  active_bidders_count: number;
+  current_price: number;
+}
+
 interface UseAuctionSocketOptions {
   auctionId: number;
   onPriceUpdated?: (event: PriceUpdatedEvent) => void;
@@ -45,6 +53,7 @@ interface UseAuctionSocketOptions {
   onLaneChanged?: (event: LaneChangedEvent) => void;
   onItemSold?: (event: ItemSoldEvent) => void;
   onAuctionStatus?: (event: AuctionStatusEvent) => void;
+  onCountdownTick?: (event: CountdownTickEvent) => void;
   onConnectionError?: (error: unknown) => void;
 }
 
@@ -63,6 +72,7 @@ export function useAuctionSocket({
   onLaneChanged,
   onItemSold,
   onAuctionStatus,
+  onCountdownTick,
   onConnectionError,
 }: UseAuctionSocketOptions): UseAuctionSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
@@ -123,6 +133,13 @@ export function useAuctionSocket({
           onAuctionStatus(event);
         });
       }
+
+      // カウントダウンティックイベント
+      if (onCountdownTick) {
+        channel.listen('.countdown.tick', (event: CountdownTickEvent) => {
+          onCountdownTick(event);
+        });
+      }
     } catch (error) {
       setIsConnected(false);
       if (onConnectionError) {
@@ -139,7 +156,7 @@ export function useAuctionSocket({
       channelRef.current = null;
       setIsConnected(false);
     };
-  }, [auctionId, isEnabled, onPriceUpdated, onBidderUpdated, onLaneChanged, onItemSold, onAuctionStatus, onConnectionError]);
+  }, [auctionId, isEnabled, onPriceUpdated, onBidderUpdated, onLaneChanged, onItemSold, onAuctionStatus, onCountdownTick, onConnectionError]);
 
   return {
     isConnected,

@@ -178,6 +178,28 @@ export default function AuctionLive() {
       fetchLiveState();
       setSocketConnected(true);
     },
+    onCountdownTick: (event) => {
+      setLiveState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lanes: prev.lanes.map((lane) =>
+            lane.current_item?.id === event.item_id
+              ? {
+                  ...lane,
+                  current_item: {
+                    ...lane.current_item,
+                    countdown_seconds: event.remaining_seconds,
+                    active_bidders_count: event.active_bidders_count,
+                    current_price: event.current_price,
+                  },
+                }
+              : lane
+          ),
+        };
+      });
+      setSocketConnected(true);
+    },
   });
 
   // 入札ON/OFF切り替え

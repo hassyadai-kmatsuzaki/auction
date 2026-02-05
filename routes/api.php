@@ -123,6 +123,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('auctions/{auctionId}/live/finish', [AdminLiveController::class, 'finish']);
     Route::post('lanes/{laneId}/next-item', [AdminLiveController::class, 'nextItem']);
     Route::patch('items/{itemId}/price', [AdminLiveController::class, 'adjustPrice']);
+    Route::get('auctions/{auctionId}/countdown-status', [AdminLiveController::class, 'countdownStatus']);
     
     // 落札者管理
     Route::get('won-items-auctions', [AdminWonItemController::class, 'auctionList']);

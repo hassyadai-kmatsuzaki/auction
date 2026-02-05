@@ -8,6 +8,8 @@ use App\Models\Lane;
 use App\Models\Item;
 use App\Models\BidParticipant;
 use App\Services\BidService;
+use App\Services\CountdownService;
+use App\Jobs\ProcessCountdownJob;
 use App\Events\LaneItemChanged;
 use App\Events\AuctionStatusChanged;
 use Illuminate\Http\Request;
@@ -17,10 +19,12 @@ use Illuminate\Support\Facades\Validator;
 class LiveController extends Controller
 {
     protected BidService $bidService;
+    protected CountdownService $countdownService;
 
-    public function __construct(BidService $bidService)
+    public function __construct(BidService $bidService, CountdownService $countdownService)
     {
         $this->bidService = $bidService;
+        $this->countdownService = $countdownService;
     }
 
     /**
@@ -578,7 +582,7 @@ class LiveController extends Controller
     /**
      * 次の商品を開始
      */
-    private function startNextItem(Lane $lane): ?Item
+    private function startNextItem(Lane $lane, bool $startCountdown = true): ?Item
     {
         // 現在の商品があれば終了
         if ($lane->currentItem && $lane->currentItem->status === 'live') {
@@ -604,6 +608,12 @@ class LiveController extends Controller
                 'status' => 'active',
             ]);
 
+            // カウントダウンを開始
+            if ($startCountdown) {
+                $this->countdownService->startCountdown($lane);
+                ProcessCountdownJob::dispatch($lane->id);
+            }
+
             return $nextItem;
         } else {
             // 商品がなければレーンを終了
@@ -614,5 +624,20 @@ class LiveController extends Controller
 
             return null;
         }
+    }
+
+    /**
+     * カウントダウン状態を取得
+     */
+    public function countdownStatus($auctionId)
+    {
+        $countdowns = $this->countdownService->getActiveCountdowns($auctionId);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'countdowns' => $countdowns,
+            ],
+        ]);
     }
 }

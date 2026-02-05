@@ -18,6 +18,16 @@ use Illuminate\Support\Facades\DB;
 
 class BidService
 {
+    protected ?CountdownService $countdownService = null;
+
+    /**
+     * CountdownServiceを設定（循環参照回避のため）
+     */
+    public function setCountdownService(CountdownService $countdownService): void
+    {
+        $this->countdownService = $countdownService;
+    }
+
     /**
      * 入札参加（ONボタン）
      *
@@ -254,13 +264,18 @@ class BidService
             // 価格更新イベントをブロードキャスト
             $lane = Lane::where('current_item_id', $item->id)->first();
             if ($lane) {
+                // カウントダウンをリセット
+                if ($this->countdownService) {
+                    $this->countdownService->resetCountdown($lane);
+                }
+
                 broadcast(new PriceUpdated(
                     $auction->id,
                     $lane->id,
                     $item->id,
                     $newPrice,
                     $activeBidderCount,
-                    $auction->countdown_seconds
+                    $auction->getAuctionSettings()['countdown_seconds'] ?? 3
                 ));
             }
 
