@@ -387,11 +387,11 @@ export default function AuctionLive() {
                         現在単価
                       </Typography>
                       <Typography variant="h4" color="primary.main" fontWeight="bold">
-                        ¥{lane.current_item.current_price.toLocaleString()}
+                        ¥{Math.floor(lane.current_item.current_price).toLocaleString()}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         × {lane.current_item.quantity}匹 = ¥
-                        {(lane.current_item.current_price * lane.current_item.quantity).toLocaleString()}
+                        {Math.floor(lane.current_item.current_price * lane.current_item.quantity).toLocaleString()}
                       </Typography>
                     </Box>
 
@@ -517,7 +517,7 @@ export default function AuctionLive() {
               )}
 
               <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
-                ¥{selectedItem?.current_price.toLocaleString()}
+                ¥{selectedItem?.current_price ? Math.floor(selectedItem.current_price).toLocaleString() : '0'}
               </Typography>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" gutterBottom>
