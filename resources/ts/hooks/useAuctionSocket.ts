@@ -93,53 +93,49 @@ export function useAuctionSocket({
     }
 
     const channelName = `auction.${auctionId}.live`;
+    console.log('[Socket] Subscribing to channel:', channelName);
 
     try {
       const channel = echo.channel(channelName);
       channelRef.current = channel;
       setIsConnected(true);
+      console.log('[Socket] Channel subscribed successfully');
 
       // 価格更新イベント
-      if (onPriceUpdated) {
-        channel.listen('.price.updated', (event: PriceUpdatedEvent) => {
-          onPriceUpdated(event);
-        });
-      }
+      channel.listen('.price.updated', (event: PriceUpdatedEvent) => {
+        console.log('[Socket] price.updated:', event);
+        if (onPriceUpdated) onPriceUpdated(event);
+      });
 
       // 入札者更新イベント
-      if (onBidderUpdated) {
-        channel.listen('.bidder.updated', (event: BidderUpdatedEvent) => {
-          onBidderUpdated(event);
-        });
-      }
+      channel.listen('.bidder.updated', (event: BidderUpdatedEvent) => {
+        console.log('[Socket] bidder.updated:', event);
+        if (onBidderUpdated) onBidderUpdated(event);
+      });
 
       // レーン変更イベント
-      if (onLaneChanged) {
-        channel.listen('.lane.changed', (event: LaneChangedEvent) => {
-          onLaneChanged(event);
-        });
-      }
+      channel.listen('.lane.changed', (event: LaneChangedEvent) => {
+        console.log('[Socket] lane.changed:', event);
+        if (onLaneChanged) onLaneChanged(event);
+      });
 
       // 落札イベント
-      if (onItemSold) {
-        channel.listen('.item.sold', (event: ItemSoldEvent) => {
-          onItemSold(event);
-        });
-      }
+      channel.listen('.item.sold', (event: ItemSoldEvent) => {
+        console.log('[Socket] item.sold:', event);
+        if (onItemSold) onItemSold(event);
+      });
 
       // オークションステータス変更イベント
-      if (onAuctionStatus) {
-        channel.listen('.auction.status', (event: AuctionStatusEvent) => {
-          onAuctionStatus(event);
-        });
-      }
+      channel.listen('.auction.status', (event: AuctionStatusEvent) => {
+        console.log('[Socket] auction.status:', event);
+        if (onAuctionStatus) onAuctionStatus(event);
+      });
 
       // カウントダウンティックイベント
-      if (onCountdownTick) {
-        channel.listen('.countdown.tick', (event: CountdownTickEvent) => {
-          onCountdownTick(event);
-        });
-      }
+      channel.listen('.countdown.tick', (event: CountdownTickEvent) => {
+        console.log('[Socket] countdown.tick:', event);
+        if (onCountdownTick) onCountdownTick(event);
+      });
     } catch (error) {
       setIsConnected(false);
       if (onConnectionError) {

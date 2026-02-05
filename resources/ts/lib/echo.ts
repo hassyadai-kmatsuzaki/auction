@@ -37,6 +37,8 @@ export const getEcho = (): Echo | null => {
   }
 
   try {
+    console.log('[Echo] Initializing with key:', PUSHER_APP_KEY, 'cluster:', PUSHER_APP_CLUSTER);
+    
     // Laravel Echo設定
     echoInstance = new Echo({
       broadcaster: 'pusher',
@@ -49,27 +51,26 @@ export const getEcho = (): Echo | null => {
     // グローバルに設定
     window.Echo = echoInstance;
 
-    // 接続状態の監視（開発環境のみ）
-    if (import.meta.env.DEV) {
-      const pusher = (echoInstance as unknown as { connector: { pusher: Pusher } }).connector?.pusher;
-      if (pusher) {
-        pusher.connection.bind('connected', () => {
-          console.info('[Echo] Pusher connected');
-        });
-        pusher.connection.bind('error', (err: unknown) => {
-          console.error('[Echo] Pusher connection error:', err);
-        });
-        pusher.connection.bind('disconnected', () => {
-          console.warn('[Echo] Pusher disconnected');
-        });
-      }
+    // 接続状態の監視（本番環境でも有効）
+    const pusher = (echoInstance as unknown as { connector: { pusher: Pusher } }).connector?.pusher;
+    if (pusher) {
+      pusher.connection.bind('connected', () => {
+        console.info('[Echo] Pusher connected successfully');
+      });
+      pusher.connection.bind('error', (err: unknown) => {
+        console.error('[Echo] Pusher connection error:', err);
+      });
+      pusher.connection.bind('disconnected', () => {
+        console.warn('[Echo] Pusher disconnected');
+      });
+      pusher.connection.bind('state_change', (states: { current: string; previous: string }) => {
+        console.log('[Echo] Pusher state:', states.previous, '->', states.current);
+      });
     }
 
     return echoInstance;
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.error('[Echo] 初期化エラー:', error);
-    }
+    console.error('[Echo] 初期化エラー:', error);
     return null;
   }
 };

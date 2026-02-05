@@ -82,9 +82,15 @@ export default function AuctionLive() {
   });
   const [bidLoading, setBidLoading] = useState<Record<number, boolean>>({});
   const [socketConnected, setSocketConnected] = useState(false);
+  const [isPollingPaused, setIsPollingPaused] = useState(false);
 
   // ライブ状態を取得
   const fetchLiveState = useCallback(async () => {
+    // ボタン操作中はポーリングをスキップ
+    if (isPollingPaused || Object.values(bidLoading).some(Boolean)) {
+      return;
+    }
+    
     try {
       const response = await axios.get(`/api/participant/auctions/${auctionId}/live`);
       if (response.data.success) {
@@ -101,13 +107,13 @@ export default function AuctionLive() {
     } finally {
       setLoading(false);
     }
-  }, [auctionId]);
+  }, [auctionId, isPollingPaused, bidLoading]);
 
   useEffect(() => {
     fetchLiveState();
     
-    // 1秒ごとにポーリング（リアルタイム更新）
-    const interval = setInterval(fetchLiveState, 1000);
+    // 3秒ごとにポーリング（WebSocketのバックアップ）
+    const interval = setInterval(fetchLiveState, 3000);
     return () => clearInterval(interval);
   }, [fetchLiveState]);
 
