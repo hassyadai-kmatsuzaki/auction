@@ -113,7 +113,7 @@ export default function AuctionLive() {
 
   // WebSocket連携
   useAuctionSocket({
-    auctionId: Number(id),
+    auctionId: Number(auctionId),
     onPriceUpdated: (event) => {
       setLiveState((prev) => {
         if (!prev) return prev;
