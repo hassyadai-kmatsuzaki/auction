@@ -264,11 +264,6 @@ class BidService
             // 価格更新イベントをブロードキャスト
             $lane = Lane::where('current_item_id', $item->id)->first();
             if ($lane) {
-                // カウントダウンをリセット
-                if ($this->countdownService) {
-                    $this->countdownService->resetCountdown($lane);
-                }
-
                 broadcast(new PriceUpdated(
                     $auction->id,
                     $lane->id,
@@ -454,6 +449,9 @@ class BidService
     {
         // レーン情報を取得
         $lanes = $auction->lanes()->with(['currentItem.media'])->orderBy('lane_number')->get();
+        
+        // カウントダウン設定を取得
+        $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
         $lanesData = [];
         foreach ($lanes as $lane) {
@@ -473,6 +471,10 @@ class BidService
                     $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                     $myBidStatus = $participant ? ($participant->is_active ? 'active' : 'inactive') : null;
                 }
+                
+                // リアルタイムカウントダウン秒数を取得
+                $countdownState = \Illuminate\Support\Facades\Cache::get("countdown:lane:{$lane->id}");
+                $remainingSeconds = $countdownState['remaining_seconds'] ?? $defaultCountdown;
 
                 $laneData['current_item'] = [
                     'id' => $item->id,
@@ -487,7 +489,7 @@ class BidService
                     'thumbnail_path' => $item->thumbnail_path,
                     'media' => $item->media,
                     'active_bidders_count' => $activeBidderCount,
-                    'countdown_seconds' => $auction->countdown_seconds,
+                    'countdown_seconds' => $remainingSeconds,
                     'my_bid_status' => $myBidStatus,
                 ];
             }
@@ -499,7 +501,7 @@ class BidService
             'auction_id' => $auction->id,
             'auction_title' => $auction->title,
             'status' => $auction->status,
-            'countdown_seconds' => $auction->countdown_seconds,
+            'countdown_seconds' => $defaultCountdown,
             'lanes' => $lanesData,
         ];
     }

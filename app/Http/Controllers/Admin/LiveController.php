@@ -249,12 +249,26 @@ class LiveController extends Controller
             // オークションを開始
             $auction->update(['status' => 'live']);
 
-            // 各レーンの最初の商品をライブに
+            // 各レーンの最初の商品をライブに（カウントダウンはまだ開始しない）
+            $lanesToStart = [];
             foreach ($auction->lanes as $lane) {
-                $this->startNextItem($lane);
+                $nextItem = $this->startNextItem($lane, false); // カウントダウン開始は後で
+                if ($nextItem) {
+                    $lanesToStart[] = $lane->id;
+                }
             }
 
             DB::commit();
+
+            // トランザクション完了後にカウントダウンを開始
+            foreach ($lanesToStart as $laneId) {
+                $lane = Lane::with(['auction', 'currentItem'])->find($laneId);
+                if ($lane && $lane->currentItem) {
+                    $this->countdownService->startCountdown($lane);
+                    ProcessCountdownJob::dispatch($laneId);
+                    \Log::info("Dispatched countdown job for lane {$laneId}");
+                }
+            }
 
             // ステータス変更イベントをブロードキャスト
             broadcast(new AuctionStatusChanged($auction->id, 'live', 'オークションが開始されました'));
@@ -392,6 +406,9 @@ class LiveController extends Controller
             ], 400);
         }
 
+        // 現在のカウントダウンを停止
+        $this->countdownService->stopCountdown($laneId);
+
         DB::beginTransaction();
         try {
             $previousItemId = $lane->current_item_id;
@@ -402,10 +419,19 @@ class LiveController extends Controller
                 $result = $this->bidService->finalizeBid($previousItem);
             }
 
-            // 次の商品を開始
-            $nextItem = $this->startNextItem($lane);
+            // 次の商品を開始（カウントダウンは後で）
+            $nextItem = $this->startNextItem($lane, false);
 
             DB::commit();
+
+            // トランザクション完了後にカウントダウンを開始
+            if ($nextItem) {
+                $lane->refresh();
+                $lane->load(['auction', 'currentItem']);
+                $this->countdownService->startCountdown($lane);
+                ProcessCountdownJob::dispatch($laneId);
+                \Log::info("Dispatched countdown job for lane {$laneId} (nextItem)");
+            }
 
             // レーン変更イベントをブロードキャスト
             $currentItemData = null;

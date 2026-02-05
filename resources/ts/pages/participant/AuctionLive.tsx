@@ -395,16 +395,15 @@ export default function AuctionLive() {
                       </Typography>
                     </Box>
 
-                    {/* 入札者数 */}
+                    {/* 入札者数・カウントダウン */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                      <Chip
+                        label={`残り ${lane.current_item.countdown_seconds ?? 3}秒`}
+                        size="small"
+                        color={lane.current_item.countdown_seconds <= 1 ? 'error' : 'warning'}
+                        sx={{ fontWeight: 'bold', minWidth: 80 }}
+                      />
                       <BidderCountDisplay count={lane.current_item.active_bidders_count} />
-                      {lane.current_item.active_bidders_count > 1 && (
-                        <Chip
-                          label={`${lane.current_item.countdown_seconds}秒`}
-                          size="small"
-                          color="warning"
-                        />
-                      )}
                     </Box>
 
                     {/* 個体情報 */}

@@ -23,6 +23,11 @@ class ProcessCountdownJob implements ShouldQueue
     public int $tries = 1;
 
     /**
+     * The number of seconds the job can run before timing out.
+     */
+    public int $timeout = 600;
+
+    /**
      * Create a new job instance.
      */
     public function __construct(int $laneId, int $maxIterations = 300)
@@ -37,14 +42,18 @@ class ProcessCountdownJob implements ShouldQueue
      */
     public function handle(CountdownService $countdownService): void
     {
+        Log::info("Countdown job STARTED for lane {$this->laneId}");
+        
         $iterations = 0;
 
         while ($iterations < $this->maxIterations) {
             $state = $countdownService->getCountdownState($this->laneId);
             
+            Log::info("Countdown state for lane {$this->laneId}: " . json_encode($state));
+            
             // カウントダウンが停止されたら終了
             if (!$state || !$state['is_running']) {
-                Log::info("Countdown job stopped for lane {$this->laneId}");
+                Log::info("Countdown job stopped for lane {$this->laneId} - state not running");
                 break;
             }
 
@@ -52,7 +61,13 @@ class ProcessCountdownJob implements ShouldQueue
             sleep(1);
 
             // カウントダウンをティック
-            $result = $countdownService->tick($this->laneId);
+            try {
+                $result = $countdownService->tick($this->laneId);
+                Log::info("Countdown tick result for lane {$this->laneId}: " . json_encode($result));
+            } catch (\Exception $e) {
+                Log::error("Countdown tick error for lane {$this->laneId}: " . $e->getMessage());
+                break;
+            }
 
             if (!$result) {
                 Log::info("Countdown job ended for lane {$this->laneId} (no result)");
@@ -72,6 +87,6 @@ class ProcessCountdownJob implements ShouldQueue
             $iterations++;
         }
 
-        Log::info("Countdown job completed for lane {$this->laneId}, iterations: {$iterations}");
+        Log::info("Countdown job COMPLETED for lane {$this->laneId}, iterations: {$iterations}");
     }
 }

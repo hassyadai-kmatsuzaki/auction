@@ -35,16 +35,26 @@ class CountdownService
      */
     public function startCountdown(Lane $lane): void
     {
+        Log::info("startCountdown called for lane {$lane->id}");
+        
+        // リレーションをロード
+        $lane->load(['currentItem', 'auction']);
+        
         $item = $lane->currentItem;
         if (!$item) {
+            Log::warning("startCountdown: No current item for lane {$lane->id}");
             return;
         }
 
         $auction = $lane->auction;
+        if (!$auction) {
+            Log::warning("startCountdown: No auction for lane {$lane->id}");
+            return;
+        }
+        
         $countdownSeconds = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
-        // カウントダウン状態をキャッシュに保存
-        Cache::put($this->getCacheKey($lane->id), [
+        $cacheData = [
             'lane_id' => $lane->id,
             'item_id' => $item->id,
             'auction_id' => $auction->id,
@@ -52,9 +62,12 @@ class CountdownService
             'started_at' => now()->timestamp,
             'countdown_seconds' => $countdownSeconds,
             'is_running' => true,
-        ], 3600); // 1時間
+        ];
+        
+        // カウントダウン状態をキャッシュに保存
+        Cache::put($this->getCacheKey($lane->id), $cacheData, 3600); // 1時間
 
-        Log::info("Countdown started for lane {$lane->id}, item {$item->id}, seconds: {$countdownSeconds}");
+        Log::info("Countdown started for lane {$lane->id}, item {$item->id}, seconds: {$countdownSeconds}, cache: " . json_encode($cacheData));
     }
 
     /**
@@ -107,19 +120,10 @@ class CountdownService
         $auction = $lane->auction;
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
-        // 入札者が2人以上の場合、価格を上昇させてカウントダウンをリセット
-        if ($activeBidderCount >= 2) {
-            $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
-            return [
-                'action' => 'price_increment',
-                'lane_id' => $laneId,
-            ];
-        }
-
         // カウントダウンを1秒減らす
         $state['remaining_seconds']--;
         
-        // ブロードキャスト
+        // ブロードキャスト（毎秒）
         broadcast(new CountdownTick(
             $auction->id,
             $lane->id,
@@ -129,9 +133,19 @@ class CountdownService
             $item->current_price
         ));
 
-        // カウントダウン終了
+        // カウントダウン終了時の処理
         if ($state['remaining_seconds'] <= 0) {
-            return $this->handleCountdownEnd($lane, $item, $auction, $activeBidderCount);
+            if ($activeBidderCount >= 2) {
+                // 入札者2人以上 → 価格上昇してカウントダウンリセット
+                $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
+                return [
+                    'action' => 'price_increment',
+                    'lane_id' => $laneId,
+                ];
+            } else {
+                // 入札者0人or1人 → 流札or落札して次へ
+                return $this->handleCountdownEnd($lane, $item, $auction, $activeBidderCount);
+            }
         }
 
         // 状態を更新
@@ -233,8 +247,12 @@ class CountdownService
                 'status' => 'active',
             ]);
 
-            // 新しいカウントダウンを開始
+            // レーンをリフレッシュして新しいカウントダウンを開始
+            $lane->refresh();
+            $lane->load(['auction', 'currentItem']);
             $this->startCountdown($lane);
+            
+            Log::info("moveToNextItem: Started countdown for lane {$lane->id}, next item {$nextItem->id}");
 
             $activeBidderCount = 0; // 新商品なので0
             $currentItemData = [
@@ -254,6 +272,7 @@ class CountdownService
                 'status' => 'finished',
             ]);
             $currentItemData = null;
+            Log::info("moveToNextItem: No more items for lane {$lane->id}");
         }
 
         // レーン変更イベントをブロードキャスト
