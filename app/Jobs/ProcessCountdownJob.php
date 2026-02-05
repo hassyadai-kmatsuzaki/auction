@@ -49,11 +49,8 @@ class ProcessCountdownJob implements ShouldQueue
         while ($iterations < $this->maxIterations) {
             $state = $countdownService->getCountdownState($this->laneId);
             
-            Log::info("Countdown state for lane {$this->laneId}: " . json_encode($state));
-            
             // カウントダウンが停止されたら終了
             if (!$state || !$state['is_running']) {
-                Log::info("Countdown job stopped for lane {$this->laneId} - state not running");
                 break;
             }
 
@@ -63,14 +60,12 @@ class ProcessCountdownJob implements ShouldQueue
             // カウントダウンをティック
             try {
                 $result = $countdownService->tick($this->laneId);
-                Log::info("Countdown tick result for lane {$this->laneId}: " . json_encode($result));
             } catch (\Exception $e) {
                 Log::error("Countdown tick error for lane {$this->laneId}: " . $e->getMessage());
                 break;
             }
 
             if (!$result) {
-                Log::info("Countdown job ended for lane {$this->laneId} (no result)");
                 break;
             }
 
@@ -79,7 +74,6 @@ class ProcessCountdownJob implements ShouldQueue
                 // 次の商品があれば、新しいカウントダウンが自動開始される
                 // ジョブは継続
                 if (!$result['next_item']) {
-                    Log::info("Countdown job ended for lane {$this->laneId} (no next item)");
                     break;
                 }
             }

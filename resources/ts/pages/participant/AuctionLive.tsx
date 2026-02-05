@@ -106,8 +106,8 @@ export default function AuctionLive() {
   useEffect(() => {
     fetchLiveState();
     
-    // WebSocket接続のフォールバックとしてポーリング（10秒ごと）
-    const interval = setInterval(fetchLiveState, 10000);
+    // 1秒ごとにポーリング（リアルタイム更新）
+    const interval = setInterval(fetchLiveState, 1000);
     return () => clearInterval(interval);
   }, [fetchLiveState]);
 

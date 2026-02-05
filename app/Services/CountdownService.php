@@ -9,6 +9,7 @@ use App\Models\BidParticipant;
 use App\Events\CountdownTick;
 use App\Events\LaneItemChanged;
 use App\Events\ItemSold;
+use App\Jobs\ProcessCountdownJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,20 +36,16 @@ class CountdownService
      */
     public function startCountdown(Lane $lane): void
     {
-        Log::info("startCountdown called for lane {$lane->id}");
-        
         // リレーションをロード
         $lane->load(['currentItem', 'auction']);
         
         $item = $lane->currentItem;
         if (!$item) {
-            Log::warning("startCountdown: No current item for lane {$lane->id}");
             return;
         }
 
         $auction = $lane->auction;
         if (!$auction) {
-            Log::warning("startCountdown: No auction for lane {$lane->id}");
             return;
         }
         
@@ -67,7 +64,7 @@ class CountdownService
         // カウントダウン状態をキャッシュに保存
         Cache::put($this->getCacheKey($lane->id), $cacheData, 3600); // 1時間
 
-        Log::info("Countdown started for lane {$lane->id}, item {$item->id}, seconds: {$countdownSeconds}, cache: " . json_encode($cacheData));
+        Log::info("Countdown started: lane {$lane->id}, item {$item->id}");
     }
 
     /**
@@ -76,7 +73,6 @@ class CountdownService
     public function stopCountdown(int $laneId): void
     {
         Cache::forget($this->getCacheKey($laneId));
-        Log::info("Countdown stopped for lane {$laneId}");
     }
 
     /**
@@ -96,7 +92,6 @@ class CountdownService
         $state['started_at'] = now()->timestamp;
 
         Cache::put($this->getCacheKey($lane->id), $state, 3600);
-        Log::info("Countdown reset for lane {$lane->id}");
     }
 
     /**
@@ -168,8 +163,6 @@ class CountdownService
         if ($result['success']) {
             // カウントダウンをリセット
             $this->resetCountdown($lane);
-            
-            Log::info("Price incremented for item {$item->id}, new price: {$result['data']['new_price']}");
         }
     }
 
@@ -185,23 +178,11 @@ class CountdownService
             if ($activeBidderCount === 0) {
                 // 入札者0人 → 流札
                 $item->update(['status' => 'unsold']);
-                Log::info("Item {$item->id} unsold (no bidders)");
+                Log::info("Item {$item->id} unsold");
             } elseif ($activeBidderCount === 1) {
-                // 入札者1人 → 落札
-                $winner = BidParticipant::forItem($item->id)->active()->first();
-                if ($winner) {
-                    $this->bidService->finalizeBid($item);
-                    Log::info("Item {$item->id} sold to user {$winner->user_id}");
-                    
-                    // 落札イベントをブロードキャスト
-                    broadcast(new ItemSold(
-                        $auction->id,
-                        $lane->id,
-                        $item->id,
-                        $winner->user_id,
-                        $item->current_price
-                    ));
-                }
+                // 入札者1人 → 落札（finalizeBid内でItemSoldがブロードキャストされる）
+                $this->bidService->finalizeBid($item);
+                Log::info("Item {$item->id} sold");
             }
 
             // 次の商品へ
@@ -251,8 +232,6 @@ class CountdownService
             $lane->refresh();
             $lane->load(['auction', 'currentItem']);
             $this->startCountdown($lane);
-            
-            Log::info("moveToNextItem: Started countdown for lane {$lane->id}, next item {$nextItem->id}");
 
             $activeBidderCount = 0; // 新商品なので0
             $currentItemData = [
@@ -272,7 +251,7 @@ class CountdownService
                 'status' => 'finished',
             ]);
             $currentItemData = null;
-            Log::info("moveToNextItem: No more items for lane {$lane->id}");
+            Log::info("Lane {$lane->id} finished - no more items");
         }
 
         // レーン変更イベントをブロードキャスト
