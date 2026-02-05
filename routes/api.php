@@ -25,6 +25,7 @@ use App\Http\Controllers\Participant\BidController as ParticipantBidController;
 use App\Http\Controllers\Participant\WonItemController as ParticipantWonItemController;
 use App\Http\Controllers\Participant\SettingsController as ParticipantSettingsController;
 use App\Http\Controllers\NotificationTestController;
+use App\Http\Controllers\ManualController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +52,10 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [LoginController::class, 'logout']);
     Route::get('/auth/me', [LoginController::class, 'me']);
+    
+    // マニュアルAPI（全ロール共通）
+    Route::get('/manuals', [ManualController::class, 'index']);
+    Route::get('/manuals/{id}', [ManualController::class, 'show']);
 });
 
 // 管理者API

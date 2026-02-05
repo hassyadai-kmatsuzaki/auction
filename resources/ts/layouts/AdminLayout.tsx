@@ -34,6 +34,7 @@ import {
   Person as PersonIcon,
   Receipt as ReceiptIcon,
   Psychology as AIIcon,
+  MenuBook as MenuBookIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -93,6 +94,7 @@ export default function AdminLayout() {
   ];
 
   const bottomMenuItems = [
+    { text: 'マニュアル', icon: <MenuBookIcon />, path: '/admin/manual' },
     { text: '設定', icon: <SettingsIcon />, path: '/admin/settings' },
     { text: '帳票管理（準備中）', icon: <ReceiptIcon />, path: '/admin/documents', disabled: true },
     { text: 'AI分析（準備中）', icon: <AIIcon />, path: '/admin/ai-analytics', disabled: true },
@@ -381,7 +383,7 @@ export default function AdminLayout() {
             </Typography>
           </Box>
           <Tooltip title="ログアウト">
-            <IconButton size="small" onClick={handleLogout}>
+            <IconButton data-testid="logout-button" size="small" onClick={handleLogout}>
               <LogoutIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>

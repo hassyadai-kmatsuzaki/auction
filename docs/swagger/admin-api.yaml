@@ -23,6 +23,8 @@ tags:
     description: オークション管理
   - name: Items
     description: 出品生体管理
+  - name: Lanes
+    description: レーン管理
   - name: Announcements
     description: お知らせ管理
   - name: Live
@@ -313,6 +315,60 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ==================== Auctions ====================
+  /admin/live-auctions:
+    get:
+      tags:
+        - Live
+      summary: ライブ管理用オークション一覧取得
+      description: ライブ管理画面で選択可能なオークション一覧を取得
+      operationId: getLiveAuctions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuctionSummary'
+
+  /admin/won-items-auctions:
+    get:
+      tags:
+        - WonItems
+      summary: 落札管理用オークション一覧取得
+      description: 落札管理画面で選択可能なオークション一覧を取得
+      operationId: getWonItemsAuctions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auctions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuctionSummary'
+
   /admin/auctions:
     get:
       tags:
@@ -971,6 +1027,201 @@ paths:
           description: 切り替え成功
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ==================== Lanes ====================
+  /admin/auctions/{auctionId}/lanes:
+    get:
+      tags:
+        - Lanes
+      summary: レーン一覧取得
+      description: 指定オークションのレーン一覧と割り当てられた商品を取得
+      operationId: getLanes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      lanes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            display_order:
+                              type: integer
+                            items:
+                              type: array
+                              items:
+                                $ref: '#/components/schemas/ItemSummary'
+                      unassigned_items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ItemSummary'
+
+  /admin/auctions/{auctionId}/lanes/{laneId}/items:
+    post:
+      tags:
+        - Lanes
+      summary: レーンに商品を割り当て
+      description: 指定レーンに商品を追加
+      operationId: assignItemToLane
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: laneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - item_id
+              properties:
+                item_id:
+                  type: integer
+                display_order:
+                  type: integer
+      responses:
+        '200':
+          description: 割り当て成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/auctions/{auctionId}/lanes/{laneId}/items/{itemId}:
+    delete:
+      tags:
+        - Lanes
+      summary: レーンから商品を削除
+      description: 指定レーンから商品を削除（商品自体は削除されない）
+      operationId: removeItemFromLane
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: laneId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 削除成功
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/auctions/{auctionId}/lanes/{laneId}/items/reorder:
+    put:
+      tags:
+        - Lanes
+      summary: レーン内商品の順序変更
+      description: レーン内の商品の表示順序を変更
+      operationId: reorderLaneItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: laneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - item_orders
+              properties:
+                item_orders:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      item_id:
+                        type: integer
+                      display_order:
+                        type: integer
+      responses:
+        '200':
+          description: 順序変更成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/auctions/{auctionId}/lanes/auto-assign:
+    post:
+      tags:
+        - Lanes
+      summary: 商品の自動レーン割り当て
+      description: 未割り当ての商品を各レーンに均等に自動割り当て
+      operationId: autoAssignLanes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: auctionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 自動割り当て成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      assigned_count:
+                        type: integer
+                        description: 割り当てられた商品数
 
   # ==================== Live ====================
   /admin/auctions/{auctionId}/live:

@@ -1,0 +1,14 @@
+{
+  "admin": {
+    "email": "admin@example.com",
+    "password": "password"
+  },
+  "seller": {
+    "email": "seller@example.com",
+    "password": "password"
+  },
+  "participant": {
+    "email": "participant@example.com",
+    "password": "password"
+  }
+}

@@ -20,6 +20,7 @@ import AuctionItems from './pages/participant/AuctionItems';
 import AuctionLive from './pages/participant/AuctionLive';
 import WonItems from './pages/participant/WonItems';
 import ParticipantSettings from './pages/participant/Settings';
+import ParticipantManual from './pages/participant/Manual';
 
 // Admin pages
 import AdminLayout from './layouts/AdminLayout';
@@ -44,6 +45,7 @@ import SellerDetail from './pages/admin/SellerDetail';
 import BuyerManagement from './pages/admin/BuyerManagement';
 import BuyerDetail from './pages/admin/BuyerDetail';
 import DocumentManagement from './pages/admin/DocumentManagement';
+import AdminManual from './pages/admin/Manual';
 
 // AI pages
 import AIAnalytics from './pages/admin/AIAnalytics';
@@ -64,11 +66,15 @@ import SellerShipping from './pages/seller/Shipping';
 import ItemHistory from './pages/seller/ItemHistory';
 import SellerItemDetail from './pages/seller/ItemDetail';
 import SalesSettlement from './pages/seller/SalesSettlement';
+import SellerManual from './pages/seller/Manual';
 
 // Legal pages
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import SpecifiedCommercialTransaction from './pages/legal/SpecifiedCommercialTransaction';
 import TermsOfService from './pages/legal/TermsOfService';
+
+// Error pages
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -100,6 +106,8 @@ function App() {
             <Route path="auction/:auctionId/items" element={<AuctionItems />} />
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
             <Route path="won-items" element={<WonItems />} />
+            <Route path="won-items/:id" element={<NotFound />} /> {/* 落札詳細は未実装のため404 */}
+            <Route path="manual" element={<ParticipantManual />} />
             <Route path="settings" element={<ParticipantSettings />} />
           </Route>
 
@@ -120,6 +128,7 @@ function App() {
             <Route path="profile" element={<SellerProfile />} />
             <Route path="bank" element={<SellerProfile />} /> {/* 口座情報（プロフィールで代用） */}
             <Route path="settings" element={<SellerProfile />} /> {/* 設定（プロフィールで代用） */}
+            <Route path="manual" element={<SellerManual />} />
           </Route>
 
           {/* 管理者ページ */}
@@ -171,6 +180,9 @@ function App() {
             {/* 帳票管理 */}
             <Route path="documents" element={<DocumentManagement />} />
             
+            {/* マニュアル */}
+            <Route path="manual" element={<AdminManual />} />
+            
             {/* AI・分析 */}
             <Route path="ai-analytics" element={<AIAnalytics />} />
             <Route path="ai/image-recognition" element={<AIImageRecognition />} />
@@ -193,6 +205,9 @@ function App() {
 
           {/* デフォルトリダイレクト（認証必須） */}
           <Route path="/" element={<RootRedirect />} />
+          
+          {/* 404 Not Found */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Box>
     </Router>

@@ -33,7 +33,13 @@ class DemoDataSeeder extends Seeder
         $this->command->info("設定: 出品者{$this->sellerCount}名, 買受者{$this->participantCount}名, オークション{$this->auctionCount}件, アイテム約" . ($this->auctionCount * $this->itemsPerAuction) . "件");
 
         // 既存データをクリア（外部キー制約を一時的に無効化）
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        $driver = DB::getDriverName();
+        
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        } elseif ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF');
+        }
         
         WonItem::truncate();
         DB::table('lane_items')->truncate();
@@ -45,7 +51,11 @@ class DemoDataSeeder extends Seeder
         DB::table('user_roles')->truncate();
         User::where('email', '!=', 'admin@example.com')->delete();
         
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        } elseif ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = ON');
+        }
 
         // ロールの確認
         $this->ensureRolesExist();
@@ -190,6 +200,8 @@ class DemoDataSeeder extends Seeder
                 'email' => "seller{$i}@example.com",
                 'password' => $hashedPassword,
                 'email_verified_at' => now(),
+                'status' => 'approved',
+                'is_active' => true,
             ]);
 
             if ($sellerRole) {
@@ -248,6 +260,8 @@ class DemoDataSeeder extends Seeder
                 'email' => "participant{$i}@example.com",
                 'password' => $hashedPassword,
                 'email_verified_at' => now(),
+                'status' => 'approved',
+                'is_active' => true,
             ]);
 
             if ($participantRole) {

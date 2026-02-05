@@ -127,8 +127,17 @@ export default function Login() {
             </Button>
           </Box>
 
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Link
+              data-testid="link-register"
+              onClick={() => navigate('/register')}
+              variant="body2"
+              sx={{ cursor: 'pointer' }}
+            >
+              新規登録
+            </Link>
+            <Link
+              data-testid="link-forgot-password"
               onClick={() => navigate('/auth/forgot-password')}
               variant="body2"
               sx={{ cursor: 'pointer' }}

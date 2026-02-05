@@ -24,6 +24,7 @@ import {
   Logout as LogoutIcon,
   List as ListIcon,
   Settings as SettingsIcon,
+  MenuBook as MenuBookIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -38,6 +39,7 @@ export default function ParticipantLayout() {
     { text: 'ホーム', icon: <HomeIcon />, path: '/participant/home' },
     { text: 'オークション', icon: <GavelIcon />, path: '/participant/auctions' },
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
+    { text: 'マニュアル', icon: <MenuBookIcon />, path: '/participant/manual' },
     { text: '設定', icon: <SettingsIcon />, path: '/participant/settings' },
   ];
 

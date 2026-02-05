@@ -25,6 +25,8 @@ tags:
     description: 入札関連
   - name: WonItems
     description: 落札商品関連
+  - name: Settings
+    description: 設定
   - name: Announcements
     description: お知らせ
 
@@ -886,3 +888,133 @@ components:
               type: array
               items:
                 type: string
+
+  # ==================== Settings ====================
+  /participant/settings:
+    get:
+      tags:
+        - Settings
+      summary: 設定情報取得
+      description: 参加者の設定情報（プロフィール、通知設定）を取得
+      operationId: getSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      profile:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          email:
+                            type: string
+                          phone:
+                            type: string
+                          postal_code:
+                            type: string
+                          address:
+                            type: string
+                      notifications:
+                        type: object
+                        properties:
+                          email_notifications:
+                            type: boolean
+                          auction_start:
+                            type: boolean
+                          bid_updates:
+                            type: boolean
+                          won_item_updates:
+                            type: boolean
+
+  /participant/settings/profile:
+    put:
+      tags:
+        - Settings
+      summary: プロフィール更新
+      description: 参加者のプロフィール情報を更新
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                postal_code:
+                  type: string
+                address:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /participant/settings/notifications:
+    put:
+      tags:
+        - Settings
+      summary: 通知設定更新
+      description: 参加者の通知設定を更新
+      operationId: updateNotifications
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email_notifications:
+                  type: boolean
+                auction_start:
+                  type: boolean
+                bid_updates:
+                  type: boolean
+                won_item_updates:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新成功
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /participant/settings/notifications/test:
+    post:
+      tags:
+        - Settings
+      summary: テスト通知送信
+      description: 通知設定のテスト用にサンプル通知を送信
+      operationId: sendTestNotification
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: テスト通知送信成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
