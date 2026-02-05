@@ -78,6 +78,28 @@ export function useAuctionSocket({
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<ReturnType<typeof getEcho> extends { channel: (name: string) => infer R } ? R : never | null>(null);
 
+  // コールバックをrefで保持（再購読を防ぐ）
+  const callbacksRef = useRef({
+    onPriceUpdated,
+    onBidderUpdated,
+    onLaneChanged,
+    onItemSold,
+    onAuctionStatus,
+    onCountdownTick,
+    onConnectionError,
+  });
+  
+  // コールバックを最新に更新
+  callbacksRef.current = {
+    onPriceUpdated,
+    onBidderUpdated,
+    onLaneChanged,
+    onItemSold,
+    onAuctionStatus,
+    onCountdownTick,
+    onConnectionError,
+  };
+
   // WebSocket が有効かどうか
   const isEnabled = isEchoEnabled();
 
@@ -104,43 +126,41 @@ export function useAuctionSocket({
       // 価格更新イベント
       channel.listen('.price.updated', (event: PriceUpdatedEvent) => {
         console.log('[Socket] price.updated:', event);
-        if (onPriceUpdated) onPriceUpdated(event);
+        callbacksRef.current.onPriceUpdated?.(event);
       });
 
       // 入札者更新イベント
       channel.listen('.bidder.updated', (event: BidderUpdatedEvent) => {
         console.log('[Socket] bidder.updated:', event);
-        if (onBidderUpdated) onBidderUpdated(event);
+        callbacksRef.current.onBidderUpdated?.(event);
       });
 
       // レーン変更イベント
       channel.listen('.lane.changed', (event: LaneChangedEvent) => {
         console.log('[Socket] lane.changed:', event);
-        if (onLaneChanged) onLaneChanged(event);
+        callbacksRef.current.onLaneChanged?.(event);
       });
 
       // 落札イベント
       channel.listen('.item.sold', (event: ItemSoldEvent) => {
         console.log('[Socket] item.sold:', event);
-        if (onItemSold) onItemSold(event);
+        callbacksRef.current.onItemSold?.(event);
       });
 
       // オークションステータス変更イベント
       channel.listen('.auction.status', (event: AuctionStatusEvent) => {
         console.log('[Socket] auction.status:', event);
-        if (onAuctionStatus) onAuctionStatus(event);
+        callbacksRef.current.onAuctionStatus?.(event);
       });
 
       // カウントダウンティックイベント
       channel.listen('.countdown.tick', (event: CountdownTickEvent) => {
         console.log('[Socket] countdown.tick:', event);
-        if (onCountdownTick) onCountdownTick(event);
+        callbacksRef.current.onCountdownTick?.(event);
       });
     } catch (error) {
       setIsConnected(false);
-      if (onConnectionError) {
-        onConnectionError(error);
-      }
+      callbacksRef.current.onConnectionError?.(error);
     }
 
     // クリーンアップ
@@ -152,7 +172,8 @@ export function useAuctionSocket({
       channelRef.current = null;
       setIsConnected(false);
     };
-  }, [auctionId, isEnabled, onPriceUpdated, onBidderUpdated, onLaneChanged, onItemSold, onAuctionStatus, onCountdownTick, onConnectionError]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auctionId, isEnabled]); // コールバックの変更で再購読しない
 
   return {
     isConnected,

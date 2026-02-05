@@ -10,6 +10,7 @@ use App\Models\BidParticipant;
 use App\Services\BidService;
 use App\Services\CountdownService;
 use App\Jobs\ProcessCountdownJob;
+use App\Jobs\ProcessAuctionCountdownJob;
 use App\Events\LaneItemChanged;
 use App\Events\AuctionStatusChanged;
 use Illuminate\Http\Request;
@@ -265,10 +266,12 @@ class LiveController extends Controller
                 $lane = Lane::with(['auction', 'currentItem'])->find($laneId);
                 if ($lane && $lane->currentItem) {
                     $this->countdownService->startCountdown($lane);
-                    ProcessCountdownJob::dispatch($laneId);
-                    \Log::info("Dispatched countdown job for lane {$laneId}");
                 }
             }
+
+            // オークション全体のカウントダウンジョブをディスパッチ（1つで全レーン処理）
+            ProcessAuctionCountdownJob::dispatch($auction->id);
+            \Log::info("Dispatched auction countdown job for auction {$auction->id}");
 
             // ステータス変更イベントをブロードキャスト
             broadcast(new AuctionStatusChanged($auction->id, 'live', 'オークションが開始されました'));
@@ -425,12 +428,11 @@ class LiveController extends Controller
             DB::commit();
 
             // トランザクション完了後にカウントダウンを開始
+            // オークション全体のジョブが既に動いているので、カウントダウン状態の開始のみ
             if ($nextItem) {
                 $lane->refresh();
                 $lane->load(['auction', 'currentItem']);
                 $this->countdownService->startCountdown($lane);
-                ProcessCountdownJob::dispatch($laneId);
-                \Log::info("Dispatched countdown job for lane {$laneId} (nextItem)");
             }
 
             // レーン変更イベントをブロードキャスト
@@ -634,10 +636,9 @@ class LiveController extends Controller
                 'status' => 'active',
             ]);
 
-            // カウントダウンを開始
+            // カウントダウンを開始（オークション全体のジョブが処理するので、状態開始のみ）
             if ($startCountdown) {
                 $this->countdownService->startCountdown($lane);
-                ProcessCountdownJob::dispatch($lane->id);
             }
 
             return $nextItem;

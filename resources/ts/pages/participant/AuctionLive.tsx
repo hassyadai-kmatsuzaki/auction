@@ -112,12 +112,13 @@ export default function AuctionLive() {
   useEffect(() => {
     fetchLiveState();
     
-    // 3秒ごとにポーリング（WebSocketのバックアップ）
-    const interval = setInterval(fetchLiveState, 3000);
-    return () => clearInterval(interval);
-  }, [fetchLiveState]);
+    // ポーリングは無効化（WebSocketのみで動作）
+    // 必要な場合は以下のコメントを外す
+    // const interval = setInterval(fetchLiveState, 30000);
+    // return () => clearInterval(interval);
+  }, [auctionId]);
 
-  // WebSocket連携
+  // WebSocket連携（lane_idでマッチング - 複数レーン対応）
   useAuctionSocket({
     auctionId: Number(auctionId),
     onPriceUpdated: (event) => {
@@ -126,7 +127,7 @@ export default function AuctionLive() {
         return {
           ...prev,
           lanes: prev.lanes.map((lane) =>
-            lane.current_item?.id === event.item_id
+            lane.lane_id === event.lane_id && lane.current_item
               ? {
                   ...lane,
                   current_item: {
@@ -148,7 +149,7 @@ export default function AuctionLive() {
         return {
           ...prev,
           lanes: prev.lanes.map((lane) =>
-            lane.current_item?.id === event.item_id
+            lane.lane_id === event.lane_id && lane.current_item
               ? {
                   ...lane,
                   current_item: {
@@ -162,8 +163,37 @@ export default function AuctionLive() {
       });
       setSocketConnected(true);
     },
-    onLaneChanged: () => {
-      fetchLiveState();
+    onLaneChanged: (event) => {
+      // レーン変更時は該当レーンのみ更新
+      setLiveState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lanes: prev.lanes.map((lane) =>
+            lane.lane_id === event.lane_id
+              ? {
+                  ...lane,
+                  current_item: event.current_item ? {
+                    id: event.current_item.id,
+                    item_number: event.current_item.item_number,
+                    species_name: event.current_item.species_name,
+                    quantity: event.current_item.quantity,
+                    current_price: event.current_item.current_price,
+                    is_premium: event.current_item.is_premium,
+                    thumbnail_path: event.current_item.thumbnail_path,
+                    active_bidders_count: event.current_item.active_bidders_count || 0,
+                    countdown_seconds: prev.countdown_seconds,
+                    my_bid_status: null, // 新商品なので入札していない
+                    estimated_price: event.current_item.estimated_price,
+                    inspection_info: event.current_item.inspection_info,
+                    individual_info: event.current_item.individual_info,
+                    media: event.current_item.media,
+                  } : null,
+                }
+              : lane
+          ),
+        };
+      });
       setSocketConnected(true);
     },
     onItemSold: (event) => {
@@ -172,7 +202,6 @@ export default function AuctionLive() {
         message: `商品が落札されました！`,
         severity: 'success',
       });
-      fetchLiveState();
       setSocketConnected(true);
     },
     onAuctionStatus: (event) => {
@@ -190,7 +219,7 @@ export default function AuctionLive() {
         return {
           ...prev,
           lanes: prev.lanes.map((lane) =>
-            lane.current_item?.id === event.item_id
+            lane.lane_id === event.lane_id && lane.current_item
               ? {
                   ...lane,
                   current_item: {

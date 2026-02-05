@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Auction;
 use App\Models\Lane;
 use App\Services\CountdownService;
-use App\Jobs\ProcessCountdownJob;
+use App\Jobs\ProcessAuctionCountdownJob;
 use Illuminate\Console\Command;
 
 class StartCountdownCommand extends Command
@@ -45,13 +45,16 @@ class StartCountdownCommand extends Command
                     
                     // 新しいカウントダウンを開始
                     $countdownService->startCountdown($lane);
-                    ProcessCountdownJob::dispatch($lane->id);
                     
                     $this->info("  Started countdown for Lane {$lane->lane_number} (ID: {$lane->id}), Item: {$lane->currentItem->species_name}");
                 } else {
                     $this->warn("  Lane {$lane->lane_number} (ID: {$lane->id}) has no live item");
                 }
             }
+
+            // オークション全体のカウントダウンジョブをディスパッチ
+            ProcessAuctionCountdownJob::dispatch($auction->id);
+            $this->info("  Dispatched auction countdown job for auction {$auction->id}");
         }
 
         $this->info('Done!');
