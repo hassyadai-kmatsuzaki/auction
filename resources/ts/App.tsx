@@ -156,7 +156,7 @@ function App() {
             <Route path="auctions/:auctionId/items/create" element={<ItemForm />} />
             <Route path="auctions/:auctionId/items/:id/edit" element={<ItemForm />} />
             
-            {/* レーン割り当て */}
+            {/* レーン割当 */}
             <Route path="auctions/:auctionId/lanes" element={<LaneAssignment />} />
             
             {/* ライブ管理 */}

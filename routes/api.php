@@ -95,6 +95,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     // 生体個別操作
     Route::get('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'show']);
     Route::put('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'update']);
+    Route::patch('auctions/{auctionId}/items/{id}/status', [AdminItemController::class, 'updateStatus']);
     Route::delete('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'destroy']);
     
     // 生体メディア管理

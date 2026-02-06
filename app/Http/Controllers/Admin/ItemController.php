@@ -614,6 +614,47 @@ class ItemController extends Controller
     }
 
     /**
+     * 個別ステータス更新
+     *
+     * @param Request $request
+     * @param int $auctionId
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateStatus(Request $request, $auctionId, $id)
+    {
+        $item = Item::where('auction_id', $auctionId)
+            ->where('id', $id)
+            ->firstOrFail();
+
+        if (in_array($item->status, ['live', 'sold'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'オークション中または落札済みの生体のステータスは変更できません。',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:draft,registered,cancelled',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $item->update(['status' => $request->input('status')]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ステータスを更新しました。',
+            'data' => ['item' => $item],
+        ]);
+    }
+
+    /**
      * 一括ステータス更新
      *
      * @param Request $request

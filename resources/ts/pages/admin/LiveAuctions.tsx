@@ -239,11 +239,11 @@ export default function LiveAuctions() {
                       </Grid>
                     </Grid>
 
-                    {/* レーン割り当て状況 */}
+                    {/* レーン割当状況 */}
                     <Box sx={{ mb: 2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                         <Typography variant="body2" fontWeight={600}>
-                          レーン割り当て
+                          レーン割当
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {auction.statistics.assigned_items}/{auction.statistics.total_items}

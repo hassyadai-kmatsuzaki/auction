@@ -241,7 +241,7 @@ export default function ItemManagement() {
     
     try {
       setStatusChanging(true);
-      await axios.patch(`/api/admin/auctions/${auctionId}/items/${statusChangeTarget.id}`, {
+      await axios.patch(`/api/admin/auctions/${auctionId}/items/${statusChangeTarget.id}/status`, {
         status: newStatus,
       });
       setSnackbar({ open: true, message: `ステータスを「${getStatusLabel(newStatus)}」に変更しました。`, severity: 'success' });
@@ -403,7 +403,7 @@ export default function ItemManagement() {
             startIcon={<ViewKanbanIcon />}
             onClick={() => navigate(`/admin/auctions/${auctionId}/lanes`)}
           >
-            レーン割り当て
+            レーン割当
           </Button>
           <Button
             variant="contained"

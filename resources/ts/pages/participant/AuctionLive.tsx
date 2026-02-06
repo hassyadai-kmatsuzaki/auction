@@ -285,7 +285,7 @@ export default function AuctionLive() {
     return (
       <Chip
         icon={<PeopleIcon />}
-        label={`${count}人入札中`}
+        label="入札中"
         size="small"
         color="error"
       />
@@ -440,13 +440,6 @@ export default function AuctionLive() {
                       />
                       <BidderCountDisplay count={lane.current_item.active_bidders_count} />
                     </Box>
-
-                    {/* 個体情報 */}
-                    {lane.current_item.inspection_info && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        {lane.current_item.inspection_info}
-                      </Typography>
-                    )}
                   </CardContent>
 
                   <CardActions>

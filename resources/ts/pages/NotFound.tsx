@@ -1,9 +1,7 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, Container, Typography } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import HomeIcon from '@mui/icons-material/Home';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -59,19 +57,10 @@ export default function NotFound() {
         >
           お探しのページは存在しないか、削除された可能性があります。
           <br />
-          URLをご確認いただくか、以下のボタンから他のページへ移動してください。
+          URLをご確認いただくか、<br />以下のボタンからホームへ移動してください。
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(-1)}
-            size="large"
-          >
-            前のページに戻る
-          </Button>
-          
           <Button
             variant="outlined"
             startIcon={<HomeIcon />}

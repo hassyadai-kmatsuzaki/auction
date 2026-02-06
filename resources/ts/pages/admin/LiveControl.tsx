@@ -532,7 +532,7 @@ export default function LiveControl() {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Chip
                         icon={<PeopleIcon sx={{ fontSize: 14 }} />}
-                            label={`${lane.current_item.active_bidders_count}人入札中`}
+                            label="入札中"
                             color={lane.current_item.active_bidders_count > 0 ? 'primary' : 'default'}
                         size="small"
                         sx={{ fontSize: '0.7rem' }}

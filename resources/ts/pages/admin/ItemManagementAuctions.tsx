@@ -153,7 +153,7 @@ export default function ItemManagementAuctions() {
           生体管理
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          オークションを選択して生体の登録・レーン割り当てを行います
+          オークションを選択して生体の登録・レーン割当を行います
         </Typography>
       </Box>
 
@@ -185,16 +185,16 @@ export default function ItemManagementAuctions() {
                 <Card sx={{ height: '100%' }}>
                   <CardContent sx={{ p: 3 }}>
                     {/* ヘッダー */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          {auction.title}
-                        </Typography>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {auction.title}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                           {new Date(auction.event_date).toLocaleDateString('ja-JP')} {auction.start_time}
                         </Typography>
+                        {getStatusChip(auction.status)}
                       </Box>
-                      {getStatusChip(auction.status)}
                     </Box>
 
                     {/* 統計 */}
@@ -254,7 +254,7 @@ export default function ItemManagementAuctions() {
                         </Typography>
                       </Box>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        レーン割り当て済み
+                        レーン割当済み
                       </Typography>
                     </Box>
 
@@ -274,7 +274,7 @@ export default function ItemManagementAuctions() {
                         onClick={() => navigate(`/admin/auctions/${auction.id}/lanes`)}
                         sx={{ flex: 1 }}
                       >
-                        レーン割り当て
+                        レーン割当
                       </Button>
                     </Box>
                   </CardContent>

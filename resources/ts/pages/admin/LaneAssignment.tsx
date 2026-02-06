@@ -229,7 +229,7 @@ export default function LaneAssignment() {
           </Button>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              レーン割り当て
+              レーン割当
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {auction?.title}
