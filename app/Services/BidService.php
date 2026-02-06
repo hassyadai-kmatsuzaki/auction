@@ -16,6 +16,7 @@ use App\Events\ItemSold;
 use App\Events\AuctionStatusChanged;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BidService
 {
@@ -397,6 +398,17 @@ class BidService
                     $item->item_number ?? 0,
                     $item->quantity ?? 1
                 ));
+            }
+
+            // 落札通知を送信（非同期・失敗してもオークション処理に影響しない）
+            try {
+                $notificationService = app(NotificationService::class);
+                // 落札者（買受者）への通知
+                $notificationService->sendWonItemNotification($wonItem);
+                // 出品者への通知
+                $notificationService->sendItemSoldNotification($wonItem);
+            } catch (\Exception $e) {
+                Log::warning('落札通知送信でエラー（オークション処理には影響なし）', ['error' => $e->getMessage()]);
             }
 
             return [

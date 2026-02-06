@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Auction;
 use App\Models\Lane;
 use App\Services\CountdownService;
+use App\Services\NotificationService;
 use App\Events\AuctionStatusChanged;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -95,6 +96,18 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 'live',
                 'オークションが開始されました'
             ));
+
+            // オークション開始通知を送信
+            try {
+                $auctionForNotification = Auction::find($this->auctionId);
+                if ($auctionForNotification) {
+                    $notificationService = app(NotificationService::class);
+                    $sentCount = $notificationService->sendAuctionStartNotification($auctionForNotification);
+                    Log::info("オークション開始通知送信: {$sentCount}件", ['auction_id' => $this->auctionId]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('オークション開始通知でエラー', ['error' => $e->getMessage()]);
+            }
 
             Log::info("Pre-start countdown completed for auction {$this->auctionId}, lanes started");
         }

@@ -334,6 +334,35 @@ class LaneController extends Controller
     }
 
     /**
+     * 全レーンの割り当てを一括解除
+     */
+    public function bulkUnassign($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        // オークションが準備中または予定でないと操作不可
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'オークションが開始済みのため、割り当て解除できません。',
+            ], 400);
+        }
+
+        $laneIds = $auction->lanes()->pluck('id');
+        $deletedCount = DB::table('lane_items')
+            ->whereIn('lane_id', $laneIds)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => $deletedCount . '件のレーン割り当てを解除しました。',
+            'data' => [
+                'unassigned_count' => $deletedCount,
+            ],
+        ]);
+    }
+
+    /**
      * レーンを作成（なければ）
      */
     private function createLanesIfNeeded(Auction $auction): void

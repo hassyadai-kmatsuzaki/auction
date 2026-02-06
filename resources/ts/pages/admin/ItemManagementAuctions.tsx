@@ -305,11 +305,17 @@ export default function ItemManagementAuctions() {
                 value={newLaneCount}
                 onChange={(e) => setNewLaneCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
                 inputProps={{ min: 1, max: 10 }}
-                helperText="1〜10の範囲で指定してください"
+                helperText={`1〜10の範囲で指定してください（現在: ${selectedAuction.lane_count}レーン）`}
               />
               {selectedAuction.statistics.assigned_items > 0 && newLaneCount < selectedAuction.lane_count && (
                 <Alert severity="warning" sx={{ mt: 2 }}>
-                  レーン数を減らすと、割り当て済みのアイテムが未割り当てになる場合があります。
+                  レーン{newLaneCount + 1}以降に割り当てられている生体は自動的に未割当に戻ります。
+                  事前にレーン割当画面で確認するか、一括解除してからレーン数を変更してください。
+                </Alert>
+              )}
+              {selectedAuction.statistics.assigned_items > 0 && (
+                <Alert severity="info" sx={{ mt: 2 }} icon={false}>
+                  💡 すべての割り当てを解除したい場合は、レーン割当画面の「一括解除」ボタンをご利用ください。
                 </Alert>
               )}
             </Box>

@@ -111,6 +111,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::delete('auctions/{auctionId}/lanes/{laneId}/items/{itemId}', [AdminLaneController::class, 'removeItem']);
     Route::put('auctions/{auctionId}/lanes/{laneId}/items/reorder', [AdminLaneController::class, 'reorderItems']);
     Route::post('auctions/{auctionId}/lanes/auto-assign', [AdminLaneController::class, 'autoAssign']);
+    Route::post('auctions/{auctionId}/lanes/bulk-unassign', [AdminLaneController::class, 'bulkUnassign']);
     
     // ダッシュボード
     Route::get('dashboard', [AdminDashboardController::class, 'index']);

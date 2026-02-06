@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
@@ -338,6 +340,17 @@ class AuctionController extends Controller
                 $auction->status = 'scheduled';
                 $auction->save();
                 $message = 'ステータスを「予定（出品受付中）」に変更しました。';
+
+                // 新規オークション通知（scheduled になった時のみ送信）
+                if ($oldStatus !== 'scheduled') {
+                    try {
+                        $notificationService = app(NotificationService::class);
+                        $sentCount = $notificationService->sendNewAuctionNotification($auction);
+                        Log::info("新規オークション通知送信: {$sentCount}件", ['auction_id' => $auction->id]);
+                    } catch (\Exception $e) {
+                        Log::warning('新規オークション通知でエラー', ['error' => $e->getMessage()]);
+                    }
+                }
                 break;
 
             case 'live':
@@ -430,8 +443,35 @@ class AuctionController extends Controller
             ], 400);
         }
 
+        // ライブ中の場合も変更不可
+        if ($auction->status === 'live') {
+            return response()->json([
+                'success' => false,
+                'message' => '開催中のオークションのレーン数は変更できません。',
+            ], 400);
+        }
+
         $oldLaneCount = $auction->lane_count;
         $newLaneCount = $request->lane_count;
+
+        // レーン数を減らす場合: 削除対象レーンのアイテムを解除してからレーンを削除
+        if ($newLaneCount < $oldLaneCount) {
+            $lanesToRemove = $auction->lanes()
+                ->where('lane_number', '>', $newLaneCount)
+                ->pluck('id');
+
+            if ($lanesToRemove->isNotEmpty()) {
+                // 削除対象レーンに割り当てられたアイテムを解除
+                \Illuminate\Support\Facades\DB::table('lane_items')
+                    ->whereIn('lane_id', $lanesToRemove)
+                    ->delete();
+
+                // レーンを削除
+                $auction->lanes()
+                    ->whereIn('id', $lanesToRemove)
+                    ->delete();
+            }
+        }
 
         $auction->update(['lane_count' => $newLaneCount]);
 

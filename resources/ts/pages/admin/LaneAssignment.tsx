@@ -92,6 +92,9 @@ export default function LaneAssignment() {
   const [autoAssignDialogOpen, setAutoAssignDialogOpen] = useState(false);
   const [autoAssignLoading, setAutoAssignLoading] = useState(false);
 
+  // 一括解除
+  const [bulkUnassignLoading, setBulkUnassignLoading] = useState(false);
+
   // 操作中フラグ（二重送信防止）
   const [operating, setOperating] = useState(false);
 
@@ -235,6 +238,21 @@ export default function LaneAssignment() {
     }
   };
 
+  // 一括割り当て解除
+  const handleBulkUnassign = async () => {
+    if (!confirm('全レーンの割り当てを解除しますか？すべての生体が未割当に戻ります。')) return;
+    try {
+      setBulkUnassignLoading(true);
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/bulk-unassign`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '一括解除に失敗しました', severity: 'error' });
+    } finally {
+      setBulkUnassignLoading(false);
+    }
+  };
+
   // =============================================
   // ドロップインジケーター
   // =============================================
@@ -320,6 +338,17 @@ export default function LaneAssignment() {
           >
             更新
           </Button>
+          {statistics && statistics.assigned_items > 0 && (
+            <Button
+              startIcon={<DeleteIcon />}
+              onClick={handleBulkUnassign}
+              variant="outlined"
+              color="error"
+              disabled={auction?.status === 'live' || bulkUnassignLoading}
+            >
+              {bulkUnassignLoading ? <CircularProgress size={20} /> : '一括解除'}
+            </Button>
+          )}
           <Button
             startIcon={<AutoAwesomeIcon />}
             onClick={() => setAutoAssignDialogOpen(true)}
