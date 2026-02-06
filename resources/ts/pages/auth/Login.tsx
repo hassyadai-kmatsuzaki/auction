@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,38 +28,32 @@ export default function Login() {
     setLoading(true);
 
     try {
-      console.log('ログイン開始:', email);
-      
       // AuthContextのlogin関数を使用
       await login(email, password);
-      
-      console.log('ログイン成功');
 
-      // ログイン成功後、ユーザー情報を取得してリダイレクト
+      // リダイレクト元があればそこに戻る
+      const from = (location.state as { from?: Location })?.from;
+      if (from) {
+        navigate(from.pathname + (from.search || ''), { replace: true });
+        return;
+      }
+
+      // ロールに応じたデフォルトリダイレクト
       const userStr = localStorage.getItem('user');
-      console.log('保存されたユーザー情報:', userStr);
-      
       if (userStr) {
         const user = JSON.parse(userStr);
-        console.log('ユーザーロール:', user.roles);
-        
-        // ロールに応じてリダイレクト
+
         if (user.roles && user.roles.some((r: any) => r.name === 'admin')) {
-          console.log('管理者としてリダイレクト');
           navigate('/admin', { replace: true });
         } else if (user.roles && user.roles.some((r: any) => r.name === 'seller')) {
-          console.log('出品者としてリダイレクト');
           navigate('/seller', { replace: true });
         } else {
-          console.log('参加者としてリダイレクト');
           navigate('/participant/home', { replace: true });
         }
       } else {
         throw new Error('ユーザー情報の取得に失敗しました');
       }
     } catch (err: any) {
-      console.error('ログインエラー:', err);
-      console.error('エラーレスポンス:', err.response);
       setError(
         err.response?.data?.message ||
         err.message ||
@@ -150,4 +145,3 @@ export default function Login() {
     </Container>
   );
 }
-

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Box } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import GuestRoute from './components/GuestRoute';
 import RootRedirect from './components/RootRedirect';
 
 // Auth pages
@@ -82,12 +83,12 @@ function App() {
       <Router>
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
           <Routes>
-            {/* 認証ページ */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            {/* 認証ページ（認証済みユーザーはダッシュボードにリダイレクト） */}
+            <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+            <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
             <Route path="/auth/set-password" element={<SetPassword />} />
-            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/auth/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+            <Route path="/auth/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
 
           {/* 法的ページ */}
           <Route path="/legal/privacy" element={<PrivacyPolicy />} />

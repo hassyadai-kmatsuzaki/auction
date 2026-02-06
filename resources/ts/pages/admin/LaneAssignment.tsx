@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -19,16 +19,12 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
-  Divider,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   AutoAwesome as AutoAwesomeIcon,
   DragIndicator as DragIndicatorIcon,
   Delete as DeleteIcon,
-  ArrowUpward as ArrowUpwardIcon,
-  ArrowDownward as ArrowDownwardIcon,
-  Add as AddIcon,
   Pets as PetsIcon,
   Star as StarIcon,
   Refresh as RefreshIcon,
@@ -67,10 +63,16 @@ interface Statistics {
   unassigned_items: number;
 }
 
+interface DragSource {
+  type: 'lane' | 'unassigned';
+  laneId?: number;
+  index?: number;
+}
+
 export default function LaneAssignment() {
   const navigate = useNavigate();
   const { auctionId } = useParams<{ auctionId: string }>();
-  
+
   const [auction, setAuction] = useState<AuctionData | null>(null);
   const [lanes, setLanes] = useState<Lane[]>([]);
   const [unassignedItems, setUnassignedItems] = useState<LaneItem[]>([]);
@@ -78,14 +80,20 @@ export default function LaneAssignment() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  
-  // ドラッグ中のアイテム
+
+  // ドラッグ状態
   const [draggedItem, setDraggedItem] = useState<LaneItem | null>(null);
-  const [dragSource, setDragSource] = useState<{ type: 'lane' | 'unassigned'; laneId?: number } | null>(null);
-  
+  const [dragSource, setDragSource] = useState<DragSource | null>(null);
+
+  // ドロップ先のインジケーター
+  const [dropTarget, setDropTarget] = useState<{ laneId: number; position: number } | null>(null);
+
   // 自動割り当てダイアログ
   const [autoAssignDialogOpen, setAutoAssignDialogOpen] = useState(false);
   const [autoAssignLoading, setAutoAssignLoading] = useState(false);
+
+  // 操作中フラグ（二重送信防止）
+  const [operating, setOperating] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -108,78 +116,105 @@ export default function LaneAssignment() {
     fetchData();
   }, [fetchData]);
 
-  // ドラッグ開始
-  const handleDragStart = (item: LaneItem, source: { type: 'lane' | 'unassigned'; laneId?: number }) => {
+  // =============================================
+  // ドラッグ&ドロップ
+  // =============================================
+
+  const handleDragStart = (e: React.DragEvent, item: LaneItem, source: DragSource) => {
+    if (operating) return;
     setDraggedItem(item);
     setDragSource(source);
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefoxのために空データを設定
+    e.dataTransfer.setData('text/plain', '');
   };
 
-  // ドラッグ終了
   const handleDragEnd = () => {
     setDraggedItem(null);
     setDragSource(null);
+    setDropTarget(null);
+  };
+
+  // アイテム間のドロップ位置を計算
+  const handleDragOverItem = (e: React.DragEvent, laneId: number, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedItem) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? index + 1 : index + 2; // 1-indexed for API
+
+    setDropTarget({ laneId, position });
+  };
+
+  // レーン空エリアへのドラッグオーバー
+  const handleDragOverLane = (e: React.DragEvent, laneId: number, itemCount: number) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+    // 空のレーンまたはリストの最後にドロップ
+    setDropTarget({ laneId, position: itemCount + 1 });
   };
 
   // レーンにドロップ
-  const handleDropOnLane = async (laneId: number, position?: number) => {
-    if (!draggedItem) return;
+  const handleDropOnLane = async (laneId: number) => {
+    if (!draggedItem || operating) return;
 
+    const position = dropTarget?.laneId === laneId ? dropTarget.position : undefined;
+
+    // 同一レーン内で同じ位置ならスキップ
+    if (dragSource?.type === 'lane' && dragSource.laneId === laneId && dragSource.index !== undefined) {
+      const currentPos = dragSource.index + 1; // 1-indexed
+      if (position === currentPos || position === currentPos + 1) {
+        handleDragEnd();
+        return;
+      }
+    }
+
+    setOperating(true);
     try {
       await axios.post(`/api/admin/auctions/${auctionId}/lanes/${laneId}/items`, {
         item_id: draggedItem.id,
         position: position,
       });
-      setSnackbar({ open: true, message: '生体をレーンに割り当てました', severity: 'success' });
-      fetchData();
+      await fetchData();
     } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '割り当てに失敗しました', severity: 'error' });
+      setSnackbar({ open: true, message: err.response?.data?.message || '操作に失敗しました', severity: 'error' });
+    } finally {
+      setOperating(false);
     }
-    
+
     handleDragEnd();
   };
 
-  // レーンから削除
-  const handleRemoveFromLane = async (laneId: number, itemId: number) => {
+  // 未割り当てエリアにドロップ（レーンから削除）
+  const handleDropOnUnassigned = async () => {
+    if (!draggedItem || !dragSource || dragSource.type !== 'lane' || !dragSource.laneId || operating) return;
+
+    setOperating(true);
     try {
-      await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${laneId}/items/${itemId}`);
-      setSnackbar({ open: true, message: 'レーンから削除しました', severity: 'success' });
-      fetchData();
+      await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${dragSource.laneId}/items/${draggedItem.id}`);
+      await fetchData();
     } catch (err: any) {
       setSnackbar({ open: true, message: err.response?.data?.message || '削除に失敗しました', severity: 'error' });
+    } finally {
+      setOperating(false);
     }
+
+    handleDragEnd();
   };
 
-  // 順序を上に移動
-  const handleMoveUp = async (lane: Lane, item: LaneItem, currentIndex: number) => {
-    if (currentIndex === 0) return;
-    
-    const newOrder = lane.items.map(i => i.id);
-    [newOrder[currentIndex], newOrder[currentIndex - 1]] = [newOrder[currentIndex - 1], newOrder[currentIndex]];
-    
+  // レーンから削除（ボタン）
+  const handleRemoveFromLane = async (laneId: number, itemId: number) => {
+    if (operating) return;
+    setOperating(true);
     try {
-      await axios.put(`/api/admin/auctions/${auctionId}/lanes/${lane.id}/items/reorder`, {
-        item_ids: newOrder,
-      });
-      fetchData();
+      await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${laneId}/items/${itemId}`);
+      await fetchData();
     } catch (err: any) {
-      setSnackbar({ open: true, message: '順序変更に失敗しました', severity: 'error' });
-    }
-  };
-
-  // 順序を下に移動
-  const handleMoveDown = async (lane: Lane, item: LaneItem, currentIndex: number) => {
-    if (currentIndex === lane.items.length - 1) return;
-    
-    const newOrder = lane.items.map(i => i.id);
-    [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
-    
-    try {
-      await axios.put(`/api/admin/auctions/${auctionId}/lanes/${lane.id}/items/reorder`, {
-        item_ids: newOrder,
-      });
-      fetchData();
-    } catch (err: any) {
-      setSnackbar({ open: true, message: '順序変更に失敗しました', severity: 'error' });
+      setSnackbar({ open: true, message: err.response?.data?.message || '削除に失敗しました', severity: 'error' });
+    } finally {
+      setOperating(false);
     }
   };
 
@@ -199,6 +234,47 @@ export default function LaneAssignment() {
       setAutoAssignLoading(false);
     }
   };
+
+  // =============================================
+  // ドロップインジケーター
+  // =============================================
+
+  const DropIndicator = ({ visible }: { visible: boolean }) => (
+    <Box
+      sx={{
+        height: visible ? 3 : 0,
+        bgcolor: visible ? 'primary.main' : 'transparent',
+        borderRadius: 2,
+        mx: 1,
+        transition: 'height 0.15s ease',
+        position: 'relative',
+        '&::before': visible ? {
+          content: '""',
+          position: 'absolute',
+          left: -4,
+          top: -3,
+          width: 9,
+          height: 9,
+          borderRadius: '50%',
+          bgcolor: 'primary.main',
+        } : {},
+        '&::after': visible ? {
+          content: '""',
+          position: 'absolute',
+          right: -4,
+          top: -3,
+          width: 9,
+          height: 9,
+          borderRadius: '50%',
+          bgcolor: 'primary.main',
+        } : {},
+      }}
+    />
+  );
+
+  // =============================================
+  // レンダリング
+  // =============================================
 
   if (loading) {
     return (
@@ -251,7 +327,7 @@ export default function LaneAssignment() {
             color="primary"
             disabled={auction?.status === 'live'}
           >
-            自動割り当て
+            自動割当
           </Button>
         </Box>
       </Box>
@@ -273,7 +349,7 @@ export default function LaneAssignment() {
                 <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
                   {statistics.assigned_items}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">割り当て済み</Typography>
+                <Typography variant="body2" color="text.secondary">割当済み</Typography>
               </Box>
             </Grid>
             <Grid item xs={4}>
@@ -281,7 +357,7 @@ export default function LaneAssignment() {
                 <Typography variant="h4" sx={{ fontWeight: 700, color: 'warning.main' }}>
                   {statistics.unassigned_items}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">未割り当て</Typography>
+                <Typography variant="body2" color="text.secondary">未割当</Typography>
               </Box>
             </Grid>
           </Grid>
@@ -299,44 +375,41 @@ export default function LaneAssignment() {
               bgcolor: draggedItem && dragSource?.type === 'lane' ? 'action.hover' : 'background.paper',
               border: draggedItem && dragSource?.type === 'lane' ? '2px dashed' : 'none',
               borderColor: 'primary.main',
+              transition: 'all 0.2s',
             }}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={() => {
-              if (draggedItem && dragSource?.type === 'lane' && dragSource.laneId) {
-                handleRemoveFromLane(dragSource.laneId, draggedItem.id);
-              }
-            }}
+            onDrop={handleDropOnUnassigned}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <PetsIcon />
-              未割り当て ({unassignedItems.length})
+              未割当 ({unassignedItems.length})
             </Typography>
-            
+
             {unassignedItems.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                すべての生体が割り当て済みです
+                すべての生体が割当済みです
               </Typography>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {unassignedItems.map((item) => (
                   <Card
                     key={item.id}
-                    draggable
-                    onDragStart={() => handleDragStart(item, { type: 'unassigned' })}
+                    draggable={!operating}
+                    onDragStart={(e) => handleDragStart(e, item, { type: 'unassigned' })}
                     onDragEnd={handleDragEnd}
                     sx={{
-                      cursor: 'grab',
-                      opacity: draggedItem?.id === item.id ? 0.5 : 1,
+                      cursor: operating ? 'default' : 'grab',
+                      opacity: draggedItem?.id === item.id ? 0.4 : 1,
                       '&:hover': { boxShadow: 3 },
                       transition: 'all 0.2s',
                     }}
                   >
                     <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                        <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 20, flexShrink: 0 }} />
                         <Avatar
                           src={item.thumbnail_path || undefined}
-                          sx={{ width: 32, height: 32, bgcolor: 'grey.200' }}
+                          sx={{ width: 32, height: 32, bgcolor: 'grey.200', flexShrink: 0 }}
                         >
                           <PetsIcon sx={{ fontSize: 16 }} />
                         </Avatar>
@@ -349,7 +422,7 @@ export default function LaneAssignment() {
                           </Typography>
                         </Box>
                         {item.is_premium && (
-                          <StarIcon sx={{ color: '#F59E0B', fontSize: 18 }} />
+                          <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />
                         )}
                       </Box>
                     </CardContent>
@@ -370,11 +443,13 @@ export default function LaneAssignment() {
                     p: 2,
                     height: 'calc(100vh - 300px)',
                     overflow: 'auto',
-                    bgcolor: draggedItem && dragSource?.laneId !== lane.id ? 'action.hover' : 'background.paper',
-                    border: draggedItem && dragSource?.laneId !== lane.id ? '2px dashed' : 'none',
-                    borderColor: 'success.main',
+                    bgcolor: draggedItem && !(dragSource?.type === 'lane' && dragSource.laneId === lane.id && lane.items.length === 1)
+                      ? 'grey.50' : 'background.paper',
+                    border: draggedItem && dropTarget?.laneId === lane.id ? '2px solid' : draggedItem ? '2px dashed' : 'none',
+                    borderColor: dropTarget?.laneId === lane.id ? 'primary.main' : 'grey.300',
+                    transition: 'border-color 0.15s ease',
                   }}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => handleDragOverLane(e, lane.id, lane.items.length)}
                   onDrop={() => handleDropOnLane(lane.id)}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -396,86 +471,95 @@ export default function LaneAssignment() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         border: '2px dashed',
-                        borderColor: 'grey.300',
+                        borderColor: draggedItem ? 'primary.main' : 'grey.300',
                         borderRadius: 2,
-                        bgcolor: 'grey.50',
+                        bgcolor: draggedItem ? 'primary.50' : 'grey.50',
+                        transition: 'all 0.2s',
                       }}
                     >
                       <Typography variant="body2" color="text.secondary">
-                        生体をドラッグ&ドロップ
+                        ここにドラッグ&ドロップ
                       </Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                       {lane.items.map((item, index) => (
-                        <Card
-                          key={item.id}
-                          draggable
-                          onDragStart={() => handleDragStart(item, { type: 'lane', laneId: lane.id })}
-                          onDragEnd={handleDragEnd}
-                          sx={{
-                            cursor: 'grab',
-                            opacity: draggedItem?.id === item.id ? 0.5 : 1,
-                            '&:hover': { boxShadow: 3 },
-                            transition: 'all 0.2s',
-                            position: 'relative',
-                          }}
-                        >
-                          <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                                  {index + 1}
-                                </Typography>
-                                <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                              </Box>
-                              <Avatar
-                                src={item.thumbnail_path || undefined}
-                                sx={{ width: 32, height: 32, bgcolor: 'grey.200' }}
-                              >
-                                <PetsIcon sx={{ fontSize: 16 }} />
-                              </Avatar>
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  #{item.item_number} {item.species_name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  ¥{item.start_price.toLocaleString()} / {item.quantity}匹
-                                </Typography>
-                              </Box>
-                              {item.is_premium && (
-                                <StarIcon sx={{ color: '#F59E0B', fontSize: 18 }} />
-                              )}
-                              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleMoveUp(lane, item, index)}
-                                  disabled={index === 0}
-                                  sx={{ p: 0.25 }}
+                        <Box key={item.id}>
+                          {/* ドロップインジケーター（アイテムの上） */}
+                          <DropIndicator
+                            visible={
+                              !!draggedItem &&
+                              dropTarget?.laneId === lane.id &&
+                              dropTarget?.position === index + 1 &&
+                              draggedItem.id !== item.id
+                            }
+                          />
+
+                          <Card
+                            draggable={!operating}
+                            onDragStart={(e) => handleDragStart(e, item, { type: 'lane', laneId: lane.id, index })}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleDragOverItem(e, lane.id, index)}
+                            sx={{
+                              cursor: operating ? 'default' : 'grab',
+                              opacity: draggedItem?.id === item.id ? 0.4 : 1,
+                              '&:hover': { boxShadow: 3 },
+                              transition: 'opacity 0.2s',
+                              my: 0.5,
+                            }}
+                          >
+                            <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main', lineHeight: 1 }}>
+                                    {index + 1}
+                                  </Typography>
+                                  <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                                </Box>
+                                <Avatar
+                                  src={item.thumbnail_path || undefined}
+                                  sx={{ width: 32, height: 32, bgcolor: 'grey.200', flexShrink: 0 }}
                                 >
-                                  <ArrowUpwardIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleMoveDown(lane, item, index)}
-                                  disabled={index === lane.items.length - 1}
-                                  sx={{ p: 0.25 }}
-                                >
-                                  <ArrowDownwardIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
+                                  <PetsIcon sx={{ fontSize: 16 }} />
+                                </Avatar>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    #{item.item_number} {item.species_name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    ¥{item.start_price.toLocaleString()} / {item.quantity}匹
+                                  </Typography>
+                                </Box>
+                                {item.is_premium && (
+                                  <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />
+                                )}
+                                <Tooltip title="レーンから削除">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleRemoveFromLane(lane.id, item.id)}
+                                    disabled={operating}
+                                    sx={{ flexShrink: 0 }}
+                                  >
+                                    <DeleteIcon sx={{ fontSize: 18 }} />
+                                  </IconButton>
+                                </Tooltip>
                               </Box>
-                              <Tooltip title="レーンから削除">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleRemoveFromLane(lane.id, item.id)}
-                                >
-                                  <DeleteIcon sx={{ fontSize: 18 }} />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+
+                          {/* 最後のアイテムの下にもドロップインジケーター */}
+                          {index === lane.items.length - 1 && (
+                            <DropIndicator
+                              visible={
+                                !!draggedItem &&
+                                dropTarget?.laneId === lane.id &&
+                                dropTarget?.position === index + 2 &&
+                                draggedItem.id !== item.id
+                              }
+                            />
+                          )}
+                        </Box>
                       ))}
                     </Box>
                   )}
@@ -488,7 +572,7 @@ export default function LaneAssignment() {
 
       {/* 自動割り当てダイアログ */}
       <Dialog open={autoAssignDialogOpen} onClose={() => setAutoAssignDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>自動割り当て</DialogTitle>
+        <DialogTitle>自動割当</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
             登録済みの生体をレーンに自動で割り当てます。
@@ -507,7 +591,7 @@ export default function LaneAssignment() {
             disabled={autoAssignLoading}
             variant="outlined"
           >
-            {autoAssignLoading ? <CircularProgress size={20} /> : '追加割り当て'}
+            {autoAssignLoading ? <CircularProgress size={20} /> : '追加割当'}
           </Button>
           <Button
             onClick={() => handleAutoAssign(true)}
@@ -515,7 +599,7 @@ export default function LaneAssignment() {
             variant="contained"
             color="primary"
           >
-            {autoAssignLoading ? <CircularProgress size={20} /> : 'クリアして再割り当て'}
+            {autoAssignLoading ? <CircularProgress size={20} /> : 'クリアして再割当'}
           </Button>
         </DialogActions>
       </Dialog>

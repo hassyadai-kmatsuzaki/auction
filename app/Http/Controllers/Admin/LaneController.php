@@ -89,13 +89,13 @@ class LaneController extends Controller
     }
 
     /**
-     * 生体をレーンに割り当て
+     * 生体をレーンに割り当て（レーン間移動・新規割り当て・並び替えすべて対応）
      */
     public function assignItem(Request $request, $auctionId, $laneId)
     {
         $validator = Validator::make($request->all(), [
             'item_id' => 'required|exists:items,id',
-            'position' => 'nullable|integer|min:0',
+            'position' => 'nullable|integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -105,45 +105,61 @@ class LaneController extends Controller
             ], 422);
         }
 
-        $auction = Auction::findOrFail($auctionId);
         $lane = Lane::where('auction_id', $auctionId)->where('id', $laneId)->firstOrFail();
         $item = Item::where('auction_id', $auctionId)->where('id', $request->item_id)->firstOrFail();
 
-        // 既に他のレーンに割り当てられていないか確認
-        $existingAssignment = DB::table('lane_items')
-            ->where('item_id', $item->id)
-            ->first();
+        try {
+            DB::transaction(function () use ($laneId, $item, $request) {
+                // 既存の割り当てを確認
+                $existing = DB::table('lane_items')
+                    ->where('item_id', $item->id)
+                    ->lockForUpdate()
+                    ->first();
 
-        if ($existingAssignment) {
-            // 他のレーンから削除
-            DB::table('lane_items')->where('item_id', $item->id)->delete();
+                // 既に割り当て済みなら削除（同一レーン内の並び替えも含む）
+                if ($existing) {
+                    DB::table('lane_items')->where('item_id', $item->id)->delete();
+
+                    // 元のレーンの順序を詰める
+                    $this->resequenceLane($existing->lane_id);
+                }
+
+                // 挿入位置を決定
+                $position = $request->input('position');
+                $maxSequence = DB::table('lane_items')
+                    ->where('lane_id', $laneId)
+                    ->max('sequence_order') ?? 0;
+
+                if ($position !== null && $position <= $maxSequence) {
+                    // 指定位置に挿入するため、既存アイテムの順序をずらす
+                    DB::table('lane_items')
+                        ->where('lane_id', $laneId)
+                        ->where('sequence_order', '>=', $position)
+                        ->increment('sequence_order');
+                    $sequenceOrder = $position;
+                } else {
+                    // 末尾に追加
+                    $sequenceOrder = $maxSequence + 1;
+                }
+
+                // レーンに割り当て
+                DB::table('lane_items')->insert([
+                    'lane_id' => $laneId,
+                    'item_id' => $item->id,
+                    'sequence_order' => $sequenceOrder,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->errorInfo[1] === 1062) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'この生体は既にレーンに割り当て済みです。',
+                ], 409);
+            }
+            throw $e;
         }
-
-        // 挿入位置を決定
-        $position = $request->input('position');
-        $maxSequence = DB::table('lane_items')
-            ->where('lane_id', $laneId)
-            ->max('sequence_order') ?? 0;
-
-        if ($position === null) {
-            $sequenceOrder = $maxSequence + 1;
-        } else {
-            // 指定位置に挿入するため、既存アイテムの順序を更新
-            DB::table('lane_items')
-                ->where('lane_id', $laneId)
-                ->where('sequence_order', '>=', $position)
-                ->increment('sequence_order');
-            $sequenceOrder = $position;
-        }
-
-        // レーンに割り当て
-        DB::table('lane_items')->insert([
-            'lane_id' => $laneId,
-            'item_id' => $item->id,
-            'sequence_order' => $sequenceOrder,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
 
         return response()->json([
             'success' => true,
@@ -256,9 +272,8 @@ class LaneController extends Controller
 
         $items = $premiumItems->concat($normalItems);
 
-        // 既に割り当て済みを除外
+        // 既に割り当て済みを除外（全レーン横断で確認）
         $assignedIds = DB::table('lane_items')
-            ->whereIn('lane_id', $auction->lanes()->pluck('id'))
             ->pluck('item_id')
             ->toArray();
         
@@ -280,17 +295,31 @@ class LaneController extends Controller
             $laneIndex = $itemIndex % $laneCount;
             $lane = $lanes[$laneIndex];
             
+            // 既に割り当て済みの場合はスキップ（レースコンディション対策）
+            $alreadyAssigned = DB::table('lane_items')->where('item_id', $item->id)->exists();
+            if ($alreadyAssigned) {
+                continue;
+            }
+
             $maxSequence = DB::table('lane_items')
                 ->where('lane_id', $lane->id)
                 ->max('sequence_order') ?? 0;
 
-            DB::table('lane_items')->insert([
-                'lane_id' => $lane->id,
-                'item_id' => $item->id,
-                'sequence_order' => $maxSequence + 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            try {
+                DB::table('lane_items')->insert([
+                    'lane_id' => $lane->id,
+                    'item_id' => $item->id,
+                    'sequence_order' => $maxSequence + 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // UNIQUE制約違反の場合はスキップ（二重クリック等の対策）
+                if ($e->errorInfo[1] === 1062) {
+                    continue;
+                }
+                throw $e;
+            }
 
             $itemIndex++;
         }
