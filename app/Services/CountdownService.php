@@ -294,4 +294,30 @@ class CountdownService
     {
         return Cache::get($this->getCacheKey($laneId));
     }
+
+    /**
+     * カウントダウンを一時停止
+     */
+    public function pauseCountdown(int $laneId): void
+    {
+        $state = Cache::get($this->getCacheKey($laneId));
+        if ($state) {
+            $state['is_running'] = false;
+            Cache::put($this->getCacheKey($laneId), $state, 3600);
+            Log::info("Countdown paused: lane {$laneId}, remaining {$state['remaining_seconds']}s");
+        }
+    }
+
+    /**
+     * カウントダウンを再開（一時停止から復帰）
+     */
+    public function resumeCountdown(int $laneId): void
+    {
+        $state = Cache::get($this->getCacheKey($laneId));
+        if ($state) {
+            $state['is_running'] = true;
+            Cache::put($this->getCacheKey($laneId), $state, 3600);
+            Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s");
+        }
+    }
 }

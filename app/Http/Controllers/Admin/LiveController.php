@@ -303,8 +303,13 @@ class LiveController extends Controller
             ], 400);
         }
 
-        // 全レーンを一時停止
-        $auction->lanes()->update(['status' => 'paused']);
+        // 全レーンのカウントダウンを一時停止（キャッシュの is_running を false に）
+        foreach ($auction->lanes()->where('status', 'active')->get() as $lane) {
+            $this->countdownService->pauseCountdown($lane->id);
+        }
+
+        // 全レーンのDBステータスを一時停止
+        $auction->lanes()->where('status', 'active')->update(['status' => 'paused']);
 
         // ステータス変更イベントをブロードキャスト
         broadcast(new AuctionStatusChanged($auction->id, 'paused', 'オークションが一時停止されました'));
@@ -332,8 +337,21 @@ class LiveController extends Controller
             ], 400);
         }
 
-        // 全レーンを再開
+        // 全レーンのDBステータスを再開
         $auction->lanes()->where('status', 'paused')->update(['status' => 'active']);
+
+        // 全レーンのカウントダウンを再開（キャッシュの is_running を true に）
+        foreach ($auction->lanes()->where('status', 'active')->get() as $lane) {
+            $this->countdownService->resumeCountdown($lane->id);
+        }
+
+        // フェイルセーフ：カウントダウンジョブが終了していた場合に再ディスパッチ
+        $jobKey = "countdown_job_running:auction:{$auctionId}";
+        $isJobRunning = \Illuminate\Support\Facades\Cache::get($jobKey, false);
+        if (!$isJobRunning) {
+            \Illuminate\Support\Facades\Log::info("Resume: Re-dispatching countdown job for auction {$auctionId}");
+            ProcessAuctionCountdownJob::dispatch($auctionId);
+        }
 
         // ステータス変更イベントをブロードキャスト
         broadcast(new AuctionStatusChanged($auction->id, 'resumed', 'オークションが再開されました'));
