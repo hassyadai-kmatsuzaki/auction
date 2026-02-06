@@ -288,12 +288,22 @@ export default function AuctionLive() {
     setSelectedMediaIndex(0);
   };
 
-  // 相対パスをフルURLに変換
-  const resolveUrl = (url: string, thumbnailPath?: string) => {
+  // S3ベースURLを推測して相対パスをフルURLに変換
+  const resolveUrl = (url: string, item?: { thumbnail_path?: string; media?: any[] } | null) => {
     if (!url || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
-    if (thumbnailPath && thumbnailPath.startsWith('http')) {
-      const idx = thumbnailPath.indexOf('items/');
-      if (idx > 0) return thumbnailPath.substring(0, idx) + url;
+    const thumb = item?.thumbnail_path;
+    if (thumb && thumb.startsWith('http')) {
+      const idx = thumb.indexOf('items/');
+      if (idx > 0) return thumb.substring(0, idx) + url;
+    }
+    if (item?.media) {
+      for (const m of item.media) {
+        const fu = m.file_url;
+        if (fu && fu.startsWith('http')) {
+          const idx = fu.indexOf('items/');
+          if (idx > 0) return fu.substring(0, idx) + url;
+        }
+      }
     }
     return url;
   };
@@ -310,7 +320,7 @@ export default function AuctionLive() {
         const rawUrl = m.file_url || m.file_path || m.url;
         if (!rawUrl) return;
         if (m.is_thumbnail && item.thumbnail_path) return;
-        const url = resolveUrl(rawUrl, item.thumbnail_path);
+        const url = resolveUrl(rawUrl, item);
         if (item.thumbnail_path && url === item.thumbnail_path) return;
         const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
         list.push({ type: isVideo ? 'video' : 'image', url });

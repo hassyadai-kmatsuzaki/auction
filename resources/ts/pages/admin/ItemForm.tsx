@@ -23,6 +23,8 @@ import {
   CircularProgress,
   Snackbar,
   LinearProgress,
+  Dialog,
+  IconButton,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -35,6 +37,7 @@ import {
   Image as ImageIcon,
   Star as StarIcon,
   Delete as DeleteIcon,
+  PlayCircleOutline as PlayCircleOutlineIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -77,6 +80,8 @@ export default function ItemForm() {
   const [existingMedia, setExistingMedia] = useState<MediaItem[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     species_name: '',
@@ -714,22 +719,30 @@ export default function ItemForm() {
                                 component="img"
                                 src={media.file_url}
                                 alt=""
+                                onClick={() => setMediaPreviewUrl(media.file_url)}
                                 sx={{
                                   width: '100%',
                                   height: '100%',
                                   objectFit: 'cover',
+                                  cursor: 'pointer',
                                 }}
                               />
                             ) : (
-                              <Box sx={{ 
-                                width: '100%', 
-                                height: '100%', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                bgcolor: 'grey.200',
-                              }}>
-                                <Typography variant="caption">動画</Typography>
+                              <Box 
+                                onClick={() => media.file_url && setVideoPreviewUrl(media.file_url)}
+                                sx={{ 
+                                  width: '100%', 
+                                  height: '100%', 
+                                  display: 'flex', 
+                                  flexDirection: 'column',
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  bgcolor: 'grey.800',
+                                  cursor: media.file_url ? 'pointer' : 'default',
+                                  '&:hover': media.file_url ? { bgcolor: 'grey.700' } : {},
+                                }}>
+                                <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 32, mb: 0.5 }} />
+                                <Typography variant="caption" sx={{ color: 'white' }}>動画</Typography>
                               </Box>
                             )}
                             
@@ -833,6 +846,57 @@ export default function ItemForm() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* 動画プレビューダイアログ */}
+      <Dialog
+        open={!!videoPreviewUrl}
+        onClose={() => setVideoPreviewUrl(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: 'black' } }}
+      >
+        <Box sx={{ position: 'relative' }}>
+          <IconButton
+            onClick={() => setVideoPreviewUrl(null)}
+            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2, bgcolor: 'rgba(0,0,0,0.5)' }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {videoPreviewUrl && (
+            <video
+              src={videoPreviewUrl}
+              controls
+              autoPlay
+              style={{ width: '100%', maxHeight: '80vh', display: 'block' }}
+            />
+          )}
+        </Box>
+      </Dialog>
+
+      {/* 画像プレビューダイアログ */}
+      <Dialog
+        open={!!mediaPreviewUrl}
+        onClose={() => setMediaPreviewUrl(null)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none' } }}
+      >
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
+          <IconButton
+            onClick={() => setMediaPreviewUrl(null)}
+            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {mediaPreviewUrl && (
+            <img
+              src={mediaPreviewUrl}
+              alt=""
+              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }}
+            />
+          )}
+        </Box>
+      </Dialog>
     </Box>
   );
 }
