@@ -509,9 +509,16 @@ export default function AuctionForm() {
                     label="商品アップロード期限"
                     value={formData.upload_deadline}
                     onChange={(date) => setFormData({ ...formData, upload_deadline: date })}
-                    maxDateTime={formData.event_date || undefined}
+                    maxDateTime={(() => {
+                      if (!formData.event_date) return undefined;
+                      const max = new Date(formData.event_date);
+                      if (formData.start_time) {
+                        max.setHours(formData.start_time.getHours(), formData.start_time.getMinutes(), 0, 0);
+                      }
+                      return max;
+                    })()}
                     slotProps={{
-                      textField: { fullWidth: true, helperText: '出品者が生体情報をアップロードできる期限' },
+                      textField: { fullWidth: true, helperText: '出品者が生体情報をアップロードできる期限（開催日時より前）' },
                     }}
                   />
                   <Grid container spacing={2}>
