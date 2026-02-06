@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\Auction;
+use App\Models\Lane;
 use App\Services\CountdownService;
+use App\Events\AuctionStatusChanged;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -53,6 +55,49 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         // ジョブ実行中フラグをセット（フェイルセーフ用）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
         Cache::put($jobKey, true, 3600);
+
+        // === 10秒プレスタートカウントダウン ===
+        $startAtKey = "auction:{$this->auctionId}:start_at";
+        $lanesToStartKey = "auction:{$this->auctionId}:lanes_to_start";
+        $startAt = Cache::get($startAtKey);
+
+        if ($startAt) {
+            Log::info("Pre-start countdown for auction {$this->auctionId}");
+            while (true) {
+                $remaining = max(0, $startAt - now()->timestamp);
+                if ($remaining <= 0) break;
+
+                broadcast(new AuctionStatusChanged(
+                    $this->auctionId,
+                    'starting',
+                    "開始まで {$remaining}秒",
+                    $remaining
+                ));
+                sleep(1);
+            }
+
+            Cache::forget($startAtKey);
+
+            // カウントダウン終了 → レーンのカウントダウンを実際に開始
+            $lanesToStart = Cache::get($lanesToStartKey, []);
+            Cache::forget($lanesToStartKey);
+
+            foreach ($lanesToStart as $laneId) {
+                $lane = Lane::with(['auction', 'currentItem'])->find($laneId);
+                if ($lane && $lane->currentItem) {
+                    $countdownService->startCountdown($lane);
+                }
+            }
+
+            // ライブ開始イベントをブロードキャスト
+            broadcast(new AuctionStatusChanged(
+                $this->auctionId,
+                'live',
+                'オークションが開始されました'
+            ));
+
+            Log::info("Pre-start countdown completed for auction {$this->auctionId}, lanes started");
+        }
         
         $iterations = 0;
         $idleIterations = 0; // 一時停止中の待機カウント
@@ -61,8 +106,14 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             // オークション状態を確認
             $auction = Auction::with('lanes')->find($this->auctionId);
             
-            if (!$auction || $auction->status !== 'live') {
+            if (!$auction || !in_array($auction->status, ['live', 'finished'])) {
                 Log::info("Auction {$this->auctionId} is not live, stopping countdown job");
+                break;
+            }
+
+            // 既に finished の場合も終了
+            if ($auction->status === 'finished') {
+                Log::info("Auction {$this->auctionId} has been finished, stopping countdown job");
                 break;
             }
 

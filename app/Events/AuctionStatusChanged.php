@@ -17,6 +17,7 @@ class AuctionStatusChanged implements ShouldBroadcast
     public int $auctionId;
     public string $status;
     public string $message;
+    public ?int $countdownSeconds;
 
     /**
      * Create a new event instance.
@@ -24,11 +25,13 @@ class AuctionStatusChanged implements ShouldBroadcast
     public function __construct(
         int $auctionId,
         string $status,
-        string $message = ''
+        string $message = '',
+        ?int $countdownSeconds = null
     ) {
         $this->auctionId = $auctionId;
         $this->status = $status;
         $this->message = $message;
+        $this->countdownSeconds = $countdownSeconds;
     }
 
     /**
@@ -62,6 +65,7 @@ class AuctionStatusChanged implements ShouldBroadcast
             'auction_id' => $this->auctionId,
             'status' => $this->status,
             'message' => $this->message,
+            'countdown_seconds' => $this->countdownSeconds,
         ];
     }
 }

@@ -181,6 +181,7 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/auctions', [ParticipantAuctionController::class, 'index']);
     Route::get('/auctions/{id}', [ParticipantAuctionController::class, 'show']);
     Route::get('/auctions/{id}/live', [ParticipantAuctionController::class, 'live']);
+    Route::get('/auctions/{id}/my-won-items', [ParticipantAuctionController::class, 'myWonItems']);
     Route::get('/auctions/{id}/items', [ParticipantAuctionController::class, 'items']);
     
     // 入札

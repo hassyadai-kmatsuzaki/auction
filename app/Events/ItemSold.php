@@ -19,6 +19,9 @@ class ItemSold implements ShouldBroadcastNow
     public int $itemId;
     public int $winnerId;
     public float $winningPrice;
+    public string $speciesName;
+    public int $itemNumber;
+    public int $quantity;
 
     /**
      * Create a new event instance.
@@ -28,13 +31,19 @@ class ItemSold implements ShouldBroadcastNow
         int $laneId,
         int $itemId,
         int $winnerId,
-        float $winningPrice
+        float $winningPrice,
+        string $speciesName = '',
+        int $itemNumber = 0,
+        int $quantity = 1
     ) {
         $this->auctionId = $auctionId;
         $this->laneId = $laneId;
         $this->itemId = $itemId;
         $this->winnerId = $winnerId;
         $this->winningPrice = $winningPrice;
+        $this->speciesName = $speciesName;
+        $this->itemNumber = $itemNumber;
+        $this->quantity = $quantity;
     }
 
     /**
@@ -69,6 +78,9 @@ class ItemSold implements ShouldBroadcastNow
             'lane_id' => $this->laneId,
             'winner_id' => $this->winnerId,
             'winning_price' => $this->winningPrice,
+            'species_name' => $this->speciesName,
+            'item_number' => $this->itemNumber,
+            'quantity' => $this->quantity,
         ];
     }
 }

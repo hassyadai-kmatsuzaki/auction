@@ -9,6 +9,7 @@ use App\Models\BidParticipant;
 use App\Events\CountdownTick;
 use App\Events\LaneItemChanged;
 use App\Events\ItemSold;
+use App\Events\AuctionStatusChanged;
 use App\Jobs\ProcessCountdownJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -252,6 +253,9 @@ class CountdownService
             ]);
             $currentItemData = null;
             Log::info("Lane {$lane->id} finished - no more items");
+
+            // 全レーンが終了したかチェック → 自動終了
+            $this->checkAutoFinishAuction($auction);
         }
 
         // レーン変更イベントをブロードキャスト
@@ -318,6 +322,39 @@ class CountdownService
             $state['is_running'] = true;
             Cache::put($this->getCacheKey($laneId), $state, 3600);
             Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s");
+        }
+    }
+
+    /**
+     * 全レーンが終了したかチェックし、終了していればオークションを自動終了
+     */
+    protected function checkAutoFinishAuction(Auction $auction): void
+    {
+        $auction->refresh();
+        $auction->load('lanes');
+
+        $allFinished = $auction->lanes->every(function ($lane) {
+            return $lane->status === 'finished';
+        });
+
+        if ($allFinished && $auction->status === 'live') {
+            Log::info("All lanes finished for auction {$auction->id} - auto finishing auction");
+
+            // 残っているライブ商品を不成立にする
+            $auction->items()->where('status', 'live')->update(['status' => 'unsold']);
+
+            // オークションを終了
+            $auction->update([
+                'status' => 'finished',
+                'end_time' => now()->format('H:i:s'),
+            ]);
+
+            // ステータス変更イベントをブロードキャスト
+            broadcast(new AuctionStatusChanged(
+                $auction->id,
+                'finished',
+                'すべての出品が終了しました。オークションが自動終了しました。'
+            ));
         }
     }
 }

@@ -88,6 +88,8 @@ export default function AuctionItems() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [videoDialogUrl, setVideoDialogUrl] = useState('');
 
   // データ取得
   const fetchItems = useCallback(async () => {
@@ -506,7 +508,14 @@ export default function AuctionItems() {
                       {mediaList.map((m, i) => (
                         <Box
                           key={i}
-                          onClick={() => setSelectedMediaIndex(i)}
+                          onClick={() => {
+                            if (m.type === 'video') {
+                              setVideoDialogUrl(m.url);
+                              setVideoDialogOpen(true);
+                            } else {
+                              setSelectedMediaIndex(i);
+                            }
+                          }}
                           sx={{
                             width: 64, height: 64, flexShrink: 0, borderRadius: 1, overflow: 'hidden',
                             border: i === selectedMediaIndex ? '2px solid' : '2px solid transparent',
@@ -515,11 +524,21 @@ export default function AuctionItems() {
                           }}
                         >
                           {m.type === 'video' ? (
-                            <>
-                              <Box sx={{ width: '100%', height: '100%', bgcolor: 'grey.800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Box sx={{ width: '100%', height: '100%', position: 'relative', bgcolor: 'black' }}>
+                              <video
+                                src={m.url}
+                                preload="metadata"
+                                muted
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                              <Box sx={{
+                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                bgcolor: 'rgba(0,0,0,0.3)',
+                              }}>
                                 <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
                               </Box>
-                            </>
+                            </Box>
                           ) : (
                             <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           )}
@@ -610,6 +629,27 @@ export default function AuctionItems() {
         <Typography variant="caption" sx={{ color: 'grey.500', textAlign: 'center', py: 1 }}>
           {lightboxIndex + 1} / {getMediaList(selectedItem).length}
         </Typography>
+      </Dialog>
+
+      {/* 動画全画面プレビュー */}
+      <Dialog
+        open={videoDialogOpen}
+        onClose={() => setVideoDialogOpen(false)}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none', m: 1, maxHeight: '98vh' } }}
+      >
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <IconButton
+            onClick={() => setVideoDialogOpen(false)}
+            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {videoDialogUrl && (
+            <video src={videoDialogUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />
+          )}
+        </Box>
       </Dialog>
     </Container>
   );

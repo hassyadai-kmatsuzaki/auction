@@ -392,7 +392,10 @@ class BidService
                     $lane->id,
                     $item->id,
                     $winnerId,
-                    $finalPrice
+                    $finalPrice,
+                    $item->species_name ?? '',
+                    $item->item_number ?? 0,
+                    $item->quantity ?? 1
                 ));
             }
 

@@ -30,12 +30,16 @@ export interface ItemSoldEvent {
   lane_id: number;
   winner_id: number;
   winning_price: number;
+  species_name?: string;
+  item_number?: number;
+  quantity?: number;
 }
 
 export interface AuctionStatusEvent {
   auction_id: number;
   status: string;
   message: string;
+  countdown_seconds?: number;
 }
 
 export interface CountdownTickEvent {

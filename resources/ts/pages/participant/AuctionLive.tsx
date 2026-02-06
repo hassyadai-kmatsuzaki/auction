@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -21,6 +21,12 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   PlayArrow as PlayArrowIcon,
@@ -34,9 +40,13 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
+  EmojiEvents as EmojiEventsIcon,
+  Timer as TimerIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { useAuctionSocket } from '../../hooks/useAuctionSocket';
+import { useAuth } from '../../contexts/AuthContext';
+import confetti from 'canvas-confetti';
 
 interface LaneItem {
   id: number;
@@ -67,12 +77,23 @@ interface LiveState {
   auction_title: string;
   status: string;
   countdown_seconds: number;
+  starting_countdown?: number;
   lanes: Lane[];
+}
+
+interface WonItemSummary {
+  id: number;
+  item_number: number;
+  species_name: string;
+  quantity: number;
+  winning_price: number;
+  total_amount: number;
 }
 
 export default function AuctionLive() {
   const { auctionId } = useParams<{ auctionId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,15 +106,78 @@ export default function AuctionLive() {
   });
   const [bidLoading, setBidLoading] = useState<Record<number, boolean>>({});
   const [socketConnected, setSocketConnected] = useState(false);
-  const [isPollingPaused, setIsPollingPaused] = useState(false);
+  const [isPollingPaused] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [agreed, setAgreed] = useState(false);
 
+  // 待機室・カウントダウン
+  const [startingCountdown, setStartingCountdown] = useState<number | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 落札一覧
+  const [wonItems, setWonItems] = useState<WonItemSummary[]>([]);
+  const [wonTotalAmount, setWonTotalAmount] = useState(0);
+
+  // 紙吹雪演出
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationItem, setCelebrationItem] = useState<{ species_name: string; winning_price: number } | null>(null);
+
+  // 動画全画面再生
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [videoDialogUrl, setVideoDialogUrl] = useState('');
+
+  // 紙吹雪を発射
+  const fireCelebration = useCallback(() => {
+    const duration = 3000;
+    const end = Date.now() + duration;
+
+    const frame = () => {
+      confetti({
+        particleCount: 5,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        colors: ['#ff0000', '#ff6600', '#ffcc00', '#00cc00', '#0066ff', '#9900ff'],
+      });
+      confetti({
+        particleCount: 5,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        colors: ['#ff0000', '#ff6600', '#ffcc00', '#00cc00', '#0066ff', '#9900ff'],
+      });
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
+      }
+    };
+    frame();
+
+    // 中央からも大きく発射
+    confetti({
+      particleCount: 150,
+      spread: 100,
+      origin: { x: 0.5, y: 0.5 },
+      colors: ['#ff0000', '#ff6600', '#ffcc00', '#00cc00', '#0066ff', '#9900ff', '#ff69b4'],
+    });
+  }, []);
+
+  // 落札一覧を取得
+  const fetchWonItems = useCallback(async () => {
+    try {
+      const response = await axios.get(`/api/participant/auctions/${auctionId}/my-won-items`);
+      if (response.data.success) {
+        setWonItems(response.data.data.items);
+        setWonTotalAmount(response.data.data.total_amount);
+      }
+    } catch (err) {
+      console.error('落札一覧取得エラー:', err);
+    }
+  }, [auctionId]);
+
   // ライブ状態を取得
   const fetchLiveState = useCallback(async () => {
-    // ボタン操作中はポーリングをスキップ
     if (isPollingPaused || Object.values(bidLoading).some(Boolean)) {
       return;
     }
@@ -101,8 +185,14 @@ export default function AuctionLive() {
     try {
       const response = await axios.get(`/api/participant/auctions/${auctionId}/live`);
       if (response.data.success) {
-        setLiveState(response.data.data);
+        const data = response.data.data;
+        setLiveState(data);
         setError(null);
+
+        // 開始カウントダウン中の場合
+        if (data.status === 'starting' && data.starting_countdown) {
+          setStartingCountdown(data.starting_countdown);
+        }
       }
     } catch (err: any) {
       console.error('ライブ状態取得エラー:', err);
@@ -118,14 +208,43 @@ export default function AuctionLive() {
 
   useEffect(() => {
     fetchLiveState();
-    
-    // ポーリングは無効化（WebSocketのみで動作）
-    // 必要な場合は以下のコメントを外す
-    // const interval = setInterval(fetchLiveState, 30000);
-    // return () => clearInterval(interval);
+    fetchWonItems();
   }, [auctionId]);
 
-  // WebSocket連携（lane_idでマッチング - 複数レーン対応）
+  // 待機室用ポーリング（scheduledの場合のみ）
+  useEffect(() => {
+    if (liveState?.status === 'scheduled') {
+      const interval = setInterval(fetchLiveState, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [liveState?.status, fetchLiveState]);
+
+  // 開始カウントダウンタイマー
+  useEffect(() => {
+    if (startingCountdown !== null && startingCountdown > 0) {
+      countdownIntervalRef.current = setInterval(() => {
+        setStartingCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+      };
+    }
+  }, [startingCountdown !== null && startingCountdown > 0]);
+
+  // WebSocket連携
   useAuctionSocket({
     auctionId: Number(auctionId),
     onPriceUpdated: (event) => {
@@ -171,7 +290,6 @@ export default function AuctionLive() {
       setSocketConnected(true);
     },
     onLaneChanged: (event) => {
-      // レーン変更時は該当レーンのみ更新
       setLiveState((prev) => {
         if (!prev) return prev;
         return {
@@ -188,14 +306,15 @@ export default function AuctionLive() {
                     current_price: event.current_item.current_price,
                     is_premium: event.current_item.is_premium,
                     thumbnail_path: event.current_item.thumbnail_path,
-                    active_bidders_count: event.current_item.active_bidders_count || 0,
+                    active_bidders_count: (event.current_item as any).active_bidders_count || 0,
                     countdown_seconds: prev.countdown_seconds,
-                    my_bid_status: null, // 新商品なので入札していない
+                    my_bid_status: null,
                     estimated_price: event.current_item.estimated_price,
                     inspection_info: event.current_item.inspection_info,
                     individual_info: event.current_item.individual_info,
-                    media: event.current_item.media,
-                  } : null,
+                    media: (event.current_item as any).media,
+                  } as LaneItem : null,
+                  status: event.current_item ? 'active' : 'finished',
                 }
               : lane
           ),
@@ -204,20 +323,65 @@ export default function AuctionLive() {
       setSocketConnected(true);
     },
     onItemSold: (event) => {
-      setSnackbar({
-        open: true,
-        message: `商品が落札されました！`,
-        severity: 'success',
-      });
+      // 自分が落札した場合
+      if (event.winner_id === user?.id) {
+        // 紙吹雪演出
+        setCelebrationItem({
+          species_name: event.species_name || '商品',
+          winning_price: event.winning_price,
+        });
+        setShowCelebration(true);
+        fireCelebration();
+
+        // 3秒後に演出を非表示
+        setTimeout(() => {
+          setShowCelebration(false);
+          setCelebrationItem(null);
+        }, 4000);
+
+        // 落札一覧を更新
+        fetchWonItems();
+
+        setSnackbar({
+          open: true,
+          message: `🎉 おめでとうございます！${event.species_name || '商品'}を落札しました！`,
+          severity: 'success',
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: '商品が落札されました',
+          severity: 'success',
+        });
+      }
       setSocketConnected(true);
     },
     onAuctionStatus: (event) => {
-      setSnackbar({
-        open: true,
-        message: event.message,
-        severity: 'success',
-      });
-      fetchLiveState();
+      if (event.status === 'starting' && event.countdown_seconds) {
+        // 開始カウントダウン
+        setStartingCountdown(event.countdown_seconds);
+        setLiveState((prev) => prev ? { ...prev, status: 'starting' } : prev);
+      } else if (event.status === 'live') {
+        // オークション開始
+        setStartingCountdown(0);
+        fetchLiveState();
+      } else if (event.status === 'finished') {
+        // オークション終了
+        fetchLiveState();
+        fetchWonItems();
+        setSnackbar({
+          open: true,
+          message: event.message || 'オークションが終了しました',
+          severity: 'success',
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: event.message,
+          severity: 'success',
+        });
+        fetchLiveState();
+      }
       setSocketConnected(true);
     },
     onCountdownTick: (event) => {
@@ -261,7 +425,6 @@ export default function AuctionLive() {
           message: newStatus ? '入札に参加しました' : '入札から離脱しました',
           severity: 'success',
         });
-        // 状態を即時更新
         await fetchLiveState();
       }
     } catch (err: any) {
@@ -375,6 +538,156 @@ export default function AuctionLive() {
     return null;
   }
 
+  // ======== 待機室 ========
+  if (liveState.status === 'scheduled') {
+    return (
+      <Box sx={{
+        bgcolor: 'grey.100',
+        minHeight: 'calc(100vh - 64px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Paper elevation={6} sx={{ maxWidth: 500, mx: 2, p: 5, textAlign: 'center', borderRadius: 3 }}>
+          <TimerIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            {liveState.auction_title}
+          </Typography>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
+            オークション開始をお待ちください
+          </Typography>
+          <Box sx={{
+            bgcolor: 'primary.50',
+            border: '2px solid',
+            borderColor: 'primary.200',
+            borderRadius: 2,
+            p: 3,
+            mb: 3,
+          }}>
+            <CircularProgress size={30} sx={{ mb: 1 }} />
+            <Typography variant="body1" color="text.secondary">
+              まもなく開始されます...
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            開始されると自動的に画面が切り替わります
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // ======== 開始カウントダウン ========
+  if ((liveState.status === 'starting' || startingCountdown !== null) && startingCountdown !== null && startingCountdown > 0) {
+    return (
+      <Box sx={{
+        bgcolor: '#1a1a2e',
+        minHeight: 'calc(100vh - 64px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+      }}>
+        <Typography variant="h5" sx={{ color: 'white', mb: 2, fontWeight: 'bold' }}>
+          {liveState.auction_title}
+        </Typography>
+        <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)', mb: 4 }}>
+          オークションが間もなく開始されます
+        </Typography>
+        <Box sx={{
+          width: 180,
+          height: 180,
+          borderRadius: '50%',
+          border: '6px solid',
+          borderColor: 'primary.main',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mb: 4,
+          animation: 'pulse 1s infinite',
+          '@keyframes pulse': {
+            '0%': { boxShadow: '0 0 0 0 rgba(25, 118, 210, 0.5)' },
+            '70%': { boxShadow: '0 0 0 30px rgba(25, 118, 210, 0)' },
+            '100%': { boxShadow: '0 0 0 0 rgba(25, 118, 210, 0)' },
+          },
+        }}>
+          <Typography variant="h1" sx={{ color: 'white', fontWeight: 'bold', fontSize: '5rem' }}>
+            {startingCountdown}
+          </Typography>
+        </Box>
+        <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+          画像は同じ品種のイメージ画像です。実際の映像は詳細ボタンよりご確認ください。
+        </Typography>
+      </Box>
+    );
+  }
+
+  // ======== オークション終了画面 ========
+  if (liveState.status === 'finished') {
+    return (
+      <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)' }}>
+        <Container maxWidth="md" sx={{ py: 4 }}>
+          <Paper sx={{ p: 4, textAlign: 'center', mb: 3 }}>
+            <EmojiEventsIcon sx={{ fontSize: 60, color: 'warning.main', mb: 2 }} />
+            <Typography variant="h4" fontWeight="bold" gutterBottom>
+              オークション終了
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              {liveState.auction_title}
+            </Typography>
+          </Paper>
+
+          {wonItems.length > 0 && (
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <EmojiEventsIcon color="warning" />
+                あなたの落札結果
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>No.</TableCell>
+                      <TableCell>品種</TableCell>
+                      <TableCell align="right">単価</TableCell>
+                      <TableCell align="right">数量</TableCell>
+                      <TableCell align="right">合計(税込)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {wonItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.item_number}</TableCell>
+                        <TableCell>{item.species_name}</TableCell>
+                        <TableCell align="right">¥{Math.floor(item.winning_price).toLocaleString()}</TableCell>
+                        <TableCell align="right">{item.quantity}匹</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{Math.floor(item.total_amount).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                        合計金額
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'primary.main' }}>
+                        ¥{Math.floor(wonTotalAmount).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+
+          <Box sx={{ textAlign: 'center' }}>
+            <Button variant="contained" size="large" onClick={() => navigate('/participant/won-items')}>
+              落札管理へ
+            </Button>
+          </Box>
+        </Container>
+      </Box>
+    );
+  }
+
   // 自分の入札中アイテムを取得
   const myActiveBids = liveState.lanes
     .filter((lane) => lane.current_item?.my_bid_status === 'active')
@@ -397,7 +710,6 @@ export default function AuctionLive() {
             justifyContent: 'center',
           }}
         >
-          {/* ブラー背景 */}
           <Box
             sx={{
               position: 'absolute',
@@ -410,20 +722,19 @@ export default function AuctionLive() {
               bgcolor: 'rgba(0,0,0,0.4)',
             }}
           />
-          {/* 同意カード */}
           <Paper
             elevation={8}
             sx={{
               position: 'relative',
               zIndex: 1,
               maxWidth: 480,
-              width: '90%',
+              mx: 2,
               p: 4,
               borderRadius: 3,
               textAlign: 'center',
             }}
           >
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
               ご確認ください
             </Typography>
             <Divider sx={{ my: 2 }} />
@@ -443,6 +754,53 @@ export default function AuctionLive() {
         </Box>
       )}
 
+      {/* 落札おめでとう演出 */}
+      {showCelebration && celebrationItem && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1400,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <Paper
+            elevation={12}
+            sx={{
+              p: 4,
+              borderRadius: 3,
+              textAlign: 'center',
+              bgcolor: 'rgba(255,255,255,0.95)',
+              border: '3px solid',
+              borderColor: 'warning.main',
+              animation: 'celebrationPop 0.5s ease-out',
+              '@keyframes celebrationPop': {
+                '0%': { transform: 'scale(0.5)', opacity: 0 },
+                '50%': { transform: 'scale(1.1)' },
+                '100%': { transform: 'scale(1)', opacity: 1 },
+              },
+            }}
+          >
+            <Typography variant="h2" sx={{ mb: 1 }}>🎉</Typography>
+            <Typography variant="h5" fontWeight="bold" color="warning.dark" gutterBottom>
+              落札おめでとうございます！
+            </Typography>
+            <Typography variant="h6" gutterBottom>
+              {celebrationItem.species_name}
+            </Typography>
+            <Typography variant="h4" color="primary.main" fontWeight="bold">
+              ¥{Math.floor(celebrationItem.winning_price).toLocaleString()}
+            </Typography>
+          </Paper>
+        </Box>
+      )}
+
       {/* ヘッダー */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Container maxWidth="xl">
@@ -452,7 +810,7 @@ export default function AuctionLive() {
                 {liveState.auction_title}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {liveState.lanes.length}レーン同時進行中
+                {liveState.lanes.filter(l => l.status === 'active').length}/{liveState.lanes.length}レーン進行中
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -527,7 +885,6 @@ export default function AuctionLive() {
                   />
 
                   <CardContent>
-                    {/* 生体番号・品種名 */}
                     <Typography variant="caption" color="text.secondary">
                       No.{lane.current_item.item_number}
                     </Typography>
@@ -535,7 +892,6 @@ export default function AuctionLive() {
                       {lane.current_item.species_name}
                     </Typography>
 
-                    {/* 現在価格 */}
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="caption" color="text.secondary">
                         現在単価
@@ -549,7 +905,6 @@ export default function AuctionLive() {
                       </Typography>
                     </Box>
 
-                    {/* 入札者数・カウントダウン */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                       <Chip
                         label={`残り ${lane.current_item.countdown_seconds ?? 3}秒`}
@@ -596,7 +951,7 @@ export default function AuctionLive() {
                       レーン {lane.lane_number}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" align="center">
-                      待機中
+                      {lane.status === 'finished' ? '全出品終了' : '待機中'}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -627,6 +982,48 @@ export default function AuctionLive() {
             )}
           </Box>
         </Paper>
+
+        {/* 落札一覧パネル */}
+        {wonItems.length > 0 && (
+          <Paper sx={{ mt: 2, p: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <EmojiEventsIcon color="warning" />
+              あなたの落札一覧（{wonItems.length}件）
+            </Typography>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>No.</TableCell>
+                    <TableCell>品種</TableCell>
+                    <TableCell align="right">単価</TableCell>
+                    <TableCell align="right">数量</TableCell>
+                    <TableCell align="right">合計(税込)</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {wonItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.item_number}</TableCell>
+                      <TableCell>{item.species_name}</TableCell>
+                      <TableCell align="right">¥{Math.floor(item.winning_price).toLocaleString()}</TableCell>
+                      <TableCell align="right">{item.quantity}匹</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{Math.floor(item.total_amount).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold' }}>
+                      合計金額
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold', color: 'primary.main', fontSize: '1.1rem' }}>
+                      ¥{Math.floor(wonTotalAmount).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        )}
       </Container>
 
       {/* 詳細ダイアログ */}
@@ -661,15 +1058,38 @@ export default function AuctionLive() {
                   {mediaList.length > 1 && (
                     <Box sx={{ display: 'flex', gap: 1, mt: 1.5, overflowX: 'auto', pb: 0.5 }}>
                       {mediaList.map((m, i) => (
-                        <Box key={i} onClick={() => setSelectedMediaIndex(i)} sx={{
-                          width: 64, height: 64, flexShrink: 0, borderRadius: 1, overflow: 'hidden',
-                          border: i === selectedMediaIndex ? '2px solid' : '2px solid transparent',
-                          borderColor: i === selectedMediaIndex ? 'primary.main' : 'transparent',
-                          cursor: 'pointer', position: 'relative', bgcolor: 'grey.200',
-                        }}>
+                        <Box
+                          key={i}
+                          onClick={() => {
+                            if (m.type === 'video') {
+                              setVideoDialogUrl(m.url);
+                              setVideoDialogOpen(true);
+                            } else {
+                              setSelectedMediaIndex(i);
+                            }
+                          }}
+                          sx={{
+                            width: 64, height: 64, flexShrink: 0, borderRadius: 1, overflow: 'hidden',
+                            border: i === selectedMediaIndex ? '2px solid' : '2px solid transparent',
+                            borderColor: i === selectedMediaIndex ? 'primary.main' : 'transparent',
+                            cursor: 'pointer', position: 'relative', bgcolor: 'grey.200',
+                          }}
+                        >
                           {m.type === 'video' ? (
-                            <Box sx={{ width: '100%', height: '100%', bgcolor: 'grey.800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
+                            <Box sx={{ width: '100%', height: '100%', position: 'relative', bgcolor: 'black' }}>
+                              <video
+                                src={m.url}
+                                preload="metadata"
+                                muted
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                              <Box sx={{
+                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                bgcolor: 'rgba(0,0,0,0.3)',
+                              }}>
+                                <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
+                              </Box>
                             </Box>
                           ) : (
                             <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -750,10 +1170,31 @@ export default function AuctionLive() {
         </Typography>
       </Dialog>
 
+      {/* 動画全画面プレビュー */}
+      <Dialog
+        open={videoDialogOpen}
+        onClose={() => setVideoDialogOpen(false)}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none', m: 1, maxHeight: '98vh' } }}
+      >
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <IconButton
+            onClick={() => setVideoDialogOpen(false)}
+            sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {videoDialogUrl && (
+            <video src={videoDialogUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />
+          )}
+        </Box>
+      </Dialog>
+
       {/* スナックバー */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >

@@ -261,20 +261,32 @@ class LiveController extends Controller
 
             DB::commit();
 
-            // トランザクション完了後にカウントダウンを開始
-            foreach ($lanesToStart as $laneId) {
-                $lane = Lane::with(['auction', 'currentItem'])->find($laneId);
-                if ($lane && $lane->currentItem) {
-                    $this->countdownService->startCountdown($lane);
-                }
-            }
+            // 10秒カウントダウン開始をキャッシュに記録
+            $countdownSeconds = 10;
+            \Illuminate\Support\Facades\Cache::put(
+                "auction:{$auction->id}:start_at",
+                now()->addSeconds($countdownSeconds)->timestamp,
+                120
+            );
+
+            // 開始予告イベントをブロードキャスト（カウントダウン付き）
+            broadcast(new AuctionStatusChanged(
+                $auction->id,
+                'starting',
+                'オークションが間もなく開始されます',
+                $countdownSeconds
+            ));
+
+            // レーン情報をキャッシュに保存（ジョブ側でカウントダウン後に開始するため）
+            \Illuminate\Support\Facades\Cache::put(
+                "auction:{$auction->id}:lanes_to_start",
+                $lanesToStart,
+                120
+            );
 
             // オークション全体のカウントダウンジョブをディスパッチ（1つで全レーン処理）
             ProcessAuctionCountdownJob::dispatch($auction->id);
-            \Log::info("Dispatched auction countdown job for auction {$auction->id}");
-
-            // ステータス変更イベントをブロードキャスト
-            broadcast(new AuctionStatusChanged($auction->id, 'live', 'オークションが開始されました'));
+            \Log::info("Dispatched auction countdown job for auction {$auction->id} with {$countdownSeconds}s pre-start countdown");
 
             return response()->json([
                 'success' => true,

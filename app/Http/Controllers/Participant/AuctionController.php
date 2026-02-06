@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
+use App\Models\WonItem;
 use App\Services\BidService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class AuctionController extends Controller
 {
@@ -115,8 +117,22 @@ class AuctionController extends Controller
     {
         $auction = Auction::findOrFail($id);
         
-        // ライブ中のみアクセス可能
-        if ($auction->status !== 'live') {
+        // 待機室: scheduledステータスの場合
+        if ($auction->status === 'scheduled') {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'auction_id' => $auction->id,
+                    'auction_title' => $auction->title,
+                    'status' => 'scheduled',
+                    'countdown_seconds' => 0,
+                    'lanes' => [],
+                ],
+            ]);
+        }
+        
+        // ライブ中 or 終了済み
+        if (!in_array($auction->status, ['live', 'finished'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'オークションは開催中ではありません。',
@@ -126,9 +142,56 @@ class AuctionController extends Controller
         $userId = Auth::id();
         $liveState = $this->bidService->getLiveState($auction, $userId);
         
+        // 開始カウントダウン中かチェック
+        $startAt = Cache::get("auction:{$auction->id}:start_at");
+        if ($startAt) {
+            $remaining = max(0, $startAt - now()->timestamp);
+            if ($remaining > 0) {
+                $liveState['status'] = 'starting';
+                $liveState['starting_countdown'] = $remaining;
+            }
+        }
+        
         return response()->json([
             'success' => true,
             'data' => $liveState,
+        ]);
+    }
+
+    /**
+     * オークション内の自分の落札一覧を取得
+     */
+    public function myWonItems($auctionId)
+    {
+        $userId = Auth::id();
+        
+        $wonItems = WonItem::where('winner_id', $userId)
+            ->whereHas('item', function ($q) use ($auctionId) {
+                $q->where('auction_id', $auctionId);
+            })
+            ->with('item')
+            ->get();
+        
+        $totalAmount = 0;
+        $items = $wonItems->map(function ($wi) use (&$totalAmount) {
+            $totalAmount += $wi->total_amount;
+            return [
+                'id' => $wi->id,
+                'item_number' => $wi->item->item_number,
+                'species_name' => $wi->item->species_name,
+                'quantity' => $wi->item->quantity,
+                'winning_price' => $wi->winning_price,
+                'total_amount' => $wi->total_amount,
+            ];
+        });
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'items' => $items,
+                'total_amount' => $totalAmount,
+                'count' => $wonItems->count(),
+            ],
         ]);
     }
 
