@@ -55,7 +55,7 @@ const sellerSponsoredAds: SponsoredAd[] = [
     id: 1,
     title: 'プロ仕様 繁殖用ヒーター「温極」',
     description: '安定した水温管理で繁殖成功率UP！省エネ設計で電気代も節約。ブリーダー様に大好評',
-    image_url: '/img/medaka/03.png',
+    image_url: '/img/noimage.png',
     link_url: 'https://example.com/heater',
     advertiser: 'アクアヒート工業',
     badge: '送料無料',

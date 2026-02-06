@@ -330,7 +330,7 @@ export default function WonItems() {
                 <Grid item xs={12} sm={3}>
                   <CardMedia
                     component="img"
-                    image={wonItem.item.thumbnail_path || '/img/medaka/01.png'}
+                    image={wonItem.item.thumbnail_path || '/img/noimage.png'}
                     alt={wonItem.item.species_name}
                     sx={{ borderRadius: 2, height: 120, objectFit: 'cover' }}
                   />

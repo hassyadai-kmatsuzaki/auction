@@ -403,7 +403,7 @@ export default function AuctionLive() {
                   <CardMedia
                     component="img"
                     height="200"
-                    image={lane.current_item.thumbnail_path || '/img/medaka/01.png'}
+                    image={lane.current_item.thumbnail_path || '/img/noimage.png'}
                     alt={lane.current_item.species_name}
                   />
 
@@ -531,7 +531,7 @@ export default function AuctionLive() {
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <img
-                src={selectedItem?.thumbnail_path || '/img/medaka/01.png'}
+                src={selectedItem?.thumbnail_path || '/img/noimage.png'}
                 alt={selectedItem?.species_name}
                 style={{ width: '100%', borderRadius: 8 }}
               />

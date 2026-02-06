@@ -504,7 +504,7 @@ export default function LiveControl() {
                   <CardMedia
                         component="img"
                         height={120}
-                        image={lane.current_item.thumbnail_path || '/img/medaka/01.png'}
+                        image={lane.current_item.thumbnail_path || '/img/noimage.png'}
                         alt={lane.current_item.species_name}
                         sx={{ objectFit: 'cover' }}
                       />
@@ -682,7 +682,7 @@ export default function LiveControl() {
                               <TableCell>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                   <Avatar
-                                    src={item.thumbnail_path || '/img/medaka/01.png'}
+                                    src={item.thumbnail_path || '/img/noimage.png'}
                                     variant="rounded"
                                     sx={{ width: 32, height: 32 }}
                                   />

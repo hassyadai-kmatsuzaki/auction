@@ -246,7 +246,7 @@ export default function AuctionItems() {
                   <CardMedia
                     component="img"
                     height="160"
-                  image={item.thumbnail_path || '/img/medaka/01.png'}
+                  image={item.thumbnail_path || '/img/noimage.png'}
                     alt={item.species_name}
                   />
 
@@ -350,7 +350,7 @@ export default function AuctionItems() {
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <img
-                src={selectedItem?.thumbnail_path || '/img/medaka/01.png'}
+                src={selectedItem?.thumbnail_path || '/img/noimage.png'}
                 alt={selectedItem?.species_name}
                 style={{ width: '100%', borderRadius: 8 }}
               />
