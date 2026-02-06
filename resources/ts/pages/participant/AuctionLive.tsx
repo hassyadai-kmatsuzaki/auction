@@ -297,8 +297,9 @@ export default function AuctionLive() {
     }
     if (item.media && item.media.length > 0) {
       item.media.forEach((m: any) => {
-        const url = m.file_path || m.url;
+        const url = m.file_url || m.file_path || m.url;
         if (!url) return;
+        if (m.is_thumbnail && item.thumbnail_path) return;
         if (item.thumbnail_path && url === item.thumbnail_path) return;
         const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
         list.push({ type: isVideo ? 'video' : 'image', url });

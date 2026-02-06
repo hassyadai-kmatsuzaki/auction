@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class ItemMedia extends Model
 {
@@ -48,6 +49,37 @@ class ItemMedia extends Model
         'display_order' => 'integer',
         'is_thumbnail' => 'boolean',
     ];
+
+    /**
+     * シリアライズ時にfile_urlを自動追加
+     */
+    protected $appends = ['file_url'];
+
+    /**
+     * file_url アクセサ - file_pathからフルURLを生成
+     */
+    public function getFileUrlAttribute(): ?string
+    {
+        if (!$this->file_path) {
+            return null;
+        }
+
+        // 既にフルURLの場合はそのまま返す
+        if (str_starts_with($this->file_path, 'http://') || str_starts_with($this->file_path, 'https://')) {
+            return $this->file_path;
+        }
+
+        // S3が有効か判定
+        $key = config('filesystems.disks.s3.key');
+        $bucket = config('filesystems.disks.s3.bucket');
+
+        if (!empty($key) && !empty($bucket) && class_exists(\Aws\S3\S3Client::class)) {
+            return Storage::disk('s3')->url($this->file_path);
+        }
+
+        // publicディスクの場合
+        return config('app.url') . '/storage/' . $this->file_path;
+    }
 
     /**
      * 商品とのリレーション
