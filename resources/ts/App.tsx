@@ -20,6 +20,7 @@ import AuctionList from './pages/participant/AuctionList';
 import AuctionItems from './pages/participant/AuctionItems';
 import AuctionLive from './pages/participant/AuctionLive';
 import WonItems from './pages/participant/WonItems';
+import Favorites from './pages/participant/Favorites';
 import ParticipantSettings from './pages/participant/Settings';
 import ParticipantManual from './pages/participant/Manual';
 
@@ -106,8 +107,8 @@ function App() {
             <Route path="auctions" element={<AuctionList />} />
             <Route path="auction/:auctionId/items" element={<AuctionItems />} />
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
+            <Route path="favorites" element={<Favorites />} />
             <Route path="won-items" element={<WonItems />} />
-            <Route path="won-items/:id" element={<NotFound />} /> {/* 落札詳細は未実装のため404 */}
             <Route path="manual" element={<ParticipantManual />} />
             <Route path="settings" element={<ParticipantSettings />} />
           </Route>

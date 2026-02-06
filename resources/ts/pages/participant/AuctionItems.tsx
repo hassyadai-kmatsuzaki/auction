@@ -37,6 +37,8 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
+  FavoriteBorder as FavoriteBorderIcon,
+  Favorite as FavoriteIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -85,6 +87,7 @@ export default function AuctionItems() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
 
   // データ取得
   const fetchItems = useCallback(async () => {
@@ -104,9 +107,30 @@ export default function AuctionItems() {
     }
   }, [auctionId]);
 
+  // お気に入り状態を取得
+  const fetchFavorites = useCallback(async (itemIds: number[]) => {
+    if (itemIds.length === 0) return;
+    try {
+      const response = await axios.post('/api/participant/favorites/check', { item_ids: itemIds });
+      if (response.data.success) {
+        setFavoriteIds(new Set(response.data.data.favorite_item_ids));
+      }
+    } catch {
+      // サイレントに失敗
+    }
+  }, []);
+
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  // アイテム取得後にお気に入りチェック
+  useEffect(() => {
+    const allIds = lanes.flatMap(lane => lane.items.map(item => item.id));
+    if (allIds.length > 0) {
+      fetchFavorites(allIds);
+    }
+  }, [lanes, fetchFavorites]);
 
   const handleLaneChange = (_event: React.SyntheticEvent, newValue: number) => {
     setSelectedLane(newValue);
@@ -150,6 +174,27 @@ export default function AuctionItems() {
   const openLightbox = (index: number) => {
     setLightboxIndex(index);
     setLightboxOpen(true);
+  };
+
+  // お気に入りトグル
+  const handleFavoriteToggle = async (e: React.MouseEvent, itemId: number) => {
+    e.stopPropagation();
+    try {
+      const response = await axios.post('/api/participant/favorites/toggle', { item_id: itemId });
+      if (response.data.success) {
+        setFavoriteIds(prev => {
+          const next = new Set(prev);
+          if (response.data.is_favorited) {
+            next.add(itemId);
+          } else {
+            next.delete(itemId);
+          }
+          return next;
+        });
+      }
+    } catch {
+      // サイレントに失敗
+    }
   };
 
   // 現在選択されているレーンのアイテム
@@ -264,6 +309,28 @@ export default function AuctionItems() {
                   }}
                 onClick={() => handleDetailOpen(item)}
                 >
+                  {/* お気に入りボタン */}
+                  <IconButton
+                    onClick={(e) => handleFavoriteToggle(e, item.id)}
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      left: 4,
+                      zIndex: 2,
+                      bgcolor: 'rgba(255,255,255,0.85)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
+                      width: 32,
+                      height: 32,
+                    }}
+                    size="small"
+                  >
+                    {favoriteIds.has(item.id) ? (
+                      <FavoriteIcon sx={{ color: '#ef4444', fontSize: 20 }} />
+                    ) : (
+                      <FavoriteBorderIcon sx={{ color: 'grey.500', fontSize: 20 }} />
+                    )}
+                  </IconButton>
+
                   {/* プレミアムバッジ */}
                   {item.is_premium && (
                     <Chip
@@ -281,9 +348,9 @@ export default function AuctionItems() {
 
                   <CardMedia
                     component="img"
-                    height="160"
-                  image={item.thumbnail_path || '/img/noimage.png'}
+                    image={item.thumbnail_path || '/img/noimage.png'}
                     alt={item.species_name}
+                    sx={{ aspectRatio: '3/2', objectFit: 'cover' }}
                   />
 
                   <CardContent>
@@ -354,9 +421,18 @@ export default function AuctionItems() {
                     {getStatusChip(item.status)}
                     </TableCell>
                     <TableCell align="center">
-                      <IconButton size="small" color="primary">
-                        <InfoIcon />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <IconButton size="small" onClick={(e) => handleFavoriteToggle(e, item.id)}>
+                          {favoriteIds.has(item.id) ? (
+                            <FavoriteIcon sx={{ color: '#ef4444', fontSize: 18 }} />
+                          ) : (
+                            <FavoriteBorderIcon sx={{ color: 'grey.500', fontSize: 18 }} />
+                          )}
+                        </IconButton>
+                        <IconButton size="small" color="primary">
+                          <InfoIcon />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
               ))}

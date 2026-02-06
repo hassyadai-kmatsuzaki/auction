@@ -24,6 +24,7 @@ use App\Http\Controllers\Participant\AuctionController as ParticipantAuctionCont
 use App\Http\Controllers\Participant\BidController as ParticipantBidController;
 use App\Http\Controllers\Participant\WonItemController as ParticipantWonItemController;
 use App\Http\Controllers\Participant\SettingsController as ParticipantSettingsController;
+use App\Http\Controllers\Participant\FavoriteController as ParticipantFavoriteController;
 use App\Http\Controllers\NotificationTestController;
 use App\Http\Controllers\ManualController;
 
@@ -191,6 +192,11 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
     Route::put('/won-items/{id}/address', [ParticipantWonItemController::class, 'updateAddress']);
     
+    // お気に入り
+    Route::get('/favorites', [ParticipantFavoriteController::class, 'index']);
+    Route::post('/favorites/toggle', [ParticipantFavoriteController::class, 'toggle']);
+    Route::post('/favorites/check', [ParticipantFavoriteController::class, 'checkBulk']);
+
     // 設定
     Route::get('/settings', [ParticipantSettingsController::class, 'index']);
     Route::put('/settings/profile', [ParticipantSettingsController::class, 'updateProfile']);

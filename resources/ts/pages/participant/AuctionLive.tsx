@@ -499,9 +499,9 @@ export default function AuctionLive() {
                   {/* サムネイル */}
                   <CardMedia
                     component="img"
-                    height="200"
                     image={lane.current_item.thumbnail_path || '/img/noimage.png'}
                     alt={lane.current_item.species_name}
+                    sx={{ aspectRatio: '3/2', objectFit: 'cover' }}
                   />
 
                   <CardContent>

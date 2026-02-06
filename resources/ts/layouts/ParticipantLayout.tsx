@@ -25,6 +25,7 @@ import {
   List as ListIcon,
   Settings as SettingsIcon,
   MenuBook as MenuBookIcon,
+  Favorite as FavoriteIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -38,6 +39,7 @@ export default function ParticipantLayout() {
   const menuItems = [
     { text: 'ホーム', icon: <HomeIcon />, path: '/participant/home' },
     { text: 'オークション', icon: <GavelIcon />, path: '/participant/auctions' },
+    { text: 'お気に入り', icon: <FavoriteIcon />, path: '/participant/favorites' },
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
     { text: 'マニュアル', icon: <MenuBookIcon />, path: '/participant/manual' },
     { text: '設定', icon: <SettingsIcon />, path: '/participant/settings' },

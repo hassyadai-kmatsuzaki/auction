@@ -11,6 +11,8 @@ import {
   Button,
   TextField,
   Paper,
+  Tabs,
+  Tab,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -88,11 +90,26 @@ const getTrackingUrl = (trackingNumber: string, company: string) => {
   }
 };
 
+// タブ定義
+type FilterTab = 'all' | 'payment_pending' | 'shipping_pending' | 'shipped' | 'completed';
+
+interface DefaultAddress {
+  postal_code: string;
+  prefecture: string;
+  city: string;
+  address_line1: string;
+  address_line2: string;
+  name: string;
+  phone: string;
+}
+
 export default function WonItems() {
   const [wonItems, setWonItems] = useState<WonItemData[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [defaultAddress, setDefaultAddress] = useState<DefaultAddress | null>(null);
   
   const [editAddressOpen, setEditAddressOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WonItemData | null>(null);
@@ -119,6 +136,7 @@ export default function WonItems() {
 
   useEffect(() => {
     fetchWonItems();
+    fetchDefaultAddress();
   }, []);
 
   const fetchWonItems = async () => {
@@ -130,12 +148,60 @@ export default function WonItems() {
         setSummary(response.data.data.summary);
       }
     } catch (err: any) {
-      console.error('落札商品取得エラー:', err);
       setError('落札商品の取得に失敗しました。');
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchDefaultAddress = async () => {
+    try {
+      const response = await axios.get('/api/participant/settings');
+      if (response.data.success) {
+        const p = response.data.data.profile;
+        if (p.postal_code && p.prefecture && p.city && p.address_line1) {
+          setDefaultAddress({
+            postal_code: p.postal_code || '',
+            prefecture: p.prefecture || '',
+            city: p.city || '',
+            address_line1: p.address_line1 || '',
+            address_line2: p.address_line2 || '',
+            name: p.name || '',
+            phone: p.phone || '',
+          });
+        }
+      }
+    } catch {
+      // サイレント
+    }
+  };
+
+  // タブフィルタ
+  const getFilteredItems = () => {
+    switch (activeTab) {
+      case 'payment_pending':
+        return wonItems.filter(i => i.payment_status === 'pending');
+      case 'shipping_pending':
+        return wonItems.filter(i => ['paid', 'confirmed'].includes(i.payment_status) && ['pending', 'preparing'].includes(i.delivery_status));
+      case 'shipped':
+        return wonItems.filter(i => i.delivery_status === 'shipped');
+      case 'completed':
+        return wonItems.filter(i => i.delivery_status === 'completed');
+      default:
+        return wonItems;
+    }
+  };
+
+  const getTabCounts = () => ({
+    all: wonItems.length,
+    payment_pending: wonItems.filter(i => i.payment_status === 'pending').length,
+    shipping_pending: wonItems.filter(i => ['paid', 'confirmed'].includes(i.payment_status) && ['pending', 'preparing'].includes(i.delivery_status)).length,
+    shipped: wonItems.filter(i => i.delivery_status === 'shipped').length,
+    completed: wonItems.filter(i => i.delivery_status === 'completed').length,
+  });
+
+  const filteredItems = getFilteredItems();
+  const tabCounts = getTabCounts();
 
   const handleEditAddress = async (item: WonItemData) => {
     try {
@@ -143,20 +209,43 @@ export default function WonItems() {
       const response = await axios.get(`/api/participant/won-items/${item.id}`);
       if (response.data.success) {
         const detail = response.data.data.won_item;
-        setAddressForm({
-          shipping_postal_code: detail.shipping_postal_code || '',
-          shipping_prefecture: detail.shipping_prefecture || '',
-          shipping_city: detail.shipping_city || '',
-          shipping_address_line1: detail.shipping_address_line1 || '',
-          shipping_address_line2: detail.shipping_address_line2 || '',
-          shipping_name: detail.shipping_name || '',
-          shipping_phone: detail.shipping_phone || '',
-        });
+        // 既に配送先が設定されていればそれを使う、なければデフォルト配送先を使う
+        const hasExisting = detail.shipping_postal_code;
+        if (hasExisting) {
+          setAddressForm({
+            shipping_postal_code: detail.shipping_postal_code || '',
+            shipping_prefecture: detail.shipping_prefecture || '',
+            shipping_city: detail.shipping_city || '',
+            shipping_address_line1: detail.shipping_address_line1 || '',
+            shipping_address_line2: detail.shipping_address_line2 || '',
+            shipping_name: detail.shipping_name || '',
+            shipping_phone: detail.shipping_phone || '',
+          });
+        } else if (defaultAddress) {
+          setAddressForm({
+            shipping_postal_code: defaultAddress.postal_code,
+            shipping_prefecture: defaultAddress.prefecture,
+            shipping_city: defaultAddress.city,
+            shipping_address_line1: defaultAddress.address_line1,
+            shipping_address_line2: defaultAddress.address_line2,
+            shipping_name: defaultAddress.name,
+            shipping_phone: defaultAddress.phone,
+          });
+        } else {
+          setAddressForm({
+            shipping_postal_code: '',
+            shipping_prefecture: '',
+            shipping_city: '',
+            shipping_address_line1: '',
+            shipping_address_line2: '',
+            shipping_name: '',
+            shipping_phone: '',
+          });
+        }
         setEditingItem(item);
         setEditAddressOpen(true);
       }
-    } catch (err) {
-      console.error('詳細取得エラー:', err);
+    } catch {
       setSnackbar({
         open: true,
         message: '情報の取得に失敗しました',
@@ -315,15 +404,32 @@ export default function WonItems() {
         </Grid>
       )}
 
+      {/* タブフィルター */}
+      <Paper sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => setActiveTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label={`すべて (${tabCounts.all})`} value="all" />
+          <Tab label={`支払い待ち (${tabCounts.payment_pending})`} value="payment_pending" />
+          <Tab label={`発送待ち (${tabCounts.shipping_pending})`} value="shipping_pending" />
+          <Tab label={`配送中 (${tabCounts.shipped})`} value="shipped" />
+          <Tab label={`配達完了 (${tabCounts.completed})`} value="completed" />
+        </Tabs>
+      </Paper>
+
       {/* 落札商品一覧 */}
-      {wonItems.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
-            落札した商品はまだありません。
+            {activeTab === 'all' ? '落札した商品はまだありません。' : '該当する商品はありません。'}
           </Typography>
         </Paper>
       ) : (
-        wonItems.map((wonItem) => (
+        filteredItems.map((wonItem) => (
           <Card key={wonItem.id} sx={{ mb: 3 }}>
             <CardContent sx={{ p: 3 }}>
               <Grid container spacing={3}>
@@ -332,7 +438,7 @@ export default function WonItems() {
                     component="img"
                     image={wonItem.item.thumbnail_path || '/img/noimage.png'}
                     alt={wonItem.item.species_name}
-                    sx={{ borderRadius: 2, height: 120, objectFit: 'cover' }}
+                    sx={{ borderRadius: 2, aspectRatio: '3/2', objectFit: 'cover', width: '100%' }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={9}>
