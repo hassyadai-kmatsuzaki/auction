@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -28,6 +29,9 @@ import {
   Pets as PetsIcon,
   Star as StarIcon,
   Refresh as RefreshIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -46,6 +50,7 @@ interface LaneItem {
 interface Lane {
   id: number;
   lane_number: number;
+  lane_name: string | null;
   status: string;
   items: LaneItem[];
 }
@@ -94,6 +99,10 @@ export default function LaneAssignment() {
 
   // 一括解除
   const [bulkUnassignLoading, setBulkUnassignLoading] = useState(false);
+
+  // レーン管理
+  const [addingLane, setAddingLane] = useState(false);
+  const [editingLaneName, setEditingLaneName] = useState<{ id: number; name: string } | null>(null);
 
   // 操作中フラグ（二重送信防止）
   const [operating, setOperating] = useState(false);
@@ -253,6 +262,57 @@ export default function LaneAssignment() {
     }
   };
 
+  // レーン追加
+  const handleAddLane = async () => {
+    try {
+      setAddingLane(true);
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/create`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'レーン追加に失敗しました', severity: 'error' });
+    } finally {
+      setAddingLane(false);
+    }
+  };
+
+  // レーン削除
+  const handleDeleteLane = async (laneId: number, laneNumber: number, itemCount: number) => {
+    const msg = itemCount > 0
+      ? `レーン${laneNumber}には${itemCount}件の割り当てがあります。削除すると未割当に戻ります。削除しますか？`
+      : `レーン${laneNumber}を削除しますか？`;
+    if (!confirm(msg)) return;
+
+    try {
+      setOperating(true);
+      const response = await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${laneId}`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'レーン削除に失敗しました', severity: 'error' });
+    } finally {
+      setOperating(false);
+    }
+  };
+
+  // レーン名変更
+  const handleSaveLaneName = async () => {
+    if (!editingLaneName) return;
+    try {
+      setOperating(true);
+      await axios.put(`/api/admin/auctions/${auctionId}/lanes/${editingLaneName.id}`, {
+        lane_name: editingLaneName.name || null,
+      });
+      setSnackbar({ open: true, message: 'レーン名を更新しました。', severity: 'success' });
+      setEditingLaneName(null);
+      fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'レーン名の更新に失敗しました', severity: 'error' });
+    } finally {
+      setOperating(false);
+    }
+  };
+
   // =============================================
   // ドロップインジケーター
   // =============================================
@@ -330,13 +390,24 @@ export default function LaneAssignment() {
             </Typography>
           </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             startIcon={<RefreshIcon />}
             onClick={fetchData}
             variant="outlined"
+            size="small"
           >
             更新
+          </Button>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={handleAddLane}
+            variant="outlined"
+            color="success"
+            size="small"
+            disabled={auction?.status === 'live' || addingLane || lanes.length >= 10}
+          >
+            {addingLane ? <CircularProgress size={18} /> : 'レーン追加'}
           </Button>
           {statistics && statistics.assigned_items > 0 && (
             <Button
@@ -344,9 +415,10 @@ export default function LaneAssignment() {
               onClick={handleBulkUnassign}
               variant="outlined"
               color="error"
+              size="small"
               disabled={auction?.status === 'live' || bulkUnassignLoading}
             >
-              {bulkUnassignLoading ? <CircularProgress size={20} /> : '一括解除'}
+              {bulkUnassignLoading ? <CircularProgress size={18} /> : '一括解除'}
             </Button>
           )}
           <Button
@@ -354,6 +426,7 @@ export default function LaneAssignment() {
             onClick={() => setAutoAssignDialogOpen(true)}
             variant="contained"
             color="primary"
+            size="small"
             disabled={auction?.status === 'live'}
           >
             自動割当
@@ -482,14 +555,44 @@ export default function LaneAssignment() {
                   onDrop={() => handleDropOnLane(lane.id)}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      レーン {lane.lane_number}
-                    </Typography>
-                    <Chip
-                      label={`${lane.items.length}件`}
-                      size="small"
-                      color={lane.items.length > 0 ? 'success' : 'default'}
-                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, flexShrink: 0 }}>
+                        レーン {lane.lane_number}
+                      </Typography>
+                      {lane.lane_name && (
+                        <Typography variant="body2" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          ({lane.lane_name})
+                        </Typography>
+                      )}
+                      {auction?.status !== 'live' && (
+                        <Tooltip title="レーン名を編集">
+                          <IconButton
+                            size="small"
+                            onClick={() => setEditingLaneName({ id: lane.id, name: lane.lane_name || '' })}
+                          >
+                            <EditIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Chip
+                        label={`${lane.items.length}件`}
+                        size="small"
+                        color={lane.items.length > 0 ? 'success' : 'default'}
+                      />
+                      {auction?.status !== 'live' && lanes.length > 1 && (
+                        <Tooltip title="このレーンを削除">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteLane(lane.id, lane.lane_number, lane.items.length)}
+                          >
+                            <CloseIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </Box>
 
                   {lane.items.length === 0 ? (
@@ -629,6 +732,28 @@ export default function LaneAssignment() {
             color="primary"
           >
             {autoAssignLoading ? <CircularProgress size={20} /> : 'クリアして再割当'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* レーン名編集ダイアログ */}
+      <Dialog open={!!editingLaneName} onClose={() => setEditingLaneName(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>レーン名を編集</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="レーン名（任意）"
+            value={editingLaneName?.name || ''}
+            onChange={(e) => setEditingLaneName(prev => prev ? { ...prev, name: e.target.value } : null)}
+            placeholder="例: 熱帯魚、爬虫類"
+            sx={{ mt: 1 }}
+            helperText="空欄にするとレーン番号のみ表示されます"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingLaneName(null)}>キャンセル</Button>
+          <Button onClick={handleSaveLaneName} variant="contained" disabled={operating}>
+            {operating ? <CircularProgress size={20} /> : '保存'}
           </Button>
         </DialogActions>
       </Dialog>

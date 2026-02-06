@@ -7,6 +7,7 @@ use App\Models\Auction;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
@@ -240,9 +241,29 @@ class AuctionController extends Controller
             'custom_shipping_settings' => $request->input('custom_shipping_settings'),
         ]);
 
+        // レーン数が減った場合、余分なレーンを削除
+        if ($newLaneCount < $oldLaneCount) {
+            $lanesToRemove = $auction->lanes()
+                ->where('lane_number', '>', $newLaneCount)
+                ->pluck('id');
+
+            if ($lanesToRemove->isNotEmpty()) {
+                // 削除対象レーンに割り当てられたアイテムを解除
+                DB::table('lane_items')
+                    ->whereIn('lane_id', $lanesToRemove)
+                    ->delete();
+
+                // レーンを削除
+                $auction->lanes()
+                    ->whereIn('id', $lanesToRemove)
+                    ->delete();
+            }
+        }
+
         // レーン数が増えた場合、新しいレーンを作成
         if ($newLaneCount > $oldLaneCount) {
-            for ($i = $oldLaneCount + 1; $i <= $newLaneCount; $i++) {
+            $maxLaneNumber = $auction->lanes()->max('lane_number') ?? 0;
+            for ($i = $maxLaneNumber + 1; $i <= $maxLaneNumber + ($newLaneCount - $oldLaneCount); $i++) {
                 $auction->lanes()->firstOrCreate(
                     ['lane_number' => $i],
                     ['status' => 'waiting']
@@ -462,7 +483,7 @@ class AuctionController extends Controller
 
             if ($lanesToRemove->isNotEmpty()) {
                 // 削除対象レーンに割り当てられたアイテムを解除
-                \Illuminate\Support\Facades\DB::table('lane_items')
+                DB::table('lane_items')
                     ->whereIn('lane_id', $lanesToRemove)
                     ->delete();
 
@@ -477,7 +498,8 @@ class AuctionController extends Controller
 
         // レーン数が増えた場合、新しいレーンを作成
         if ($newLaneCount > $oldLaneCount) {
-            for ($i = $oldLaneCount + 1; $i <= $newLaneCount; $i++) {
+            $maxLaneNumber = $auction->lanes()->max('lane_number') ?? 0;
+            for ($i = $maxLaneNumber + 1; $i <= $maxLaneNumber + ($newLaneCount - $oldLaneCount); $i++) {
                 $auction->lanes()->firstOrCreate(
                     ['lane_number' => $i],
                     ['status' => 'waiting']

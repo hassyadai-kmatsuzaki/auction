@@ -476,6 +476,7 @@ class BidService
             $laneData = [
                 'lane_id' => $lane->id,
                 'lane_number' => $lane->lane_number,
+                'lane_name' => $lane->lane_name,
                 'status' => $lane->status,
                 'current_item' => null,
             ];

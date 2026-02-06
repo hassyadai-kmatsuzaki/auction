@@ -17,6 +17,7 @@ class Lane extends Model
     protected $fillable = [
         'auction_id',
         'lane_number',
+        'lane_name',
         'current_item_id',
         'status',
     ];

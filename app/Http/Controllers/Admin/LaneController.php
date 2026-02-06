@@ -19,8 +19,10 @@ class LaneController extends Controller
     {
         $auction = Auction::findOrFail($auctionId);
         
-        // レーンを作成（なければ）
-        $this->createLanesIfNeeded($auction);
+        // レーンが1つもない場合のみ初期レーンを作成
+        if ($auction->lanes()->count() === 0) {
+            $this->createInitialLanes($auction);
+        }
         
         $lanes = $auction->lanes()
             ->with(['items' => function ($query) {
@@ -51,6 +53,7 @@ class LaneController extends Controller
                     return [
                         'id' => $lane->id,
                         'lane_number' => $lane->lane_number,
+                        'lane_name' => $lane->lane_name,
                         'status' => $lane->status,
                         'items' => $lane->items->map(function ($item) {
                             return [
@@ -85,6 +88,142 @@ class LaneController extends Controller
                     'unassigned_items' => $unassignedItems->count(),
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * レーンを追加
+     */
+    public function createLane(Request $request, $auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションにレーンを追加できません。',
+            ], 400);
+        }
+
+        // 最大10レーン
+        $currentCount = $auction->lanes()->count();
+        if ($currentCount >= 10) {
+            return response()->json([
+                'success' => false,
+                'message' => 'レーンは最大10個までです。',
+            ], 400);
+        }
+
+        // 次のレーン番号を取得
+        $maxLaneNumber = $auction->lanes()->max('lane_number') ?? 0;
+        $newLaneNumber = $maxLaneNumber + 1;
+
+        $laneName = $request->input('lane_name', null);
+
+        $lane = Lane::create([
+            'auction_id' => $auction->id,
+            'lane_number' => $newLaneNumber,
+            'lane_name' => $laneName,
+            'status' => 'waiting',
+        ]);
+
+        // auction.lane_count を同期
+        $this->syncLaneCount($auction);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'レーン' . $newLaneNumber . 'を追加しました。',
+            'data' => [
+                'lane' => [
+                    'id' => $lane->id,
+                    'lane_number' => $lane->lane_number,
+                    'lane_name' => $lane->lane_name,
+                    'status' => $lane->status,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * レーンを削除（空のレーンのみ）
+     */
+    public function deleteLane($auctionId, $laneId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションのレーンを削除できません。',
+            ], 400);
+        }
+
+        $lane = Lane::where('auction_id', $auctionId)->where('id', $laneId)->firstOrFail();
+
+        // レーンにアイテムが割り当てられている場合
+        $itemCount = DB::table('lane_items')->where('lane_id', $laneId)->count();
+        if ($itemCount > 0) {
+            // アイテムを先に解除
+            DB::table('lane_items')->where('lane_id', $laneId)->delete();
+        }
+
+        // 最低1レーンは必要
+        if ($auction->lanes()->count() <= 1) {
+            return response()->json([
+                'success' => false,
+                'message' => '最低1つのレーンが必要です。',
+            ], 400);
+        }
+
+        $deletedNumber = $lane->lane_number;
+        $lane->delete();
+
+        // 残りのレーンの番号を詰め直す
+        $this->renumberLanes($auction);
+
+        // auction.lane_count を同期
+        $this->syncLaneCount($auction);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'レーン' . $deletedNumber . 'を削除しました。' . ($itemCount > 0 ? "（{$itemCount}件の割り当ても解除されました）" : ''),
+        ]);
+    }
+
+    /**
+     * レーン名を更新
+     */
+    public function updateLane(Request $request, $auctionId, $laneId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションのレーンを編集できません。',
+            ], 400);
+        }
+
+        $lane = Lane::where('auction_id', $auctionId)->where('id', $laneId)->firstOrFail();
+
+        $validator = Validator::make($request->all(), [
+            'lane_name' => 'nullable|string|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $lane->update([
+            'lane_name' => $request->input('lane_name'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'レーン名を更新しました。',
         ]);
     }
 
@@ -252,9 +391,6 @@ class LaneController extends Controller
                 ->delete();
         }
 
-        // レーンを作成
-        $this->createLanesIfNeeded($auction);
-
         // 登録済みの生体を取得（プレミアム優先）
         $premiumItems = Item::where('auction_id', $auctionId)
             ->where('status', 'registered')
@@ -286,7 +422,7 @@ class LaneController extends Controller
         if ($laneCount === 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'レーンがありません。',
+                'message' => 'レーンがありません。先にレーンを追加してください。',
             ], 400);
         }
 
@@ -363,18 +499,42 @@ class LaneController extends Controller
     }
 
     /**
-     * レーンを作成（なければ）
+     * 初期レーンを作成（レーンが0個の場合のみ）
      */
-    private function createLanesIfNeeded(Auction $auction): void
+    private function createInitialLanes(Auction $auction): void
     {
-        $existingCount = $auction->lanes()->count();
-        
-        for ($i = $existingCount + 1; $i <= $auction->lane_count; $i++) {
+        for ($i = 1; $i <= $auction->lane_count; $i++) {
             Lane::create([
                 'auction_id' => $auction->id,
                 'lane_number' => $i,
                 'status' => 'waiting',
             ]);
+        }
+    }
+
+    /**
+     * レーン番号を詰め直す（削除後に番号が飛ばないようにする）
+     */
+    private function renumberLanes(Auction $auction): void
+    {
+        $lanes = $auction->lanes()->orderBy('lane_number')->get();
+        $number = 1;
+        foreach ($lanes as $lane) {
+            if ($lane->lane_number !== $number) {
+                $lane->update(['lane_number' => $number]);
+            }
+            $number++;
+        }
+    }
+
+    /**
+     * auction.lane_count を実際のレーン数に同期
+     */
+    private function syncLaneCount(Auction $auction): void
+    {
+        $actualCount = $auction->lanes()->count();
+        if ($auction->lane_count !== $actualCount) {
+            $auction->update(['lane_count' => $actualCount]);
         }
     }
 

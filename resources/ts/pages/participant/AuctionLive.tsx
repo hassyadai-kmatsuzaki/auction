@@ -68,6 +68,7 @@ interface LaneItem {
 interface Lane {
   lane_id: number;
   lane_number: number;
+  lane_name: string | null;
   status: string;
   current_item: LaneItem | null;
 }
@@ -858,7 +859,7 @@ export default function AuctionLive() {
                       fontSize: '0.85rem',
                     }}
                   >
-                    レーン {lane.lane_number}
+                    レーン {lane.lane_number}{lane.lane_name ? ` (${lane.lane_name})` : ''}
                   </Box>
 
                   {/* プレミアムバッジ */}
@@ -948,7 +949,7 @@ export default function AuctionLive() {
                 <Card sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CardContent>
                     <Typography variant="h6" color="text.secondary" align="center">
-                      レーン {lane.lane_number}
+                      レーン {lane.lane_number}{lane.lane_name ? ` (${lane.lane_name})` : ''}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" align="center">
                       {lane.status === 'finished' ? '全出品終了' : '待機中'}
@@ -974,7 +975,7 @@ export default function AuctionLive() {
               myActiveBids.map((lane) => (
                 <Chip
                   key={lane.lane_id}
-                  label={`レーン${lane.lane_number}: ${lane.current_item?.species_name}`}
+                  label={`レーン${lane.lane_number}${lane.lane_name ? `(${lane.lane_name})` : ''}: ${lane.current_item?.species_name}`}
                   color="success"
                   onDelete={() => lane.current_item && handleBidToggle(lane.current_item.id, 'active')}
                 />
