@@ -60,7 +60,6 @@ interface FormData {
   event_date: Date | null;
   start_time: Date | null;
   description: string;
-  lane_count: number;
   default_bid_increment: number;
   countdown_seconds: number;
   deposit_required: boolean;
@@ -135,7 +134,6 @@ export default function AuctionForm() {
     event_date: null,
     start_time: new Date(0, 0, 0, 10, 0),
     description: '',
-    lane_count: 6,
     default_bid_increment: 100,
     countdown_seconds: 3,
     deposit_required: false,
@@ -242,7 +240,6 @@ export default function AuctionForm() {
           event_date: auction.event_date ? new Date(auction.event_date) : null,
           start_time: startTime,
           description: auction.description || '',
-          lane_count: auction.lane_count,
           default_bid_increment: parseFloat(auction.default_bid_increment),
           countdown_seconds: auction.countdown_seconds,
           deposit_required: auction.deposit_required,
@@ -269,7 +266,6 @@ export default function AuctionForm() {
     if (!formData.event_date) return '開催日を選択してください。';
     if (formData.event_date < new Date(new Date().setHours(0, 0, 0, 0))) return '開催日は本日以降を指定してください。';
     if (!formData.start_time) return '開始時刻を選択してください。';
-    if (formData.lane_count < 1 || formData.lane_count > 10) return 'レーン数は1〜10の範囲で指定してください。';
     if (formData.default_bid_increment < 1) return 'デフォルト入札単位は1円以上を指定してください。';
     if (formData.countdown_seconds < 1 || formData.countdown_seconds > 60) return 'カウントダウン秒数は1〜60秒の範囲で指定してください。';
     if (formData.payment_deadline_hours < 1) return '入金期限は1時間以上を指定してください。';
@@ -327,7 +323,6 @@ export default function AuctionForm() {
         event_date: formatLocalDate(formData.event_date),
         start_time: startTime,
         description: formData.description,
-        lane_count: formData.lane_count,
         default_bid_increment: formData.default_bid_increment,
         countdown_seconds: formData.countdown_seconds,
         deposit_required: formData.deposit_required,
@@ -463,18 +458,6 @@ export default function AuctionForm() {
                 <Typography variant="h6" gutterBottom>オークション設定</Typography>
                 <Stack spacing={3} sx={{ mt: 2 }}>
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={4}>
-                      <TextField
-                        label="レーン数"
-                        type="number"
-                        value={formData.lane_count}
-                        onChange={(e) => setFormData({ ...formData, lane_count: parseInt(e.target.value) || 0 })}
-                        required
-                        fullWidth
-                        InputProps={{ inputProps: { min: 1, max: 10 } }}
-                        helperText="1〜10"
-                      />
-                    </Grid>
                     <Grid item xs={12} sm={4}>
                       <TextField
                         label="デフォルト入札単位"

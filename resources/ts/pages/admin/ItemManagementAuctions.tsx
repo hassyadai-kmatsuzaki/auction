@@ -10,20 +10,12 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Snackbar,
-  IconButton,
-  Tooltip,
   LinearProgress,
 } from '@mui/material';
 import {
   Pets as PetsIcon,
   ViewKanban as ViewKanbanIcon,
-  Edit as EditIcon,
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon,
   PlayArrow as PlayArrowIcon,
@@ -56,11 +48,7 @@ export default function ItemManagementAuctions() {
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // レーン数編集ダイアログ
-  const [laneDialogOpen, setLaneDialogOpen] = useState(false);
-  const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
-  const [newLaneCount, setNewLaneCount] = useState(3);
-  const [saving, setSaving] = useState(false);
+  
 
   useEffect(() => {
     fetchAuctions();
@@ -81,40 +69,7 @@ export default function ItemManagementAuctions() {
     }
   };
 
-  const handleOpenLaneDialog = (auction: Auction) => {
-    setSelectedAuction(auction);
-    setNewLaneCount(auction.lane_count);
-    setLaneDialogOpen(true);
-  };
-
-  const handleCloseLaneDialog = () => {
-    setLaneDialogOpen(false);
-    setSelectedAuction(null);
-  };
-
-  const handleUpdateLaneCount = async () => {
-    if (!selectedAuction) return;
-
-    setSaving(true);
-    try {
-      const response = await axios.patch(`/api/admin/auctions/${selectedAuction.id}/lane-count`, {
-        lane_count: newLaneCount,
-      });
-      if (response.data.success) {
-        setSnackbar({ open: true, message: 'レーン数を更新しました。', severity: 'success' });
-        fetchAuctions();
-        handleCloseLaneDialog();
-      }
-    } catch (err: any) {
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.message || 'レーン数の更新に失敗しました。',
-        severity: 'error',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+  
 
   const getStatusChip = (status: string) => {
     switch (status) {
@@ -229,11 +184,6 @@ export default function ItemManagementAuctions() {
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           レーン数: {auction.lane_count}
                         </Typography>
-                        <Tooltip title="レーン数を変更">
-                          <IconButton size="small" onClick={() => handleOpenLaneDialog(auction)}>
-                            <EditIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <LinearProgress
@@ -284,54 +234,6 @@ export default function ItemManagementAuctions() {
           })}
         </Grid>
       )}
-
-      {/* レーン数編集ダイアログ */}
-      <Dialog open={laneDialogOpen} onClose={handleCloseLaneDialog} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            レーン数を変更
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {selectedAuction && (
-            <Box sx={{ pt: 1 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                {selectedAuction.title}
-              </Typography>
-              <TextField
-                fullWidth
-                type="number"
-                label="レーン数"
-                value={newLaneCount}
-                onChange={(e) => setNewLaneCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                inputProps={{ min: 1, max: 10 }}
-                helperText={`1〜10の範囲で指定してください（現在: ${selectedAuction.lane_count}レーン）`}
-              />
-              {selectedAuction.statistics.assigned_items > 0 && newLaneCount < selectedAuction.lane_count && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  レーン{newLaneCount + 1}以降に割り当てられている生体は自動的に未割当に戻ります。
-                  事前にレーン割当画面で確認するか、一括解除してからレーン数を変更してください。
-                </Alert>
-              )}
-              {selectedAuction.statistics.assigned_items > 0 && (
-                <Alert severity="info" sx={{ mt: 2 }} icon={false}>
-                  💡 すべての割り当てを解除したい場合は、レーン割当画面の「一括解除」ボタンをご利用ください。
-                </Alert>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseLaneDialog}>キャンセル</Button>
-          <Button
-            variant="contained"
-            onClick={handleUpdateLaneCount}
-            disabled={saving}
-          >
-            {saving ? '保存中...' : '保存'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* スナックバー */}
       <Snackbar

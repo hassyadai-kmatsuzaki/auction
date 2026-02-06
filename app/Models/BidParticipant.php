@@ -3,9 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 
-class BidParticipant extends Model
+class BidParticipant extends BaseModel
 {
     use HasFactory;
 

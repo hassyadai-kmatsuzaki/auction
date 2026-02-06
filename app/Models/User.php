@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -69,6 +70,14 @@ class User extends Authenticatable
             'password' => 'hashed',
             'notification_settings' => 'array',
         ];
+    }
+
+    /**
+     * JSONシリアライズ時にタイムゾーン情報を含めない
+     */
+    protected function serializeDate(DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d\TH:i:s');
     }
 
     /**

@@ -84,7 +84,6 @@ class AuctionController extends Controller
             'event_date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|date_format:H:i',
             'description' => 'nullable|string',
-            'lane_count' => 'required|integer|between:1,10',
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
@@ -98,8 +97,6 @@ class AuctionController extends Controller
             'event_date.after_or_equal' => '開催日は本日以降を指定してください。',
             'start_time.required' => '開始時刻は必須です。',
             'start_time.date_format' => '開始時刻の形式が不正です。',
-            'lane_count.required' => 'レーン数は必須です。',
-            'lane_count.between' => 'レーン数は1〜10の範囲で指定してください。',
             'default_bid_increment.required' => 'デフォルト入札単位は必須です。',
             'default_bid_increment.min' => 'デフォルト入札単位は1円以上を指定してください。',
             'countdown_seconds.required' => 'カウントダウン秒数は必須です。',
@@ -137,7 +134,7 @@ class AuctionController extends Controller
             'event_date' => $request->event_date,
             'start_time' => $request->start_time,
             'description' => $request->description,
-            'lane_count' => $request->lane_count,
+            'lane_count' => 1, // 初期値1、レーン割り当て画面で管理
             'default_bid_increment' => $request->default_bid_increment,
             'countdown_seconds' => $request->countdown_seconds,
             'deposit_required' => $request->boolean('deposit_required', false),
@@ -188,7 +185,6 @@ class AuctionController extends Controller
             'event_date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|date_format:H:i',
             'description' => 'nullable|string',
-            'lane_count' => 'required|integer|between:1,10',
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
@@ -219,15 +215,11 @@ class AuctionController extends Controller
             }
         }
 
-        $oldLaneCount = $auction->lane_count;
-        $newLaneCount = $request->lane_count;
-
         $auction->update([
             'title' => $request->title,
             'event_date' => $request->event_date,
             'start_time' => $request->start_time,
             'description' => $request->description,
-            'lane_count' => $request->lane_count,
             'default_bid_increment' => $request->default_bid_increment,
             'countdown_seconds' => $request->countdown_seconds,
             'deposit_required' => $request->boolean('deposit_required', false),
@@ -241,35 +233,7 @@ class AuctionController extends Controller
             'custom_shipping_settings' => $request->input('custom_shipping_settings'),
         ]);
 
-        // レーン数が減った場合、余分なレーンを削除
-        if ($newLaneCount < $oldLaneCount) {
-            $lanesToRemove = $auction->lanes()
-                ->where('lane_number', '>', $newLaneCount)
-                ->pluck('id');
-
-            if ($lanesToRemove->isNotEmpty()) {
-                // 削除対象レーンに割り当てられたアイテムを解除
-                DB::table('lane_items')
-                    ->whereIn('lane_id', $lanesToRemove)
-                    ->delete();
-
-                // レーンを削除
-                $auction->lanes()
-                    ->whereIn('id', $lanesToRemove)
-                    ->delete();
-            }
-        }
-
-        // レーン数が増えた場合、新しいレーンを作成
-        if ($newLaneCount > $oldLaneCount) {
-            $maxLaneNumber = $auction->lanes()->max('lane_number') ?? 0;
-            for ($i = $maxLaneNumber + 1; $i <= $maxLaneNumber + ($newLaneCount - $oldLaneCount); $i++) {
-                $auction->lanes()->firstOrCreate(
-                    ['lane_number' => $i],
-                    ['status' => 'waiting']
-                );
-            }
-        }
+        // レーン数はレーン割り当て画面で管理（ここでは変更しない）
 
         $auction->load(['creator:id,name']);
 
