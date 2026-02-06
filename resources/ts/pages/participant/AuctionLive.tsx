@@ -31,6 +31,9 @@ import {
   Refresh as RefreshIcon,
   Wifi as WifiIcon,
   WifiOff as WifiOffIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  PlayCircleOutline as PlayCircleOutlineIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { useAuctionSocket } from '../../hooks/useAuctionSocket';
@@ -83,6 +86,10 @@ export default function AuctionLive() {
   const [bidLoading, setBidLoading] = useState<Record<number, boolean>>({});
   const [socketConnected, setSocketConnected] = useState(false);
   const [isPollingPaused, setIsPollingPaused] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [agreed, setAgreed] = useState(false);
 
   // ライブ状態を取得
   const fetchLiveState = useCallback(async () => {
@@ -271,12 +278,41 @@ export default function AuctionLive() {
 
   const handleDetailOpen = (item: LaneItem) => {
     setSelectedItem(item);
+    setSelectedMediaIndex(0);
     setDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setDetailOpen(false);
     setSelectedItem(null);
+    setSelectedMediaIndex(0);
+  };
+
+  // メディア一覧を構築
+  const getMediaList = (item: LaneItem | null) => {
+    if (!item) return [];
+    const list: { type: 'image' | 'video'; url: string }[] = [];
+    if (item.thumbnail_path) {
+      list.push({ type: 'image', url: item.thumbnail_path });
+    }
+    if (item.media && item.media.length > 0) {
+      item.media.forEach((m: any) => {
+        const url = m.file_path || m.url;
+        if (!url) return;
+        if (item.thumbnail_path && url === item.thumbnail_path) return;
+        const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
+        list.push({ type: isVideo ? 'video' : 'image', url });
+      });
+    }
+    if (list.length === 0) {
+      list.push({ type: 'image', url: '/img/noimage.png' });
+    }
+    return list;
+  };
+
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
   };
 
   // 入札者数表示コンポーネント
@@ -323,7 +359,68 @@ export default function AuctionLive() {
     .map((lane) => lane);
 
   return (
-    <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)' }}>
+    <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
+      {/* 同意画面オーバーレイ */}
+      {!agreed && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* ブラー背景 */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              bgcolor: 'rgba(0,0,0,0.4)',
+            }}
+          />
+          {/* 同意カード */}
+          <Paper
+            elevation={8}
+            sx={{
+              position: 'relative',
+              zIndex: 1,
+              maxWidth: 480,
+              width: '90%',
+              p: 4,
+              borderRadius: 3,
+              textAlign: 'center',
+            }}
+          >
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              ご確認ください
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.8 }}>
+              画像は同じ品種のイメージ画像です。実際の映像は詳細ボタンよりご確認ください。
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              onClick={() => setAgreed(true)}
+              sx={{ py: 1.5, fontWeight: 'bold', fontSize: '1rem' }}
+            >
+              同意してオークションに参加する
+            </Button>
+          </Paper>
+        </Box>
+      )}
+
       {/* ヘッダー */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Container maxWidth="xl">
@@ -511,75 +608,124 @@ export default function AuctionLive() {
       </Container>
 
       {/* 詳細ダイアログ */}
-      <Dialog
-        open={detailOpen}
-        onClose={handleDetailClose}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={detailOpen} onClose={handleDetailClose} maxWidth="md" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6">
               No.{selectedItem?.item_number} {selectedItem?.species_name}
             </Typography>
-            <IconButton onClick={handleDetailClose}>
-              <CloseIcon />
-            </IconButton>
+            <IconButton onClick={handleDetailClose}><CloseIcon /></IconButton>
           </Box>
         </DialogTitle>
         <DialogContent dividers>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <img
-                src={selectedItem?.thumbnail_path || '/img/noimage.png'}
-                alt={selectedItem?.species_name}
-                style={{ width: '100%', borderRadius: 8 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              {/* 入札者数 */}
-              {selectedItem && (
-                <Box sx={{ mb: 2 }}>
-                  <BidderCountDisplay count={selectedItem.active_bidders_count} />
-                </Box>
-              )}
-
-              <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
-                ¥{selectedItem?.current_price ? Math.floor(selectedItem.current_price).toLocaleString() : '0'}
-              </Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" gutterBottom>
-                匹数
-              </Typography>
-              <Typography variant="body1" gutterBottom>
-                {selectedItem?.quantity}匹
-              </Typography>
-              {selectedItem?.inspection_info && (
-                <>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    審査情報
+          {(() => {
+            const mediaList = getMediaList(selectedItem);
+            const currentMedia = mediaList[selectedMediaIndex] || mediaList[0];
+            return (
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Box sx={{ position: 'relative', borderRadius: 2, overflow: 'hidden', bgcolor: 'grey.100' }}>
+                    {currentMedia?.type === 'video' ? (
+                      <video src={currentMedia.url} controls style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain' }} />
+                    ) : (
+                      <img
+                        src={currentMedia?.url || '/img/noimage.png'}
+                        alt={selectedItem?.species_name}
+                        style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain', cursor: 'pointer' }}
+                        onClick={() => openLightbox(selectedMediaIndex)}
+                      />
+                    )}
+                  </Box>
+                  {mediaList.length > 1 && (
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1.5, overflowX: 'auto', pb: 0.5 }}>
+                      {mediaList.map((m, i) => (
+                        <Box key={i} onClick={() => setSelectedMediaIndex(i)} sx={{
+                          width: 64, height: 64, flexShrink: 0, borderRadius: 1, overflow: 'hidden',
+                          border: i === selectedMediaIndex ? '2px solid' : '2px solid transparent',
+                          borderColor: i === selectedMediaIndex ? 'primary.main' : 'transparent',
+                          cursor: 'pointer', position: 'relative', bgcolor: 'grey.200',
+                        }}>
+                          {m.type === 'video' ? (
+                            <Box sx={{ width: '100%', height: '100%', bgcolor: 'grey.800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
+                            </Box>
+                          ) : (
+                            <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  {selectedItem && (
+                    <Box sx={{ mb: 2 }}><BidderCountDisplay count={selectedItem.active_bidders_count} /></Box>
+                  )}
+                  <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
+                    ¥{selectedItem?.current_price ? Math.floor(selectedItem.current_price).toLocaleString() : '0'}
                   </Typography>
-                  <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedItem.inspection_info}
-                  </Typography>
-                </>
-              )}
-              {selectedItem?.individual_info && (
-                <>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    個体情報
-                  </Typography>
-                  <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedItem.individual_info}
-                  </Typography>
-                </>
-              )}
-            </Grid>
-          </Grid>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle2" gutterBottom>匹数</Typography>
+                  <Typography variant="body1" gutterBottom>{selectedItem?.quantity}匹</Typography>
+                  {selectedItem?.inspection_info && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, color: 'primary.main' }}>審査情報</Typography>
+                      <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.inspection_info}</Typography>
+                    </>
+                  )}
+                  {selectedItem?.individual_info && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, color: 'primary.main' }}>個体情報</Typography>
+                      <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.individual_info}</Typography>
+                    </>
+                  )}
+                </Grid>
+              </Grid>
+            );
+          })()}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDetailClose}>閉じる</Button>
         </DialogActions>
+      </Dialog>
+
+      {/* 画像拡大ライトボックス */}
+      <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="xl" fullWidth
+        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none', m: 1, maxHeight: '98vh' } }}
+      >
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <IconButton onClick={() => setLightboxOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}>
+            <CloseIcon />
+          </IconButton>
+          {(() => {
+            const mediaList = getMediaList(selectedItem);
+            if (mediaList.length > 1) {
+              return (
+                <>
+                  <IconButton onClick={() => setLightboxIndex((p) => (p - 1 + mediaList.length) % mediaList.length)}
+                    sx={{ position: 'absolute', left: 8, color: 'white', zIndex: 2 }}>
+                    <ChevronLeftIcon sx={{ fontSize: 40 }} />
+                  </IconButton>
+                  <IconButton onClick={() => setLightboxIndex((p) => (p + 1) % mediaList.length)}
+                    sx={{ position: 'absolute', right: 8, color: 'white', zIndex: 2 }}>
+                    <ChevronRightIcon sx={{ fontSize: 40 }} />
+                  </IconButton>
+                </>
+              );
+            }
+            return null;
+          })()}
+          {(() => {
+            const mediaList = getMediaList(selectedItem);
+            const m = mediaList[lightboxIndex];
+            if (!m) return null;
+            if (m.type === 'video') return <video src={m.url} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />;
+            return <img src={m.url} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} />;
+          })()}
+        </Box>
+        <Typography variant="caption" sx={{ color: 'grey.500', textAlign: 'center', py: 1 }}>
+          {lightboxIndex + 1} / {getMediaList(selectedItem).length}
+        </Typography>
       </Dialog>
 
       {/* スナックバー */}

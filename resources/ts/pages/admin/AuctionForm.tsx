@@ -274,8 +274,15 @@ export default function AuctionForm() {
     if (formData.countdown_seconds < 1 || formData.countdown_seconds > 60) return 'カウントダウン秒数は1〜60秒の範囲で指定してください。';
     if (formData.payment_deadline_hours < 1) return '入金期限は1時間以上を指定してください。';
     if (formData.shipping_deadline_hours < 1) return '発送期限は1時間以上を指定してください。';
-    if (formData.upload_deadline && formData.event_date && formData.upload_deadline >= formData.event_date) {
-      return 'アップロード期限は開催日より前に設定してください。';
+    if (formData.upload_deadline && formData.event_date) {
+      // 開催日 + 開始時刻を合算して比較
+      const eventDateTime = new Date(formData.event_date);
+      if (formData.start_time) {
+        eventDateTime.setHours(formData.start_time.getHours(), formData.start_time.getMinutes(), 0, 0);
+      }
+      if (formData.upload_deadline >= eventDateTime) {
+        return 'アップロード期限は開催日時より前に設定してください。';
+      }
     }
     return null;
   };

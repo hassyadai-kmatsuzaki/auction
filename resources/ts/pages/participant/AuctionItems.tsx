@@ -34,6 +34,9 @@ import {
   Close as CloseIcon,
   Info as InfoIcon,
   ArrowBack as ArrowBackIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  PlayCircleOutline as PlayCircleOutlineIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -79,6 +82,9 @@ export default function AuctionItems() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ItemData | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
   // データ取得
   const fetchItems = useCallback(async () => {
@@ -108,12 +114,42 @@ export default function AuctionItems() {
 
   const handleDetailOpen = (item: ItemData) => {
     setSelectedItem(item);
+    setSelectedMediaIndex(0);
     setDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setDetailOpen(false);
     setSelectedItem(null);
+    setSelectedMediaIndex(0);
+  };
+
+  // メディア一覧を構築（サムネイル + 追加メディア）
+  const getMediaList = (item: ItemData | null) => {
+    if (!item) return [];
+    const list: { type: 'image' | 'video'; url: string }[] = [];
+    if (item.thumbnail_path) {
+      list.push({ type: 'image', url: item.thumbnail_path });
+    }
+    if (item.media && item.media.length > 0) {
+      item.media.forEach((m: any) => {
+        const url = m.file_path || m.url;
+        if (!url) return;
+        // サムネイルと同じURLは重複除外
+        if (item.thumbnail_path && url === item.thumbnail_path) return;
+        const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
+        list.push({ type: isVideo ? 'video' : 'image', url });
+      });
+    }
+    if (list.length === 0) {
+      list.push({ type: 'image', url: '/img/noimage.png' });
+    }
+    return list;
+  };
+
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
   };
 
   // 現在選択されているレーンのアイテム
@@ -330,96 +366,150 @@ export default function AuctionItems() {
       )}
 
       {/* 詳細ダイアログ */}
-      <Dialog
-        open={detailOpen}
-        onClose={handleDetailClose}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={detailOpen} onClose={handleDetailClose} maxWidth="md" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6">
               No.{selectedItem?.item_number} {selectedItem?.species_name}
             </Typography>
-            <IconButton onClick={handleDetailClose}>
-              <CloseIcon />
-            </IconButton>
+            <IconButton onClick={handleDetailClose}><CloseIcon /></IconButton>
           </Box>
         </DialogTitle>
         <DialogContent dividers>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <img
-                src={selectedItem?.thumbnail_path || '/img/noimage.png'}
-                alt={selectedItem?.species_name}
-                style={{ width: '100%', borderRadius: 8 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                {selectedItem?.is_premium && (
-                  <Chip label="プレミアム" color="warning" />
-                )}
-                {selectedItem && getStatusChip(selectedItem.status)}
-              </Box>
+          {(() => {
+            const mediaList = getMediaList(selectedItem);
+            const currentMedia = mediaList[selectedMediaIndex] || mediaList[0];
+            return (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  {/* メイン表示 */}
+                  <Box sx={{ position: 'relative', borderRadius: 2, overflow: 'hidden', bgcolor: 'grey.100' }}>
+                    {currentMedia?.type === 'video' ? (
+                      <video
+                        src={currentMedia.url}
+                        controls
+                        style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <img
+                        src={currentMedia?.url || '/img/noimage.png'}
+                        alt={selectedItem?.species_name}
+                        style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain', cursor: 'pointer' }}
+                        onClick={() => openLightbox(selectedMediaIndex)}
+                      />
+                    )}
+                  </Box>
 
-              <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
-                ¥{Number(selectedItem?.start_price || 0).toLocaleString()}〜
-              </Typography>
-
-              {selectedItem?.current_price && selectedItem.current_price !== selectedItem.start_price && (
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  現在価格: ¥{Number(selectedItem.current_price).toLocaleString()}
-                </Typography>
-              )}
-
-              <Divider sx={{ my: 2 }} />
-
-              <Typography variant="subtitle2" gutterBottom>
-                匹数
-              </Typography>
-              <Typography variant="body1" gutterBottom>
-                {selectedItem?.quantity}匹セット
-              </Typography>
-
-              {selectedItem?.inspection_info && (
-                <>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    個体情報
+                  {/* サムネイル一覧 */}
+                  {mediaList.length > 1 && (
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1.5, overflowX: 'auto', pb: 0.5 }}>
+                      {mediaList.map((m, i) => (
+                        <Box
+                          key={i}
+                          onClick={() => setSelectedMediaIndex(i)}
+                          sx={{
+                            width: 64, height: 64, flexShrink: 0, borderRadius: 1, overflow: 'hidden',
+                            border: i === selectedMediaIndex ? '2px solid' : '2px solid transparent',
+                            borderColor: i === selectedMediaIndex ? 'primary.main' : 'transparent',
+                            cursor: 'pointer', position: 'relative', bgcolor: 'grey.200',
+                          }}
+                        >
+                          {m.type === 'video' ? (
+                            <>
+                              <Box sx={{ width: '100%', height: '100%', bgcolor: 'grey.800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
+                              </Box>
+                            </>
+                          ) : (
+                            <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    {selectedItem?.is_premium && <Chip label="プレミアム" color="warning" />}
+                    {selectedItem && getStatusChip(selectedItem.status)}
+                  </Box>
+                  <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
+                    ¥{Number(selectedItem?.start_price || 0).toLocaleString()}〜
                   </Typography>
-                  <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedItem.inspection_info}
-                  </Typography>
-                </>
-              )}
-
-              {selectedItem?.individual_info && (
-                <>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    詳細情報
-                  </Typography>
-                  <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedItem.individual_info}
-                  </Typography>
-                </>
-              )}
-            </Grid>
-          </Grid>
+                  {selectedItem?.current_price && selectedItem.current_price !== selectedItem.start_price && (
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      現在価格: ¥{Number(selectedItem.current_price).toLocaleString()}
+                    </Typography>
+                  )}
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle2" gutterBottom>匹数</Typography>
+                  <Typography variant="body1" gutterBottom>{selectedItem?.quantity}匹セット</Typography>
+                  {selectedItem?.inspection_info && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, color: 'primary.main' }}>個体情報</Typography>
+                      <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.inspection_info}</Typography>
+                    </>
+                  )}
+                  {selectedItem?.individual_info && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, color: 'primary.main' }}>詳細情報</Typography>
+                      <Typography variant="body2" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.individual_info}</Typography>
+                    </>
+                  )}
+                </Grid>
+              </Grid>
+            );
+          })()}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDetailClose}>閉じる</Button>
           {auction?.status === 'live' && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                handleDetailClose();
-                navigate(`/participant/auctions/${auctionId}/live`);
-              }}
-            >
+            <Button variant="contained" onClick={() => { handleDetailClose(); navigate(`/participant/auctions/${auctionId}/live`); }}>
               ライブ画面へ
             </Button>
           )}
         </DialogActions>
+      </Dialog>
+
+      {/* 画像拡大ライトボックス */}
+      <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="xl" fullWidth
+        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none', m: 1, maxHeight: '98vh' } }}
+      >
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <IconButton onClick={() => setLightboxOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}>
+            <CloseIcon />
+          </IconButton>
+          {(() => {
+            const mediaList = getMediaList(selectedItem);
+            if (mediaList.length > 1) {
+              return (
+                <>
+                  <IconButton onClick={() => setLightboxIndex((p) => (p - 1 + mediaList.length) % mediaList.length)}
+                    sx={{ position: 'absolute', left: 8, color: 'white', zIndex: 2 }}>
+                    <ChevronLeftIcon sx={{ fontSize: 40 }} />
+                  </IconButton>
+                  <IconButton onClick={() => setLightboxIndex((p) => (p + 1) % mediaList.length)}
+                    sx={{ position: 'absolute', right: 8, color: 'white', zIndex: 2 }}>
+                    <ChevronRightIcon sx={{ fontSize: 40 }} />
+                  </IconButton>
+                </>
+              );
+            }
+            return null;
+          })()}
+          {(() => {
+            const mediaList = getMediaList(selectedItem);
+            const m = mediaList[lightboxIndex];
+            if (!m) return null;
+            if (m.type === 'video') {
+              return <video src={m.url} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />;
+            }
+            return <img src={m.url} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} />;
+          })()}
+        </Box>
+        <Typography variant="caption" sx={{ color: 'grey.500', textAlign: 'center', py: 1 }}>
+          {lightboxIndex + 1} / {getMediaList(selectedItem).length}
+        </Typography>
       </Dialog>
     </Container>
   );
