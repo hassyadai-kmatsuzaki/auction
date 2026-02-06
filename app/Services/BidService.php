@@ -14,10 +14,13 @@ use App\Events\BidderUpdated;
 use App\Events\LaneItemChanged;
 use App\Events\ItemSold;
 use App\Events\AuctionStatusChanged;
+use App\Traits\MediaUrlTrait;
 use Illuminate\Support\Facades\DB;
 
 class BidService
 {
+    use MediaUrlTrait;
+
     protected ?CountdownService $countdownService = null;
 
     /**
@@ -487,7 +490,7 @@ class BidService
                     'individual_info' => $item->individual_info,
                     'is_premium' => $item->is_premium,
                     'thumbnail_path' => $item->thumbnail_path,
-                    'media' => $item->media,
+                    'media' => $this->transformMedia($item->media),
                     'active_bidders_count' => $activeBidderCount,
                     'countdown_seconds' => $remainingSeconds,
                     'my_bid_status' => $myBidStatus,

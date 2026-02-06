@@ -148,6 +148,17 @@ export default function AuctionItems() {
     setSelectedMediaIndex(0);
   };
 
+  // 相対パスをフルURLに変換
+  const resolveUrl = (url: string, thumbnailPath?: string) => {
+    if (!url || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
+    // thumbnail_pathからS3ベースURLを推測
+    if (thumbnailPath && thumbnailPath.startsWith('http')) {
+      const idx = thumbnailPath.indexOf('items/');
+      if (idx > 0) return thumbnailPath.substring(0, idx) + url;
+    }
+    return url;
+  };
+
   // メディア一覧を構築（サムネイル + 追加メディア）
   const getMediaList = (item: ItemData | null) => {
     if (!item) return [];
@@ -157,10 +168,11 @@ export default function AuctionItems() {
     }
     if (item.media && item.media.length > 0) {
       item.media.forEach((m: any) => {
-        const url = m.file_url || m.file_path || m.url;
-        if (!url) return;
-        // サムネイルと同じURLは重複除外（is_thumbnailフラグまたはURL一致）
+        const rawUrl = m.file_url || m.file_path || m.url;
+        if (!rawUrl) return;
+        // サムネイルと同じファイルは重複除外
         if (m.is_thumbnail && item.thumbnail_path) return;
+        const url = resolveUrl(rawUrl, item.thumbnail_path);
         if (item.thumbnail_path && url === item.thumbnail_path) return;
         const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
         list.push({ type: isVideo ? 'video' : 'image', url });

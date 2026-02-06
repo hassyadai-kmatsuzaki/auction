@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Services\BidService;
+use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuctionController extends Controller
 {
+    use MediaUrlTrait;
+
     protected BidService $bidService;
 
     public function __construct(BidService $bidService)
@@ -181,7 +184,7 @@ class AuctionController extends Controller
                         'is_premium' => $item->is_premium,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'media' => $item->media,
+                        'media' => $this->transformMedia($item->media),
                     ];
                 }),
             ];
@@ -216,7 +219,7 @@ class AuctionController extends Controller
                         'is_premium' => $item->is_premium,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'media' => $item->media,
+                        'media' => $this->transformMedia($item->media),
                     ];
                 }),
             ];

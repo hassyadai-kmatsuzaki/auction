@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Favorite;
 use App\Models\Item;
+use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class FavoriteController extends Controller
 {
+    use MediaUrlTrait;
+
     /**
      * お気に入り一覧を取得
      */
@@ -42,7 +45,7 @@ class FavoriteController extends Controller
                         'is_premium' => $item->is_premium,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'media' => $item->media,
+                        'media' => $this->transformMedia($item->media),
                         'auction' => $item->auction ? [
                             'id' => $item->auction->id,
                             'title' => $item->auction->title,

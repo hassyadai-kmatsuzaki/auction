@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
 use App\Models\WonItem;
+use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class WonItemController extends Controller
 {
+    use MediaUrlTrait;
+
     /**
      * 自分の落札商品一覧を取得
      *
@@ -109,7 +112,7 @@ class WonItemController extends Controller
                         'inspection_info' => $wonItem->item->inspection_info,
                         'individual_info' => $wonItem->item->individual_info,
                         'notes' => $wonItem->item->notes,
-                        'media' => $wonItem->item->media,
+                        'media' => $this->transformMedia($wonItem->item->media),
                         'auction' => [
                             'id' => $wonItem->item->auction->id,
                             'title' => $wonItem->item->auction->title,
