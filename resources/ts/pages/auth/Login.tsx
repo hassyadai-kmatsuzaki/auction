@@ -43,10 +43,9 @@ export default function Login() {
       if (userStr) {
         const user = JSON.parse(userStr);
 
-        if (user.roles && user.roles.some((r: any) => r.name === 'admin')) {
+        // 管理者のみの場合は管理画面へ、それ以外は参加者画面へ
+        if (user.roles && user.roles.length === 1 && user.roles.some((r: any) => r.name === 'admin')) {
           navigate('/admin', { replace: true });
-        } else if (user.roles && user.roles.some((r: any) => r.name === 'seller')) {
-          navigate('/seller', { replace: true });
         } else {
           navigate('/participant/home', { replace: true });
         }

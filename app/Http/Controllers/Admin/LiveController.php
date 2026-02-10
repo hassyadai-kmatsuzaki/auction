@@ -457,18 +457,23 @@ class LiveController extends Controller
 
             DB::commit();
 
-            // トランザクション完了後にカウントダウンを開始
+            // トランザクション完了後に入札開始待機 → カウントダウンを開始
             // オークション全体のジョブが既に動いているので、カウントダウン状態の開始のみ
             if ($nextItem) {
                 $lane->refresh();
                 $lane->load(['auction', 'currentItem']);
-                $this->countdownService->startCountdown($lane);
+                $this->countdownService->startPreBidCountdown($lane);
             }
 
             // レーン変更イベントをブロードキャスト
             $currentItemData = null;
             if ($nextItem) {
                 $activeBidderCount = BidParticipant::forItem($nextItem->id)->active()->count();
+                // 入札開始待機の残り秒数を取得
+                $countdownState = $this->countdownService->getCountdownState($lane->id);
+                $preBidRemaining = ($countdownState && ($countdownState['phase'] ?? '') === 'pre_bid')
+                    ? $countdownState['remaining_seconds'] : 0;
+
                 $currentItemData = [
                     'id' => $nextItem->id,
                     'item_number' => $nextItem->item_number,
@@ -478,6 +483,7 @@ class LiveController extends Controller
                     'is_premium' => $nextItem->is_premium,
                     'thumbnail_path' => $nextItem->thumbnail_path,
                     'active_bidders_count' => $activeBidderCount,
+                    'pre_bid_remaining_seconds' => $preBidRemaining,
                 ];
             }
 

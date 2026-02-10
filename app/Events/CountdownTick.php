@@ -18,6 +18,7 @@ class CountdownTick implements ShouldBroadcastNow
     public int $remainingSeconds;
     public int $activeBiddersCount;
     public int $currentPrice;
+    public string $phase;
 
     /**
      * Create a new event instance.
@@ -28,7 +29,8 @@ class CountdownTick implements ShouldBroadcastNow
         int $itemId,
         int $remainingSeconds,
         int $activeBiddersCount,
-        int $currentPrice
+        int $currentPrice,
+        string $phase = 'bidding'
     ) {
         $this->auctionId = $auctionId;
         $this->laneId = $laneId;
@@ -36,6 +38,7 @@ class CountdownTick implements ShouldBroadcastNow
         $this->remainingSeconds = $remainingSeconds;
         $this->activeBiddersCount = $activeBiddersCount;
         $this->currentPrice = $currentPrice;
+        $this->phase = $phase;
     }
 
     /**
@@ -71,6 +74,7 @@ class CountdownTick implements ShouldBroadcastNow
             'remaining_seconds' => $this->remainingSeconds,
             'active_bidders_count' => $this->activeBiddersCount,
             'current_price' => $this->currentPrice,
+            'phase' => $this->phase,
         ];
     }
 }

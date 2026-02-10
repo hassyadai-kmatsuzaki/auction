@@ -169,9 +169,13 @@ class SystemSetting extends BaseModel
             'price_increment_rate' => self::get('price_increment_rate', 10),
             'price_increment_min' => self::get('price_increment_min', 50),
             'countdown_seconds' => self::get('countdown_seconds', 3),
+            'countdown_seconds_default' => self::get('countdown_seconds_default', 10),
+            'countdown_seconds_competitive' => self::get('countdown_seconds_competitive', 1),
             'max_lanes' => self::get('default_lane_count', 6),
             'auto_extend_seconds' => self::get('auto_extend_seconds', 10),
             'default_bid_increment' => self::get('default_bid_increment', 100),
+            'venue_open_minutes_before_start' => self::get('venue_open_minutes_before_start', 30),
+            'item_switch_delay_seconds' => self::get('item_switch_delay_seconds', 5),
         ];
     }
 

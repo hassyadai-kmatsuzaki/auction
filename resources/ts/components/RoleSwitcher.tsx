@@ -95,19 +95,30 @@ const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
     },
   ].filter(item => item.available);
 
+  // 現在の画面名を取得
+  const getCurrentScreenName = () => {
+    if (isAdminScreen) return '管理者画面';
+    if (isSellerScreen) return '出品者画面';
+    return '参加者画面';
+  };
+
   return (
     <>
-      <Tooltip title="画面切り替え">
-        <IconButton
-          onClick={handleClick}
-          size="small"
-          sx={{ ml: 2 }}
-          aria-label="画面切り替え"
-          color="inherit"
-        >
-          <SwapHorizIcon />
-        </IconButton>
-      </Tooltip>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="body2" sx={{ color: 'inherit', fontWeight: 500 }}>
+          {getCurrentScreenName()}
+        </Typography>
+        <Tooltip title="画面切り替え">
+          <IconButton
+            onClick={handleClick}
+            size="small"
+            aria-label="画面切り替え"
+            color="inherit"
+          >
+            <SwapHorizIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
 
       <Menu
         anchorEl={anchorEl}

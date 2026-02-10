@@ -34,6 +34,7 @@ class CountdownService
 
     /**
      * カウントダウンを開始
+     * 新商品が表示された直後 → 入札者0人なので「通常（default）」秒数を使用
      */
     public function startCountdown(Lane $lane): void
     {
@@ -50,22 +51,83 @@ class CountdownService
             return;
         }
         
-        $countdownSeconds = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
+        $auctionSettings = $auction->getAuctionSettings();
+        // 通常カウントダウン（0〜1人入札時）
+        $defaultSeconds = $auctionSettings['countdown_seconds_default']
+            ?? $auctionSettings['countdown_seconds']
+            ?? 10;
+        // 競合カウントダウン（2人以上入札時）
+        $competitiveSeconds = $auctionSettings['countdown_seconds_competitive'] ?? 1;
 
         $cacheData = [
             'lane_id' => $lane->id,
             'item_id' => $item->id,
             'auction_id' => $auction->id,
-            'remaining_seconds' => $countdownSeconds,
+            'phase' => 'bidding',
+            'remaining_seconds' => $defaultSeconds,
             'started_at' => now()->timestamp,
-            'countdown_seconds' => $countdownSeconds,
+            'countdown_seconds' => $defaultSeconds,
+            'countdown_seconds_default' => $defaultSeconds,
+            'countdown_seconds_competitive' => $competitiveSeconds,
+            'countdown_mode' => 'default', // 'default' or 'competitive'
             'is_running' => true,
+            'pre_bid_remaining_seconds' => 0,
         ];
         
         // カウントダウン状態をキャッシュに保存
         Cache::put($this->getCacheKey($lane->id), $cacheData, 3600); // 1時間
 
-        Log::info("Countdown started: lane {$lane->id}, item {$item->id}");
+        Log::info("Countdown started: lane {$lane->id}, item {$item->id}, default={$defaultSeconds}s, competitive={$competitiveSeconds}s");
+    }
+
+    /**
+     * 入札開始待機フェーズを開始（生体切り替え後の待機）
+     */
+    public function startPreBidCountdown(Lane $lane): void
+    {
+        $lane->load(['currentItem', 'auction']);
+        
+        $item = $lane->currentItem;
+        if (!$item) {
+            return;
+        }
+
+        $auction = $lane->auction;
+        if (!$auction) {
+            return;
+        }
+
+        $auctionSettings = $auction->getAuctionSettings();
+        $preBidDelay = $auctionSettings['item_switch_delay_seconds'] ?? 5;
+        $defaultSeconds = $auctionSettings['countdown_seconds_default']
+            ?? $auctionSettings['countdown_seconds']
+            ?? 10;
+        $competitiveSeconds = $auctionSettings['countdown_seconds_competitive'] ?? 1;
+
+        // 待機秒数が0の場合は即入札カウントダウンを開始
+        if ($preBidDelay <= 0) {
+            $this->startCountdown($lane);
+            return;
+        }
+
+        $cacheData = [
+            'lane_id' => $lane->id,
+            'item_id' => $item->id,
+            'auction_id' => $auction->id,
+            'phase' => 'pre_bid',
+            'remaining_seconds' => $preBidDelay,
+            'started_at' => now()->timestamp,
+            'countdown_seconds' => $defaultSeconds,
+            'countdown_seconds_default' => $defaultSeconds,
+            'countdown_seconds_competitive' => $competitiveSeconds,
+            'countdown_mode' => 'default',
+            'is_running' => true,
+            'pre_bid_remaining_seconds' => $preBidDelay,
+        ];
+
+        Cache::put($this->getCacheKey($lane->id), $cacheData, 3600);
+
+        Log::info("Pre-bid countdown started: lane {$lane->id}, item {$item->id}, delay {$preBidDelay}s");
     }
 
     /**
@@ -78,6 +140,7 @@ class CountdownService
 
     /**
      * カウントダウンをリセット（価格上昇時）
+     * 価格上昇は入札者2人以上の時に発生するため、競合秒数を使用
      */
     public function resetCountdown(Lane $lane): void
     {
@@ -86,13 +149,16 @@ class CountdownService
             return;
         }
 
-        $auction = $lane->auction;
-        $countdownSeconds = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
+        // 競合秒数を使用（価格上昇後 = 入札者2人以上）
+        $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
 
-        $state['remaining_seconds'] = $countdownSeconds;
+        $state['remaining_seconds'] = $competitiveSeconds;
+        $state['countdown_mode'] = 'competitive';
         $state['started_at'] = now()->timestamp;
 
         Cache::put($this->getCacheKey($lane->id), $state, 3600);
+
+        Log::info("Countdown reset (competitive): lane {$lane->id}, {$competitiveSeconds}s");
     }
 
     /**
@@ -114,7 +180,32 @@ class CountdownService
 
         $item = $lane->currentItem;
         $auction = $lane->auction;
+
+        // 入札開始待機フェーズの処理
+        $phase = $state['phase'] ?? 'bidding';
+        if ($phase === 'pre_bid') {
+            return $this->tickPreBid($laneId, $lane, $item, $auction, $state);
+        }
+
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+
+        // ========= 入札者数に応じた動的カウントダウン切り替え =========
+        $currentMode = $state['countdown_mode'] ?? 'default';
+        $defaultSeconds = $state['countdown_seconds_default'] ?? 10;
+        $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
+
+        if ($activeBidderCount >= 2 && $currentMode === 'default') {
+            // 入札者が2人以上になった → 競合モードに切り替え
+            $state['countdown_mode'] = 'competitive';
+            $state['remaining_seconds'] = $competitiveSeconds;
+            Log::info("Mode switch to competitive: lane {$laneId}, bidders={$activeBidderCount}, new countdown={$competitiveSeconds}s");
+        } elseif ($activeBidderCount < 2 && $currentMode === 'competitive') {
+            // 入札者が1人以下になった → 通常モードに切り替え（カウントダウンを延長）
+            $state['countdown_mode'] = 'default';
+            $state['remaining_seconds'] = $defaultSeconds;
+            Log::info("Mode switch to default: lane {$laneId}, bidders={$activeBidderCount}, new countdown={$defaultSeconds}s");
+        }
+        // ================================================================
 
         // カウントダウンを1秒減らす
         $state['remaining_seconds']--;
@@ -149,6 +240,52 @@ class CountdownService
 
         return [
             'action' => 'tick',
+            'remaining_seconds' => $state['remaining_seconds'],
+        ];
+    }
+
+    /**
+     * 入札開始待機フェーズのティック処理
+     */
+    protected function tickPreBid(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
+    {
+        $state['remaining_seconds']--;
+        $state['pre_bid_remaining_seconds'] = $state['remaining_seconds'];
+
+        // pre_bidフェーズ用のブロードキャスト（remaining_secondsを負数で送信して区別、またはphaseをeventに含める）
+        broadcast(new CountdownTick(
+            $auction->id,
+            $lane->id,
+            $item->id,
+            $state['remaining_seconds'],
+            0, // pre_bid中は入札者数0
+            $item->current_price,
+            'pre_bid' // フェーズ情報
+        ));
+
+        if ($state['remaining_seconds'] <= 0) {
+            // 待機完了 → 入札カウントダウンに移行（開始時は通常秒数を使用）
+            $defaultSeconds = $state['countdown_seconds_default'] ?? $state['countdown_seconds'] ?? 10;
+            $state['phase'] = 'bidding';
+            $state['remaining_seconds'] = $defaultSeconds;
+            $state['countdown_mode'] = 'default';
+            $state['pre_bid_remaining_seconds'] = 0;
+            $state['started_at'] = now()->timestamp;
+
+            Cache::put($this->getCacheKey($laneId), $state, 3600);
+
+            Log::info("Pre-bid ended, bidding started: lane {$laneId}, item {$item->id}, countdown={$defaultSeconds}s");
+
+            return [
+                'action' => 'pre_bid_end',
+                'lane_id' => $laneId,
+            ];
+        }
+
+        Cache::put($this->getCacheKey($laneId), $state, 3600);
+
+        return [
+            'action' => 'pre_bid_tick',
             'remaining_seconds' => $state['remaining_seconds'],
         ];
     }
@@ -229,10 +366,15 @@ class CountdownService
                 'status' => 'active',
             ]);
 
-            // レーンをリフレッシュして新しいカウントダウンを開始
+            // レーンをリフレッシュして入札開始待機 → カウントダウンを開始
             $lane->refresh();
             $lane->load(['auction', 'currentItem']);
-            $this->startCountdown($lane);
+            $this->startPreBidCountdown($lane);
+
+            // 入札開始待機の残り秒数を取得
+            $countdownState = $this->getCountdownState($lane->id);
+            $preBidRemaining = ($countdownState && ($countdownState['phase'] ?? '') === 'pre_bid')
+                ? $countdownState['remaining_seconds'] : 0;
 
             $activeBidderCount = 0; // 新商品なので0
             $currentItemData = [
@@ -244,6 +386,7 @@ class CountdownService
                 'is_premium' => $nextItem->is_premium,
                 'thumbnail_path' => $nextItem->thumbnail_path,
                 'active_bidders_count' => $activeBidderCount,
+                'pre_bid_remaining_seconds' => $preBidRemaining,
             ];
         } else {
             // 商品がなければレーンを終了

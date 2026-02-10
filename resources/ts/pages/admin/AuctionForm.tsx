@@ -72,7 +72,11 @@ interface FormData {
     price_increment_rate: number;
     price_increment_min: number;
     countdown_seconds: number;
+    countdown_seconds_default: number;
+    countdown_seconds_competitive: number;
     auto_extend_seconds: number;
+    venue_open_minutes_before_start: number;
+    item_switch_delay_seconds: number;
   };
   custom_fee_settings: {
     seller_commission_rate: number;
@@ -145,7 +149,11 @@ export default function AuctionForm() {
       price_increment_rate: 10,
       price_increment_min: 50,
       countdown_seconds: 3,
+      countdown_seconds_default: 10,
+      countdown_seconds_competitive: 1,
       auto_extend_seconds: 10,
+      venue_open_minutes_before_start: 30,
+      item_switch_delay_seconds: 5,
     },
     custom_fee_settings: {
       seller_commission_rate: 10,
@@ -191,7 +199,11 @@ export default function AuctionForm() {
               price_increment_rate: response.data.data.auction_settings.price_increment_rate,
               price_increment_min: response.data.data.auction_settings.price_increment_min || 50,
               countdown_seconds: response.data.data.auction_settings.countdown_seconds,
+              countdown_seconds_default: response.data.data.auction_settings.countdown_seconds_default || 10,
+              countdown_seconds_competitive: response.data.data.auction_settings.countdown_seconds_competitive || 1,
               auto_extend_seconds: response.data.data.auction_settings.auto_extend_seconds || 10,
+              venue_open_minutes_before_start: response.data.data.auction_settings.venue_open_minutes_before_start || 30,
+              item_switch_delay_seconds: response.data.data.auction_settings.item_switch_delay_seconds || 5,
             },
             custom_fee_settings: {
               seller_commission_rate: response.data.data.fee_settings.seller_commission_rate,
@@ -636,17 +648,34 @@ export default function AuctionForm() {
                   <TextField
                     fullWidth
                     type="number"
-                    label="カウントダウン秒数"
-                    value={formData.custom_auction_settings.countdown_seconds}
+                    label="カウントダウン（通常）"
+                    value={formData.custom_auction_settings.countdown_seconds_default}
                     onChange={(e) => setFormData({
                       ...formData,
                       custom_auction_settings: {
                         ...formData.custom_auction_settings,
-                        countdown_seconds: parseInt(e.target.value) || 0,
+                        countdown_seconds_default: parseInt(e.target.value) || 0,
                       },
                     })}
                     InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                    helperText={defaultSettings ? `システム: ${defaultSettings.auction_settings.countdown_seconds}秒` : ''}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).countdown_seconds_default || 10}秒（0〜1人入札時）` : '0〜1人入札時'}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="カウントダウン（競合時）"
+                    value={formData.custom_auction_settings.countdown_seconds_competitive}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        countdown_seconds_competitive: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).countdown_seconds_competitive || 1}秒（2人以上入札時）` : '2人以上入札時'}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -664,6 +693,43 @@ export default function AuctionForm() {
                     })}
                     InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
                     helperText={defaultSettings ? `システム: ${defaultSettings.auction_settings.auto_extend_seconds || 10}秒` : ''}
+                  />
+                </Grid>
+
+                <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="会場入室可能開始"
+                    value={formData.custom_auction_settings.venue_open_minutes_before_start}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        venue_open_minutes_before_start: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">分前</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).venue_open_minutes_before_start || 30}分前` : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="生体切り替え後の入札開始待機"
+                    value={formData.custom_auction_settings.item_switch_delay_seconds}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_auction_settings: {
+                        ...formData.custom_auction_settings,
+                        item_switch_delay_seconds: parseInt(e.target.value) || 0,
+                      },
+                    })}
+                    InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).item_switch_delay_seconds || 5}秒（0で待機なし）` : ''}
                   />
                 </Grid>
               </Grid>

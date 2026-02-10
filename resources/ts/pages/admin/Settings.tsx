@@ -82,9 +82,14 @@ export default function Settings() {
     price_increment_rate: '',
     price_increment_min: '',
     countdown_seconds: '',
+    countdown_seconds_default: '',
+    countdown_seconds_competitive: '',
     default_lane_count: '',
     auto_extend_seconds: '',
     default_bid_increment: '',
+    show_consent_screen: false,
+    venue_open_minutes_before_start: '',
+    item_switch_delay_seconds: '',
   });
 
   // 料金設定
@@ -159,9 +164,14 @@ export default function Settings() {
             price_increment_rate: String(data.auction.price_increment_rate?.value ?? '10'),
             price_increment_min: String(data.auction.price_increment_min?.value ?? '50'),
             countdown_seconds: String(data.auction.countdown_seconds?.value ?? '3'),
+            countdown_seconds_default: String(data.auction.countdown_seconds_default?.value ?? '10'),
+            countdown_seconds_competitive: String(data.auction.countdown_seconds_competitive?.value ?? '1'),
             default_lane_count: String(data.auction.default_lane_count?.value ?? '6'),
             auto_extend_seconds: String(data.auction.auto_extend_seconds?.value ?? '10'),
             default_bid_increment: String(data.auction.default_bid_increment?.value ?? '100'),
+            show_consent_screen: data.auction.show_consent_screen?.value ?? false,
+            venue_open_minutes_before_start: String(data.auction.venue_open_minutes_before_start?.value ?? '30'),
+            item_switch_delay_seconds: String(data.auction.item_switch_delay_seconds?.value ?? '5'),
           });
         }
         
@@ -237,9 +247,14 @@ export default function Settings() {
         price_increment_rate: auctionSettings.price_increment_rate,
         price_increment_min: auctionSettings.price_increment_min,
         countdown_seconds: auctionSettings.countdown_seconds,
+        countdown_seconds_default: auctionSettings.countdown_seconds_default,
+        countdown_seconds_competitive: auctionSettings.countdown_seconds_competitive,
         default_lane_count: auctionSettings.default_lane_count,
         auto_extend_seconds: auctionSettings.auto_extend_seconds,
         default_bid_increment: auctionSettings.default_bid_increment,
+        show_consent_screen: auctionSettings.show_consent_screen,
+        venue_open_minutes_before_start: auctionSettings.venue_open_minutes_before_start,
+        item_switch_delay_seconds: auctionSettings.item_switch_delay_seconds,
         // 料金設定
         seller_registration_fee: feeSettings.seller_registration_fee,
         seller_annual_fee: feeSettings.seller_annual_fee,
@@ -430,13 +445,40 @@ export default function Settings() {
                 <TextField
                   fullWidth
                   type="number"
-                  label="カウントダウン秒数"
+                  label="カウントダウン秒数（旧）"
                   value={auctionSettings.countdown_seconds}
                   onChange={handleAuctionChange('countdown_seconds')}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">秒</InputAdornment>,
                   }}
-                  helperText="価格上昇までの待機時間"
+                  helperText="後方互換用（下の2項目を優先）"
+                  disabled
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="カウントダウン秒数（通常）"
+                  value={auctionSettings.countdown_seconds_default}
+                  onChange={handleAuctionChange('countdown_seconds_default')}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
+                  }}
+                  helperText="開始時・入札者0〜1人の場合"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="カウントダウン秒数（競合時）"
+                  value={auctionSettings.countdown_seconds_competitive}
+                  onChange={handleAuctionChange('countdown_seconds_competitive')}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
+                  }}
+                  helperText="入札者2人以上の場合"
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={4}>
@@ -476,6 +518,62 @@ export default function Settings() {
                 />
               </Grid>
             </Grid>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+              会場・レーン設定
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="会場入室可能開始"
+                  value={auctionSettings.venue_open_minutes_before_start}
+                  onChange={handleAuctionChange('venue_open_minutes_before_start')}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">分前</InputAdornment>,
+                  }}
+                  helperText="オークション開始の何分前から入室可能にするか"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="生体切り替え後の入札開始待機"
+                  value={auctionSettings.item_switch_delay_seconds}
+                  onChange={handleAuctionChange('item_switch_delay_seconds')}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
+                  }}
+                  helperText="次の生体表示後、入札を開始するまでの待機秒数（0で待機なし）"
+                />
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+              同意画面設定
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={auctionSettings.show_consent_screen}
+                    onChange={(e) => setAuctionSettings({ ...auctionSettings, show_consent_screen: e.target.checked })}
+                  />
+                }
+                label="オークション開始時に同意画面を表示する"
+              />
+              <Alert severity="info">
+                <Typography variant="body2">
+                  オンにすると、参加者がオークションに参加する際に「画像は同じ品種のイメージ画像です。実際の映像は詳細ボタンよりご確認ください。」という同意画面が表示されます。
+                </Typography>
+              </Alert>
+            </Box>
           </CardContent>
         </Card>
       </TabPanel>

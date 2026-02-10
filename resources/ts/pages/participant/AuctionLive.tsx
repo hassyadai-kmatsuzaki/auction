@@ -53,6 +53,7 @@ interface LaneItem {
   item_number: number;
   species_name: string;
   quantity: number;
+  quantity_unit?: string;
   current_price: number;
   estimated_price?: number;
   inspection_info?: string;
@@ -63,6 +64,9 @@ interface LaneItem {
   active_bidders_count: number;
   countdown_seconds: number;
   my_bid_status: 'active' | 'inactive' | null;
+  phase?: 'bidding' | 'pre_bid';
+  pre_bid_remaining_seconds?: number;
+  countdown_mode?: 'default' | 'competitive';
 }
 
 interface Lane {
@@ -79,6 +83,11 @@ interface LiveState {
   status: string;
   countdown_seconds: number;
   starting_countdown?: number;
+  entrance_allowed?: boolean;
+  entrance_at?: string;
+  start_at?: string;
+  venue_open_minutes_before_start?: number;
+  message?: string;
   lanes: Lane[];
 }
 
@@ -87,6 +96,7 @@ interface WonItemSummary {
   item_number: number;
   species_name: string;
   quantity: number;
+  quantity_unit?: string;
   winning_price: number;
   total_amount: number;
 }
@@ -112,10 +122,17 @@ export default function AuctionLive() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [agreed, setAgreed] = useState(false);
+  const [showConsentScreen, setShowConsentScreen] = useState(false);
 
   // 待機室・カウントダウン
   const [startingCountdown, setStartingCountdown] = useState<number | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 入室不可状態
+  const [entranceAllowed, setEntranceAllowed] = useState<boolean>(true);
+  const [entranceAt, setEntranceAt] = useState<string | null>(null);
+  const [entranceCountdown, setEntranceCountdown] = useState<string | null>(null);
+  const entranceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 落札一覧
   const [wonItems, setWonItems] = useState<WonItemSummary[]>([]);
@@ -190,6 +207,21 @@ export default function AuctionLive() {
         setLiveState(data);
         setError(null);
 
+        // 入室可否判定
+        if (data.entrance_allowed !== undefined) {
+          setEntranceAllowed(data.entrance_allowed);
+          if (!data.entrance_allowed && data.entrance_at) {
+            setEntranceAt(data.entrance_at);
+          } else {
+            setEntranceAt(null);
+          }
+        }
+
+        // 同意画面の表示設定を取得
+        if (data.show_consent_screen !== undefined) {
+          setShowConsentScreen(data.show_consent_screen);
+        }
+
         // 開始カウントダウン中の場合
         if (data.status === 'starting' && data.starting_countdown) {
           setStartingCountdown(data.starting_countdown);
@@ -212,13 +244,58 @@ export default function AuctionLive() {
     fetchWonItems();
   }, [auctionId]);
 
+  // 入室不可のカウントダウン表示
+  useEffect(() => {
+    if (!entranceAllowed && entranceAt) {
+      const updateCountdown = () => {
+        const target = new Date(entranceAt).getTime();
+        const now = Date.now();
+        const diff = Math.max(0, Math.floor((target - now) / 1000));
+        if (diff <= 0) {
+          setEntranceCountdown(null);
+          setEntranceAllowed(true);
+          fetchLiveState();
+          if (entranceIntervalRef.current) {
+            clearInterval(entranceIntervalRef.current);
+            entranceIntervalRef.current = null;
+          }
+          return;
+        }
+        const hours = Math.floor(diff / 3600);
+        const minutes = Math.floor((diff % 3600) / 60);
+        const seconds = diff % 60;
+        if (hours > 0) {
+          setEntranceCountdown(`${hours}時間${minutes}分${seconds.toString().padStart(2, '0')}秒`);
+        } else if (minutes > 0) {
+          setEntranceCountdown(`${minutes}分${seconds.toString().padStart(2, '0')}秒`);
+        } else {
+          setEntranceCountdown(`${seconds}秒`);
+        }
+      };
+
+      updateCountdown();
+      entranceIntervalRef.current = setInterval(updateCountdown, 1000);
+
+      return () => {
+        if (entranceIntervalRef.current) {
+          clearInterval(entranceIntervalRef.current);
+          entranceIntervalRef.current = null;
+        }
+      };
+    }
+  }, [entranceAllowed, entranceAt]);
+
   // 待機室用ポーリング（scheduledの場合のみ）
   useEffect(() => {
-    if (liveState?.status === 'scheduled') {
+    if (liveState?.status === 'scheduled' && entranceAllowed) {
       const interval = setInterval(fetchLiveState, 5000);
       return () => clearInterval(interval);
+    } else if (liveState?.status === 'scheduled' && !entranceAllowed) {
+      // 入室不可の場合は30秒ごとにポーリング
+      const interval = setInterval(fetchLiveState, 30000);
+      return () => clearInterval(interval);
     }
-  }, [liveState?.status, fetchLiveState]);
+  }, [liveState?.status, entranceAllowed, fetchLiveState]);
 
   // 開始カウントダウンタイマー
   useEffect(() => {
@@ -293,6 +370,7 @@ export default function AuctionLive() {
     onLaneChanged: (event) => {
       setLiveState((prev) => {
         if (!prev) return prev;
+        const preBidRemaining = (event.current_item as any)?.pre_bid_remaining_seconds || 0;
         return {
           ...prev,
           lanes: prev.lanes.map((lane) =>
@@ -314,6 +392,8 @@ export default function AuctionLive() {
                     inspection_info: event.current_item.inspection_info,
                     individual_info: event.current_item.individual_info,
                     media: (event.current_item as any).media,
+                    phase: preBidRemaining > 0 ? 'pre_bid' : 'bidding',
+                    pre_bid_remaining_seconds: preBidRemaining,
                   } as LaneItem : null,
                   status: event.current_item ? 'active' : 'finished',
                 }
@@ -388,6 +468,7 @@ export default function AuctionLive() {
     onCountdownTick: (event) => {
       setLiveState((prev) => {
         if (!prev) return prev;
+        const phase = (event as any).phase || 'bidding';
         return {
           ...prev,
           lanes: prev.lanes.map((lane) =>
@@ -396,9 +477,11 @@ export default function AuctionLive() {
                   ...lane,
                   current_item: {
                     ...lane.current_item,
-                    countdown_seconds: event.remaining_seconds,
+                    countdown_seconds: phase === 'pre_bid' ? lane.current_item.countdown_seconds : event.remaining_seconds,
                     active_bidders_count: event.active_bidders_count,
                     current_price: event.current_price,
+                    phase: phase,
+                    pre_bid_remaining_seconds: phase === 'pre_bid' ? event.remaining_seconds : 0,
                   },
                 }
               : lane
@@ -411,6 +494,17 @@ export default function AuctionLive() {
 
   // 入札ON/OFF切り替え
   const handleBidToggle = async (itemId: number, currentStatus: 'active' | 'inactive' | null) => {
+    // pre_bidフェーズの場合は入札を受け付けない
+    const currentLane = liveState?.lanes.find(l => l.current_item?.id === itemId);
+    if (currentLane?.current_item?.phase === 'pre_bid') {
+      setSnackbar({
+        open: true,
+        message: '入札開始待機中です。もう少々お待ちください。',
+        severity: 'error',
+      });
+      return;
+    }
+
     const newStatus = currentStatus !== 'active';
     setBidLoading((prev) => ({ ...prev, [itemId]: true }));
 
@@ -539,6 +633,51 @@ export default function AuctionLive() {
     return null;
   }
 
+  // ======== 入室不可画面 ========
+  if (liveState.status === 'scheduled' && !entranceAllowed) {
+    return (
+      <Box sx={{
+        bgcolor: 'grey.100',
+        minHeight: 'calc(100vh - 64px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Paper elevation={6} sx={{ maxWidth: 500, mx: 2, p: 5, textAlign: 'center', borderRadius: 3 }}>
+          <TimerIcon sx={{ fontSize: 80, color: 'warning.main', mb: 2 }} />
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            {liveState.auction_title}
+          </Typography>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
+            {liveState.message || `オークション開始${liveState.venue_open_minutes_before_start || 30}分前から入室できます`}
+          </Typography>
+          {entranceCountdown && (
+            <Box sx={{
+              bgcolor: 'warning.50',
+              border: '2px solid',
+              borderColor: 'warning.300',
+              borderRadius: 2,
+              p: 3,
+              mb: 3,
+            }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                入室可能まで
+              </Typography>
+              <Typography variant="h3" fontWeight="bold" color="warning.main">
+                {entranceCountdown}
+              </Typography>
+            </Box>
+          )}
+          {liveState.start_at && (
+            <Typography variant="body2" color="text.secondary">
+              オークション開始予定: {new Date(liveState.start_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+            </Typography>
+          )}
+        </Paper>
+      </Box>
+    );
+  }
+
   // ======== 待機室 ========
   if (liveState.status === 'scheduled') {
     return (
@@ -660,8 +799,16 @@ export default function AuctionLive() {
                       <TableRow key={item.id}>
                         <TableCell>{item.item_number}</TableCell>
                         <TableCell>{item.species_name}</TableCell>
-                        <TableCell align="right">¥{Math.floor(item.winning_price).toLocaleString()}</TableCell>
-                        <TableCell align="right">{item.quantity}匹</TableCell>
+                        <TableCell align="right">
+                          ¥{Math.floor(item.winning_price).toLocaleString()}
+                          /1{item.quantity_unit === 'kg' ? 'kg' : 
+                             item.quantity_unit === 'bag' ? '袋' : '匹'}
+                        </TableCell>
+                        <TableCell align="right">
+                          {item.quantity}
+                          {item.quantity_unit === 'kg' ? 'kg' : 
+                           item.quantity_unit === 'bag' ? '袋' : '匹'}
+                        </TableCell>
                         <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{Math.floor(item.total_amount).toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
@@ -697,7 +844,7 @@ export default function AuctionLive() {
   return (
     <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
       {/* 同意画面オーバーレイ */}
-      {!agreed && (
+      {showConsentScreen && !agreed && (
         <Box
           sx={{
             position: 'fixed',
@@ -899,44 +1046,96 @@ export default function AuctionLive() {
                       </Typography>
                       <Typography variant="h4" color="primary.main" fontWeight="bold">
                         ¥{Math.floor(lane.current_item.current_price).toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        × {lane.current_item.quantity}匹 = ¥
-                        {Math.floor(lane.current_item.current_price * lane.current_item.quantity).toLocaleString()}
+                        <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                          /1{lane.current_item.quantity_unit === 'kg' ? 'kg' : 
+                             lane.current_item.quantity_unit === 'bag' ? '袋' : '匹'}
+                        </Typography>
                       </Typography>
                     </Box>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                      <Chip
-                        label={`残り ${lane.current_item.countdown_seconds ?? 3}秒`}
-                        size="small"
-                        color={lane.current_item.countdown_seconds <= 1 ? 'error' : 'warning'}
-                        sx={{ fontWeight: 'bold', minWidth: 80 }}
-                      />
-                      <BidderCountDisplay count={lane.current_item.active_bidders_count} />
-                    </Box>
+                    {lane.current_item.phase === 'pre_bid' ? (
+                      <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        mb: 1,
+                        bgcolor: 'info.50',
+                        border: '2px solid',
+                        borderColor: 'info.200',
+                        borderRadius: 1,
+                        p: 1.5,
+                      }}>
+                        <TimerIcon sx={{ color: 'info.main', fontSize: 20 }} />
+                        <Typography variant="body1" fontWeight="bold" color="info.main">
+                          入札開始まで {lane.current_item.pre_bid_remaining_seconds ?? 0}秒
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                        <Chip
+                          label={lane.current_item.active_bidders_count >= 2
+                            ? `残り ${lane.current_item.countdown_seconds ?? 1}秒`
+                            : `残り ${lane.current_item.countdown_seconds ?? 10}秒`
+                          }
+                          size="small"
+                          color={
+                            lane.current_item.active_bidders_count >= 2
+                              ? 'error'
+                              : lane.current_item.countdown_seconds <= 3
+                                ? 'warning'
+                                : 'default'
+                          }
+                          sx={{
+                            fontWeight: 'bold',
+                            minWidth: 80,
+                            ...(lane.current_item.active_bidders_count >= 2 && {
+                              animation: 'pulse 0.5s infinite',
+                              '@keyframes pulse': {
+                                '0%, 100%': { opacity: 1 },
+                                '50%': { opacity: 0.7 },
+                              },
+                            }),
+                          }}
+                        />
+                        <BidderCountDisplay count={lane.current_item.active_bidders_count} />
+                      </Box>
+                    )}
                   </CardContent>
 
                   <CardActions>
-                    <Button
-                      fullWidth
-                      variant={lane.current_item.my_bid_status === 'active' ? 'contained' : 'outlined'}
-                      color={lane.current_item.my_bid_status === 'active' ? 'success' : 'primary'}
-                      size="large"
-                      onClick={() => handleBidToggle(lane.current_item!.id, lane.current_item!.my_bid_status)}
-                      startIcon={
-                        bidLoading[lane.current_item.id] ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : lane.current_item.my_bid_status === 'active' ? (
-                          <PauseIcon />
-                        ) : (
-                          <PlayArrowIcon />
-                        )
-                      }
-                      disabled={bidLoading[lane.current_item.id]}
-                    >
-                      {lane.current_item.my_bid_status === 'active' ? '入札ON' : '入札OFF'}
-                    </Button>
+                    {lane.current_item.phase === 'pre_bid' ? (
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="inherit"
+                        size="large"
+                        disabled
+                        startIcon={<TimerIcon />}
+                      >
+                        入札準備中...
+                      </Button>
+                    ) : (
+                      <Button
+                        fullWidth
+                        variant={lane.current_item.my_bid_status === 'active' ? 'contained' : 'outlined'}
+                        color={lane.current_item.my_bid_status === 'active' ? 'success' : 'primary'}
+                        size="large"
+                        onClick={() => handleBidToggle(lane.current_item!.id, lane.current_item!.my_bid_status)}
+                        startIcon={
+                          bidLoading[lane.current_item.id] ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : lane.current_item.my_bid_status === 'active' ? (
+                            <PauseIcon />
+                          ) : (
+                            <PlayArrowIcon />
+                          )
+                        }
+                        disabled={bidLoading[lane.current_item.id]}
+                      >
+                        {lane.current_item.my_bid_status === 'active' ? '入札中' : '入札する'}
+                      </Button>
+                    )}
                     <IconButton
                       color="primary"
                       onClick={() => handleDetailOpen(lane.current_item!)}
@@ -992,26 +1191,34 @@ export default function AuctionLive() {
               あなたの落札一覧（{wonItems.length}件）
             </Typography>
             <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>No.</TableCell>
-                    <TableCell>品種</TableCell>
-                    <TableCell align="right">単価</TableCell>
-                    <TableCell align="right">数量</TableCell>
-                    <TableCell align="right">合計(税込)</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {wonItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.item_number}</TableCell>
-                      <TableCell>{item.species_name}</TableCell>
-                      <TableCell align="right">¥{Math.floor(item.winning_price).toLocaleString()}</TableCell>
-                      <TableCell align="right">{item.quantity}匹</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{Math.floor(item.total_amount).toLocaleString()}</TableCell>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>No.</TableCell>
+                      <TableCell>品種</TableCell>
+                      <TableCell align="right">単価</TableCell>
+                      <TableCell align="right">数量</TableCell>
+                      <TableCell align="right">合計(税込)</TableCell>
                     </TableRow>
-                  ))}
+                  </TableHead>
+                  <TableBody>
+                    {wonItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.item_number}</TableCell>
+                        <TableCell>{item.species_name}</TableCell>
+                        <TableCell align="right">
+                          ¥{Math.floor(item.winning_price).toLocaleString()}
+                          /1{item.quantity_unit === 'kg' ? 'kg' : 
+                             item.quantity_unit === 'bag' ? '袋' : '匹'}
+                        </TableCell>
+                        <TableCell align="right">
+                          {item.quantity}
+                          {item.quantity_unit === 'kg' ? 'kg' : 
+                           item.quantity_unit === 'bag' ? '袋' : '匹'}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{Math.floor(item.total_amount).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
                   <TableRow>
                     <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold' }}>
                       合計金額

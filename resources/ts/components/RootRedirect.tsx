@@ -26,10 +26,9 @@ const RootRedirect: React.FC = () => {
   }
 
   // ロールに応じてリダイレクト
-  if (user?.roles.some(r => r.name === 'admin')) {
+  // 管理者のみの場合は管理画面へ、それ以外は参加者画面へ
+  if (user?.roles.length === 1 && user?.roles.some(r => r.name === 'admin')) {
     return <Navigate to="/admin" replace />;
-  } else if (user?.roles.some(r => r.name === 'seller')) {
-    return <Navigate to="/seller" replace />;
   } else {
     return <Navigate to="/participant/home" replace />;
   }

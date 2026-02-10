@@ -183,50 +183,100 @@ export default function LaneAssignment() {
       }
     }
 
-    setOperating(true);
-    try {
-      await axios.post(`/api/admin/auctions/${auctionId}/lanes/${laneId}/items`, {
-        item_id: draggedItem.id,
-        position: position,
-      });
-      await fetchData();
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '操作に失敗しました', severity: 'error' });
-    } finally {
-      setOperating(false);
+    const item = { ...draggedItem };
+    const source = dragSource ? { ...dragSource } : null;
+
+    // 楽観的更新
+    // 1) ソースから削除
+    if (source?.type === 'lane' && source.laneId) {
+      setLanes(prev => prev.map(lane =>
+        lane.id === source.laneId
+          ? { ...lane, items: lane.items.filter(i => i.id !== item.id) }
+          : lane
+      ));
+    } else if (source?.type === 'unassigned') {
+      setUnassignedItems(prev => prev.filter(i => i.id !== item.id));
+      setStatistics(prev => prev ? {
+        ...prev,
+        assigned_items: prev.assigned_items + 1,
+        unassigned_items: prev.unassigned_items - 1,
+      } : prev);
     }
 
+    // 2) ターゲットレーンに追加
+    setLanes(prev => prev.map(lane => {
+      if (lane.id !== laneId) return lane;
+      const newItems = [...lane.items];
+      const insertAt = position ? position - 1 : newItems.length; // 0-indexed
+      newItems.splice(insertAt, 0, item);
+      return { ...lane, items: newItems };
+    }));
+
     handleDragEnd();
+
+    try {
+      await axios.post(`/api/admin/auctions/${auctionId}/lanes/${laneId}/items`, {
+        item_id: item.id,
+        position: position,
+      });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '操作に失敗しました', severity: 'error' });
+      fetchData(); // 失敗時だけリロード
+    }
+  };
+
+  // レーンからアイテムをローカルで移動するヘルパー
+  const moveItemToUnassigned = (laneId: number, item: LaneItem) => {
+    setLanes(prev => prev.map(lane =>
+      lane.id === laneId
+        ? { ...lane, items: lane.items.filter(i => i.id !== item.id) }
+        : lane
+    ));
+    setUnassignedItems(prev => [...prev, item].sort((a, b) => a.item_number - b.item_number));
+    setStatistics(prev => prev ? {
+      ...prev,
+      assigned_items: prev.assigned_items - 1,
+      unassigned_items: prev.unassigned_items + 1,
+    } : prev);
   };
 
   // 未割り当てエリアにドロップ（レーンから削除）
   const handleDropOnUnassigned = async () => {
     if (!draggedItem || !dragSource || dragSource.type !== 'lane' || !dragSource.laneId || operating) return;
 
-    setOperating(true);
+    const sourceLaneId = dragSource.laneId;
+    const item = { ...draggedItem };
+
+    // 楽観的更新
+    moveItemToUnassigned(sourceLaneId, item);
+    handleDragEnd();
+
     try {
-      await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${dragSource.laneId}/items/${draggedItem.id}`);
-      await fetchData();
+      await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${sourceLaneId}/items/${item.id}`);
     } catch (err: any) {
       setSnackbar({ open: true, message: err.response?.data?.message || '削除に失敗しました', severity: 'error' });
-    } finally {
-      setOperating(false);
+      fetchData(); // 失敗時だけリロード
     }
-
-    handleDragEnd();
   };
 
   // レーンから削除（ボタン）
   const handleRemoveFromLane = async (laneId: number, itemId: number) => {
     if (operating) return;
-    setOperating(true);
+
+    // 対象アイテムを見つける
+    const lane = lanes.find(l => l.id === laneId);
+    const item = lane?.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // 楽観的更新
+    moveItemToUnassigned(laneId, item);
+    setSnackbar({ open: true, message: 'レーンから削除しました', severity: 'success' });
+
     try {
       await axios.delete(`/api/admin/auctions/${auctionId}/lanes/${laneId}/items/${itemId}`);
-      await fetchData();
     } catch (err: any) {
       setSnackbar({ open: true, message: err.response?.data?.message || '削除に失敗しました', severity: 'error' });
-    } finally {
-      setOperating(false);
+      fetchData(); // 失敗時だけリロード
     }
   };
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
+use App\Models\SystemSetting;
 use App\Models\WonItem;
 use App\Services\BidService;
 use App\Traits\MediaUrlTrait;
@@ -119,13 +120,42 @@ class AuctionController extends Controller
         
         // 待機室: scheduledステータスの場合
         if ($auction->status === 'scheduled') {
+            // 入室可能時刻を判定
+            $auctionSettings = $auction->getAuctionSettings();
+            $venueOpenMinutes = $auctionSettings['venue_open_minutes_before_start'] ?? 30;
+            $startDateTime = \Carbon\Carbon::parse($auction->event_date->format('Y-m-d') . ' ' . $auction->start_time);
+            $entranceAt = $startDateTime->copy()->subMinutes($venueOpenMinutes);
+            $now = now();
+            
+            if ($now->lt($entranceAt)) {
+                // 入室不可
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'auction_id' => $auction->id,
+                        'auction_title' => $auction->title,
+                        'status' => 'scheduled',
+                        'entrance_allowed' => false,
+                        'entrance_at' => $entranceAt->toIso8601String(),
+                        'start_at' => $startDateTime->toIso8601String(),
+                        'venue_open_minutes_before_start' => $venueOpenMinutes,
+                        'message' => "オークション開始{$venueOpenMinutes}分前から入室できます",
+                        'countdown_seconds' => 0,
+                        'lanes' => [],
+                    ],
+                ]);
+            }
+            
             return response()->json([
                 'success' => true,
                 'data' => [
                     'auction_id' => $auction->id,
                     'auction_title' => $auction->title,
                     'status' => 'scheduled',
+                    'entrance_allowed' => true,
+                    'start_at' => $startDateTime->toIso8601String(),
                     'countdown_seconds' => 0,
+                    'show_consent_screen' => SystemSetting::get('show_consent_screen', false),
                     'lanes' => [],
                 ],
             ]);
@@ -141,6 +171,9 @@ class AuctionController extends Controller
         
         $userId = Auth::id();
         $liveState = $this->bidService->getLiveState($auction, $userId);
+        
+        // 同意画面の表示設定を追加
+        $liveState['show_consent_screen'] = SystemSetting::get('show_consent_screen', false);
         
         // 開始カウントダウン中かチェック
         $startAt = Cache::get("auction:{$auction->id}:start_at");
@@ -180,6 +213,7 @@ class AuctionController extends Controller
                 'item_number' => $wi->item->item_number,
                 'species_name' => $wi->item->species_name,
                 'quantity' => $wi->item->quantity,
+                'quantity_unit' => $wi->item->quantity_unit ?? 'fish',
                 'winning_price' => $wi->winning_price,
                 'total_amount' => $wi->total_amount,
             ];
@@ -239,6 +273,7 @@ class AuctionController extends Controller
                         'item_number' => $item->item_number,
                         'species_name' => $item->species_name,
                         'quantity' => $item->quantity,
+                        'quantity_unit' => $item->quantity_unit ?? 'fish',
                         'start_price' => $item->start_price,
                         'current_price' => $item->current_price,
                         'estimated_price' => $item->estimated_price,
@@ -274,6 +309,7 @@ class AuctionController extends Controller
                         'item_number' => $item->item_number,
                         'species_name' => $item->species_name,
                         'quantity' => $item->quantity,
+                        'quantity_unit' => $item->quantity_unit ?? 'fish',
                         'start_price' => $item->start_price,
                         'current_price' => $item->current_price,
                         'estimated_price' => $item->estimated_price,

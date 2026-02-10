@@ -60,6 +60,21 @@ class BidService
             ];
         }
 
+        // 入札開始待機中は入札を受け付けない
+        $lane = Lane::where('current_item_id', $item->id)->first();
+        if ($lane) {
+            $countdownState = \Illuminate\Support\Facades\Cache::get("countdown:lane:{$lane->id}");
+            if ($countdownState && ($countdownState['phase'] ?? 'bidding') === 'pre_bid') {
+                return [
+                    'success' => false,
+                    'message' => '入札開始待機中です。もう少々お待ちください。',
+                    'data' => [
+                        'pre_bid_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0,
+                    ],
+                ];
+            }
+        }
+
         DB::beginTransaction();
         try {
             // 入札参加状態を更新
@@ -494,12 +509,16 @@ class BidService
                 // リアルタイムカウントダウン秒数を取得
                 $countdownState = \Illuminate\Support\Facades\Cache::get("countdown:lane:{$lane->id}");
                 $remainingSeconds = $countdownState['remaining_seconds'] ?? $defaultCountdown;
+                $phase = $countdownState['phase'] ?? 'bidding';
+                $preBidRemaining = ($phase === 'pre_bid') ? ($countdownState['remaining_seconds'] ?? 0) : 0;
+                $countdownMode = $countdownState['countdown_mode'] ?? 'default';
 
                 $laneData['current_item'] = [
                     'id' => $item->id,
                     'item_number' => $item->item_number,
                     'species_name' => $item->species_name,
                     'quantity' => $item->quantity,
+                    'quantity_unit' => $item->quantity_unit ?? 'fish',
                     'current_price' => $item->current_price,
                     'estimated_price' => $item->estimated_price,
                     'inspection_info' => $item->inspection_info,
@@ -510,6 +529,9 @@ class BidService
                     'active_bidders_count' => $activeBidderCount,
                     'countdown_seconds' => $remainingSeconds,
                     'my_bid_status' => $myBidStatus,
+                    'phase' => $phase,
+                    'pre_bid_remaining_seconds' => $preBidRemaining,
+                    'countdown_mode' => $countdownMode,
                 ];
             }
 
