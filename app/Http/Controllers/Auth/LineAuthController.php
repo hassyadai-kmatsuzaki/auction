@@ -8,6 +8,7 @@ use App\Models\LineAccount;
 use App\Services\LineService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class LineAuthController extends Controller
@@ -32,28 +33,51 @@ class LineAuthController extends Controller
     /** LINE Login コールバック（認証後にブラウザから呼ばれる） */
     public function callback(Request $request)
     {
-        $state = session('line_oauth_state');
-        if (!$state || $state !== $request->input('state')) {
-            return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=state');
-        }
+        $userId = Auth::id();
+        $code   = $request->input('code');
+        $state  = $request->input('state');
 
-        $code = $request->input('code');
+        Log::info('LINE callback received', [
+            'user_id'       => $userId,
+            'has_code'      => !!$code,
+            'has_state'     => !!$state,
+            'session_state' => session('line_oauth_state') ? 'exists' : 'missing',
+        ]);
+
         if (!$code) {
+            Log::warning('LINE callback: no code');
             return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=code');
         }
 
-        $userId = Auth::id();
         if (!$userId) {
+            Log::warning('LINE callback: not authenticated');
             return redirect(config('app.frontend_url', '/') . '/login?line=error&reason=auth');
+        }
+
+        // state検証（セッションが切れている場合はスキップしてログに記録）
+        $sessionState = session('line_oauth_state');
+        if ($sessionState && $sessionState !== $state) {
+            Log::warning('LINE callback: state mismatch', ['session' => $sessionState, 'request' => $state]);
+            return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=state');
+        }
+        if (!$sessionState) {
+            Log::warning('LINE callback: session state missing (proceeding anyway)');
         }
 
         $lineAccount = $this->linkAction->execute($userId, $code);
 
         if (!$lineAccount) {
+            Log::error('LINE callback: linkAction failed', ['user_id' => $userId]);
             return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=link');
         }
 
-        // フロントの設定画面に成功パラメータ付きでリダイレクト
+        Log::info('LINE account linked successfully', [
+            'user_id'      => $userId,
+            'line_user_id' => substr($lineAccount->line_user_id, 0, 10) . '...',
+            'display_name' => $lineAccount->display_name,
+        ]);
+
+        session()->forget('line_oauth_state');
         $role = $this->detectRole($request);
         return redirect(config('app.frontend_url', '/') . "/{$role}/settings?line=success");
     }

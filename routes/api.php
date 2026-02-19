@@ -40,8 +40,8 @@ use App\Http\Controllers\ManualController;
 |
 */
 
-// LINE Login（認証不要・コールバック）
-Route::get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController::class, 'callback']);
+// LINE Login コールバック（ブラウザからリダイレクトされるためセッション認証を使用）
+Route::middleware(['web', 'auth:sanctum'])->get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController::class, 'callback']);
 
 // 認証API（ゲスト）
 Route::prefix('auth')->group(function () {
