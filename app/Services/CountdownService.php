@@ -207,7 +207,18 @@ class CountdownService
 
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
-        // ========= 入札者数に応じた動的カウントダウン切り替え =========
+        // ========= オークション設定の同期（途中変更対応） =========
+        // $auction は毎tick Lane::with(['auction'])->find() で取得済みなのでDB追加クエリなし
+        $liveSettings       = $auction->getAuctionSettings();
+        $latestDefault      = $liveSettings['countdown_seconds_default'] ?? $liveSettings['countdown_seconds'] ?? 10;
+        $latestCompetitive  = $liveSettings['countdown_seconds_competitive'] ?? 1;
+
+        // キャッシュの設定値が古い場合は更新
+        if (($state['countdown_seconds_competitive'] ?? null) != $latestCompetitive) {
+            $state['countdown_seconds_competitive'] = $latestCompetitive;
+            $state['countdown_seconds_default']     = $latestDefault;
+        }
+
         $currentMode       = $state['countdown_mode'] ?? 'default';
         $defaultSeconds    = $state['countdown_seconds_default'] ?? 10;
         $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
@@ -611,15 +622,36 @@ class CountdownService
 
     /**
      * カウントダウンを再開（一時停止から復帰）
+     *
+     * ■ 一時停止中に管理画面で設定変更された可能性があるため、
+     *   再開時にオークション設定を再読み込みしてキャッシュを更新する
      */
     public function resumeCountdown(int $laneId): void
     {
         $state = Cache::get($this->getCacheKey($laneId));
-        if ($state) {
-            $state['is_running'] = true;
-            Cache::put($this->getCacheKey($laneId), $state, 3600);
-            Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s");
+        if (!$state) return;
+
+        // 設定値をDBから最新に更新
+        $lane = Lane::with('auction')->find($laneId);
+        if ($lane && $lane->auction) {
+            $settings           = $lane->auction->getAuctionSettings();
+            $newDefault         = $settings['countdown_seconds_default'] ?? $settings['countdown_seconds'] ?? 10;
+            $newCompetitive     = $settings['countdown_seconds_competitive'] ?? 1;
+
+            $oldCompetitive = $state['countdown_seconds_competitive'] ?? null;
+
+            $state['countdown_seconds_default']     = $newDefault;
+            $state['countdown_seconds_competitive']  = $newCompetitive;
+            $state['countdown_seconds']              = $newDefault;
+
+            if ($oldCompetitive !== $newCompetitive) {
+                Log::info("Countdown settings refreshed on resume: lane {$laneId}, competitive {$oldCompetitive}→{$newCompetitive}");
+            }
         }
+
+        $state['is_running'] = true;
+        Cache::put($this->getCacheKey($laneId), $state, 3600);
+        Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s");
     }
 
     /**
