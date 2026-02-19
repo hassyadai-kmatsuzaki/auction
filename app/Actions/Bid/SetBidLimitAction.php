@@ -112,12 +112,20 @@ class SetBidLimitAction
     public function activatePendingBidLimits(Item $item): int
     {
         $item->loadMissing('auction');
-        if ($item->status !== 'live') return 0;
+
+        \Illuminate\Support\Facades\Log::info("activatePendingBidLimits called: item={$item->id}, status={$item->status}, price={$item->current_price}");
+
+        if ($item->status !== 'live') {
+            \Illuminate\Support\Facades\Log::info("activatePendingBidLimits: item {$item->id} is not live (status={$item->status}), skipping");
+            return 0;
+        }
 
         $limits = BidLimitPrice::forItem($item->id)
             ->notTriggered()
             ->where('limit_price', '>', $item->current_price)
             ->get();
+
+        \Illuminate\Support\Facades\Log::info("activatePendingBidLimits: item={$item->id}, found " . $limits->count() . " pending limits");
 
         $activated = 0;
         foreach ($limits as $limit) {

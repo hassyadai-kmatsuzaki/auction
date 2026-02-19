@@ -507,9 +507,12 @@ class CountdownService
             // 事前に指値を設定していたユーザーを自動で入札ONにする
             $autoActivated = 0;
             try {
-                $autoActivated = $this->setBidLimitAction->activatePendingBidLimits($nextItem->fresh());
+                $freshNext = $nextItem->fresh();
+                Log::info("moveToNextItem: calling activatePendingBidLimits for item {$freshNext->id}, status={$freshNext->status}");
+                $autoActivated = $this->setBidLimitAction->activatePendingBidLimits($freshNext);
+                Log::info("moveToNextItem: activatePendingBidLimits returned {$autoActivated} for item {$freshNext->id}");
             } catch (\Exception $e) {
-                Log::warning("Auto-bid activation error: " . $e->getMessage());
+                Log::error("Auto-bid activation error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             }
 
             // 入札開始待機の残り秒数を取得
