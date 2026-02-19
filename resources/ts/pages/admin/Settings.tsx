@@ -465,7 +465,8 @@ export default function Settings() {
                   InputProps={{
                     endAdornment: <InputAdornment position="end">秒</InputAdornment>,
                   }}
-                  helperText="開始時・入札者0〜1人の場合"
+                  inputProps={{ step: 0.5, min: 0.5 }}
+                  helperText="開始時・入札者0〜1人の場合（0.5秒単位）"
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={4}>
@@ -478,7 +479,8 @@ export default function Settings() {
                   InputProps={{
                     endAdornment: <InputAdornment position="end">秒</InputAdornment>,
                   }}
-                  helperText="入札者2人以上の場合"
+                  inputProps={{ step: 0.5, min: 0.5 }}
+                  helperText="入札者2人以上の場合（0.5秒単位）"
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={4}>
@@ -548,7 +550,8 @@ export default function Settings() {
                   InputProps={{
                     endAdornment: <InputAdornment position="end">秒</InputAdornment>,
                   }}
-                  helperText="次の生体表示後、入札を開始するまでの待機秒数（0で待機なし）"
+                  inputProps={{ step: 0.5, min: 0 }}
+                  helperText="次の生体表示後、入札を開始するまでの待機秒数（0で待機なし、0.5秒単位）"
                 />
               </Grid>
             </Grid>

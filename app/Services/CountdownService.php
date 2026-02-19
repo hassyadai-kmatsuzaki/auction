@@ -19,6 +19,11 @@ class CountdownService
 {
     protected BidService $bidService;
 
+    /**
+     * Tick interval in seconds (0.5 = 500ms)
+     */
+    public const TICK_INTERVAL = 0.5;
+
     public function __construct(BidService $bidService)
     {
         $this->bidService = $bidService;
@@ -162,8 +167,8 @@ class CountdownService
     }
 
     /**
-     * カウントダウンをティック（1秒進める）
-     * キューワーカーから毎秒呼ばれる
+     * カウントダウンをティック（0.5秒進める）
+     * キューワーカーから0.5秒ごとに呼ばれる
      */
     public function tick(int $laneId): ?array
     {
@@ -207,15 +212,15 @@ class CountdownService
         }
         // ================================================================
 
-        // カウントダウンを1秒減らす
-        $state['remaining_seconds']--;
+        // カウントダウンを0.5秒減らす
+        $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
         
-        // ブロードキャスト（毎秒）
+        // ブロードキャスト（0.5秒ごと）
         broadcast(new CountdownTick(
             $auction->id,
             $lane->id,
             $item->id,
-            $state['remaining_seconds'],
+            (float) $state['remaining_seconds'],
             $activeBidderCount,
             $item->current_price
         ));
@@ -245,19 +250,20 @@ class CountdownService
     }
 
     /**
-     * 入札開始待機フェーズのティック処理
+     * 入札開始待機フェーズのティック処理（0.5秒ごと）
      */
     protected function tickPreBid(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
     {
-        $state['remaining_seconds']--;
+        // 0.5秒減算
+        $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
         $state['pre_bid_remaining_seconds'] = $state['remaining_seconds'];
 
-        // pre_bidフェーズ用のブロードキャスト（remaining_secondsを負数で送信して区別、またはphaseをeventに含める）
+        // pre_bidフェーズ用のブロードキャスト（0.5秒ごと）
         broadcast(new CountdownTick(
             $auction->id,
             $lane->id,
             $item->id,
-            $state['remaining_seconds'],
+            (float) $state['remaining_seconds'],
             0, // pre_bid中は入札者数0
             $item->current_price,
             'pre_bid' // フェーズ情報
@@ -267,7 +273,7 @@ class CountdownService
             // 待機完了 → 入札カウントダウンに移行（開始時は通常秒数を使用）
             $defaultSeconds = $state['countdown_seconds_default'] ?? $state['countdown_seconds'] ?? 10;
             $state['phase'] = 'bidding';
-            $state['remaining_seconds'] = $defaultSeconds;
+            $state['remaining_seconds'] = (float) $defaultSeconds;
             $state['countdown_mode'] = 'default';
             $state['pre_bid_remaining_seconds'] = 0;
             $state['started_at'] = now()->timestamp;

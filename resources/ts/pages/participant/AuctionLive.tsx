@@ -595,6 +595,15 @@ export default function AuctionLive() {
     setLightboxOpen(true);
   };
 
+  // カウントダウン秒数のフォーマット（0.5秒対応）
+  const formatCountdownSeconds = (seconds: number): string => {
+    if (seconds <= 0) return '0秒';
+    if (Number.isInteger(seconds)) {
+      return `${seconds}秒`;
+    }
+    return `${seconds.toFixed(1)}秒`;
+  };
+
   // 入札者数表示コンポーネント
   const BidderCountDisplay = ({ count }: { count: number }) => {
     if (count === 0) return null;
@@ -1068,21 +1077,18 @@ export default function AuctionLive() {
                       }}>
                         <TimerIcon sx={{ color: 'info.main', fontSize: 20 }} />
                         <Typography variant="body1" fontWeight="bold" color="info.main">
-                          入札開始まで {lane.current_item.pre_bid_remaining_seconds ?? 0}秒
+                          入札開始まで {formatCountdownSeconds(lane.current_item.pre_bid_remaining_seconds ?? 0)}
                         </Typography>
                       </Box>
                     ) : (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                         <Chip
-                          label={lane.current_item.active_bidders_count >= 2
-                            ? `残り ${lane.current_item.countdown_seconds ?? 1}秒`
-                            : `残り ${lane.current_item.countdown_seconds ?? 10}秒`
-                          }
+                          label={`残り ${formatCountdownSeconds(lane.current_item.countdown_seconds ?? (lane.current_item.active_bidders_count >= 2 ? 1 : 10))}`}
                           size="small"
                           color={
                             lane.current_item.active_bidders_count >= 2
                               ? 'error'
-                              : lane.current_item.countdown_seconds <= 3
+                              : (lane.current_item.countdown_seconds ?? 10) <= 3
                                 ? 'warning'
                                 : 'default'
                           }

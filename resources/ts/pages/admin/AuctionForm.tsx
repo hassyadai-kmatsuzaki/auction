@@ -654,11 +654,12 @@ export default function AuctionForm() {
                       ...formData,
                       custom_auction_settings: {
                         ...formData.custom_auction_settings,
-                        countdown_seconds_default: parseInt(e.target.value) || 0,
+                        countdown_seconds_default: parseFloat(e.target.value) || 0,
                       },
                     })}
                     InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).countdown_seconds_default || 10}秒（0〜1人入札時）` : '0〜1人入札時'}
+                    inputProps={{ step: 0.5, min: 0.5 }}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).countdown_seconds_default || 10}秒（0〜1人入札時、0.5秒単位）` : '0〜1人入札時、0.5秒単位'}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -671,11 +672,12 @@ export default function AuctionForm() {
                       ...formData,
                       custom_auction_settings: {
                         ...formData.custom_auction_settings,
-                        countdown_seconds_competitive: parseInt(e.target.value) || 0,
+                        countdown_seconds_competitive: parseFloat(e.target.value) || 0,
                       },
                     })}
                     InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).countdown_seconds_competitive || 1}秒（2人以上入札時）` : '2人以上入札時'}
+                    inputProps={{ step: 0.5, min: 0.5 }}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).countdown_seconds_competitive || 1}秒（2人以上入札時、0.5秒単位）` : '2人以上入札時、0.5秒単位'}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -725,11 +727,12 @@ export default function AuctionForm() {
                       ...formData,
                       custom_auction_settings: {
                         ...formData.custom_auction_settings,
-                        item_switch_delay_seconds: parseInt(e.target.value) || 0,
+                        item_switch_delay_seconds: parseFloat(e.target.value) || 0,
                       },
                     })}
                     InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).item_switch_delay_seconds || 5}秒（0で待機なし）` : ''}
+                    inputProps={{ step: 0.5, min: 0 }}
+                    helperText={defaultSettings ? `システム: ${(defaultSettings.auction_settings as any).item_switch_delay_seconds || 5}秒（0で待機なし、0.5秒単位）` : '0で待機なし、0.5秒単位'}
                   />
                 </Grid>
               </Grid>

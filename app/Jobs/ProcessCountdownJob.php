@@ -28,12 +28,17 @@ class ProcessCountdownJob implements ShouldQueue
     public int $timeout = 600;
 
     /**
+     * Tick interval in milliseconds (500ms = 0.5 seconds)
+     */
+    public const TICK_INTERVAL_MS = 500;
+
+    /**
      * Create a new job instance.
      */
-    public function __construct(int $laneId, int $maxIterations = 300)
+    public function __construct(int $laneId, int $maxIterations = 600)
     {
         $this->laneId = $laneId;
-        $this->maxIterations = $maxIterations; // 最大5分（300秒）
+        $this->maxIterations = $maxIterations; // 最大5分（600回 × 0.5秒）
         $this->onQueue('countdown'); // 専用キュー
     }
 
@@ -42,7 +47,7 @@ class ProcessCountdownJob implements ShouldQueue
      */
     public function handle(CountdownService $countdownService): void
     {
-        Log::info("Countdown job STARTED for lane {$this->laneId}");
+        Log::info("Countdown job STARTED for lane {$this->laneId} (interval: " . self::TICK_INTERVAL_MS . "ms)");
         
         $iterations = 0;
 
@@ -54,8 +59,8 @@ class ProcessCountdownJob implements ShouldQueue
                 break;
             }
 
-            // 1秒待機
-            sleep(1);
+            // 0.5秒（500ms）待機
+            usleep(self::TICK_INTERVAL_MS * 1000);
 
             // カウントダウンをティック
             try {

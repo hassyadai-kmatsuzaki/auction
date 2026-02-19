@@ -15,7 +15,7 @@ class CountdownTick implements ShouldBroadcastNow
     public int $auctionId;
     public int $laneId;
     public int $itemId;
-    public int $remainingSeconds;
+    public float $remainingSeconds;
     public int $activeBiddersCount;
     public int $currentPrice;
     public string $phase;
@@ -27,7 +27,7 @@ class CountdownTick implements ShouldBroadcastNow
         int $auctionId,
         int $laneId,
         int $itemId,
-        int $remainingSeconds,
+        float $remainingSeconds,
         int $activeBiddersCount,
         int $currentPrice,
         string $phase = 'bidding'
