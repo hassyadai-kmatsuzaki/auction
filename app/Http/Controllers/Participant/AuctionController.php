@@ -57,15 +57,24 @@ class AuctionController extends Controller
             'success' => true,
             'data' => [
                 'auctions' => $auctions->map(function ($auction) {
-                    return [
-                        'id' => $auction->id,
-                        'title' => $auction->title,
-                        'event_date' => $auction->event_date->format('Y-m-d'),
-                        'start_time' => $auction->start_time,
-                        'status' => $auction->status,
+                    $data = [
+                        'id'          => $auction->id,
+                        'title'       => $auction->title,
+                        'event_date'  => $auction->event_date->format('Y-m-d'),
+                        'start_time'  => $auction->start_time,
+                        'status'      => $auction->status,
                         'description' => $auction->description,
-                        'lane_count' => $auction->lane_count,
+                        'lane_count'  => $auction->lane_count,
+                        'entrance_allowed' => null, // scheduled 以外は null
                     ];
+
+                    // scheduled の場合のみ入室可否を付与
+                    if ($auction->status === 'scheduled') {
+                        $entrance = $this->auctionService->resolveEntranceState($auction);
+                        $data['entrance_allowed'] = $entrance['entrance_allowed'] ?? false;
+                    }
+
+                    return $data;
                 }),
             ],
         ]);

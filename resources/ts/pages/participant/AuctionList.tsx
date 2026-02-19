@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -26,6 +26,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Inventory as InventoryIcon,
   ArrowForward as ArrowForwardIcon,
+  MeetingRoom as MeetingRoomIcon,
 } from '@mui/icons-material';
 import type { Auction } from '../../types';
 import axios from '../../lib/axios';
@@ -41,7 +42,7 @@ export default function AuctionList() {
     fetchAuctions();
   }, []);
 
-  const fetchAuctions = async () => {
+  const fetchAuctions = useCallback(async () => {
     try {
       const response = await axios.get('/api/participant/auctions');
       if (response.data.success) {
@@ -52,7 +53,15 @@ export default function AuctionList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // scheduled オークションがある場合は30秒ごとに入室状態をポーリング
+  useEffect(() => {
+    const hasScheduled = auctions.some(a => a.status === 'scheduled');
+    if (!hasScheduled) return;
+    const interval = setInterval(fetchAuctions, 30_000);
+    return () => clearInterval(interval);
+  }, [auctions, fetchAuctions]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -352,15 +361,41 @@ export default function AuctionList() {
                       オークション会場へ
                     </Button>
                   ) : auction.status === 'scheduled' ? (
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      size="large"
-                      onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
-                      sx={{ fontWeight: 600 }}
-                    >
-                      出品一覧を見る
-                    </Button>
+                    /* 待機室が公開中かどうかでボタンを出し分け */
+                    auction.entrance_allowed ? (
+                      /* 入室可能: 2ボタン並列表示 */
+                      <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+                        <Button
+                          variant="outlined"
+                          size="large"
+                          onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
+                          sx={{ fontWeight: 600, flex: 1 }}
+                        >
+                          出品一覧
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="large"
+                          startIcon={<MeetingRoomIcon />}
+                          onClick={() => navigate(`/participant/auction/${auction.id}/live`)}
+                          sx={{ fontWeight: 600, flex: 1 }}
+                        >
+                          待機室へ入室
+                        </Button>
+                      </Box>
+                    ) : (
+                      /* 入室不可: 出品一覧ボタンのみ */
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        size="large"
+                        onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
+                        sx={{ fontWeight: 600 }}
+                      >
+                        出品一覧を見る
+                      </Button>
+                    )
                   ) : (
                     <Button
                       variant="text"

@@ -45,6 +45,8 @@ export interface Auction {
   created_by?: number;
   created_at?: string;
   updated_at?: string;
+  /** scheduled のとき: 待機室に入室可能かどうか（null = live/finished など非該当） */
+  entrance_allowed?: boolean | null;
 }
 
 export interface Item {
