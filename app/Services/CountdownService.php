@@ -173,6 +173,11 @@ class CountdownService
     /**
      * カウントダウンをティック（0.5秒進める）
      * キューワーカーから0.5秒ごとに呼ばれる
+     *
+     * ■ 堅牢性設計:
+     *   1. どのパスを通っても必ずキャッシュを更新する（or 明示的にstop/restart）
+     *   2. 例外が発生してもレーンが止まらない（catchで復旧を試みる）
+     *   3. カウントダウン終了後の moveToNextItem はトランザクション外でカウントダウンを開始
      */
     public function tick(int $laneId): ?array
     {
@@ -204,53 +209,58 @@ class CountdownService
         $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
 
         if ($activeBidderCount >= 2 && $currentMode === 'default') {
-            // 入札者が2人以上になった → 競合モードに切り替え
             $state['countdown_mode'] = 'competitive';
             $state['remaining_seconds'] = $competitiveSeconds;
-            Log::info("Mode switch to competitive: lane {$laneId}, bidders={$activeBidderCount}, new countdown={$competitiveSeconds}s");
         } elseif ($activeBidderCount < 2 && $currentMode === 'competitive') {
-            // 入札者が1人以下になった → 通常モードに切り替え（カウントダウンを延長）
             $state['countdown_mode'] = 'default';
             $state['remaining_seconds'] = $defaultSeconds;
-            Log::info("Mode switch to default: lane {$laneId}, bidders={$activeBidderCount}, new countdown={$defaultSeconds}s");
         }
-        // ================================================================
 
         // カウントダウンを0.5秒減らす
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
-        
+
         // ブロードキャスト（0.5秒ごと）
-        broadcast(new CountdownTick(
-            $auction->id,
-            $lane->id,
-            $item->id,
-            (float) $state['remaining_seconds'],
-            $activeBidderCount,
-            $item->current_price
-        ));
+        try {
+            broadcast(new CountdownTick(
+                $auction->id, $lane->id, $item->id,
+                (float) $state['remaining_seconds'],
+                $activeBidderCount, $item->current_price
+            ));
+        } catch (\Exception $e) {
+            Log::warning("Broadcast error lane {$laneId}: " . $e->getMessage());
+        }
 
         // カウントダウン終了時の処理
         if ($state['remaining_seconds'] <= 0) {
             if ($activeBidderCount >= 2) {
                 // 入札者2人以上 → 価格上昇してカウントダウンリセット
-                $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
-                return [
-                    'action' => 'price_increment',
-                    'lane_id' => $laneId,
-                ];
+                try {
+                    $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
+                } catch (\Exception $e) {
+                    // 価格上昇が失敗してもレーンを止めない: カウントダウンをリセットして継続
+                    Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - resetting countdown");
+                    $this->resetCountdown($lane);
+                }
+                return ['action' => 'price_increment', 'lane_id' => $laneId];
             } else {
                 // 入札者0人or1人 → 流札or落札して次へ
-                return $this->handleCountdownEnd($lane, $item, $auction, $activeBidderCount);
+                try {
+                    return $this->handleCountdownEnd($lane, $item, $auction, $activeBidderCount);
+                } catch (\Exception $e) {
+                    Log::error("Countdown end FAILED lane {$laneId}: {$e->getMessage()} - attempting recovery");
+                    // 復旧: カウントダウンをdefaultに再設定して止まらないようにする
+                    $state['remaining_seconds'] = $defaultSeconds;
+                    $state['countdown_mode'] = 'default';
+                    Cache::put($this->getCacheKey($laneId), $state, 3600);
+                    return ['action' => 'recovery', 'lane_id' => $laneId];
+                }
             }
         }
 
-        // 状態を更新
+        // ★ 重要: どのパスを通っても必ずキャッシュを更新する
         Cache::put($this->getCacheKey($laneId), $state, 3600);
 
-        return [
-            'action' => 'tick',
-            'remaining_seconds' => $state['remaining_seconds'],
-        ];
+        return ['action' => 'tick', 'remaining_seconds' => $state['remaining_seconds']];
     }
 
     /**
@@ -328,18 +338,28 @@ class CountdownService
             return;
         }
 
+        // ★ 重要: 価格更新が成功したらまずカウントダウンをリセット
+        // これにより、後続の処理で例外が発生してもレーンが止まらない
         $this->resetCountdown($lane);
 
         $freshItem = $item->fresh();
 
-        broadcast(new \App\Events\PriceUpdated(
-            $auction->id, $lane->id, $item->id,
-            $freshItem->current_price, $activeBidderCount,
-            $auction->getAuctionSettings()['countdown_seconds'] ?? 3
-        ));
+        try {
+            broadcast(new \App\Events\PriceUpdated(
+                $auction->id, $lane->id, $item->id,
+                $freshItem->current_price, $activeBidderCount,
+                $auction->getAuctionSettings()['countdown_seconds'] ?? 3
+            ));
+        } catch (\Exception $e) {
+            Log::warning("PriceUpdated broadcast error: " . $e->getMessage());
+        }
 
-        // 価格上昇後に指値チェックを実行
-        $this->checkBidLimits($lane, $freshItem, $auction);
+        // 価格上昇後に指値チェック（失敗してもカウントダウンは既にリセット済みなので安全）
+        try {
+            $this->checkBidLimits($lane, $freshItem, $auction);
+        } catch (\Exception $e) {
+            Log::error("BidLimit check error after price increment: " . $e->getMessage());
+        }
     }
 
     /**
@@ -402,37 +422,49 @@ class CountdownService
 
     /**
      * カウントダウン終了処理
+     *
+     * ■ 修正ポイント:
+     *   1. 落札/流札のDB処理はトランザクション内
+     *   2. moveToNextItem（次商品のセット + startPreBidCountdown）はトランザクション外
+     *      → startPreBidCountdownがCache::putするので、トランザクションrollback時に
+     *        キャッシュだけ残って不整合になるのを防ぐ
      */
     protected function handleCountdownEnd(Lane $lane, Item $item, Auction $auction, int $activeBidderCount): array
     {
         $this->stopCountdown($lane->id);
 
+        // Step 1: 落札/流札のDB処理（トランザクション内）
         DB::beginTransaction();
         try {
             if ($activeBidderCount === 0) {
                 $item->update(['status' => 'unsold']);
                 Log::info("Item {$item->id} unsold");
             } elseif ($activeBidderCount === 1) {
-                // FinalizeBidAction を使用（BidService依存を除去）
                 $this->finalizeBidAction->execute($item);
                 Log::info("Item {$item->id} sold");
             }
-
-            // 次の商品へ
-            $nextItem = $this->moveToNextItem($lane, $auction);
-
             DB::commit();
-
-            return [
-                'action' => 'countdown_end',
-                'result' => $activeBidderCount === 0 ? 'unsold' : 'sold',
-                'next_item' => $nextItem ? $nextItem->id : null,
-            ];
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Countdown end error: " . $e->getMessage());
+            Log::error("Countdown end DB error: " . $e->getMessage());
             throw $e;
         }
+
+        // Step 2: 次の商品への移行（トランザクション外）
+        // ここでstartPreBidCountdownが呼ばれてキャッシュが書き込まれる
+        // トランザクション外なのでrollbackでキャッシュが不整合になることはない
+        $nextItem = null;
+        try {
+            $nextItem = $this->moveToNextItem($lane, $auction);
+        } catch (\Exception $e) {
+            Log::error("Move to next item error lane {$lane->id}: " . $e->getMessage());
+        }
+
+        return [
+            'action'    => 'countdown_end',
+            'result'    => $activeBidderCount === 0 ? 'unsold' : 'sold',
+            'next_item' => $nextItem ? $nextItem->id : null,
+        ];
     }
 
     /**

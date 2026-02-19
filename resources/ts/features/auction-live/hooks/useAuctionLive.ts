@@ -30,7 +30,7 @@ export function useAuctionLive(auctionId: number) {
   const applyCountdownTick = (event: CountdownTickEvent) => {
     queryClient.setQueryData<LiveState>(LIVE_STATE_QUERY_KEY(auctionId), (prev) => {
       if (!prev) return prev;
-      const phase = (event as any).phase ?? 'bidding';
+      const phase = event.phase ?? 'bidding';
       return {
         ...prev,
         lanes: prev.lanes.map((lane) =>

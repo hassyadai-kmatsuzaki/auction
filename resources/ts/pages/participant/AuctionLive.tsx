@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Grid, CircularProgress, Alert, Button,
@@ -50,7 +50,18 @@ export default function AuctionLive() {
   // null = 未確定（APIレスポンス待ち）、true/false = 確定
   const [entranceAllowed, setEntranceAllowed] = useState<boolean | null>(null);
   const [entranceAt, setEntranceAt] = useState<string | null>(null);
+  /**
+   * 開始カウントダウン表示値（0 以下 = 非表示、null = 未開始）
+   *
+   * ■ タイムスタンプ方式を採用
+   *   - startingEndsAt: サーバーから受け取った残り秒数から計算した「終了時刻（ms）」
+   *   - 表示値は Math.ceil((startingEndsAt - Date.now()) / 1000) で算出
+   *   - ローカルタイマーのドリフトが発生しないためブラウザ間の差異が出ない
+   *   - WebSocketが遅延しても表示はウォールクロックを基準にするため正確
+   */
+  const [startingEndsAt, setStartingEndsAt] = useState<number | null>(null);
   const [startingCountdown, setStartingCountdown] = useState<number | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [celebration, setCelebration] = useState<CelebrationItem | null>(null);
   // 指値モーダル
   const [limitModalItemId, setLimitModalItemId] = useState<number | null>(null);
@@ -95,7 +106,7 @@ export default function AuctionLive() {
     removeLimit: removeModalLimit,
     isSetting: isModalSetting,
     isRemoving: isModalRemoving,
-  } = useBidLimit(limitModalItemId ?? 0); // 0 の場合はクエリが無効化される（enabled: false）
+  } = useBidLimit(limitModalItemId ?? 0, auctionId); // auctionId を渡してライブ状態も再取得
 
   // WebSocketイベント購読
   useAuctionSocket({
@@ -116,9 +127,11 @@ export default function AuctionLive() {
     },
     onAuctionStatus: (e) => {
       if (e.status === 'starting' && e.countdown_seconds) {
-        setStartingCountdown(e.countdown_seconds);
+        // サーバーの残り秒数から「終了時刻」を計算（タイムスタンプ方式）
+        setStartingEndsAt(Date.now() + e.countdown_seconds * 1000);
       } else if (e.status === 'live') {
-        setStartingCountdown(0);
+        setStartingEndsAt(null);
+        setStartingCountdown(null);
         refetch();
       } else if (e.status === 'finished') {
         refetch();
@@ -165,9 +178,63 @@ export default function AuctionLive() {
     }
 
     if (liveState.status === 'starting' && liveState.starting_countdown) {
-      setStartingCountdown(liveState.starting_countdown);
+      // APIポーリングで取得した場合もタイムスタンプを設定
+      // すでに startingEndsAt が設定されている場合は大きなずれがある時だけ上書き
+      setStartingEndsAt(prev => {
+        const serverEndsAt = Date.now() + (liveState.starting_countdown ?? 0) * 1000;
+        if (prev === null) return serverEndsAt;
+        // サーバー値との差が2秒以上ある場合のみ補正（APIポーリングによる不要なリセット防止）
+        return Math.abs(prev - serverEndsAt) > 2000 ? serverEndsAt : prev;
+      });
     }
   }, [liveState]);
+
+  /**
+   * 開始カウントダウンのタイムスタンプ方式タイマー
+   *
+   * ■ 設計思想
+   *   - startingEndsAt（終了時刻ms）を基準にカウントダウン表示値を算出
+   *   - 100ms ごとに Math.ceil((endsAt - Date.now()) / 1000) で表示値を更新
+   *   - ローカルの setInterval は表示更新のみ（カウンター自体は保持しない）
+   *   - ブラウザのタイマードリフトが蓄積しないため全ブラウザで誤差ゼロ
+   *   - WebSocketやAPIポーリングで終了時刻が更新されれば自動的に補正される
+   */
+  useEffect(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+
+    if (startingEndsAt === null) {
+      setStartingCountdown(null);
+      return;
+    }
+
+    const tick = () => {
+      const remaining = Math.ceil((startingEndsAt - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setStartingCountdown(0);
+        if (countdownTimerRef.current) {
+          clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+        }
+        // 終了したらライブ状態を再取得
+        refetch();
+        return;
+      }
+      setStartingCountdown(remaining);
+    };
+
+    tick(); // 即時表示
+    countdownTimerRef.current = setInterval(tick, 200); // 200msごとに更新（スムーズ表示）
+
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+    };
+  }, [startingEndsAt, refetch]);
 
   // ========== ローディング / エラー ==========
   if (isLoading) {
@@ -189,8 +256,26 @@ export default function AuctionLive() {
 
   if (!liveState) return null;
 
+  // ========== 開始カウントダウン（最優先チェック） ==========
+  //
+  // ■ なぜここが最初か？
+  //   待機室(scheduled)からカウントダウンが始まる際、WebSocketで
+  //   AuctionStatusChanged('starting') を受け取り startingEndsAt が設定される。
+  //   その時点では liveState.status がまだ 'scheduled' のままなので、
+  //   scheduled チェックより前に置かないと WaitingRoom が表示されたままになる。
+  //
+  // ■ 表示条件
+  //   - startingEndsAt が設定済み（WebSocketで開始カウントダウン受信）
+  //   - OR liveState.status が 'starting'（APIで取得済み）
+  //   - AND startingCountdown が 0 より大きい（まだカウント中）
+  if (
+    (startingEndsAt !== null || liveState.status === 'starting') &&
+    (startingCountdown === null || startingCountdown > 0)
+  ) {
+    return <StartingCountdown title={liveState.auction_title} count={startingCountdown ?? 10} />;
+  }
+
   // ========== 入室不可 ==========
-  // entranceAllowed === false のとき、または null（未確定）かつAPIで entrance_allowed が false の場合
   if (liveState.status === 'scheduled' && entranceAllowed === false) {
     return (
       <EntranceBlocked
@@ -204,23 +289,17 @@ export default function AuctionLive() {
   }
 
   // ========== 待機室 ==========
-  // entranceAllowed === true のとき表示（null のときはローディング済みのため表示しない）
   if (liveState.status === 'scheduled' && entranceAllowed === true) {
     return <WaitingRoom title={liveState.auction_title} />;
   }
 
-  // scheduled で entranceAllowed が null（未確定）の場合はローディング表示
-  if (liveState.status === 'scheduled' && entranceAllowed === null) {
+  // scheduled で entranceAllowed が null（未確定）の場合はローディング
+  if (liveState.status === 'scheduled') {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress />
       </Box>
     );
-  }
-
-  // ========== 開始カウントダウン ==========
-  if (liveState.status === 'starting' || (startingCountdown !== null && startingCountdown > 0)) {
-    return <StartingCountdown title={liveState.auction_title} count={startingCountdown ?? 0} />;
   }
 
   // ========== オークション終了 ==========

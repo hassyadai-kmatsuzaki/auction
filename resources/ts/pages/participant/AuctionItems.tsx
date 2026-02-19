@@ -198,12 +198,22 @@ export default function AuctionItems() {
         <Grid container spacing={2}>
           {currentItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
-              <Box sx={{ position: 'relative' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ItemCard item={item} isFavorited={favoriteIds.has(item.id)}
                   onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}
                   onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)} />
-                {/* 指値バッジ */}
-                <Box sx={{ position: 'absolute', bottom: 52, left: 8, right: 8 }}>
+                {/* 指値バッジ（カード下部に独立して配置・重ならない） */}
+                <Box
+                  sx={{
+                    px: 1.5, py: 1,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderTop: 'none',
+                    borderColor: 'divider',
+                    borderBottomLeftRadius: 2,
+                    borderBottomRightRadius: 2,
+                  }}
+                >
                   <BidLimitBadge
                     limitPrice={limitSettings[item.id]?.limit_price ?? null}
                     isTriggered={limitSettings[item.id]?.is_triggered ?? false}

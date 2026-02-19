@@ -1,25 +1,39 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bidLimitApi } from '@/api/participant/bidLimitApi';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { LIVE_STATE_QUERY_KEY } from '@/features/auction-live/hooks/useAuctionLive';
 
 export const BID_LIMIT_QUERY_KEY = (itemId: number) =>
   ['bid-limit', itemId] as const;
 
-export function useBidLimit(itemId: number) {
+/**
+ * @param itemId       対象商品ID（0の場合はクエリ無効）
+ * @param auctionId    設定変更後にライブ状態も再取得する場合に指定
+ */
+export function useBidLimit(itemId: number, auctionId?: number) {
   const queryClient = useQueryClient();
   const showSnackbar = useNotificationStore((s) => s.showSnackbar);
 
   const query = useQuery({
     queryKey: BID_LIMIT_QUERY_KEY(itemId),
     queryFn: () => bidLimitApi.getOne(itemId),
-    enabled: itemId > 0, // itemId が 0 または null の場合はクエリを実行しない
+    enabled: itemId > 0,
     staleTime: 30_000,
   });
+
+  /** 設定変更後に関連キャッシュを全て無効化 */
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(itemId) });
+    // ライブ状態のキャッシュも無効化してLaneCardの表示を即時更新する
+    if (auctionId) {
+      queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
+    }
+  };
 
   const setMutation = useMutation({
     mutationFn: (limitPrice: number) => bidLimitApi.set(itemId, limitPrice),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(itemId) });
+      invalidateAll();
       if (data.data?.is_triggered) {
         showSnackbar(
           `上限価格を設定しました（現在価格が上限に達しているため自動的に入札オフになりました）`,
@@ -37,8 +51,11 @@ export function useBidLimit(itemId: number) {
   const removeMutation = useMutation({
     mutationFn: () => bidLimitApi.remove(itemId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(itemId) });
+      invalidateAll();
       showSnackbar('上限価格の設定を解除しました', 'info');
+    },
+    onError: () => {
+      showSnackbar('上限価格の解除に失敗しました', 'error');
     },
   });
 

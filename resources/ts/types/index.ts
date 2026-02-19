@@ -151,9 +151,12 @@ export interface LaneItem {
   thumbnail_path?: string;
   media?: ItemMedia[];
   active_bidders_count: number;
-  /** カウントダウン残り秒数（float対応） */
+  /** カウントダウン残り秒数（0.5秒単位。表示時は Math.ceil で整数秒に変換） */
   countdown_seconds: number;
   my_bid_status: 'active' | 'inactive' | null;
+  /** 自分の指値（上限価格） */
+  my_limit_price?: number | null;
+  my_limit_triggered?: boolean;
   phase?: 'bidding' | 'pre_bid';
   pre_bid_remaining_seconds?: number;
   countdown_mode?: 'default' | 'competitive';

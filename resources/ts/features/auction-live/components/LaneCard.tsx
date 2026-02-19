@@ -114,8 +114,8 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         {onLimitEdit && (
           <Box sx={{ mt: 0.5 }}>
             <BidLimitBadge
-              limitPrice={(item as any).my_limit_price ?? null}
-              isTriggered={(item as any).my_limit_triggered ?? false}
+              limitPrice={item.my_limit_price ?? null}
+              isTriggered={item.my_limit_triggered ?? false}
               onEdit={() => onLimitEdit(item.id)}
               onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
             />

@@ -60,9 +60,9 @@ class ProcessAuctionCountdownJob implements ShouldQueue
     {
         Log::info("Auction countdown job STARTED for auction {$this->auctionId}");
         
-        // ジョブ実行中フラグをセット（フェイルセーフ用）
+        // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
-        Cache::put($jobKey, true, 3600);
+        Cache::put($jobKey, true, $this->timeout + 600); // timeout + 10分余裕
 
         // === 10秒プレスタートカウントダウン ===
         $startAtKey = "auction:{$this->auctionId}:start_at";
@@ -143,23 +143,44 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             // 全レーンのカウントダウンを処理
             foreach ($auction->lanes as $lane) {
                 if ($lane->status === 'paused') {
-                    // 一時停止中のレーンはカウントせず待機
                     $pausedCount++;
                     continue;
                 }
 
                 if ($lane->status === 'active' && $lane->current_item_id) {
                     $state = $countdownService->getCountdownState($lane->id);
-                    
-                    if ($state && $state['is_running']) {
+
+                    // ★ 復旧ロジック: active レーンにカウントダウンキャッシュがない場合は再作成
+                    // 一時停止→再開後やキャッシュ消滅時に発生する
+                    if (!$state) {
+                        Log::warning("Lane {$lane->id} is active but has no countdown state - recovering");
                         try {
-                            $result = $countdownService->tick($lane->id);
-                            if ($result) {
+                            $lane->load(['auction', 'currentItem']);
+                            if ($lane->currentItem && $lane->currentItem->status === 'live') {
+                                $countdownService->startCountdown($lane);
                                 $activeCount++;
                             }
                         } catch (\Exception $e) {
-                            Log::error("Countdown tick error for lane {$lane->id}: " . $e->getMessage());
+                            Log::error("Lane {$lane->id} recovery failed: " . $e->getMessage());
                         }
+                        continue;
+                    }
+
+                    // is_running が false の場合はスキップ（一時停止→active に戻ったがresumeされてない）
+                    if (!$state['is_running']) {
+                        continue;
+                    }
+
+                    try {
+                        $result = $countdownService->tick($lane->id);
+                        if ($result) {
+                            $activeCount++;
+                        }
+                    } catch (\Exception $e) {
+                        Log::error("Countdown tick error for lane {$lane->id}: " . $e->getMessage());
+                        // ★ 例外が発生してもレーンをアクティブとしてカウントする
+                        // （次のティックで復旧する可能性があるため）
+                        $activeCount++;
                     }
                 }
             }

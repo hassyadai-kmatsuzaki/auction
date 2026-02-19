@@ -48,6 +48,7 @@ export interface CountdownTickEvent {
   remaining_seconds: number;
   active_bidders_count: number;
   current_price: number;
+  phase?: 'bidding' | 'pre_bid';
 }
 
 export interface BidLimitReachedEvent {

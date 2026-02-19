@@ -6,9 +6,10 @@ interface Props {
   remainingSeconds: number;
 }
 
+/** 1秒刻みで表示（0.5秒単位のサーバー値を繰り上げ変換） */
 const formatSeconds = (s: number): string => {
   if (s <= 0) return '0秒';
-  return Number.isInteger(s) ? `${s}秒` : `${s.toFixed(1)}秒`;
+  return `${Math.ceil(s)}秒`;
 };
 
 /**
