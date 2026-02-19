@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\LaneController as AdminLaneController;
 use App\Http\Controllers\Participant\AuctionController as ParticipantAuctionController;
 use App\Http\Controllers\Participant\BidController as ParticipantBidController;
+use App\Http\Controllers\Participant\BidLimitController as ParticipantBidLimitController;
 use App\Http\Controllers\Participant\WonItemController as ParticipantWonItemController;
 use App\Http\Controllers\Participant\SettingsController as ParticipantSettingsController;
 use App\Http\Controllers\Participant\FavoriteController as ParticipantFavoriteController;
@@ -130,6 +131,10 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('lanes/{laneId}/next-item', [AdminLiveController::class, 'nextItem']);
     Route::patch('items/{itemId}/price', [AdminLiveController::class, 'adjustPrice']);
     Route::get('auctions/{auctionId}/countdown-status', [AdminLiveController::class, 'countdownStatus']);
+    // 待機室手動公開・閉鎖
+    Route::get('auctions/{auctionId}/entrance-status',  [AdminLiveController::class, 'entranceStatus']);
+    Route::post('auctions/{auctionId}/entrance/open',   [AdminLiveController::class, 'openEntrance']);
+    Route::post('auctions/{auctionId}/entrance/close',  [AdminLiveController::class, 'closeEntrance']);
     
     // 落札者管理
     Route::get('won-items-auctions', [AdminWonItemController::class, 'auctionList']);
@@ -191,6 +196,12 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     // 入札
     Route::post('/bids', [ParticipantBidController::class, 'toggle']);
     Route::get('/bids/my-active', [ParticipantBidController::class, 'myActive']);
+
+    // 指値（上限価格）
+    Route::get('/bid-limits',          [ParticipantBidLimitController::class, 'index']);
+    Route::post('/bid-limits',         [ParticipantBidLimitController::class, 'store']);
+    Route::get('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'show']);
+    Route::delete('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'destroy']);
     
     // 落札商品
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);

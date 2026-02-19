@@ -6,7 +6,9 @@ use App\Actions\Auction\FinishAuctionAction;
 use App\Actions\Auction\MoveToNextItemAction;
 use App\Actions\Auction\PauseAuctionAction;
 use App\Actions\Auction\ResumeAuctionAction;
+use App\Actions\Auction\ToggleEntranceAction;
 use App\Actions\Item\AdjustPriceAction;
+use App\Services\AuctionService;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Lane;
@@ -31,6 +33,8 @@ class LiveController extends Controller
         private readonly FinishAuctionAction   $finishAction,
         private readonly MoveToNextItemAction  $nextItemAction,
         private readonly AdjustPriceAction     $adjustPriceAction,
+        private readonly ToggleEntranceAction  $toggleEntranceAction,
+        private readonly AuctionService        $auctionService,
     ) {}
 
 
@@ -466,8 +470,41 @@ class LiveController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'countdowns' => $countdowns,
+            'data' => ['countdowns' => $countdowns],
+        ]);
+    }
+
+    /**
+     * 待機室を手動公開する（scheduled ステータス専用）
+     */
+    public function openEntrance($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        return $this->toggleEntranceAction->execute($auction, true)->toResponse();
+    }
+
+    /**
+     * 待機室を閉鎖して時間制御に戻す
+     */
+    public function closeEntrance($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        return $this->toggleEntranceAction->execute($auction, false)->toResponse();
+    }
+
+    /**
+     * 待機室の現在の公開状態を取得
+     */
+    public function entranceStatus($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'auction_id'      => $auction->id,
+                'auction_status'  => $auction->status,
+                'entrance_opened' => $this->auctionService->isEntranceManuallyOpened($auction->id),
             ],
         ]);
     }

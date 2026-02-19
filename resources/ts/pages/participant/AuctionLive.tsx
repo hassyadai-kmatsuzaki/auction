@@ -15,6 +15,8 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { useAuctionLive } from '../../features/auction-live/hooks/useAuctionLive';
 import { useBidToggle } from '../../features/auction-live/hooks/useBidToggle';
 import { useWonItems } from '../../features/auction-live/hooks/useWonItems';
+import { useBidLimit, BID_LIMIT_QUERY_KEY } from '../../features/bid-limit/hooks/useBidLimit';
+import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { useEntranceControl } from '../../features/auction-live/hooks/useEntranceControl';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
 import { AuctionHeader } from '../../features/auction-live/components/AuctionHeader';
@@ -36,7 +38,7 @@ export default function AuctionLive() {
   const auctionId = Number(auctionIdStr);
   const navigate = useNavigate();
   const { user } = useAuth();
-  useQueryClient(); // TanStack Query context に依存するフックの初期化
+  const queryClient = useQueryClient();
 
   // グローバルストア
   const socketConnected = useAuctionLiveStore((s) => s.socketConnected);
@@ -49,6 +51,8 @@ export default function AuctionLive() {
   const [entranceAt, setEntranceAt] = useState<string | null>(null);
   const [startingCountdown, setStartingCountdown] = useState<number | null>(null);
   const [celebration, setCelebration] = useState<CelebrationItem | null>(null);
+  // 指値モーダル
+  const [limitModalItemId, setLimitModalItemId] = useState<number | null>(null);
 
   // WebSocket切断時の自動復旧
   useSocketReconnect(auctionId);
@@ -76,6 +80,21 @@ export default function AuctionLive() {
     setEntranceAllowed(true);
     refetch();
   });
+
+  // 指値モーダル用フック（選択中のアイテムの指値）
+  // useBidLimit 内で enabled: itemId > 0 により、0 の場合はAPIを呼ばない
+  const limitModalItem = limitModalItemId
+    ? liveState?.lanes.find(l => l.current_item?.id === limitModalItemId)?.current_item ?? null
+    : null;
+  const {
+    limitPrice: modalLimitPrice,
+    isTriggered: modalLimitTriggered,
+    quickOptions: modalQuickOptions,
+    setLimit: setModalLimit,
+    removeLimit: removeModalLimit,
+    isSetting: isModalSetting,
+    isRemoving: isModalRemoving,
+  } = useBidLimit(limitModalItemId ?? 0); // 0 の場合はクエリが無効化される（enabled: false）
 
   // WebSocketイベント購読
   useAuctionSocket({
@@ -105,6 +124,24 @@ export default function AuctionLive() {
         refetchWon();
         showSnackbar(e.message || 'オークションが終了しました', 'success');
       }
+    },
+    onBidLimitReached: (e) => {
+      if (e.user_id !== user?.id) return;
+      showSnackbar(e.message || `上限価格に達したため自動的に入札オフになりました`, 'warning');
+      // 入札状態をキャッシュ上でも即時更新
+      queryClient.setQueryData(['auction-live', auctionId], (prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lanes: prev.lanes.map((lane: any) =>
+            lane.current_item?.id === e.item_id
+              ? { ...lane, current_item: { ...lane.current_item, my_bid_status: 'inactive' } }
+              : lane
+          ),
+        };
+      });
+      // 指値のキャッシュも更新（発動済みにする）
+      queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
     },
   });
 
@@ -267,6 +304,10 @@ export default function AuctionLive() {
                   handleBidToggle(itemId, status);
                 }}
                 onDetailOpen={(l) => setDetailLane(l)}
+                onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
+                onLimitRemove={(itemId) => {
+                  setLimitModalItemId(itemId);
+                }}
               />
             </Grid>
           ))}
@@ -281,6 +322,24 @@ export default function AuctionLive() {
         {/* 落札一覧 */}
         <WonItemsPanel items={wonItems} totalAmount={wonTotalAmount} />
       </Container>
+
+      {/* 指値（上限価格）設定モーダル */}
+      {limitModalItemId && limitModalItem && (
+        <BidLimitModal
+          open={!!limitModalItemId}
+          onClose={() => setLimitModalItemId(null)}
+          itemId={limitModalItemId}
+          speciesName={limitModalItem.species_name}
+          currentLimitPrice={modalLimitPrice}
+          currentPrice={limitModalItem.current_price}
+          quickOptions={modalQuickOptions}
+          isLive={true}
+          isSetting={isModalSetting}
+          isRemoving={isModalRemoving}
+          onSet={(price) => setModalLimit(price)}
+          onRemove={() => removeModalLimit()}
+        />
+      )}
 
       {/* 詳細ダイアログ */}
       <ItemDetailDialog

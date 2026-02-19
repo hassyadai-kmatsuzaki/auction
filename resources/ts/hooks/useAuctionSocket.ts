@@ -50,6 +50,16 @@ export interface CountdownTickEvent {
   current_price: number;
 }
 
+export interface BidLimitReachedEvent {
+  lane_id: number;
+  item_id: number;
+  user_id: number;
+  current_price: number;
+  limit_price: number;
+  species_name: string;
+  message: string;
+}
+
 interface UseAuctionSocketOptions {
   auctionId: number;
   onPriceUpdated?: (event: PriceUpdatedEvent) => void;
@@ -58,6 +68,7 @@ interface UseAuctionSocketOptions {
   onItemSold?: (event: ItemSoldEvent) => void;
   onAuctionStatus?: (event: AuctionStatusEvent) => void;
   onCountdownTick?: (event: CountdownTickEvent) => void;
+  onBidLimitReached?: (event: BidLimitReachedEvent) => void;
   onConnectionError?: (error: unknown) => void;
 }
 
@@ -77,31 +88,36 @@ export function useAuctionSocket({
   onItemSold,
   onAuctionStatus,
   onCountdownTick,
+  onBidLimitReached,
   onConnectionError,
 }: UseAuctionSocketOptions): UseAuctionSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<ReturnType<typeof getEcho> extends { channel: (name: string) => infer R } ? R : never | null>(null);
 
   // コールバックをrefで保持（再購読を防ぐ）
-  const callbacksRef = useRef({
-    onPriceUpdated,
-    onBidderUpdated,
-    onLaneChanged,
-    onItemSold,
-    onAuctionStatus,
-    onCountdownTick,
-    onConnectionError,
+  const callbacksRef = useRef<Required<UseAuctionSocketOptions>>({
+    auctionId,
+    onPriceUpdated:     onPriceUpdated      ?? (() => {}),
+    onBidderUpdated:    onBidderUpdated     ?? (() => {}),
+    onLaneChanged:      onLaneChanged       ?? (() => {}),
+    onItemSold:         onItemSold          ?? (() => {}),
+    onAuctionStatus:    onAuctionStatus     ?? (() => {}),
+    onCountdownTick:    onCountdownTick     ?? (() => {}),
+    onBidLimitReached:  onBidLimitReached   ?? (() => {}),
+    onConnectionError:  onConnectionError   ?? (() => {}),
   });
   
   // コールバックを最新に更新
   callbacksRef.current = {
-    onPriceUpdated,
-    onBidderUpdated,
-    onLaneChanged,
-    onItemSold,
-    onAuctionStatus,
-    onCountdownTick,
-    onConnectionError,
+    auctionId,
+    onPriceUpdated:     onPriceUpdated      ?? (() => {}),
+    onBidderUpdated:    onBidderUpdated     ?? (() => {}),
+    onLaneChanged:      onLaneChanged       ?? (() => {}),
+    onItemSold:         onItemSold          ?? (() => {}),
+    onAuctionStatus:    onAuctionStatus     ?? (() => {}),
+    onCountdownTick:    onCountdownTick     ?? (() => {}),
+    onBidLimitReached:  onBidLimitReached   ?? (() => {}),
+    onConnectionError:  onConnectionError   ?? (() => {}),
   };
 
   // WebSocket が有効かどうか
@@ -161,6 +177,12 @@ export function useAuctionSocket({
       channel.listen('.countdown.tick', (event: CountdownTickEvent) => {
         console.log('[Socket] countdown.tick:', event);
         callbacksRef.current.onCountdownTick?.(event);
+      });
+
+      // 指値自動オフイベント
+      channel.listen('.bid.limit.reached', (event: BidLimitReachedEvent) => {
+        console.log('[Socket] bid.limit.reached:', event);
+        callbacksRef.current.onBidLimitReached?.(event);
       });
     } catch (error) {
       setIsConnected(false);

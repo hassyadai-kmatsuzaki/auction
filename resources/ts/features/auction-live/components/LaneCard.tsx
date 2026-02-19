@@ -8,19 +8,22 @@ import type { LiveLane } from '@/types';
 import { CountdownChip } from './CountdownChip';
 import { BidButton } from './BidButton';
 import { PreBidOverlay } from './PreBidOverlay';
+import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
 
 interface Props {
   lane: LiveLane;
   isLoading: boolean;
   onBidToggle: (itemId: number, currentStatus: 'active' | 'inactive' | null) => void;
   onDetailOpen: (lane: LiveLane) => void;
+  onLimitEdit?: (itemId: number) => void;
+  onLimitRemove?: (itemId: number) => void;
 }
 
 /**
  * レーンカード1枚
  * React.memo + 細粒度メモ化で不要な再レンダリングを防ぐ
  */
-export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen }: Props) => {
+export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove }: Props) => {
   const item = lane.current_item;
 
   if (!item) {
@@ -104,6 +107,18 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
             {item.active_bidders_count > 0 && (
               <Chip icon={<PeopleIcon />} label="入札中" size="small" color="error" />
             )}
+          </Box>
+        )}
+
+        {/* 指値（上限価格）バッジ */}
+        {onLimitEdit && (
+          <Box sx={{ mt: 0.5 }}>
+            <BidLimitBadge
+              limitPrice={(item as any).my_limit_price ?? null}
+              isTriggered={(item as any).my_limit_triggered ?? false}
+              onEdit={() => onLimitEdit(item.id)}
+              onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
+            />
           </Box>
         )}
       </CardContent>

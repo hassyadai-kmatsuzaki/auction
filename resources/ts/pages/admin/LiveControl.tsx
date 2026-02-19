@@ -5,13 +5,14 @@ import {
   Chip, IconButton, Tabs, Tab, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Avatar, Tooltip, Badge,
   CircularProgress, Alert, Snackbar, Dialog, DialogTitle,
-  DialogContent, DialogActions,
+  DialogContent, DialogActions, Divider,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon, PlayArrow as PlayArrowIcon,
   Pause as PauseIcon, SkipNext as SkipNextIcon, Stop as StopIcon,
   People as PeopleIcon, LiveTv as LiveTvIcon, List as ListIcon,
   FiberManualRecord as RecordIcon, Refresh as RefreshIcon,
+  MeetingRoom as MeetingRoomIcon, NoMeetingRoom as NoMeetingRoomIcon,
 } from '@mui/icons-material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuctionSocket } from '../../hooks/useAuctionSocket';
@@ -50,8 +51,12 @@ export default function LiveControl() {
   const [snackbar, setSnackbar]       = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [confirmDialog, setConfirmDialog] = useState({ open: false, action: '', title: '', message: '' });
 
-  const { liveState, isLoading, refetch, pause, resume, finish, nextItem, isPausing, isResuming, isFinishing, isNextItem } =
-    useLiveControl(id);
+  const {
+    liveState, isLoading, refetch,
+    pause, resume, finish, nextItem,
+    isPausing, isResuming, isFinishing, isNextItem,
+    entranceOpened, isEntranceLoading, openEntrance, closeEntrance,
+  } = useLiveControl(id);
 
   const auction    = liveState?.auction;
   const lanes      = liveState?.lanes ?? [];
@@ -140,6 +145,56 @@ export default function LiveControl() {
       {/* ライブコントロールタブ */}
       {tabValue === 0 && (
         <>
+          {/* 待機室手動公開パネル（scheduled のときのみ表示） */}
+          {auction?.status === 'scheduled' && (
+            <Card sx={{ mb: 3, border: '1px solid', borderColor: entranceOpened ? 'success.300' : 'warning.300' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {entranceOpened
+                      ? <MeetingRoomIcon sx={{ color: 'success.main', fontSize: 28 }} />
+                      : <NoMeetingRoomIcon sx={{ color: 'warning.main', fontSize: 28 }} />}
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        待機室の公開状態
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {entranceOpened
+                          ? '現在：手動公開中（参加者が入室できます）'
+                          : '現在：閉鎖中（時間設定に従い自動公開されます）'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Button
+                      variant={entranceOpened ? 'outlined' : 'contained'}
+                      color="success"
+                      startIcon={<MeetingRoomIcon />}
+                      onClick={openEntrance}
+                      disabled={entranceOpened || isEntranceLoading}
+                    >
+                      今すぐ公開
+                    </Button>
+                    <Button
+                      variant={entranceOpened ? 'contained' : 'outlined'}
+                      color="warning"
+                      startIcon={<NoMeetingRoomIcon />}
+                      onClick={closeEntrance}
+                      disabled={!entranceOpened || isEntranceLoading}
+                    >
+                      閉鎖に戻す
+                    </Button>
+                  </Box>
+                </Box>
+                <Alert severity="info" sx={{ mt: 1.5, py: 0.5 }} icon={false}>
+                  <Typography variant="caption">
+                    「今すぐ公開」を押すと、時間設定に関わらず参加者がすぐに待機室へ入室できます。「閉鎖に戻す」を押すと時間設定に戻ります。
+                  </Typography>
+                </Alert>
+              </CardContent>
+            </Card>
+          )}
+
           {/* コントロールパネル */}
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ p: 2 }}>

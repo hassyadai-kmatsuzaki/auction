@@ -13,10 +13,13 @@ import {
   PlayCircleOutline as PlayCircleOutlineIcon,
   FavoriteBorder as FavoriteBorderIcon, Favorite as FavoriteIcon,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
+import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
+import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
+import { bidLimitApi, type BidLimitData } from '../../api/participant/bidLimitApi';
 
 const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
   registered: { label: '出品中', color: 'primary' },
@@ -67,6 +70,12 @@ export default function AuctionItems() {
   const [videoDialogOpen, setVideoDialogOpen]   = useState(false);
   const [favoriteIds, setFavoriteIds]           = useState<Set<number>>(new Set());
 
+  const queryClient = useQueryClient();
+  // 指値モーダル
+  const [limitModalItem, setLimitModalItem] = useState<ItemData | null>(null);
+  const [limitSettings, setLimitSettings] = useState<Record<number, BidLimitData | null>>({});
+  const [isSettingLimit, setIsSettingLimit] = useState(false);
+
   // TanStack Query でデータ取得
   const { data, isLoading, error } = useQuery({
     queryKey: ['auction-items-page', auctionId],
@@ -81,14 +90,42 @@ export default function AuctionItems() {
   const lanes      = data?.lanes ?? [];
   const totalItems = data?.total_items ?? 0;
 
-  // お気に入り取得
+  // お気に入り・指値を一括取得
   useEffect(() => {
     const allIds = lanes.flatMap((l: any) => l.items.map((i: any) => i.id));
     if (!allIds.length) return;
     axios.post('/api/participant/favorites/check', { item_ids: allIds })
       .then((r) => { if (r.data.success) setFavoriteIds(new Set(r.data.data.favorite_item_ids)); })
       .catch(() => {});
+    // 指値の一括取得
+    bidLimitApi.getMany(allIds)
+      .then((limits) => setLimitSettings(limits))
+      .catch(() => {});
   }, [lanes]);
+
+  const handleSetLimit = async (itemId: number, price: number) => {
+    setIsSettingLimit(true);
+    try {
+      await bidLimitApi.set(itemId, price);
+      setLimitSettings((prev) => ({
+        ...prev,
+        [itemId]: { limit_price: price, is_triggered: false },
+      }));
+    } catch (err: any) {
+      console.error('指値設定エラー:', err);
+    } finally {
+      setIsSettingLimit(false);
+    }
+  };
+
+  const handleRemoveLimit = async (itemId: number) => {
+    try {
+      await bidLimitApi.remove(itemId);
+      setLimitSettings((prev) => ({ ...prev, [itemId]: null }));
+    } catch (err: any) {
+      console.error('指値解除エラー:', err);
+    }
+  };
 
   const handleFavoriteToggle = async (e: React.MouseEvent, itemId: number) => {
     e.stopPropagation();
@@ -161,9 +198,20 @@ export default function AuctionItems() {
         <Grid container spacing={2}>
           {currentItems.map((item) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
-              <ItemCard item={item} isFavorited={favoriteIds.has(item.id)}
-                onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}
-                onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)} />
+              <Box sx={{ position: 'relative' }}>
+                <ItemCard item={item} isFavorited={favoriteIds.has(item.id)}
+                  onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}
+                  onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)} />
+                {/* 指値バッジ */}
+                <Box sx={{ position: 'absolute', bottom: 52, left: 8, right: 8 }}>
+                  <BidLimitBadge
+                    limitPrice={limitSettings[item.id]?.limit_price ?? null}
+                    isTriggered={limitSettings[item.id]?.is_triggered ?? false}
+                    onEdit={() => setLimitModalItem(item)}
+                    onRemove={() => handleRemoveLimit(item.id)}
+                  />
+                </Box>
+              </Box>
             </Grid>
           ))}
         </Grid>
@@ -313,6 +361,29 @@ export default function AuctionItems() {
           {videoDialogUrl && <video src={videoDialogUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />}
         </Box>
       </Dialog>
+
+      {/* 指値（上限価格）設定モーダル（開始前） */}
+      {limitModalItem && (
+        <BidLimitModal
+          open={!!limitModalItem}
+          onClose={() => setLimitModalItem(null)}
+          itemId={limitModalItem.id}
+          speciesName={limitModalItem.species_name}
+          currentLimitPrice={limitSettings[limitModalItem.id]?.limit_price ?? null}
+          currentPrice={limitModalItem.start_price}
+          quickOptions={null}
+          isLive={false}
+          isSetting={isSettingLimit}
+          onSet={(price) => {
+            handleSetLimit(limitModalItem.id, price);
+            setLimitModalItem(null);
+          }}
+          onRemove={() => {
+            handleRemoveLimit(limitModalItem.id);
+            setLimitModalItem(null);
+          }}
+        />
+      )}
     </Container>
   );
 }

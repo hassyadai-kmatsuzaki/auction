@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Actions\Bid\FinalizeBidAction;
+use App\Actions\Bid\LeaveBidAction;
 use App\Models\Auction;
+use App\Models\BidLimitPrice;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\BidParticipant;
+use App\Events\BidLimitReached;
 use App\Events\CountdownTick;
 use App\Events\LaneItemChanged;
 use App\Events\AuctionStatusChanged;
@@ -23,6 +26,7 @@ class CountdownService
 
     public function __construct(
         private readonly FinalizeBidAction $finalizeBidAction,
+        private readonly LeaveBidAction    $leaveBidAction,
     ) {}
 
     /** @deprecated 後方互換性のため残存 — CountdownService は BidService に依存しない */
@@ -326,11 +330,74 @@ class CountdownService
 
         $this->resetCountdown($lane);
 
+        $freshItem = $item->fresh();
+
         broadcast(new \App\Events\PriceUpdated(
             $auction->id, $lane->id, $item->id,
-            $item->fresh()->current_price, $activeBidderCount,
+            $freshItem->current_price, $activeBidderCount,
             $auction->getAuctionSettings()['countdown_seconds'] ?? 3
         ));
+
+        // 価格上昇後に指値チェックを実行
+        $this->checkBidLimits($lane, $freshItem, $auction);
+    }
+
+    /**
+     * 指値（上限価格）チェック
+     * 価格上昇後に呼び出し、上限に達した参加者を自動離脱させる
+     *
+     * ■ N+1対策: whereIn サブクエリで1回のSQLに集約
+     * ■ 競合対策: markAsTriggered() に楽観的ロックを使用
+     *             → 複数の価格上昇が同時に来ても二重発動しない
+     */
+    protected function checkBidLimits(Lane $lane, Item $item, Auction $auction): void
+    {
+        // N+1修正: whereHasの代わりにwhereInサブクエリで1クエリに最適化
+        $limits = BidLimitPrice::where('item_id', $item->id)
+            ->where('is_triggered', false)
+            ->where('limit_price', '<=', $item->current_price) // 上限以下のものだけ取得
+            ->whereIn('user_id', function ($q) use ($item) {
+                // アクティブな入札者のuser_idのみ
+                $q->select('user_id')
+                  ->from('bid_participants')
+                  ->where('item_id', $item->id)
+                  ->where('is_active', true);
+            })
+            ->get();
+
+        if ($limits->isEmpty()) {
+            return;
+        }
+
+        foreach ($limits as $limit) {
+            // 競合対策: markAsTriggered() は楽観的ロックで二重発動を防ぐ
+            // false が返った場合は既に他のプロセスが処理済み
+            try {
+                $triggered = $limit->markAsTriggered();
+                if (!$triggered) {
+                    // 既に別プロセスが発動済みのためスキップ
+                    continue;
+                }
+
+                // 自動離脱（markAsTriggered成功後に実行）
+                $this->leaveBidAction->execute($item, $limit->user_id);
+
+                // ブロードキャストはトランザクション外で実行
+                broadcast(new BidLimitReached(
+                    $auction->id,
+                    $lane->id,
+                    $item->id,
+                    $limit->user_id,
+                    $item->current_price,
+                    $limit->limit_price,
+                    $item->species_name ?? ''
+                ));
+
+                Log::info("BidLimit triggered: item={$item->id}, user={$limit->user_id}, price={$item->current_price}, limit={$limit->limit_price}");
+            } catch (\Exception $e) {
+                Log::error("BidLimit check error: item={$item->id}, user={$limit->user_id} - " . $e->getMessage());
+            }
+        }
     }
 
     /**

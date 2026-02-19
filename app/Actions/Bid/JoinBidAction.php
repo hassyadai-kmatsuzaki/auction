@@ -5,6 +5,7 @@ namespace App\Actions\Bid;
 use App\DTOs\BidResultDto;
 use App\Events\BidderUpdated;
 use App\Models\BidEvent;
+use App\Models\BidLimitPrice;
 use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
@@ -43,6 +44,15 @@ class JoinBidAction
                     ['pre_bid_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0]
                 );
             }
+        }
+
+        // 指値（上限価格）が設定されており、現在価格が既に上限以上なら入札を拒否
+        $limit = BidLimitPrice::forItem($item->id)->forUser($userId)->notTriggered()->first();
+        if ($limit && $item->current_price >= $limit->limit_price) {
+            return BidResultDto::failure(
+                "上限価格（¥" . number_format($limit->limit_price) . "）に達しているため入札できません。上限価格を変更してください。",
+                ['limit_price' => $limit->limit_price]
+            );
         }
 
         DB::beginTransaction();

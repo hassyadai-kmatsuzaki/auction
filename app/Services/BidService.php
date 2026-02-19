@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Auction;
+use App\Models\BidLimitPrice;
 use App\Models\BidParticipant;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Support\Facades\Cache;
@@ -45,9 +46,17 @@ class BidService
                 $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
                 $myBidStatus = null;
+                $myLimitPrice = null;
+                $myLimitTriggered = false;
                 if ($userId) {
                     $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                     $myBidStatus = $participant ? ($participant->is_active ? 'active' : 'inactive') : null;
+
+                    $limit = BidLimitPrice::forItem($item->id)->forUser($userId)->first();
+                    if ($limit) {
+                        $myLimitPrice     = $limit->limit_price;
+                        $myLimitTriggered = $limit->is_triggered;
+                    }
                 }
 
                 $countdownState   = Cache::get("countdown:lane:{$lane->id}");
@@ -75,6 +84,8 @@ class BidService
                     'phase'                    => $phase,
                     'pre_bid_remaining_seconds'=> $preBidRemaining,
                     'countdown_mode'           => $countdownMode,
+                    'my_limit_price'           => $myLimitPrice,
+                    'my_limit_triggered'       => $myLimitTriggered,
                 ];
             }
 
