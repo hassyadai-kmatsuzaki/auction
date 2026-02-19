@@ -58,8 +58,8 @@ class BidLimitController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'item_ids'   => 'required|array|max:50',
-            'item_ids.*' => 'integer|exists:items,id',
+            'item_ids'   => 'required|array|max:500',
+            'item_ids.*' => 'integer',
         ]);
 
         if ($validator->fails()) {
