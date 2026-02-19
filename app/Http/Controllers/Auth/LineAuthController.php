@@ -21,8 +21,17 @@ class LineAuthController extends Controller
     /** LINE Login 画面へリダイレクト */
     public function redirect(Request $request)
     {
-        $state = Str::random(40);
-        session(['line_oauth_state' => $state]);
+        $userId = Auth::id();
+        if (!$userId) {
+            return response()->json(['success' => false, 'message' => 'ログインが必要です'], 401);
+        }
+
+        // state にユーザーIDを埋め込み（コールバック時にセッションが切れていても復元可能）
+        $token = Str::random(40);
+        $state = base64_encode(json_encode(['token' => $token, 'user_id' => $userId]));
+
+        // キャッシュに保存（セッションはAPIとブラウザで共有されない場合があるため）
+        \Illuminate\Support\Facades\Cache::put("line_oauth:{$token}", $userId, now()->addMinutes(10));
 
         return response()->json([
             'success' => true,
@@ -30,56 +39,53 @@ class LineAuthController extends Controller
         ]);
     }
 
-    /** LINE Login コールバック（認証後にブラウザから呼ばれる） */
+    /** LINE Login コールバック（LINEからブラウザにリダイレクトされる） */
     public function callback(Request $request)
     {
-        $userId = Auth::id();
-        $code   = $request->input('code');
-        $state  = $request->input('state');
+        $code     = $request->input('code');
+        $stateRaw = $request->input('state');
+        $baseUrl  = config('app.frontend_url', config('app.url', ''));
 
-        Log::info('LINE callback received', [
-            'user_id'       => $userId,
-            'has_code'      => !!$code,
-            'has_state'     => !!$state,
-            'session_state' => session('line_oauth_state') ? 'exists' : 'missing',
-        ]);
+        Log::info('LINE callback received', ['has_code' => !!$code, 'has_state' => !!$stateRaw]);
 
         if (!$code) {
-            Log::warning('LINE callback: no code');
-            return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=code');
+            return redirect("{$baseUrl}/participant/settings?line=error&reason=code");
+        }
+
+        // state からユーザーIDを復元（セッション非依存）
+        $userId = null;
+        if ($stateRaw) {
+            $decoded = json_decode(base64_decode($stateRaw), true);
+            if ($decoded && !empty($decoded['token'])) {
+                $userId = \Illuminate\Support\Facades\Cache::pull("line_oauth:{$decoded['token']}");
+            }
+        }
+
+        // キャッシュから取れなかった場合はセッション認証にフォールバック
+        if (!$userId) {
+            $userId = Auth::guard('web')->id() ?? Auth::id();
         }
 
         if (!$userId) {
-            Log::warning('LINE callback: not authenticated');
-            return redirect(config('app.frontend_url', '/') . '/login?line=error&reason=auth');
+            Log::warning('LINE callback: could not identify user');
+            return redirect("{$baseUrl}/login?line=error&reason=auth");
         }
 
-        // state検証（セッションが切れている場合はスキップしてログに記録）
-        $sessionState = session('line_oauth_state');
-        if ($sessionState && $sessionState !== $state) {
-            Log::warning('LINE callback: state mismatch', ['session' => $sessionState, 'request' => $state]);
-            return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=state');
-        }
-        if (!$sessionState) {
-            Log::warning('LINE callback: session state missing (proceeding anyway)');
-        }
+        Log::info('LINE callback: user identified', ['user_id' => $userId]);
 
         $lineAccount = $this->linkAction->execute($userId, $code);
 
         if (!$lineAccount) {
             Log::error('LINE callback: linkAction failed', ['user_id' => $userId]);
-            return redirect(config('app.frontend_url', '/') . '/participant/settings?line=error&reason=link');
+            return redirect("{$baseUrl}/participant/settings?line=error&reason=link");
         }
 
         Log::info('LINE account linked successfully', [
             'user_id'      => $userId,
-            'line_user_id' => substr($lineAccount->line_user_id, 0, 10) . '...',
             'display_name' => $lineAccount->display_name,
         ]);
 
-        session()->forget('line_oauth_state');
-        $role = $this->detectRole($request);
-        return redirect(config('app.frontend_url', '/') . "/{$role}/settings?line=success");
+        return redirect("{$baseUrl}/participant/settings?line=success");
     }
 
     /** LINE連携状態を取得 */
