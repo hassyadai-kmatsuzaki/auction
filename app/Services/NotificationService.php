@@ -9,7 +9,6 @@ use App\Mail\PaymentConfirmedMail;
 use App\Mail\SellerPaymentReceivedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
-use App\Jobs\SendLineNotificationJob;
 use App\Models\Auction;
 use App\Models\SellerProfile;
 use App\Models\User;
@@ -21,13 +20,15 @@ class NotificationService
 {
     // ─── LINE通知ヘルパー ────────────────────────────────────────
 
-    /** LINE通知を非同期で送信 */
+    /** LINE通知を送信（同期実行・オークション処理をブロックしないよう例外を握りつぶす） */
     private function sendLineNotification(int $userId, string $type, string $text): void
     {
         try {
-            SendLineNotificationJob::dispatch($userId, $type, $text);
+            $lineService = app(LineService::class);
+            $sent = $lineService->notify($userId, $type, $text);
+            Log::info("LINE notification: type={$type}, user={$userId}, sent=" . ($sent ? 'true' : 'false'));
         } catch (\Exception $e) {
-            Log::warning("LINE notification dispatch failed: {$type} user={$userId} - " . $e->getMessage());
+            Log::warning("LINE notification failed: {$type} user={$userId} - " . $e->getMessage());
         }
     }
 
