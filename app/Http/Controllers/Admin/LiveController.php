@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Auction\FinishAuctionAction;
+use App\Actions\Auction\MoveToNextItemAction;
+use App\Actions\Auction\PauseAuctionAction;
+use App\Actions\Auction\ResumeAuctionAction;
+use App\Actions\Item\AdjustPriceAction;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Lane;
@@ -9,7 +14,6 @@ use App\Models\Item;
 use App\Models\BidParticipant;
 use App\Services\BidService;
 use App\Services\CountdownService;
-use App\Jobs\ProcessCountdownJob;
 use App\Jobs\ProcessAuctionCountdownJob;
 use App\Events\LaneItemChanged;
 use App\Events\AuctionStatusChanged;
@@ -19,14 +23,16 @@ use Illuminate\Support\Facades\Validator;
 
 class LiveController extends Controller
 {
-    protected BidService $bidService;
-    protected CountdownService $countdownService;
+    public function __construct(
+        protected BidService                   $bidService,
+        protected CountdownService             $countdownService,
+        private readonly PauseAuctionAction    $pauseAction,
+        private readonly ResumeAuctionAction   $resumeAction,
+        private readonly FinishAuctionAction   $finishAction,
+        private readonly MoveToNextItemAction  $nextItemAction,
+        private readonly AdjustPriceAction     $adjustPriceAction,
+    ) {}
 
-    public function __construct(BidService $bidService, CountdownService $countdownService)
-    {
-        $this->bidService = $bidService;
-        $this->countdownService = $countdownService;
-    }
 
     /**
      * ライブ管理用オークション一覧
@@ -298,284 +304,46 @@ class LiveController extends Controller
         }
     }
 
-    /**
-     * オークション一時停止
-     *
-     * @param int $auctionId
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** オークション一時停止 */
     public function pause($auctionId)
     {
         $auction = Auction::findOrFail($auctionId);
-
-        if ($auction->status !== 'live') {
-            return response()->json([
-                'success' => false,
-                'message' => '開催中のオークションのみ一時停止できます。',
-            ], 400);
-        }
-
-        // 全レーンのカウントダウンを一時停止（キャッシュの is_running を false に）
-        foreach ($auction->lanes()->where('status', 'active')->get() as $lane) {
-            $this->countdownService->pauseCountdown($lane->id);
-        }
-
-        // 全レーンのDBステータスを一時停止
-        $auction->lanes()->where('status', 'active')->update(['status' => 'paused']);
-
-        // ステータス変更イベントをブロードキャスト
-        broadcast(new AuctionStatusChanged($auction->id, 'paused', 'オークションが一時停止されました'));
-
-        return response()->json([
-            'success' => true,
-            'message' => '全レーンを一時停止しました。',
-        ]);
+        return $this->pauseAction->execute($auction)->toResponse();
     }
 
-    /**
-     * オークション再開
-     *
-     * @param int $auctionId
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** オークション再開 */
     public function resume($auctionId)
     {
         $auction = Auction::findOrFail($auctionId);
-
-        if ($auction->status !== 'live') {
-            return response()->json([
-                'success' => false,
-                'message' => '開催中のオークションのみ再開できます。',
-            ], 400);
-        }
-
-        // 全レーンのDBステータスを再開
-        $auction->lanes()->where('status', 'paused')->update(['status' => 'active']);
-
-        // 全レーンのカウントダウンを再開（キャッシュの is_running を true に）
-        foreach ($auction->lanes()->where('status', 'active')->get() as $lane) {
-            $this->countdownService->resumeCountdown($lane->id);
-        }
-
-        // フェイルセーフ：カウントダウンジョブが終了していた場合に再ディスパッチ
-        $jobKey = "countdown_job_running:auction:{$auctionId}";
-        $isJobRunning = \Illuminate\Support\Facades\Cache::get($jobKey, false);
-        if (!$isJobRunning) {
-            \Illuminate\Support\Facades\Log::info("Resume: Re-dispatching countdown job for auction {$auctionId}");
-            ProcessAuctionCountdownJob::dispatch($auctionId);
-        }
-
-        // ステータス変更イベントをブロードキャスト
-        broadcast(new AuctionStatusChanged($auction->id, 'resumed', 'オークションが再開されました'));
-
-        return response()->json([
-            'success' => true,
-            'message' => '全レーンを再開しました。',
-        ]);
+        return $this->resumeAction->execute($auction)->toResponse();
     }
 
-    /**
-     * オークション終了
-     *
-     * @param int $auctionId
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** オークション終了 */
     public function finish($auctionId)
     {
         $auction = Auction::findOrFail($auctionId);
-
-        if ($auction->status !== 'live') {
-            return response()->json([
-                'success' => false,
-                'message' => '開催中のオークションのみ終了できます。',
-            ], 400);
-        }
-
-        DB::beginTransaction();
-        try {
-            // 残っているライブ商品を不成立にする
-            $auction->items()->where('status', 'live')->update(['status' => 'unsold']);
-
-            // 全レーンを終了
-            $auction->lanes()->update(['status' => 'finished', 'current_item_id' => null]);
-
-            // オークションを終了
-            $auction->update([
-                'status' => 'finished',
-                'end_time' => now()->format('H:i:s'),
-            ]);
-
-            DB::commit();
-
-            // ステータス変更イベントをブロードキャスト
-            broadcast(new AuctionStatusChanged($auction->id, 'finished', 'オークションが終了しました'));
-
-            return response()->json([
-                'success' => true,
-                'message' => 'オークションを終了しました。',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        return $this->finishAction->execute($auction)->toResponse();
     }
 
-    /**
-     * 次の商品へ進む（手動）
-     *
-     * @param Request $request
-     * @param int $laneId
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** 次の商品へ進む（手動） */
     public function nextItem(Request $request, $laneId)
     {
         $lane = Lane::with(['auction', 'currentItem'])->findOrFail($laneId);
-        $auction = $lane->auction;
-
-        if ($auction->status !== 'live') {
-            return response()->json([
-                'success' => false,
-                'message' => 'オークションが開催中ではありません。',
-            ], 400);
-        }
-
-        // 現在のカウントダウンを停止
-        $this->countdownService->stopCountdown($laneId);
-
-        DB::beginTransaction();
-        try {
-            $previousItemId = $lane->current_item_id;
-            $previousItem = $lane->currentItem;
-
-            // 現在の商品を落札処理
-            if ($previousItem && $previousItem->status === 'live') {
-                $result = $this->bidService->finalizeBid($previousItem);
-            }
-
-            // 次の商品を開始（カウントダウンは後で）
-            $nextItem = $this->startNextItem($lane, false);
-
-            DB::commit();
-
-            // トランザクション完了後に入札開始待機 → カウントダウンを開始
-            // オークション全体のジョブが既に動いているので、カウントダウン状態の開始のみ
-            if ($nextItem) {
-                $lane->refresh();
-                $lane->load(['auction', 'currentItem']);
-                $this->countdownService->startPreBidCountdown($lane);
-            }
-
-            // レーン変更イベントをブロードキャスト
-            $currentItemData = null;
-            if ($nextItem) {
-                $activeBidderCount = BidParticipant::forItem($nextItem->id)->active()->count();
-                // 入札開始待機の残り秒数を取得
-                $countdownState = $this->countdownService->getCountdownState($lane->id);
-                $preBidRemaining = ($countdownState && ($countdownState['phase'] ?? '') === 'pre_bid')
-                    ? $countdownState['remaining_seconds'] : 0;
-
-                $currentItemData = [
-                    'id' => $nextItem->id,
-                    'item_number' => $nextItem->item_number,
-                    'species_name' => $nextItem->species_name,
-                    'quantity' => $nextItem->quantity,
-                    'current_price' => $nextItem->current_price,
-                    'is_premium' => $nextItem->is_premium,
-                    'thumbnail_path' => $nextItem->thumbnail_path,
-                    'active_bidders_count' => $activeBidderCount,
-                    'pre_bid_remaining_seconds' => $preBidRemaining,
-                ];
-            }
-
-            broadcast(new LaneItemChanged(
-                $auction->id,
-                $lane->id,
-                $lane->lane_number,
-                $previousItemId,
-                $currentItemData
-            ));
-
-            return response()->json([
-                'success' => true,
-                'message' => '次の商品に進みました。',
-                'data' => [
-                    'lane_id' => $lane->id,
-                    'previous_item_id' => $previousItemId,
-                    'current_item' => $currentItemData,
-                ],
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        return $this->nextItemAction->execute($lane)->toResponse();
     }
 
-    /**
-     * 価格手動調整
-     *
-     * @param Request $request
-     * @param int $itemId
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** 価格手動調整 */
     public function adjustPrice(Request $request, $itemId)
     {
-        $validator = Validator::make($request->all(), [
-            'new_price' => 'required|numeric|min:0',
-        ]);
-
+        $validator = Validator::make($request->all(), ['new_price' => 'required|numeric|min:0']);
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
         $item = Item::with('auction')->findOrFail($itemId);
-
-        if ($item->status !== 'live') {
-            return response()->json([
-                'success' => false,
-                'message' => 'ライブ中の商品のみ価格調整できます。',
-            ], 400);
-        }
-
-        $oldPrice = $item->current_price;
-        $newPrice = $request->new_price;
-
-        $item->update(['current_price' => $newPrice]);
-
-        // 価格イベントを記録
-        \App\Models\PriceEvent::recordManualAdjustment(
-            $item->id,
-            $oldPrice,
-            $newPrice,
-            auth()->id(),
-            ['reason' => $request->input('reason', '手動調整')]
-        );
-
-        // 価格更新イベントをブロードキャスト
-        $lane = Lane::where('current_item_id', $item->id)->first();
-        if ($lane) {
-            $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
-            broadcast(new \App\Events\PriceUpdated(
-                $item->auction->id,
-                $lane->id,
-                $item->id,
-                $newPrice,
-                $activeBidderCount,
-                $item->auction->countdown_seconds
-            ));
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => '価格を調整しました。',
-            'data' => [
-                'item_id' => $item->id,
-                'old_price' => $oldPrice,
-                'new_price' => $newPrice,
-            ],
-        ]);
+        return $this->adjustPriceAction
+            ->execute($item, (float) $request->new_price, $request->input('reason'), auth()->id())
+            ->toResponse();
     }
 
     /**

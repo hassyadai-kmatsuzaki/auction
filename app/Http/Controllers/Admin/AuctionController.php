@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Auction\UpdateAuctionStatusAction;
+use App\Actions\Auction\UpdateLaneCountAction;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Services\NotificationService;
@@ -14,6 +16,11 @@ use Carbon\Carbon;
 
 class AuctionController extends Controller
 {
+    public function __construct(
+        private readonly UpdateAuctionStatusAction $updateStatusAction,
+        private readonly UpdateLaneCountAction     $updateLaneCountAction,
+    ) {}
+
     /**
      * オークション一覧取得
      *
@@ -284,201 +291,35 @@ class AuctionController extends Controller
      * @param int $id
      * @return \Illuminate\Http\JsonResponse
      */
+    /** ステータス変更 */
     public function updateStatus(Request $request, $id)
     {
-        $auction = Auction::findOrFail($id);
-
         $validator = Validator::make($request->all(), [
             'status' => 'required|in:preparing,scheduled,live,finished,cancelled',
         ]);
-
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $newStatus = $request->status;
-        $oldStatus = $auction->status;
-        $message = '';
-
-        // 同じステータスの場合は何もしない
-        if ($newStatus === $oldStatus) {
-            return response()->json([
-                'success' => true,
-                'message' => 'ステータスは既に「' . $this->getStatusLabel($newStatus) . '」です。',
-                'data' => [
-                    'auction' => $auction->load(['creator:id,name']),
-                ],
-            ]);
-        }
-
-        switch ($newStatus) {
-            case 'preparing':
-                $auction->status = 'preparing';
-                $auction->save();
-                $message = 'ステータスを「準備中」に変更しました。';
-                break;
-
-            case 'scheduled':
-                $auction->status = 'scheduled';
-                $auction->save();
-                $message = 'ステータスを「予定（出品受付中）」に変更しました。';
-
-                // 新規オークション通知（scheduled になった時のみ送信）
-                if ($oldStatus !== 'scheduled') {
-                    try {
-                        $notificationService = app(NotificationService::class);
-                        $sentCount = $notificationService->sendNewAuctionNotification($auction);
-                        Log::info("新規オークション通知送信: {$sentCount}件", ['auction_id' => $auction->id]);
-                    } catch (\Exception $e) {
-                        Log::warning('新規オークション通知でエラー', ['error' => $e->getMessage()]);
-                    }
-                }
-                break;
-
-            case 'live':
-                if (!$auction->start()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'オークションを開始できません。承認済みの生体を1件以上登録してください。',
-                    ], 400);
-                }
-                $message = 'オークションを開始しました。';
-                break;
-
-            case 'finished':
-                if (!$auction->finish()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'オークションを終了できません。',
-                    ], 400);
-                }
-                $message = 'オークションを終了しました。';
-                break;
-
-            case 'cancelled':
-                if (!$auction->cancel()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'オークションをキャンセルできません。',
-                    ], 400);
-                }
-                $message = 'オークションをキャンセルしました。';
-                break;
-        }
-
-        $auction->load(['creator:id,name']);
-
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => [
-                'auction' => $auction,
-            ],
-        ]);
+        $auction = Auction::findOrFail($id);
+        return $this->updateStatusAction->execute($auction, $request->status)->toResponse();
     }
 
-    /**
-     * ステータスラベルを取得
-     */
-    private function getStatusLabel($status): string
-    {
-        $labels = [
-            'preparing' => '準備中',
-            'scheduled' => '予定（出品受付中）',
-            'live' => '開催中',
-            'finished' => '終了',
-            'cancelled' => 'キャンセル',
-        ];
-        return $labels[$status] ?? $status;
-    }
-
-    /**
-     * レーン数を更新
-     *
-     * @param Request $request
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** レーン数更新 */
     public function updateLaneCount(Request $request, $id)
     {
-        $auction = Auction::findOrFail($id);
-
         $validator = Validator::make($request->all(), [
             'lane_count' => 'required|integer|between:1,10',
         ], [
             'lane_count.required' => 'レーン数は必須です。',
-            'lane_count.between' => 'レーン数は1〜10の範囲で指定してください。',
+            'lane_count.between'  => 'レーン数は1〜10の範囲で指定してください。',
         ]);
-
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        // オークションが終了済みの場合は変更不可
-        if (in_array($auction->status, ['finished', 'cancelled'])) {
-            return response()->json([
-                'success' => false,
-                'message' => '終了済みまたはキャンセル済みのオークションは変更できません。',
-            ], 400);
-        }
-
-        // ライブ中の場合も変更不可
-        if ($auction->status === 'live') {
-            return response()->json([
-                'success' => false,
-                'message' => '開催中のオークションのレーン数は変更できません。',
-            ], 400);
-        }
-
-        $oldLaneCount = $auction->lane_count;
-        $newLaneCount = $request->lane_count;
-
-        // レーン数を減らす場合: 削除対象レーンのアイテムを解除してからレーンを削除
-        if ($newLaneCount < $oldLaneCount) {
-            $lanesToRemove = $auction->lanes()
-                ->where('lane_number', '>', $newLaneCount)
-                ->pluck('id');
-
-            if ($lanesToRemove->isNotEmpty()) {
-                // 削除対象レーンに割り当てられたアイテムを解除
-                DB::table('lane_items')
-                    ->whereIn('lane_id', $lanesToRemove)
-                    ->delete();
-
-                // レーンを削除
-                $auction->lanes()
-                    ->whereIn('id', $lanesToRemove)
-                    ->delete();
-            }
-        }
-
-        $auction->update(['lane_count' => $newLaneCount]);
-
-        // レーン数が増えた場合、新しいレーンを作成
-        if ($newLaneCount > $oldLaneCount) {
-            $maxLaneNumber = $auction->lanes()->max('lane_number') ?? 0;
-            for ($i = $maxLaneNumber + 1; $i <= $maxLaneNumber + ($newLaneCount - $oldLaneCount); $i++) {
-                $auction->lanes()->firstOrCreate(
-                    ['lane_number' => $i],
-                    ['status' => 'waiting']
-                );
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'レーン数を更新しました。',
-            'data' => [
-                'auction_id' => $auction->id,
-                'lane_count' => $newLaneCount,
-            ],
-        ]);
+        $auction = Auction::findOrFail($id);
+        return $this->updateLaneCountAction->execute($auction, (int) $request->lane_count)->toResponse();
     }
 
     /**

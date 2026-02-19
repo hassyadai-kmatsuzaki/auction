@@ -2,32 +2,32 @@
 
 namespace App\Services;
 
+use App\Actions\Bid\FinalizeBidAction;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\BidParticipant;
 use App\Events\CountdownTick;
 use App\Events\LaneItemChanged;
-use App\Events\ItemSold;
 use App\Events\AuctionStatusChanged;
-use App\Jobs\ProcessCountdownJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CountdownService
 {
-    protected BidService $bidService;
-
     /**
      * Tick interval in seconds (0.5 = 500ms)
      */
     public const TICK_INTERVAL = 0.5;
 
-    public function __construct(BidService $bidService)
-    {
-        $this->bidService = $bidService;
-    }
+    public function __construct(
+        private readonly FinalizeBidAction $finalizeBidAction,
+    ) {}
+
+    /** @deprecated 後方互換性のため残存 — CountdownService は BidService に依存しない */
+    public function setBidService(mixed $bidService): void {}
+
 
     /**
      * カウントダウンのキャッシュキーを生成
@@ -297,17 +297,40 @@ class CountdownService
     }
 
     /**
-     * 価格上昇処理
+     * 価格上昇処理（BidServiceに依存せず直接実装）
      */
     protected function handlePriceIncrement(Lane $lane, Item $item, Auction $auction, int $activeBidderCount): void
     {
-        // 価格上昇
-        $result = $this->bidService->incrementPrice($item);
-        
-        if ($result['success']) {
-            // カウントダウンをリセット
-            $this->resetCountdown($lane);
+        if ($item->status !== 'live' || $activeBidderCount <= 1) {
+            return;
         }
+
+        DB::beginTransaction();
+        try {
+            $oldPrice        = $item->current_price;
+            $incrementRate   = $auction->getPriceIncrementRate();
+            $incrementMin    = $auction->getPriceIncrementMin();
+            $increment       = max($oldPrice * ($incrementRate / 100), $incrementMin);
+            $newPrice        = $oldPrice + $increment;
+
+            $item->update(['current_price' => $newPrice]);
+
+            \App\Models\PriceEvent::recordAutoIncrement($item->id, $oldPrice, $newPrice, $activeBidderCount);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Price increment error: " . $e->getMessage());
+            return;
+        }
+
+        $this->resetCountdown($lane);
+
+        broadcast(new \App\Events\PriceUpdated(
+            $auction->id, $lane->id, $item->id,
+            $item->fresh()->current_price, $activeBidderCount,
+            $auction->getAuctionSettings()['countdown_seconds'] ?? 3
+        ));
     }
 
     /**
@@ -320,12 +343,11 @@ class CountdownService
         DB::beginTransaction();
         try {
             if ($activeBidderCount === 0) {
-                // 入札者0人 → 流札
                 $item->update(['status' => 'unsold']);
                 Log::info("Item {$item->id} unsold");
             } elseif ($activeBidderCount === 1) {
-                // 入札者1人 → 落札（finalizeBid内でItemSoldがブロードキャストされる）
-                $this->bidService->finalizeBid($item);
+                // FinalizeBidAction を使用（BidService依存を除去）
+                $this->finalizeBidAction->execute($item);
                 Log::info("Item {$item->id} sold");
             }
 

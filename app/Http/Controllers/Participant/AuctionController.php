@@ -5,24 +5,22 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
-use App\Models\SystemSetting;
 use App\Models\WonItem;
+use App\Services\AuctionService;
 use App\Services\BidService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 
 class AuctionController extends Controller
 {
     use MediaUrlTrait;
 
-    protected BidService $bidService;
+    public function __construct(
+        private readonly BidService     $bidService,
+        private readonly AuctionService $auctionService,
+    ) {}
 
-    public function __construct(BidService $bidService)
-    {
-        $this->bidService = $bidService;
-    }
 
     /**
      * オークション一覧取得
@@ -110,85 +108,49 @@ class AuctionController extends Controller
 
     /**
      * ライブオークション状態取得
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
      */
     public function live($id)
     {
         $auction = Auction::findOrFail($id);
-        
+
         // 待機室: scheduledステータスの場合
         if ($auction->status === 'scheduled') {
-            // 入室可能時刻を判定
-            $auctionSettings = $auction->getAuctionSettings();
-            $venueOpenMinutes = $auctionSettings['venue_open_minutes_before_start'] ?? 30;
-            $startDateTime = \Carbon\Carbon::parse($auction->event_date->format('Y-m-d') . ' ' . $auction->start_time);
-            $entranceAt = $startDateTime->copy()->subMinutes($venueOpenMinutes);
-            $now = now();
-            
-            if ($now->lt($entranceAt)) {
-                // 入室不可
-                return response()->json([
-                    'success' => true,
-                    'data' => [
-                        'auction_id' => $auction->id,
-                        'auction_title' => $auction->title,
-                        'status' => 'scheduled',
-                        'entrance_allowed' => false,
-                        'entrance_at' => $entranceAt->toIso8601String(),
-                        'start_at' => $startDateTime->toIso8601String(),
-                        'venue_open_minutes_before_start' => $venueOpenMinutes,
-                        'message' => "オークション開始{$venueOpenMinutes}分前から入室できます",
-                        'countdown_seconds' => 0,
-                        'lanes' => [],
-                    ],
-                ]);
+            $entrance = $this->auctionService->resolveEntranceState($auction);
+
+            $base = [
+                'auction_id'    => $auction->id,
+                'auction_title' => $auction->title,
+                'status'        => 'scheduled',
+                'countdown_seconds' => 0,
+                'lanes'         => [],
+            ];
+
+            if (!$entrance['entrance_allowed']) {
+                return response()->json(['success' => true, 'data' => array_merge($base, $entrance)]);
             }
-            
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'auction_id' => $auction->id,
-                    'auction_title' => $auction->title,
-                    'status' => 'scheduled',
-                    'entrance_allowed' => true,
-                    'start_at' => $startDateTime->toIso8601String(),
-                    'countdown_seconds' => 0,
-                    'show_consent_screen' => SystemSetting::get('show_consent_screen', false),
-                    'lanes' => [],
-                ],
-            ]);
+
+            return response()->json(['success' => true, 'data' => array_merge($base, [
+                'entrance_allowed'   => true,
+                'start_at'           => $entrance['start_at'],
+                'show_consent_screen'=> $this->auctionService->shouldShowConsentScreen(),
+            ])]);
         }
-        
+
         // ライブ中 or 終了済み
         if (!in_array($auction->status, ['live', 'finished'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'オークションは開催中ではありません。',
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'オークションは開催中ではありません。'], 400);
         }
-        
-        $userId = Auth::id();
-        $liveState = $this->bidService->getLiveState($auction, $userId);
-        
-        // 同意画面の表示設定を追加
-        $liveState['show_consent_screen'] = SystemSetting::get('show_consent_screen', false);
-        
-        // 開始カウントダウン中かチェック
-        $startAt = Cache::get("auction:{$auction->id}:start_at");
-        if ($startAt) {
-            $remaining = max(0, $startAt - now()->timestamp);
-            if ($remaining > 0) {
-                $liveState['status'] = 'starting';
-                $liveState['starting_countdown'] = $remaining;
-            }
+
+        $liveState = $this->bidService->getLiveState($auction, Auth::id());
+        $liveState['show_consent_screen'] = $this->auctionService->shouldShowConsentScreen();
+
+        $startingCountdown = $this->auctionService->getStartingCountdown($auction->id);
+        if ($startingCountdown !== null) {
+            $liveState['status']             = 'starting';
+            $liveState['starting_countdown'] = $startingCountdown;
         }
-        
-        return response()->json([
-            'success' => true,
-            'data' => $liveState,
-        ]);
+
+        return response()->json(['success' => true, 'data' => $liveState]);
     }
 
     /**

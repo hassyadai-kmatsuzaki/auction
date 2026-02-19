@@ -28,3 +28,6 @@ cypress/videos
 cypress/screenshots
 cypress/downloads
 .env.cypress
+
+*storybook.log
+storybook-static

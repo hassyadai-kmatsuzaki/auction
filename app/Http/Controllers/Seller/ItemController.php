@@ -6,13 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
+use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
 
 class ItemController extends Controller
 {
+    public function __construct(
+        private readonly StorageService $storage,
+    ) {}
+
     /**
      * 出品履歴一覧を取得
      *
@@ -544,38 +548,16 @@ class ItemController extends Controller
         return $sellerProfile;
     }
 
-    /**
-     * ストレージディスクを取得（S3またはpublic）
-     */
-    protected function getStorageDisk()
+    /** @deprecated StorageService::disk() を使用してください */
+    protected function getStorageDisk(): string
     {
-        // AWS設定が有効な値である場合のみS3を使用
-        $key = config('filesystems.disks.s3.key');
-        $bucket = config('filesystems.disks.s3.bucket');
-        
-        if (!empty($key) && !empty($bucket) && $key !== '' && $bucket !== '') {
-            if (class_exists(\Aws\S3\S3Client::class)) {
-                return 's3';
-            }
-        }
-        
-        return 'public';
+        return $this->storage->disk();
     }
 
-    /**
-     * ファイルのURLを取得
-     */
-    protected function getFileUrl($path)
+    /** @deprecated StorageService::url() を使用してください */
+    protected function getFileUrl(?string $path): ?string
     {
-        if (empty($path)) {
-            return null;
-        }
-        
-        $disk = $this->getStorageDisk();
-        if ($disk === 's3') {
-            return Storage::disk('s3')->url($path);
-        }
-        // publicディスクの場合はAPP_URLを使用
-        return config('app.url') . '/storage/' . $path;
+        return $this->storage->url($path);
     }
 }
+

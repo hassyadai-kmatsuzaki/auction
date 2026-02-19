@@ -34,15 +34,22 @@ class ProcessAuctionCountdownJob implements ShouldQueue
     /**
      * The number of seconds the job can run before timing out.
      */
-    public int $timeout = 3600; // 1時間
+    public int $timeout = 14400; // 4時間
+
+    /**
+     * Tick interval in seconds (shared with CountdownService)
+     */
+    public const TICK_INTERVAL = 0.5;
 
     /**
      * Create a new job instance.
+     *
+     * maxIterations: 4時間分 = 4 * 60 * 60 / 0.5 = 28800
      */
-    public function __construct(int $auctionId, int $maxIterations = 3600)
+    public function __construct(int $auctionId, int $maxIterations = 28800)
     {
         $this->auctionId = $auctionId;
-        $this->maxIterations = $maxIterations; // 最大1時間
+        $this->maxIterations = $maxIterations;
         $this->onQueue('countdown'); // 専用キュー
     }
 
@@ -160,7 +167,7 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             // 一時停止中のレーンがある場合はループを継続（ジョブを終了しない）
             if ($pausedCount > 0 && $activeCount === 0) {
                 $idleIterations++;
-                sleep(1);
+                usleep((int)(self::TICK_INTERVAL * 1_000_000));
                 $iterations++;
                 continue;
             }
@@ -184,8 +191,8 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 }
             }
 
-            // 1秒待機
-            sleep(1);
+            // 0.5秒待機
+            usleep((int)(self::TICK_INTERVAL * 1_000_000));
             $iterations++;
         }
 

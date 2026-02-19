@@ -131,3 +131,62 @@ export interface SystemSettings {
   premium_plan_fee: number;
 }
 
+// ============================================================
+// ライブオークション専用型
+// ============================================================
+
+export interface LaneItem {
+  id: number;
+  item_number: number;
+  species_name: string;
+  quantity: number;
+  quantity_unit?: string;
+  current_price: number;
+  estimated_price?: number;
+  inspection_info?: string;
+  individual_info?: string;
+  is_premium: boolean;
+  thumbnail_path?: string;
+  media?: ItemMedia[];
+  active_bidders_count: number;
+  /** カウントダウン残り秒数（float対応） */
+  countdown_seconds: number;
+  my_bid_status: 'active' | 'inactive' | null;
+  phase?: 'bidding' | 'pre_bid';
+  pre_bid_remaining_seconds?: number;
+  countdown_mode?: 'default' | 'competitive';
+}
+
+export interface LiveLane {
+  lane_id: number;
+  lane_number: number;
+  lane_name: string | null;
+  status: string;
+  current_item: LaneItem | null;
+}
+
+export interface LiveState {
+  auction_id: number;
+  auction_title: string;
+  status: string;
+  countdown_seconds: number;
+  starting_countdown?: number;
+  entrance_allowed?: boolean;
+  entrance_at?: string;
+  start_at?: string;
+  venue_open_minutes_before_start?: number;
+  message?: string;
+  show_consent_screen?: boolean;
+  lanes: LiveLane[];
+}
+
+export interface WonItemSummary {
+  id: number;
+  item_number: number;
+  species_name: string;
+  quantity: number;
+  quantity_unit?: string;
+  winning_price: number;
+  total_amount: number;
+}
+

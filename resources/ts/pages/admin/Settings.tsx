@@ -1,360 +1,160 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  Button,
-  Grid,
-  Divider,
-  Card,
-  CardContent,
-  InputAdornment,
-  Alert,
-  Tabs,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Switch,
-  FormControlLabel,
-  CircularProgress,
-  Snackbar,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Box, Typography, Paper, TextField, Button, Grid, Divider,
+  Card, CardContent, InputAdornment, Alert, Tabs, Tab,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  IconButton, Switch, FormControlLabel, CircularProgress, Snackbar,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
-  Save as SaveIcon,
-  Settings as SettingsIcon,
-  AttachMoney as MoneyIcon,
-  LocalShipping as ShippingIcon,
-  Receipt as ReceiptIcon,
-  Gavel as GavelIcon,
+  Save as SaveIcon, Settings as SettingsIcon, AttachMoney as MoneyIcon,
+  LocalShipping as ShippingIcon, Receipt as ReceiptIcon, Gavel as GavelIcon,
   Edit as EditIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import axios from '../../lib/axios';
+import { useSettings } from '../../features/settings/hooks/useSettings';
+import { useNotificationStore } from '../../stores/notificationStore';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
+interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
+const TabPanel = ({ children, value, index }: TabPanelProps) => (
+  <div hidden={value !== index}>{value === index && <Box sx={{ py: 3 }}>{children}</Box>}</div>
+);
+
+interface SettingsState {
+  // システム
+  site_name: string; contact_email: string; contact_phone: string; business_hours: string;
+  // オークション
+  price_increment_rate: string; price_increment_min: string; countdown_seconds: string;
+  countdown_seconds_default: string; countdown_seconds_competitive: string;
+  default_lane_count: string; auto_extend_seconds: string; default_bid_increment: string;
+  show_consent_screen: boolean; venue_open_minutes_before_start: string; item_switch_delay_seconds: string;
+  // 料金
+  seller_registration_fee: string; seller_annual_fee: string; base_listing_fee: string;
+  premium_plan_fee: string; default_commission_rate: string; seller_commission_min: string;
+  buyer_registration_fee: string; buyer_commission_rate: string; buyer_commission_min: string;
+  // 配送
+  packaging_fee: string; handling_fee: string; insurance_fee_rate: string;
+  cooling_fee_summer: string; heating_fee_winter: string;
+  // 帳票
+  company_name: string; company_address: string; company_phone: string; company_email: string;
+  bank_name: string; bank_branch: string; bank_account_type: string; bank_account_number: string;
+  bank_account_holder: string; invoice_prefix: string; payment_notice_prefix: string;
+  warranty_validity_days: string; auto_generate_invoice: boolean; auto_generate_payment_notice: boolean;
 }
 
-function TabPanel({ children, value, index }: TabPanelProps) {
-  return (
-    <div hidden={value !== index}>
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
-    </div>
-  );
-}
+const DEFAULT_SETTINGS: SettingsState = {
+  site_name: '', contact_email: '', contact_phone: '', business_hours: '',
+  price_increment_rate: '10', price_increment_min: '50', countdown_seconds: '3',
+  countdown_seconds_default: '10', countdown_seconds_competitive: '1',
+  default_lane_count: '6', auto_extend_seconds: '10', default_bid_increment: '100',
+  show_consent_screen: false, venue_open_minutes_before_start: '30', item_switch_delay_seconds: '5',
+  seller_registration_fee: '3000', seller_annual_fee: '0', base_listing_fee: '500',
+  premium_plan_fee: '300', default_commission_rate: '10', seller_commission_min: '500',
+  buyer_registration_fee: '0', buyer_commission_rate: '5', buyer_commission_min: '300',
+  packaging_fee: '500', handling_fee: '300', insurance_fee_rate: '3',
+  cooling_fee_summer: '300', heating_fee_winter: '300',
+  company_name: '', company_address: '', company_phone: '', company_email: '',
+  bank_name: '', bank_branch: '', bank_account_type: '', bank_account_number: '', bank_account_holder: '',
+  invoice_prefix: '', payment_notice_prefix: '', warranty_validity_days: '14',
+  auto_generate_invoice: false, auto_generate_payment_notice: false,
+};
 
-interface ShippingRate {
-  region: string;
-  size_60: number;
-  size_80: number;
-  size_100: number;
-}
-
-export default function Settings() {
+export default function AdminSettings() {
   const [tabValue, setTabValue] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  
-  // システム設定
-  const [systemSettings, setSystemSettings] = useState({
-    site_name: '',
-    contact_email: '',
-    contact_phone: '',
-    business_hours: '',
-  });
+  const [s, setS]               = useState<SettingsState>(DEFAULT_SETTINGS);
+  const [shippingRates, setShippingRates]             = useState<any[]>([]);
+  const [editShippingDialog, setEditShippingDialog]   = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
 
-  // オークション設定
-  const [auctionSettings, setAuctionSettings] = useState({
-    price_increment_rate: '',
-    price_increment_min: '',
-    countdown_seconds: '',
-    countdown_seconds_default: '',
-    countdown_seconds_competitive: '',
-    default_lane_count: '',
-    auto_extend_seconds: '',
-    default_bid_increment: '',
-    show_consent_screen: false,
-    venue_open_minutes_before_start: '',
-    item_switch_delay_seconds: '',
-  });
+  const { rawSettings, isLoading, isSaving, save } = useSettings();
 
-  // 料金設定
-  const [feeSettings, setFeeSettings] = useState({
-    seller_registration_fee: '',
-    seller_annual_fee: '',
-    base_listing_fee: '',
-    premium_plan_fee: '',
-    default_commission_rate: '',
-    seller_commission_min: '',
-    buyer_registration_fee: '',
-    buyer_commission_rate: '',
-    buyer_commission_min: '',
-  });
-
-  // 配送・梱包料金
-  const [shippingSettings, setShippingSettings] = useState({
-    packaging_fee: '',
-    handling_fee: '',
-    insurance_fee_rate: '',
-    cooling_fee_summer: '',
-    heating_fee_winter: '',
-  });
-
-  // 配送料金テーブル
-  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
-  const [editShippingDialog, setEditShippingDialog] = useState(false);
-
-  // 帳票設定
-  const [documentSettings, setDocumentSettings] = useState({
-    company_name: '',
-    company_address: '',
-    company_phone: '',
-    company_email: '',
-    bank_name: '',
-    bank_branch: '',
-    bank_account_type: '',
-    bank_account_number: '',
-    bank_account_holder: '',
-    invoice_prefix: '',
-    payment_notice_prefix: '',
-    warranty_validity_days: '',
-    auto_generate_invoice: false,
-    auto_generate_payment_notice: false,
-  });
-
+  // rawSettings が取得できたらフォームに反映
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (!rawSettings) return;
+    const d = rawSettings;
+    setS({
+      site_name:                      d.site?.site_name?.value ?? '',
+      contact_email:                  d.site?.contact_email?.value ?? '',
+      contact_phone:                  d.site?.contact_phone?.value ?? '',
+      business_hours:                 d.site?.business_hours?.value ?? '',
+      price_increment_rate:           String(d.auction?.price_increment_rate?.value ?? '10'),
+      price_increment_min:            String(d.auction?.price_increment_min?.value ?? '50'),
+      countdown_seconds:              String(d.auction?.countdown_seconds?.value ?? '3'),
+      countdown_seconds_default:      String(d.auction?.countdown_seconds_default?.value ?? '10'),
+      countdown_seconds_competitive:  String(d.auction?.countdown_seconds_competitive?.value ?? '1'),
+      default_lane_count:             String(d.auction?.default_lane_count?.value ?? '6'),
+      auto_extend_seconds:            String(d.auction?.auto_extend_seconds?.value ?? '10'),
+      default_bid_increment:          String(d.auction?.default_bid_increment?.value ?? '100'),
+      show_consent_screen:            d.auction?.show_consent_screen?.value ?? false,
+      venue_open_minutes_before_start:String(d.auction?.venue_open_minutes_before_start?.value ?? '30'),
+      item_switch_delay_seconds:      String(d.auction?.item_switch_delay_seconds?.value ?? '5'),
+      seller_registration_fee:        String(d.payment?.seller_registration_fee?.value ?? '3000'),
+      seller_annual_fee:              String(d.payment?.seller_annual_fee?.value ?? '0'),
+      base_listing_fee:               String(d.payment?.base_listing_fee?.value ?? '500'),
+      premium_plan_fee:               String(d.premium?.premium_plan_fee?.value ?? '300'),
+      default_commission_rate:        String(d.payment?.default_commission_rate?.value ?? '10'),
+      seller_commission_min:          String(d.payment?.seller_commission_min?.value ?? '500'),
+      buyer_registration_fee:         String(d.payment?.buyer_registration_fee?.value ?? '0'),
+      buyer_commission_rate:          String(d.payment?.buyer_commission_rate?.value ?? '5'),
+      buyer_commission_min:           String(d.payment?.buyer_commission_min?.value ?? '300'),
+      packaging_fee:                  String(d.shipping?.packaging_fee?.value ?? '500'),
+      handling_fee:                   String(d.shipping?.handling_fee?.value ?? '300'),
+      insurance_fee_rate:             String(d.shipping?.insurance_fee_rate?.value ?? '3'),
+      cooling_fee_summer:             String(d.shipping?.cooling_fee_summer?.value ?? '300'),
+      heating_fee_winter:             String(d.shipping?.heating_fee_winter?.value ?? '300'),
+      company_name:                   d.document?.company_name?.value ?? '',
+      company_address:                d.document?.company_address?.value ?? '',
+      company_phone:                  d.document?.company_phone?.value ?? '',
+      company_email:                  d.document?.company_email?.value ?? '',
+      bank_name:                      d.document?.bank_name?.value ?? '',
+      bank_branch:                    d.document?.bank_branch?.value ?? '',
+      bank_account_type:              d.document?.bank_account_type?.value ?? '',
+      bank_account_number:            d.document?.bank_account_number?.value ?? '',
+      bank_account_holder:            d.document?.bank_account_holder?.value ?? '',
+      invoice_prefix:                 d.document?.invoice_prefix?.value ?? '',
+      payment_notice_prefix:          d.document?.payment_notice_prefix?.value ?? '',
+      warranty_validity_days:         String(d.document?.warranty_validity_days?.value ?? '14'),
+      auto_generate_invoice:          d.document?.auto_generate_invoice?.value ?? false,
+      auto_generate_payment_notice:   d.document?.auto_generate_payment_notice?.value ?? false,
+    });
+    if (d.shipping?.shipping_rates?.value) setShippingRates(d.shipping.shipping_rates.value);
+  }, [rawSettings]);
 
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('/api/admin/settings');
-      
-      if (response.data.success) {
-        const data = response.data.data.settings;
-        
-        // システム設定
-        if (data.site) {
-          setSystemSettings({
-            site_name: data.site.site_name?.value || '',
-            contact_email: data.site.contact_email?.value || '',
-            contact_phone: data.site.contact_phone?.value || '',
-            business_hours: data.site.business_hours?.value || '',
-          });
-        }
-        
-        // オークション設定
-        if (data.auction) {
-          setAuctionSettings({
-            price_increment_rate: String(data.auction.price_increment_rate?.value ?? '10'),
-            price_increment_min: String(data.auction.price_increment_min?.value ?? '50'),
-            countdown_seconds: String(data.auction.countdown_seconds?.value ?? '3'),
-            countdown_seconds_default: String(data.auction.countdown_seconds_default?.value ?? '10'),
-            countdown_seconds_competitive: String(data.auction.countdown_seconds_competitive?.value ?? '1'),
-            default_lane_count: String(data.auction.default_lane_count?.value ?? '6'),
-            auto_extend_seconds: String(data.auction.auto_extend_seconds?.value ?? '10'),
-            default_bid_increment: String(data.auction.default_bid_increment?.value ?? '100'),
-            show_consent_screen: data.auction.show_consent_screen?.value ?? false,
-            venue_open_minutes_before_start: String(data.auction.venue_open_minutes_before_start?.value ?? '30'),
-            item_switch_delay_seconds: String(data.auction.item_switch_delay_seconds?.value ?? '5'),
-          });
-        }
-        
-        // 料金設定
-        if (data.premium || data.payment) {
-          setFeeSettings({
-            seller_registration_fee: String(data.payment?.seller_registration_fee?.value ?? '3000'),
-            seller_annual_fee: String(data.payment?.seller_annual_fee?.value ?? '0'),
-            base_listing_fee: String(data.payment?.base_listing_fee?.value ?? '500'),
-            premium_plan_fee: String(data.premium?.premium_plan_fee?.value ?? '300'),
-            default_commission_rate: String(data.payment?.default_commission_rate?.value ?? '10'),
-            seller_commission_min: String(data.payment?.seller_commission_min?.value ?? '500'),
-            buyer_registration_fee: String(data.payment?.buyer_registration_fee?.value ?? '0'),
-            buyer_commission_rate: String(data.payment?.buyer_commission_rate?.value ?? '5'),
-            buyer_commission_min: String(data.payment?.buyer_commission_min?.value ?? '300'),
-          });
-        }
-        
-        // 配送設定
-        if (data.shipping) {
-          setShippingSettings({
-            packaging_fee: String(data.shipping.packaging_fee?.value ?? '500'),
-            handling_fee: String(data.shipping.handling_fee?.value ?? '300'),
-            insurance_fee_rate: String(data.shipping.insurance_fee_rate?.value ?? '3'),
-            cooling_fee_summer: String(data.shipping.cooling_fee_summer?.value ?? '300'),
-            heating_fee_winter: String(data.shipping.heating_fee_winter?.value ?? '300'),
-          });
-          
-          if (data.shipping.shipping_rates?.value) {
-            setShippingRates(data.shipping.shipping_rates.value);
-          }
-        }
-        
-        // 帳票設定
-        if (data.document) {
-          setDocumentSettings({
-            company_name: data.document.company_name?.value || '',
-            company_address: data.document.company_address?.value || '',
-            company_phone: data.document.company_phone?.value || '',
-            company_email: data.document.company_email?.value || '',
-            bank_name: data.document.bank_name?.value || '',
-            bank_branch: data.document.bank_branch?.value || '',
-            bank_account_type: data.document.bank_account_type?.value || '',
-            bank_account_number: data.document.bank_account_number?.value || '',
-            bank_account_holder: data.document.bank_account_holder?.value || '',
-            invoice_prefix: data.document.invoice_prefix?.value || '',
-            payment_notice_prefix: data.document.payment_notice_prefix?.value || '',
-            warranty_validity_days: String(data.document.warranty_validity_days?.value ?? '14'),
-            auto_generate_invoice: data.document.auto_generate_invoice?.value || false,
-            auto_generate_payment_notice: data.document.auto_generate_payment_notice?.value || false,
-          });
-        }
-      }
-    } catch (err) {
-      console.error('設定取得エラー:', err);
-      setSnackbar({ open: true, message: '設定の取得に失敗しました', severity: 'error' });
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = () => {
+    save({
+      ...s,
+      show_consent_screen:          s.show_consent_screen,
+      auto_generate_invoice:        s.auto_generate_invoice,
+      auto_generate_payment_notice: s.auto_generate_payment_notice,
+    });
   };
 
-  const handleSubmit = async () => {
-    try {
-      setSaving(true);
-      
-      const settings = {
-        // システム設定
-        site_name: systemSettings.site_name,
-        contact_email: systemSettings.contact_email,
-        contact_phone: systemSettings.contact_phone,
-        business_hours: systemSettings.business_hours,
-        // オークション設定
-        price_increment_rate: auctionSettings.price_increment_rate,
-        price_increment_min: auctionSettings.price_increment_min,
-        countdown_seconds: auctionSettings.countdown_seconds,
-        countdown_seconds_default: auctionSettings.countdown_seconds_default,
-        countdown_seconds_competitive: auctionSettings.countdown_seconds_competitive,
-        default_lane_count: auctionSettings.default_lane_count,
-        auto_extend_seconds: auctionSettings.auto_extend_seconds,
-        default_bid_increment: auctionSettings.default_bid_increment,
-        show_consent_screen: auctionSettings.show_consent_screen,
-        venue_open_minutes_before_start: auctionSettings.venue_open_minutes_before_start,
-        item_switch_delay_seconds: auctionSettings.item_switch_delay_seconds,
-        // 料金設定
-        seller_registration_fee: feeSettings.seller_registration_fee,
-        seller_annual_fee: feeSettings.seller_annual_fee,
-        base_listing_fee: feeSettings.base_listing_fee,
-        premium_plan_fee: feeSettings.premium_plan_fee,
-        default_commission_rate: feeSettings.default_commission_rate,
-        seller_commission_min: feeSettings.seller_commission_min,
-        buyer_registration_fee: feeSettings.buyer_registration_fee,
-        buyer_commission_rate: feeSettings.buyer_commission_rate,
-        buyer_commission_min: feeSettings.buyer_commission_min,
-        // 配送設定
-        packaging_fee: shippingSettings.packaging_fee,
-        handling_fee: shippingSettings.handling_fee,
-        insurance_fee_rate: shippingSettings.insurance_fee_rate,
-        cooling_fee_summer: shippingSettings.cooling_fee_summer,
-        heating_fee_winter: shippingSettings.heating_fee_winter,
-        // 帳票設定
-        company_name: documentSettings.company_name,
-        company_address: documentSettings.company_address,
-        company_phone: documentSettings.company_phone,
-        company_email: documentSettings.company_email,
-        bank_name: documentSettings.bank_name,
-        bank_branch: documentSettings.bank_branch,
-        bank_account_type: documentSettings.bank_account_type,
-        bank_account_number: documentSettings.bank_account_number,
-        bank_account_holder: documentSettings.bank_account_holder,
-        invoice_prefix: documentSettings.invoice_prefix,
-        payment_notice_prefix: documentSettings.payment_notice_prefix,
-        warranty_validity_days: documentSettings.warranty_validity_days,
-        auto_generate_invoice: documentSettings.auto_generate_invoice,
-        auto_generate_payment_notice: documentSettings.auto_generate_payment_notice,
-      };
-      
-      await axios.put('/api/admin/settings', { settings });
-      setSnackbar({ open: true, message: '設定を保存しました', severity: 'success' });
-    } catch (err) {
-      console.error('設定保存エラー:', err);
-      setSnackbar({ open: true, message: '設定の保存に失敗しました', severity: 'error' });
-    } finally {
-      setSaving(false);
-    }
-  };
+  const str = (k: keyof SettingsState) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setS((p) => ({ ...p, [k]: e.target.value }));
+  const bool = (k: keyof SettingsState) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setS((p) => ({ ...p, [k]: e.target.checked }));
 
-  const handleSystemChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSystemSettings({ ...systemSettings, [field]: e.target.value });
-  };
-
-  const handleAuctionChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAuctionSettings({ ...auctionSettings, [field]: e.target.value });
-  };
-
-  const handleFeeChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFeeSettings({ ...feeSettings, [field]: e.target.value });
-  };
-
-  const handleShippingChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setShippingSettings({ ...shippingSettings, [field]: e.target.value });
-  };
-
-  const handleDocumentChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDocumentSettings({ ...documentSettings, [field]: e.target.value });
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (isLoading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
+  );
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            システム設定
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            オークションシステムの各種設定を管理します
-          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>システム設定</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>オークションシステムの各種設定を管理します</Typography>
         </Box>
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-          onClick={handleSubmit}
-          disabled={saving}
-        >
-          すべて保存
-        </Button>
+        <Button variant="contained" size="large" startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+          onClick={handleSubmit} disabled={isSaving}>すべて保存</Button>
       </Box>
 
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab icon={<SettingsIcon />} iconPosition="start" label="システム" />
-          <Tab icon={<GavelIcon />} iconPosition="start" label="オークション" />
-          <Tab icon={<MoneyIcon />} iconPosition="start" label="料金設定" />
+          <Tab icon={<GavelIcon />}    iconPosition="start" label="オークション" />
+          <Tab icon={<MoneyIcon />}    iconPosition="start" label="料金設定" />
           <Tab icon={<ShippingIcon />} iconPosition="start" label="配送・梱包" />
-          <Tab icon={<ReceiptIcon />} iconPosition="start" label="帳票" />
+          <Tab icon={<ReceiptIcon />}  iconPosition="start" label="帳票" />
         </Tabs>
       </Paper>
 
@@ -362,43 +162,12 @@ export default function Settings() {
       <TabPanel value={tabValue} index={0}>
         <Card>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-              基本情報
-            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>基本情報</Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="サイト名"
-                  value={systemSettings.site_name}
-                  onChange={handleSystemChange('site_name')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="連絡先メールアドレス"
-                  type="email"
-                  value={systemSettings.contact_email}
-                  onChange={handleSystemChange('contact_email')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="連絡先電話番号"
-                  value={systemSettings.contact_phone}
-                  onChange={handleSystemChange('contact_phone')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="営業時間"
-                  value={systemSettings.business_hours}
-                  onChange={handleSystemChange('business_hours')}
-                />
-              </Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth label="サイト名" value={s.site_name} onChange={str('site_name')} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth label="連絡先メールアドレス" type="email" value={s.contact_email} onChange={str('contact_email')} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth label="連絡先電話番号" value={s.contact_phone} onChange={str('contact_phone')} /></Grid>
+              <Grid item xs={12} sm={6}><TextField fullWidth label="営業時間" value={s.business_hours} onChange={str('business_hours')} /></Grid>
             </Grid>
           </CardContent>
         </Card>
@@ -408,321 +177,96 @@ export default function Settings() {
       <TabPanel value={tabValue} index={1}>
         <Card>
           <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-              入札ルール（システムデフォルト）
-            </Typography>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>入札ルール（システムデフォルト）</Typography>
+            <Alert severity="info" sx={{ mb: 3 }}>この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。</Alert>
+            <Grid container spacing={3}>
+              {[
+                { label: '価格上昇率', k: 'price_increment_rate' as const, unit: '%', helper: '複数人入札時の価格上昇率' },
+                { label: '最低上昇金額', k: 'price_increment_min' as const, unit: '¥', prefix: true, helper: '最低でもこの金額は上昇' },
+                { label: 'カウントダウン秒数（通常）', k: 'countdown_seconds_default' as const, unit: '秒', step: 0.5, helper: '開始時・入札者0〜1人（0.5秒単位）' },
+                { label: 'カウントダウン秒数（競合時）', k: 'countdown_seconds_competitive' as const, unit: '秒', step: 0.5, helper: '入札者2人以上（0.5秒単位）' },
+                { label: 'デフォルトレーン数', k: 'default_lane_count' as const, helper: '同時進行できるレーン数' },
+                { label: '自動延長秒数', k: 'auto_extend_seconds' as const, unit: '秒', helper: '終了直前の入札で延長' },
+                { label: 'デフォルト入札単位', k: 'default_bid_increment' as const, unit: '¥', prefix: true, helper: '価格上昇の単位' },
+              ].map(({ label, k, unit, prefix, step, helper }) => (
+                <Grid item xs={12} sm={6} md={4} key={k}>
+                  <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                    InputProps={prefix ? { startAdornment: <InputAdornment position="start">¥</InputAdornment> }
+                      : unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> } : {}}
+                    inputProps={step ? { step } : {}} />
+                </Grid>
+              ))}
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>会場・レーン設定</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField fullWidth type="number" label="会場入室可能開始" value={s.venue_open_minutes_before_start} onChange={str('venue_open_minutes_before_start')}
+                  InputProps={{ endAdornment: <InputAdornment position="end">分前</InputAdornment> }}
+                  helperText="オークション開始の何分前から入室可能か" />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField fullWidth type="number" label="生体切り替え後の入札開始待機" value={s.item_switch_delay_seconds} onChange={str('item_switch_delay_seconds')}
+                  InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                  inputProps={{ step: 0.5, min: 0 }} helperText="次の生体表示後の待機秒数（0で待機なし、0.5秒単位）" />
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>同意画面設定</Typography>
+            <FormControlLabel control={<Switch checked={s.show_consent_screen} onChange={bool('show_consent_screen')} />}
+              label="オークション開始時に同意画面を表示する" />
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="body2">オンにすると「画像は同じ品種のイメージ画像です。実際の映像は詳細ボタンよりご確認ください。」という同意画面が表示されます。</Typography>
             </Alert>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="価格上昇率"
-                  value={auctionSettings.price_increment_rate}
-                  onChange={handleAuctionChange('price_increment_rate')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                  }}
-                  helperText="複数人入札時の価格上昇率"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="最低上昇金額"
-                  value={auctionSettings.price_increment_min}
-                  onChange={handleAuctionChange('price_increment_min')}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                  }}
-                  helperText="最低でもこの金額は上昇"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="カウントダウン秒数（旧）"
-                  value={auctionSettings.countdown_seconds}
-                  onChange={handleAuctionChange('countdown_seconds')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                  }}
-                  helperText="後方互換用（下の2項目を優先）"
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="カウントダウン秒数（通常）"
-                  value={auctionSettings.countdown_seconds_default}
-                  onChange={handleAuctionChange('countdown_seconds_default')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                  }}
-                  inputProps={{ step: 0.5, min: 0.5 }}
-                  helperText="開始時・入札者0〜1人の場合（0.5秒単位）"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="カウントダウン秒数（競合時）"
-                  value={auctionSettings.countdown_seconds_competitive}
-                  onChange={handleAuctionChange('countdown_seconds_competitive')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                  }}
-                  inputProps={{ step: 0.5, min: 0.5 }}
-                  helperText="入札者2人以上の場合（0.5秒単位）"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="デフォルトレーン数"
-                  value={auctionSettings.default_lane_count}
-                  onChange={handleAuctionChange('default_lane_count')}
-                  helperText="同時進行できるレーン数"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="自動延長秒数"
-                  value={auctionSettings.auto_extend_seconds}
-                  onChange={handleAuctionChange('auto_extend_seconds')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                  }}
-                  helperText="終了直前の入札で延長"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="デフォルト入札単位"
-                  value={auctionSettings.default_bid_increment}
-                  onChange={handleAuctionChange('default_bid_increment')}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                  }}
-                  helperText="価格上昇の単位"
-                />
-              </Grid>
-            </Grid>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-              会場・レーン設定
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="会場入室可能開始"
-                  value={auctionSettings.venue_open_minutes_before_start}
-                  onChange={handleAuctionChange('venue_open_minutes_before_start')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">分前</InputAdornment>,
-                  }}
-                  helperText="オークション開始の何分前から入室可能にするか"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="生体切り替え後の入札開始待機"
-                  value={auctionSettings.item_switch_delay_seconds}
-                  onChange={handleAuctionChange('item_switch_delay_seconds')}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">秒</InputAdornment>,
-                  }}
-                  inputProps={{ step: 0.5, min: 0 }}
-                  helperText="次の生体表示後、入札を開始するまでの待機秒数（0で待機なし、0.5秒単位）"
-                />
-              </Grid>
-            </Grid>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-              同意画面設定
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={auctionSettings.show_consent_screen}
-                    onChange={(e) => setAuctionSettings({ ...auctionSettings, show_consent_screen: e.target.checked })}
-                  />
-                }
-                label="オークション開始時に同意画面を表示する"
-              />
-              <Alert severity="info">
-                <Typography variant="body2">
-                  オンにすると、参加者がオークションに参加する際に「画像は同じ品種のイメージ画像です。実際の映像は詳細ボタンよりご確認ください。」という同意画面が表示されます。
-                </Typography>
-              </Alert>
-            </Box>
           </CardContent>
         </Card>
       </TabPanel>
 
       {/* 料金設定 */}
       <TabPanel value={tabValue} index={2}>
-        <Alert severity="info" sx={{ mb: 3 }}>
-          この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。
-        </Alert>
+        <Alert severity="info" sx={{ mb: 3 }}>この設定はシステム全体のデフォルト値です。</Alert>
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
             <Card>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#059669' }}>
-                  出品者向け料金
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#059669' }}>出品者向け料金</Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="登録料（初回）"
-                      value={feeSettings.seller_registration_fee}
-                      onChange={handleFeeChange('seller_registration_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="出品者登録時の初期費用"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="年会費"
-                      value={feeSettings.seller_annual_fee}
-                      onChange={handleFeeChange('seller_annual_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="年間維持費（0で無料）"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="基本出品料"
-                      value={feeSettings.base_listing_fee}
-                      onChange={handleFeeChange('base_listing_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="1点あたりの出品料"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="プレミアム出品料"
-                      value={feeSettings.premium_plan_fee}
-                      onChange={handleFeeChange('premium_plan_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="個別撮影付きの出品料"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="販売手数料率"
-                      value={feeSettings.default_commission_rate}
-                      onChange={handleFeeChange('default_commission_rate')}
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                      }}
-                      helperText="落札金額に対する手数料"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="最低手数料"
-                      value={feeSettings.seller_commission_min}
-                      onChange={handleFeeChange('seller_commission_min')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="1点あたりの最低手数料"
-                    />
-                  </Grid>
+                  {[
+                    { label: '登録料（初回）', k: 'seller_registration_fee' as const, helper: '出品者登録時の初期費用' },
+                    { label: '年会費', k: 'seller_annual_fee' as const, helper: '年間維持費（0で無料）' },
+                    { label: '基本出品料', k: 'base_listing_fee' as const, helper: '1点あたりの出品料' },
+                    { label: 'プレミアム出品料', k: 'premium_plan_fee' as const, helper: '個別撮影付きの出品料' },
+                    { label: '販売手数料率', k: 'default_commission_rate' as const, unit: '%', helper: '落札金額に対する手数料' },
+                    { label: '最低手数料', k: 'seller_commission_min' as const, helper: '1点あたりの最低手数料' },
+                  ].map(({ label, k, unit, helper }) => (
+                    <Grid item xs={12} sm={6} key={k}>
+                      <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                        InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
+                          : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
+                    </Grid>
+                  ))}
                 </Grid>
               </CardContent>
             </Card>
           </Grid>
-
           <Grid item xs={12} lg={6}>
             <Card>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#3B82F6' }}>
-                  買受者向け料金
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#3B82F6' }}>買受者向け料金</Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="登録料"
-                      value={feeSettings.buyer_registration_fee}
-                      onChange={handleFeeChange('buyer_registration_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="買受者登録時の費用（0で無料）"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="落札手数料率"
-                      value={feeSettings.buyer_commission_rate}
-                      onChange={handleFeeChange('buyer_commission_rate')}
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                      }}
-                      helperText="落札金額に対する手数料"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="最低手数料"
-                      value={feeSettings.buyer_commission_min}
-                      onChange={handleFeeChange('buyer_commission_min')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="1点あたりの最低手数料"
-                    />
-                  </Grid>
+                  {[
+                    { label: '登録料', k: 'buyer_registration_fee' as const, helper: '買受者登録時の費用（0で無料）' },
+                    { label: '落札手数料率', k: 'buyer_commission_rate' as const, unit: '%', helper: '落札金額に対する手数料' },
+                    { label: '最低手数料', k: 'buyer_commission_min' as const, helper: '1点あたりの最低手数料' },
+                  ].map(({ label, k, unit, helper }) => (
+                    <Grid item xs={12} sm={6} key={k}>
+                      <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                        InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
+                          : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
+                    </Grid>
+                  ))}
                 </Grid>
               </CardContent>
             </Card>
@@ -732,97 +276,36 @@ export default function Settings() {
 
       {/* 配送・梱包設定 */}
       <TabPanel value={tabValue} index={3}>
-        <Alert severity="info" sx={{ mb: 3 }}>
-          この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。
-        </Alert>
+        <Alert severity="info" sx={{ mb: 3 }}>この設定はシステム全体のデフォルト値です。</Alert>
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
             <Card sx={{ mb: 3 }}>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                  梱包・手数料
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>梱包・手数料</Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="梱包料金"
-                      value={shippingSettings.packaging_fee}
-                      onChange={handleShippingChange('packaging_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="1件あたりの梱包費"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="取扱手数料"
-                      value={shippingSettings.handling_fee}
-                      onChange={handleShippingChange('handling_fee')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="発送事務手数料"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="保険料率"
-                      value={shippingSettings.insurance_fee_rate}
-                      onChange={handleShippingChange('insurance_fee_rate')}
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                      }}
-                      helperText="落札金額に対する保険料"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="夏季クール便料金"
-                      value={shippingSettings.cooling_fee_summer}
-                      onChange={handleShippingChange('cooling_fee_summer')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="6-9月の追加料金"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="冬季保温料金"
-                      value={shippingSettings.heating_fee_winter}
-                      onChange={handleShippingChange('heating_fee_winter')}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-                      }}
-                      helperText="12-2月の追加料金"
-                    />
-                  </Grid>
+                  {[
+                    { label: '梱包料金', k: 'packaging_fee' as const, helper: '1件あたりの梱包費' },
+                    { label: '取扱手数料', k: 'handling_fee' as const, helper: '発送事務手数料' },
+                    { label: '保険料率', k: 'insurance_fee_rate' as const, unit: '%', helper: '落札金額に対する保険料' },
+                    { label: '夏季クール便料金', k: 'cooling_fee_summer' as const, helper: '6-9月の追加料金' },
+                    { label: '冬季保温料金', k: 'heating_fee_winter' as const, helper: '12-2月の追加料金' },
+                  ].map(({ label, k, unit, helper }) => (
+                    <Grid item xs={12} sm={6} key={k}>
+                      <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                        InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
+                          : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
+                    </Grid>
+                  ))}
                 </Grid>
               </CardContent>
             </Card>
           </Grid>
-
           <Grid item xs={12} lg={6}>
             <Card>
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    地域別配送料金
-                  </Typography>
-                  <Button size="small" startIcon={<EditIcon />} onClick={() => setEditShippingDialog(true)}>
-                    編集
-                  </Button>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>地域別配送料金</Typography>
+                  <Button size="small" startIcon={<EditIcon />} onClick={() => setEditShippingDialog(true)}>編集</Button>
                 </Box>
                 <TableContainer>
                   <Table size="small">
@@ -835,12 +318,12 @@ export default function Settings() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {shippingRates.map((rate, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{rate.region}</TableCell>
-                          <TableCell align="right">¥{rate.size_60?.toLocaleString()}</TableCell>
-                          <TableCell align="right">¥{rate.size_80?.toLocaleString()}</TableCell>
-                          <TableCell align="right">¥{rate.size_100?.toLocaleString()}</TableCell>
+                      {shippingRates.map((r, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{r.region}</TableCell>
+                          <TableCell align="right">¥{r.size_60?.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{r.size_80?.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{r.size_100?.toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -858,168 +341,51 @@ export default function Settings() {
           <Grid item xs={12} lg={6}>
             <Card sx={{ mb: 3 }}>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                  会社情報（帳票に表示）
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>会社情報（帳票に表示）</Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="会社名・屋号"
-                      value={documentSettings.company_name}
-                      onChange={handleDocumentChange('company_name')}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="住所"
-                      value={documentSettings.company_address}
-                      onChange={handleDocumentChange('company_address')}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="電話番号"
-                      value={documentSettings.company_phone}
-                      onChange={handleDocumentChange('company_phone')}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="メールアドレス"
-                      value={documentSettings.company_email}
-                      onChange={handleDocumentChange('company_email')}
-                    />
-                  </Grid>
+                  <Grid item xs={12}><TextField fullWidth label="会社名・屋号" value={s.company_name} onChange={str('company_name')} /></Grid>
+                  <Grid item xs={12}><TextField fullWidth label="住所" value={s.company_address} onChange={str('company_address')} /></Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="電話番号" value={s.company_phone} onChange={str('company_phone')} /></Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="メールアドレス" value={s.company_email} onChange={str('company_email')} /></Grid>
                 </Grid>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                  振込先口座
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>振込先口座</Typography>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="銀行名"
-                      value={documentSettings.bank_name}
-                      onChange={handleDocumentChange('bank_name')}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="支店名"
-                      value={documentSettings.bank_branch}
-                      onChange={handleDocumentChange('bank_branch')}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      fullWidth
-                      label="口座種別"
-                      value={documentSettings.bank_account_type}
-                      onChange={handleDocumentChange('bank_account_type')}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      fullWidth
-                      label="口座番号"
-                      value={documentSettings.bank_account_number}
-                      onChange={handleDocumentChange('bank_account_number')}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      fullWidth
-                      label="口座名義"
-                      value={documentSettings.bank_account_holder}
-                      onChange={handleDocumentChange('bank_account_holder')}
-                    />
-                  </Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="銀行名" value={s.bank_name} onChange={str('bank_name')} /></Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="支店名" value={s.bank_branch} onChange={str('bank_branch')} /></Grid>
+                  <Grid item xs={12} sm={4}><TextField fullWidth label="口座種別" value={s.bank_account_type} onChange={str('bank_account_type')} /></Grid>
+                  <Grid item xs={12} sm={4}><TextField fullWidth label="口座番号" value={s.bank_account_number} onChange={str('bank_account_number')} /></Grid>
+                  <Grid item xs={12} sm={4}><TextField fullWidth label="口座名義" value={s.bank_account_holder} onChange={str('bank_account_holder')} /></Grid>
                 </Grid>
               </CardContent>
             </Card>
           </Grid>
-
           <Grid item xs={12} lg={6}>
             <Card sx={{ mb: 3 }}>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                  帳票番号設定
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>帳票番号設定</Typography>
                 <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="請求書プレフィックス" value={s.invoice_prefix} onChange={str('invoice_prefix')} helperText="例: INV-2025-0001" /></Grid>
+                  <Grid item xs={12} sm={6}><TextField fullWidth label="支払通知書プレフィックス" value={s.payment_notice_prefix} onChange={str('payment_notice_prefix')} helperText="例: PAY-2025-0001" /></Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="請求書プレフィックス"
-                      value={documentSettings.invoice_prefix}
-                      onChange={handleDocumentChange('invoice_prefix')}
-                      helperText="例: INV-2025-0001"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="支払通知書プレフィックス"
-                      value={documentSettings.payment_notice_prefix}
-                      onChange={handleDocumentChange('payment_notice_prefix')}
-                      helperText="例: PAY-2025-0001"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="保証書有効日数"
-                      value={documentSettings.warranty_validity_days}
-                      onChange={handleDocumentChange('warranty_validity_days')}
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">日</InputAdornment>,
-                      }}
-                      helperText="到着後の保証期間"
-                    />
+                    <TextField fullWidth type="number" label="保証書有効日数" value={s.warranty_validity_days} onChange={str('warranty_validity_days')}
+                      InputProps={{ endAdornment: <InputAdornment position="end">日</InputAdornment> }} helperText="到着後の保証期間" />
                   </Grid>
                 </Grid>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                  自動発行設定
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>自動発行設定</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={documentSettings.auto_generate_invoice}
-                        onChange={(e) => setDocumentSettings({ ...documentSettings, auto_generate_invoice: e.target.checked })}
-                      />
-                    }
-                    label="請求書を自動発行する"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={documentSettings.auto_generate_payment_notice}
-                        onChange={(e) => setDocumentSettings({ ...documentSettings, auto_generate_payment_notice: e.target.checked })}
-                      />
-                    }
-                    label="支払通知書を自動発行する"
-                  />
+                  <FormControlLabel control={<Switch checked={s.auto_generate_invoice} onChange={bool('auto_generate_invoice')} />} label="請求書を自動発行する" />
+                  <FormControlLabel control={<Switch checked={s.auto_generate_payment_notice} onChange={bool('auto_generate_payment_notice')} />} label="支払通知書を自動発行する" />
                 </Box>
                 <Alert severity="info" sx={{ mt: 2 }}>
-                  <Typography variant="body2">
-                    自動発行を有効にすると、落札確定時に請求書、入金確認時に支払通知書が自動で生成されます。
-                  </Typography>
+                  <Typography variant="body2">自動発行を有効にすると、落札確定時に請求書、入金確認時に支払通知書が自動で生成されます。</Typography>
                 </Alert>
               </CardContent>
             </Card>
@@ -1028,28 +394,18 @@ export default function Settings() {
       </TabPanel>
 
       {/* スナックバー */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-          {snackbar.message}
-        </Alert>
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar((p) => ({ ...p, open: false }))}>{snackbar.message}</Alert>
       </Snackbar>
 
       {/* 配送料金編集ダイアログ */}
       <Dialog open={editShippingDialog} onClose={() => setEditShippingDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>地域別配送料金の編集</DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            配送料金テーブルは現在のバージョンでは編集できません。今後のアップデートで対応予定です。
-          </Alert>
+          <Alert severity="info" sx={{ mb: 2 }}>配送料金テーブルは現在のバージョンでは編集できません。今後のアップデートで対応予定です。</Alert>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditShippingDialog(false)}>閉じる</Button>
-        </DialogActions>
+        <DialogActions><Button onClick={() => setEditShippingDialog(false)}>閉じる</Button></DialogActions>
       </Dialog>
     </Box>
   );

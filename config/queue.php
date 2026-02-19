@@ -40,7 +40,8 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // countdown ジョブは最大4時間動くため余裕を持たせる（デフォルト90秒は二重実行の原因）
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 14400),
             'after_commit' => false,
         ],
 

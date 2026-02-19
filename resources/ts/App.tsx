@@ -1,76 +1,24 @@
-import React from 'react';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Box } from '@mui/material';
+import { Box, CircularProgress } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import GuestRoute from './components/GuestRoute';
 import RootRedirect from './components/RootRedirect';
 
-// Auth pages
+// Auth pages（小さいので同期ロード）
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import SetPassword from './pages/auth/SetPassword';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 
-// Participant pages
+// Layouts（同期ロード）
 import ParticipantLayout from './layouts/ParticipantLayout';
-import ParticipantHome from './pages/participant/Home';
-import AuctionList from './pages/participant/AuctionList';
-import AuctionItems from './pages/participant/AuctionItems';
-import AuctionLive from './pages/participant/AuctionLive';
-import WonItems from './pages/participant/WonItems';
-import Favorites from './pages/participant/Favorites';
-import ParticipantSettings from './pages/participant/Settings';
-import ParticipantManual from './pages/participant/Manual';
-
-// Admin pages
 import AdminLayout from './layouts/AdminLayout';
-import AdminDashboard from './pages/admin/Dashboard';
-import AnnouncementManagement from './pages/admin/AnnouncementManagement';
-import AnnouncementForm from './pages/admin/AnnouncementForm';
-import AuctionManagement from './pages/admin/AuctionManagement';
-import AuctionForm from './pages/admin/AuctionForm';
-import ItemManagement from './pages/admin/ItemManagement';
-import ItemManagementAuctions from './pages/admin/ItemManagementAuctions';
-import ItemForm from './pages/admin/ItemForm';
-import LiveControl from './pages/admin/LiveControl';
-import LiveAuctions from './pages/admin/LiveAuctions';
-import WonItemManagement from './pages/admin/WonItemManagement';
-import WonItemAuctions from './pages/admin/WonItemAuctions';
-import UserManagement from './pages/admin/UserManagement';
-import UserDetail from './pages/admin/UserDetail';
-import UserCreate from './pages/admin/UserCreate';
-import Settings from './pages/admin/Settings';
-import SellerManagement from './pages/admin/SellerManagement';
-import SellerDetail from './pages/admin/SellerDetail';
-import BuyerManagement from './pages/admin/BuyerManagement';
-import BuyerDetail from './pages/admin/BuyerDetail';
-import DocumentManagement from './pages/admin/DocumentManagement';
-import AdminManual from './pages/admin/Manual';
-
-// AI pages
-import AIAnalytics from './pages/admin/AIAnalytics';
-import AIImageRecognition from './pages/admin/AIImageRecognition';
-import AIPricePrediction from './pages/admin/AIPricePrediction';
-import AIFraudDetection from './pages/admin/AIFraudDetection';
-import AIRecommendations from './pages/admin/AIRecommendations';
-import Reports from './pages/admin/Reports';
-import DesignSystem from './pages/admin/DesignSystem';
-import LaneAssignment from './pages/admin/LaneAssignment';
-
-// Seller pages
 import SellerLayout from './layouts/SellerLayout';
-import SellerDashboard from './pages/seller/Dashboard';
-import SubmitItem from './pages/seller/SubmitItem';
-import SellerProfile from './pages/seller/Profile';
-import SellerShipping from './pages/seller/Shipping';
-import ItemHistory from './pages/seller/ItemHistory';
-import SellerItemDetail from './pages/seller/ItemDetail';
-import SalesSettlement from './pages/seller/SalesSettlement';
-import SellerManual from './pages/seller/Manual';
 
-// Legal pages
+// Legal（同期ロード）
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import SpecifiedCommercialTransaction from './pages/legal/SpecifiedCommercialTransaction';
 import TermsOfService from './pages/legal/TermsOfService';
@@ -78,11 +26,73 @@ import TermsOfService from './pages/legal/TermsOfService';
 // Error pages
 import NotFound from './pages/NotFound';
 
+// ─── 遅延読み込み（重いページ群） ────────────────────────────────────────────
+
+// Participant
+const ParticipantHome        = lazy(() => import('./pages/participant/Home'));
+const AuctionList            = lazy(() => import('./pages/participant/AuctionList'));
+const AuctionItems           = lazy(() => import('./pages/participant/AuctionItems'));
+const AuctionLive            = lazy(() => import('./pages/participant/AuctionLive'));
+const WonItems               = lazy(() => import('./pages/participant/WonItems'));
+const Favorites              = lazy(() => import('./pages/participant/Favorites'));
+const ParticipantSettings    = lazy(() => import('./pages/participant/Settings'));
+const ParticipantManual      = lazy(() => import('./pages/participant/Manual'));
+
+// Admin
+const AdminDashboard         = lazy(() => import('./pages/admin/Dashboard'));
+const AnnouncementManagement = lazy(() => import('./pages/admin/AnnouncementManagement'));
+const AnnouncementForm       = lazy(() => import('./pages/admin/AnnouncementForm'));
+const AuctionManagement      = lazy(() => import('./pages/admin/AuctionManagement'));
+const AuctionForm            = lazy(() => import('./pages/admin/AuctionForm'));
+const ItemManagement         = lazy(() => import('./pages/admin/ItemManagement'));
+const ItemManagementAuctions = lazy(() => import('./pages/admin/ItemManagementAuctions'));
+const ItemForm               = lazy(() => import('./pages/admin/ItemForm'));
+const LiveControl            = lazy(() => import('./pages/admin/LiveControl'));
+const LiveAuctions           = lazy(() => import('./pages/admin/LiveAuctions'));
+const WonItemManagement      = lazy(() => import('./pages/admin/WonItemManagement'));
+const WonItemAuctions        = lazy(() => import('./pages/admin/WonItemAuctions'));
+const UserManagement         = lazy(() => import('./pages/admin/UserManagement'));
+const UserDetail             = lazy(() => import('./pages/admin/UserDetail'));
+const UserCreate             = lazy(() => import('./pages/admin/UserCreate'));
+const Settings               = lazy(() => import('./pages/admin/Settings'));
+const SellerManagement       = lazy(() => import('./pages/admin/SellerManagement'));
+const SellerDetail           = lazy(() => import('./pages/admin/SellerDetail'));
+const BuyerManagement        = lazy(() => import('./pages/admin/BuyerManagement'));
+const BuyerDetail            = lazy(() => import('./pages/admin/BuyerDetail'));
+const DocumentManagement     = lazy(() => import('./pages/admin/DocumentManagement'));
+const AdminManual            = lazy(() => import('./pages/admin/Manual'));
+const LaneAssignment         = lazy(() => import('./pages/admin/LaneAssignment'));
+const Reports                = lazy(() => import('./pages/admin/Reports'));
+const DesignSystem           = lazy(() => import('./pages/admin/DesignSystem'));
+const AIAnalytics            = lazy(() => import('./pages/admin/AIAnalytics'));
+const AIImageRecognition     = lazy(() => import('./pages/admin/AIImageRecognition'));
+const AIPricePrediction      = lazy(() => import('./pages/admin/AIPricePrediction'));
+const AIFraudDetection       = lazy(() => import('./pages/admin/AIFraudDetection'));
+const AIRecommendations      = lazy(() => import('./pages/admin/AIRecommendations'));
+
+// Seller
+const SellerDashboard        = lazy(() => import('./pages/seller/Dashboard'));
+const SubmitItem             = lazy(() => import('./pages/seller/SubmitItem'));
+const SellerProfile          = lazy(() => import('./pages/seller/Profile'));
+const SellerShipping         = lazy(() => import('./pages/seller/Shipping'));
+const ItemHistory            = lazy(() => import('./pages/seller/ItemHistory'));
+const SellerItemDetail       = lazy(() => import('./pages/seller/ItemDetail'));
+const SalesSettlement        = lazy(() => import('./pages/seller/SalesSettlement'));
+const SellerManual           = lazy(() => import('./pages/seller/Manual'));
+
+// ローディングフォールバック
+const PageLoader = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+    <CircularProgress />
+  </Box>
+);
+
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* 認証ページ（認証済みユーザーはダッシュボードにリダイレクト） */}
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
@@ -211,6 +221,7 @@ function App() {
           {/* 404 Not Found */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+          </Suspense>
       </Box>
     </Router>
     </AuthProvider>

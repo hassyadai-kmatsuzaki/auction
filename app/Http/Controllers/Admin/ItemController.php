@@ -6,14 +6,24 @@ use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\ItemMedia;
+use App\Actions\Item\DeleteMediaAction;
+use App\Actions\Item\UploadMediaAction;
+use App\Services\ItemImportService;
+use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class ItemController extends Controller
 {
+    public function __construct(
+        private readonly ItemImportService $importService,
+        private readonly StorageService    $storage,
+        private readonly UploadMediaAction $uploadMediaAction,
+        private readonly DeleteMediaAction $deleteMediaAction,
+    ) {}
+
     /**
      * 生体一覧を取得
      *
@@ -341,37 +351,16 @@ class ItemController extends Controller
         ]);
     }
 
-    /**
-     * ストレージディスクを取得（S3またはpublic）
-     */
-    protected function getStorageDisk()
+    /** @deprecated StorageService::disk() を使用してください */
+    protected function getStorageDisk(): string
     {
-        // AWS設定が有効な値である場合のみS3を使用
-        $key = config('filesystems.disks.s3.key');
-        $bucket = config('filesystems.disks.s3.bucket');
-        
-        if (!empty($key) && !empty($bucket) && $key !== '' && $bucket !== '') {
-            // S3パッケージがインストールされているかチェック
-            if (class_exists(\Aws\S3\S3Client::class)) {
-                return 's3';
-            }
-            \Log::warning('S3設定がありますが、aws/aws-sdk-phpがインストールされていません。publicディスクを使用します。');
-        }
-        
-        return 'public';
+        return $this->storage->disk();
     }
 
-    /**
-     * ファイルのURLを取得
-     */
-    protected function getFileUrl($path)
+    /** @deprecated StorageService::url() を使用してください */
+    protected function getFileUrl(?string $path): ?string
     {
-        $disk = $this->getStorageDisk();
-        if ($disk === 's3') {
-            return Storage::disk('s3')->url($path);
-        }
-        // publicディスクの場合はAPP_URLを使用
-        return config('app.url') . '/storage/' . $path;
+        return $this->storage->url($path);
     }
 
     /**
@@ -382,164 +371,36 @@ class ItemController extends Controller
      * @param int $id
      * @return \Illuminate\Http\JsonResponse
      */
+    /** メディアをアップロード */
     public function uploadMedia(Request $request, $auctionId, $id)
     {
-        $item = Item::where('auction_id', $auctionId)
-            ->where('id', $id)
-            ->firstOrFail();
-        
+        $item = Item::where('auction_id', $auctionId)->where('id', $id)->firstOrFail();
+
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:jpg,jpeg,png,gif,webp,mp4,mov,webm|max:102400', // 100MB max
-            'media_type' => 'required|in:image,video',
-            'is_thumbnail' => 'nullable|string', // FormDataでは文字列として送られる
+            'file'         => 'required|file|mimes:jpg,jpeg,png,gif,webp,mp4,mov,webm|max:102400',
+            'media_type'   => 'required|in:image,video',
+            'is_thumbnail' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
-        
-        $file = $request->file('file');
-        $mediaType = $request->input('media_type');
-        $isThumbnail = $request->boolean('is_thumbnail', false);
-        
-        // ストレージディスクを取得
-        $disk = $this->getStorageDisk();
-        
-        // ファイル名を生成
-        $extension = $file->getClientOriginalExtension();
-        $filename = 'items/' . $auctionId . '/' . $id . '/' . Str::uuid() . '.' . $extension;
-        
-        try {
-            // ファイルをアップロード
-            if ($disk === 's3') {
-                // S3設定のデバッグ情報
-                \Log::info('S3アップロード開始', [
-                    'bucket' => config('filesystems.disks.s3.bucket'),
-                    'region' => config('filesystems.disks.s3.region'),
-                    'filename' => $filename,
-                ]);
-                
-                $path = Storage::disk('s3')->putFileAs('', $file, $filename, 'public');
-                
-                \Log::info('S3アップロード結果', ['path' => $path]);
-            } else {
-                // ディレクトリを事前に作成
-                $directory = dirname($filename);
-                if (!Storage::disk('public')->exists($directory)) {
-                    Storage::disk('public')->makeDirectory($directory);
-                }
-                $path = Storage::disk('public')->putFileAs('', $file, $filename);
-            }
-            
-            if (!$path) {
-                throw new \Exception('ファイルの保存に失敗しました。ディスク: ' . $disk);
-            }
-        } catch (\Aws\S3\Exception\S3Exception $e) {
-            \Log::error('S3エラー: ' . $e->getMessage(), [
-                'aws_error_code' => $e->getAwsErrorCode(),
-                'aws_error_message' => $e->getAwsErrorMessage(),
-                'disk' => $disk,
-                'filename' => $filename,
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'S3アップロードエラー: ' . $e->getAwsErrorMessage(),
-            ], 500);
-        } catch (\Exception $e) {
-            \Log::error('メディアアップロードエラー: ' . $e->getMessage(), [
-                'disk' => $disk,
-                'filename' => $filename,
-                'file_size' => $file->getSize(),
-                'mime_type' => $file->getMimeType(),
-                'exception_class' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'ファイルのアップロードに失敗しました: ' . $e->getMessage(),
-            ], 500);
-        }
-        
-        // サムネイル設定時は既存のサムネイルを解除
-        if ($isThumbnail) {
-            ItemMedia::where('item_id', $id)->update(['is_thumbnail' => false]);
-            
-            // サムネイルパスを更新
-            $item->thumbnail_path = $this->getFileUrl($path);
-            $item->save();
-        }
-        
-        // メディアレコードを作成
-        $displayOrder = ItemMedia::where('item_id', $id)->max('display_order') ?? 0;
-        
-        // media_type をDBのenum値に変換
-        $dbMediaType = $mediaType === 'image' ? 'photo_other' : 'video_top';
-        
-        $media = ItemMedia::create([
-            'item_id' => $id,
-            'media_type' => $dbMediaType,
-            'file_path' => $path,
-            'file_name' => $file->getClientOriginalName(),
-            'file_size' => $file->getSize(),
-            'mime_type' => $file->getMimeType(),
-            'is_thumbnail' => $isThumbnail,
-            'display_order' => $displayOrder + 1,
-        ]);
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'ファイルをアップロードしました。',
-            'data' => [
-                'media' => [
-                    'id' => $media->id,
-                    'media_type' => $media->media_type,
-                    'file_path' => $media->file_path,
-                    'file_url' => $this->getFileUrl($media->file_path),
-                    'is_thumbnail' => $media->is_thumbnail,
-                ],
-            ],
-        ], 201);
+
+        return $this->uploadMediaAction->execute(
+            $item,
+            $request->file('file'),
+            $request->input('media_type'),
+            $request->boolean('is_thumbnail', false)
+        )->toResponse(201);
     }
 
-    /**
-     * メディアを削除
-     *
-     * @param int $auctionId
-     * @param int $id
-     * @param int $mediaId
-     * @return \Illuminate\Http\JsonResponse
-     */
+    /** メディアを削除 */
     public function deleteMedia($auctionId, $id, $mediaId)
     {
-        $item = Item::where('auction_id', $auctionId)
-            ->where('id', $id)
-            ->firstOrFail();
-        
-        $media = ItemMedia::where('item_id', $id)
-            ->where('id', $mediaId)
-            ->firstOrFail();
-        
-        // ストレージからファイルを削除
-        if ($media->file_path) {
-            $disk = $this->getStorageDisk();
-            Storage::disk($disk)->delete($media->file_path);
-        }
-        
-        // サムネイルだった場合はクリア
-        if ($media->is_thumbnail) {
-            $item->thumbnail_path = null;
-            $item->save();
-        }
-        
-        $media->delete();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'ファイルを削除しました。',
-        ]);
+        $item  = Item::where('auction_id', $auctionId)->where('id', $id)->firstOrFail();
+        $media = ItemMedia::where('item_id', $id)->where('id', $mediaId)->firstOrFail();
+
+        return $this->deleteMediaAction->execute($item, $media)->toResponse();
     }
 
     /**
@@ -763,147 +624,31 @@ class ItemController extends Controller
 
     /**
      * CSVから一括インポート
-     *
-     * @param Request $request
-     * @param int $auctionId
-     * @return \Illuminate\Http\JsonResponse
      */
     public function import(Request $request, $auctionId)
     {
-        $auction = Auction::findOrFail($auctionId);
+        Auction::findOrFail($auctionId);
 
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:csv,txt|max:10240',
+            'file'              => 'required|file|mimes:csv,txt|max:10240',
             'seller_profile_id' => 'nullable|exists:seller_profiles,id',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $file = $request->file('file');
-        $sellerProfileId = $request->input('seller_profile_id');
-
         try {
-            $path = $file->getRealPath();
-            $content = file_get_contents($path);
-            
-            // BOMを除去
-            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-            
-            // 一時ファイルに保存
-            $tempPath = tempnam(sys_get_temp_dir(), 'csv');
-            file_put_contents($tempPath, $content);
-            
-            $handle = fopen($tempPath, 'r');
-            
-            if (!$handle) {
-                throw new \Exception('ファイルを開けませんでした。');
-            }
+            $result = $this->importService->importFromCsv(
+                $request->file('file')->getRealPath(),
+                (int) $auctionId,
+                $request->input('seller_profile_id')
+            );
 
-            // ヘッダー行をスキップ
-            $header = fgetcsv($handle);
-
-            $imported = 0;
-            $errors = [];
-            $rowNumber = 1;
-
-            // 現在の最大アイテム番号を取得
-            $maxItemNumber = Item::where('auction_id', $auctionId)->max('item_number') ?? 0;
-
-            while (($row = fgetcsv($handle)) !== false) {
-                $rowNumber++;
-                
-                // 空行をスキップ
-                if (empty($row[0])) {
-                    continue;
-                }
-
-                try {
-                    // データ検証
-                    if (count($row) < 3) {
-                        $errors[] = "行 {$rowNumber}: データが不足しています。";
-                        continue;
-                    }
-
-                    $speciesName = trim($row[0] ?? '');
-                    $quantity = (int) trim($row[1] ?? '1');
-                    $startPrice = (float) trim($row[2] ?? '0');
-
-                    if (empty($speciesName)) {
-                        $errors[] = "行 {$rowNumber}: 品種名は必須です。";
-                        continue;
-                    }
-
-                    if ($quantity < 1) {
-                        $errors[] = "行 {$rowNumber}: 匹数は1以上にしてください。";
-                        continue;
-                    }
-
-                    if ($startPrice < 1) {
-                        $errors[] = "行 {$rowNumber}: 開始価格は1円以上にしてください。";
-                        continue;
-                    }
-
-                    $maxItemNumber++;
-
-                    // 未落札時対応のバリデーション
-                    $unsoldAction = trim($row[10] ?? 'return');
-                    if (!in_array($unsoldAction, ['return', 'free_pickup', 'relist'])) {
-                        $unsoldAction = 'return';
-                    }
-
-                    Item::create([
-                        'auction_id' => $auctionId,
-                        'seller_profile_id' => $sellerProfileId,
-                        'item_number' => $maxItemNumber,
-                        'species_name' => $speciesName,
-                        'quantity' => $quantity,
-                        'start_price' => $startPrice,
-                        'current_price' => $startPrice,
-                        'reserve_price' => !empty($row[3]) ? (float) trim($row[3]) : null,
-                        'estimated_price' => !empty($row[4]) ? (float) trim($row[4]) : null,
-                        'bid_increment' => !empty($row[5]) ? (float) trim($row[5]) : 100,
-                        'individual_info' => trim($row[6] ?? ''),
-                        'inspection_info' => trim($row[7] ?? ''),
-                        'notes' => trim($row[8] ?? ''),
-                        'is_premium' => (bool) (int) trim($row[9] ?? '0'),
-                        'unsold_action' => $unsoldAction,
-                        'status' => 'draft',
-                    ]);
-
-                    $imported++;
-                } catch (\Exception $e) {
-                    $errors[] = "行 {$rowNumber}: " . $e->getMessage();
-                }
-            }
-
-            fclose($handle);
-            unlink($tempPath);
-
-            $message = "{$imported}件の生体をインポートしました。";
-            if (!empty($errors)) {
-                $message .= ' エラー: ' . count($errors) . '件';
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'data' => [
-                    'imported' => $imported,
-                    'errors' => $errors,
-                ],
-            ]);
-
+            return $result->toResponse();
         } catch (\Exception $e) {
             \Log::error('CSVインポートエラー: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'インポートに失敗しました: ' . $e->getMessage(),
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'インポートに失敗しました: ' . $e->getMessage()], 500);
         }
     }
 

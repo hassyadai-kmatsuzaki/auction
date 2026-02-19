@@ -9,7 +9,9 @@
         "cy:open": "cypress open",
         "cy:run": "cypress run",
         "cy:run:headed": "cypress run --headed",
-        "test:e2e": "cypress run"
+        "test:e2e": "cypress run",
+        "storybook": "storybook dev -p 6006",
+        "build-storybook": "storybook build"
     },
     "dependencies": {
         "@emotion/react": "^11.13.5",
@@ -17,6 +19,7 @@
         "@mui/icons-material": "^6.1.7",
         "@mui/material": "^6.1.7",
         "@mui/x-date-pickers": "^8.25.0",
+        "@tanstack/react-query": "^5.90.21",
         "canvas-confetti": "^1.9.4",
         "date-fns": "^4.1.0",
         "laravel-echo": "^1.16.1",
@@ -25,7 +28,8 @@
         "react-dom": "^18.3.1",
         "react-markdown": "^10.1.0",
         "react-router-dom": "^6.30.1",
-        "recharts": "^3.5.1"
+        "recharts": "^3.5.1",
+        "zustand": "^5.0.11"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
@@ -40,6 +44,17 @@
         "laravel-vite-plugin": "^2.0.0",
         "tailwindcss": "^4.0.0",
         "typescript": "^5.6.3",
-        "vite": "^7.0.7"
+        "vite": "^7.0.7",
+        "storybook": "^10.2.10",
+        "@storybook/react-vite": "^10.2.10",
+        "@chromatic-com/storybook": "^5.0.1",
+        "@storybook/addon-vitest": "^10.2.10",
+        "@storybook/addon-a11y": "^10.2.10",
+        "@storybook/addon-docs": "^10.2.10",
+        "@storybook/addon-onboarding": "^10.2.10",
+        "vitest": "^4.0.18",
+        "playwright": "^1.58.2",
+        "@vitest/browser-playwright": "^4.0.18",
+        "@vitest/coverage-v8": "^4.0.18"
     }
 }

@@ -2,6 +2,15 @@
 
 namespace App\Providers;
 
+use App\Repositories\Contracts\AuctionRepositoryInterface;
+use App\Repositories\Contracts\BidParticipantRepositoryInterface;
+use App\Repositories\Contracts\ItemRepositoryInterface;
+use App\Repositories\Contracts\LaneRepositoryInterface;
+use App\Repositories\Eloquent\AuctionRepository;
+use App\Repositories\Eloquent\BidParticipantRepository;
+use App\Repositories\Eloquent\ItemRepository;
+use App\Repositories\Eloquent\LaneRepository;
+use App\Actions\Bid\FinalizeBidAction;
 use App\Services\BidService;
 use App\Services\CountdownService;
 use Illuminate\Support\ServiceProvider;
@@ -13,17 +22,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // BidServiceをシングルトンで登録
+        // ========== Repository バインド ==========
+        $this->app->bind(BidParticipantRepositoryInterface::class, BidParticipantRepository::class);
+        $this->app->bind(AuctionRepositoryInterface::class,        AuctionRepository::class);
+        $this->app->bind(ItemRepositoryInterface::class,           ItemRepository::class);
+        $this->app->bind(LaneRepositoryInterface::class,           LaneRepository::class);
+
+        // ========== Service シングルトン ==========
+        // BidService: 後方互換のためシングルトンを維持
         $this->app->singleton(BidService::class, function ($app) {
             return new BidService();
         });
 
-        // CountdownServiceをシングルトンで登録
+        // CountdownService: FinalizeBidAction に依存（BidService 依存を除去）
         $this->app->singleton(CountdownService::class, function ($app) {
-            $countdownService = new CountdownService($app->make(BidService::class));
-            // BidServiceにCountdownServiceを設定（循環参照解決）
-            $app->make(BidService::class)->setCountdownService($countdownService);
-            return $countdownService;
+            return new CountdownService($app->make(FinalizeBidAction::class));
         });
     }
 
