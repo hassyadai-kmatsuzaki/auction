@@ -31,6 +31,35 @@ class BidService
         $lanes            = $auction->lanes()->with(['currentItem.media'])->orderBy('lane_number')->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
+        // ★ N+1解消: 全アクティブアイテムのデータを一括取得
+        $currentItemIds = $lanes->pluck('currentItem.id')->filter()->values()->toArray();
+
+        // 入札者数を一括取得（GROUP BY item_id）
+        $bidderCounts = !empty($currentItemIds)
+            ? BidParticipant::whereIn('item_id', $currentItemIds)
+                ->where('is_active', true)
+                ->selectRaw('item_id, COUNT(*) as cnt')
+                ->groupBy('item_id')
+                ->pluck('cnt', 'item_id')
+                ->toArray()
+            : [];
+
+        // 自分の入札状態を一括取得
+        $myParticipants = ($userId && !empty($currentItemIds))
+            ? BidParticipant::whereIn('item_id', $currentItemIds)
+                ->where('user_id', $userId)
+                ->get()
+                ->keyBy('item_id')
+            : collect();
+
+        // 自分の指値を一括取得
+        $myLimits = ($userId && !empty($currentItemIds))
+            ? BidLimitPrice::whereIn('item_id', $currentItemIds)
+                ->where('user_id', $userId)
+                ->get()
+                ->keyBy('item_id')
+            : collect();
+
         $lanesData = [];
         foreach ($lanes as $lane) {
             $laneData = [
@@ -43,16 +72,16 @@ class BidService
 
             if ($lane->currentItem) {
                 $item              = $lane->currentItem;
-                $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+                $activeBidderCount = $bidderCounts[$item->id] ?? 0;
 
                 $myBidStatus = null;
                 $myLimitPrice = null;
                 $myLimitTriggered = false;
                 if ($userId) {
-                    $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
+                    $participant = $myParticipants->get($item->id);
                     $myBidStatus = $participant ? ($participant->is_active ? 'active' : 'inactive') : null;
 
-                    $limit = BidLimitPrice::forItem($item->id)->forUser($userId)->first();
+                    $limit = $myLimits->get($item->id);
                     if ($limit) {
                         $myLimitPrice     = $limit->limit_price;
                         $myLimitTriggered = $limit->is_triggered;
