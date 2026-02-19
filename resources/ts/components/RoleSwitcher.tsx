@@ -1,16 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Select, MenuItem, Box } from '@mui/material';
 import {
-  Menu,
-  MenuItem,
-  IconButton,
-  Typography,
-  Box,
-  Tooltip,
-  Divider,
-} from '@mui/material';
-import {
-  SwapHoriz as SwapHorizIcon,
   AdminPanelSettings as AdminIcon,
   Store as SellerIcon,
   Person as ParticipantIcon,
@@ -26,149 +17,80 @@ interface RoleSwitcherProps {
   currentPath: string;
 }
 
+const ROLE_CONFIG = {
+  admin:       { label: '管理者画面',   icon: <AdminIcon sx={{ fontSize: 18, color: '#2563EB' }} />, path: '/admin/dashboard' },
+  seller:      { label: '出品者画面',   icon: <SellerIcon sx={{ fontSize: 18, color: '#059669' }} />, path: '/seller/dashboard' },
+  participant: { label: '参加者画面',   icon: <ParticipantIcon sx={{ fontSize: 18, color: '#6366F1' }} />, path: '/participant/home' },
+} as const;
+
 const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ roles, currentPath }) => {
   const navigate = useNavigate();
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
-  // 各ロールの有無をチェック
-  const hasAdmin = roles.some(r => r.name === 'admin');
-  const hasSeller = roles.some(r => r.name === 'seller');
+  const hasAdmin       = roles.some(r => r.name === 'admin');
+  const hasSeller      = roles.some(r => r.name === 'seller');
   const hasParticipant = roles.some(r => r.name === 'participant');
 
-  // 切り替え可能なロールの数をカウント
-  const availableRoles = [hasAdmin, hasSeller, hasParticipant].filter(Boolean).length;
+  const availableRoles = [
+    hasAdmin       && 'admin',
+    hasSeller      && 'seller',
+    hasParticipant && 'participant',
+  ].filter(Boolean) as string[];
 
-  // 2つ以上のロールがない場合は表示しない
-  if (availableRoles < 2) {
-    return null;
-  }
+  if (availableRoles.length < 2) return null;
 
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
+  const currentRole = currentPath.startsWith('/admin')
+    ? 'admin'
+    : currentPath.startsWith('/seller')
+      ? 'seller'
+      : 'participant';
 
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleSwitch = (roleName: string) => {
-    handleClose();
-    
-    if (roleName === 'admin') {
-      navigate('/admin/dashboard');
-    } else if (roleName === 'seller') {
-      navigate('/seller/dashboard');
-    } else if (roleName === 'participant') {
-      navigate('/participant/home');
-    }
-  };
-
-  // 現在の画面を判定
-  const isAdminScreen = currentPath.startsWith('/admin');
-  const isSellerScreen = currentPath.startsWith('/seller');
-  const isParticipantScreen = !isAdminScreen && !isSellerScreen;
-
-  const roleItems = [
-    {
-      name: 'admin',
-      label: '管理者画面',
-      description: 'システム管理・設定',
-      icon: <AdminIcon sx={{ color: 'primary.main' }} />,
-      available: hasAdmin,
-      selected: isAdminScreen,
-    },
-    {
-      name: 'seller',
-      label: '出品者画面',
-      description: '商品管理・売上確認',
-      icon: <SellerIcon sx={{ color: 'success.main' }} />,
-      available: hasSeller,
-      selected: isSellerScreen,
-    },
-    {
-      name: 'participant',
-      label: '参加者画面',
-      description: 'オークション参加・落札管理',
-      icon: <ParticipantIcon sx={{ color: 'info.main' }} />,
-      available: hasParticipant,
-      selected: isParticipantScreen,
-    },
-  ].filter(item => item.available);
-
-  // 現在の画面名を取得
-  const getCurrentScreenName = () => {
-    if (isAdminScreen) return '管理者画面';
-    if (isSellerScreen) return '出品者画面';
-    return '参加者画面';
+  const handleChange = (roleName: string) => {
+    if (roleName === currentRole) return;
+    const config = ROLE_CONFIG[roleName as keyof typeof ROLE_CONFIG];
+    if (config) navigate(config.path);
   };
 
   return (
-    <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography variant="body2" sx={{ color: 'inherit', fontWeight: 500 }}>
-          {getCurrentScreenName()}
-        </Typography>
-        <Tooltip title="画面切り替え">
-          <IconButton
-            onClick={handleClick}
-            size="small"
-            aria-label="画面切り替え"
-            color="inherit"
-          >
-            <SwapHorizIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-        PaperProps={{
-          sx: { minWidth: 220 },
-        }}
-      >
-        <Box sx={{ px: 2, py: 1 }}>
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            画面を切り替え
-          </Typography>
-        </Box>
-        <Divider />
-        {roleItems.map((item, index) => (
-          <MenuItem
-            key={item.name}
-            onClick={() => handleSwitch(item.name)}
-            selected={item.selected}
-            sx={{
-              py: 1.5,
-              '&.Mui-selected': {
-                backgroundColor: 'action.selected',
-              },
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              {item.icon}
-              <Box>
-                <Typography variant="body2" fontWeight={item.selected ? 600 : 400}>
-                  {item.label}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {item.description}
-                </Typography>
-              </Box>
-            </Box>
+    <Select
+      value={currentRole}
+      onChange={(e) => handleChange(e.target.value)}
+      size="small"
+      variant="outlined"
+      sx={{
+        minWidth: 150,
+        fontSize: '0.8125rem',
+        fontWeight: 600,
+        bgcolor: 'background.paper',
+        '& .MuiSelect-select': {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          py: 0.75,
+        },
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'divider',
+        },
+      }}
+      renderValue={(value) => {
+        const config = ROLE_CONFIG[value as keyof typeof ROLE_CONFIG];
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            {config?.icon}
+            {config?.label}
+          </Box>
+        );
+      }}
+    >
+      {availableRoles.map((roleName) => {
+        const config = ROLE_CONFIG[roleName as keyof typeof ROLE_CONFIG];
+        return (
+          <MenuItem key={roleName} value={roleName} sx={{ gap: 1 }}>
+            {config.icon}
+            {config.label}
           </MenuItem>
-        ))}
-      </Menu>
-    </>
+        );
+      })}
+    </Select>
   );
 };
 

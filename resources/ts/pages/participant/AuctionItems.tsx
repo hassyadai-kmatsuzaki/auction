@@ -59,9 +59,10 @@ export default function AuctionItems() {
   const { auctionId } = useParams<{ auctionId: string }>();
   const navigate      = useNavigate();
 
-  // ローカルUIState（サーバーデータでないものだけ）
+  // ローカルUIState
   const [selectedLane, setSelectedLane]         = useState(0);
   const [viewMode, setViewMode]                 = useState<'grid' | 'list'>('grid');
+  const [statusFilter, setStatusFilter]         = useState<string[]>([]);  // 空配列 = デフォルト
   const [selectedItem, setSelectedItem]         = useState<ItemData | null>(null);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen]         = useState(false);
@@ -147,9 +148,19 @@ export default function AuctionItems() {
     } catch {}
   };
 
-  const currentItems: ItemData[] = selectedLane === 0
+  // ステータスフィルターのデフォルト値（開催中は入札中+出品中のみ）
+  const isLiveAuction = auction?.status === 'live';
+  const defaultStatuses = isLiveAuction ? ['registered', 'live'] : [];
+  const activeFilter = statusFilter.length > 0 ? statusFilter : defaultStatuses;
+
+  const allLaneItems: ItemData[] = selectedLane === 0
     ? lanes.flatMap((l: any) => l.items)
     : lanes[selectedLane - 1]?.items ?? [];
+
+  // フィルター適用
+  const currentItems = activeFilter.length > 0
+    ? allLaneItems.filter((item) => activeFilter.includes(item.status))
+    : allLaneItems;
 
   if (isLoading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -175,7 +186,9 @@ export default function AuctionItems() {
             <IconButton onClick={() => navigate('/participant')}><ArrowBackIcon /></IconButton>
             <Box>
               <Typography variant="h5" fontWeight="bold">{auction?.title || '出品一覧'}</Typography>
-              <Typography variant="body2" color="text.secondary">全{totalItems}点の出品があります</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {activeFilter.length > 0 ? `${currentItems.length}件表示 / 全${totalItems}点` : `全${totalItems}点の出品`}
+              </Typography>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -186,7 +199,7 @@ export default function AuctionItems() {
       </Paper>
 
       {/* レーンタブ */}
-      <Paper sx={{ mb: 3 }}>
+      <Paper sx={{ mb: 2 }}>
         <Tabs value={selectedLane} onChange={(_, v) => setSelectedLane(v)} variant="scrollable" scrollButtons="auto">
           <Tab label={`すべて (${totalItems})`} />
           {lanes.map((lane: any, i: number) => (
@@ -194,6 +207,47 @@ export default function AuctionItems() {
           ))}
         </Tabs>
       </Paper>
+
+      {/* ステータスフィルター */}
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>表示:</Typography>
+        {[
+          { key: 'all',        label: 'すべて',   color: 'default' as const },
+          { key: 'registered', label: '出品中',   color: 'primary' as const },
+          { key: 'live',       label: '入札中',   color: 'error'   as const },
+          { key: 'sold',       label: '落札済み', color: 'success' as const },
+          { key: 'unsold',     label: '不成立',   color: 'default' as const },
+        ].map(({ key, label, color }) => {
+          const isAll = key === 'all';
+          const isActive = isAll
+            ? statusFilter.length === 0 && !isLiveAuction  // 非開催中のデフォルト
+            : activeFilter.includes(key);
+          const isDefault = isAll && statusFilter.length === 0;
+
+          return (
+            <Chip
+              key={key}
+              label={label}
+              size="small"
+              color={isActive || isDefault ? color : 'default'}
+              variant={isActive || isDefault ? 'filled' : 'outlined'}
+              onClick={() => {
+                if (isAll) {
+                  setStatusFilter([]);
+                } else {
+                  setStatusFilter((prev) => {
+                    const current = prev.length > 0 ? prev : defaultStatuses;
+                    return current.includes(key)
+                      ? current.filter((s) => s !== key)
+                      : [...current, key];
+                  });
+                }
+              }}
+              sx={{ cursor: 'pointer', fontWeight: isActive || isDefault ? 600 : 400 }}
+            />
+          );
+        })}
+      </Box>
 
       {/* アイテム一覧 */}
       {currentItems.length === 0 ? (

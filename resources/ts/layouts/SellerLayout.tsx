@@ -174,7 +174,6 @@ export default function SellerLayout() {
         <Box sx={{ flex: 1 }}>
           <Logo />
         </Box>
-        {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
       </Box>
 
       <Divider sx={{ mx: 2 }} />
@@ -395,11 +394,8 @@ export default function SellerLayout() {
             >
               <MenuIcon />
             </IconButton>
-            <Chip
-              label="出品者"
-              size="small"
-              sx={{ bgcolor: '#F0FDF4', color: '#059669', fontWeight: 600 }}
-            />
+            <Box sx={{ display: { xs: 'block', sm: 'none' } }}><Logo /></Box>
+            {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

@@ -107,11 +107,8 @@ export default function AdminLayout() {
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ロゴエリア */}
-      <Box sx={{ p: 2.5, pb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Box sx={{ flex: 1 }}>
-          <Logo />
-        </Box>
-        {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
+      <Box sx={{ p: 2.5, pb: 2 }}>
+        <Logo />
       </Box>
 
       <Divider sx={{ mx: 2 }} />
@@ -461,11 +458,10 @@ export default function AdminLayout() {
             >
               <MenuIcon />
             </IconButton>
-            <Chip
-              label="管理者"
-              size="small"
-              sx={{ bgcolor: '#DBEAFE', color: '#2563EB', fontWeight: 600 }}
-            />
+            {/* SP時はロゴ表示 */}
+            <Box sx={{ display: { xs: 'block', sm: 'none' } }}><Logo /></Box>
+            {/* ロール切り替えセレクトボックス */}
+            {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
           </Box>
 
         </Box>
