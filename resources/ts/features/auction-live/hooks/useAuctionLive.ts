@@ -98,43 +98,10 @@ export function useAuctionLive(auctionId: number) {
     });
   };
 
-  const applyLaneChanged = (event: LaneChangedEvent) => {
-    queryClient.setQueryData<LiveState>(LIVE_STATE_QUERY_KEY(auctionId), (prev) => {
-      if (!prev) return prev;
-      const preBidRemaining = (event.current_item as any)?.pre_bid_remaining_seconds ?? 0;
-      return {
-        ...prev,
-        lanes: prev.lanes.map((lane) =>
-          lane.lane_id === event.lane_id
-            ? {
-                ...lane,
-                current_item: event.current_item
-                  ? ({
-                      id: event.current_item.id!,
-                      item_number: event.current_item.item_number!,
-                      species_name: event.current_item.species_name!,
-                      quantity: event.current_item.quantity!,
-                      current_price: event.current_item.current_price!,
-                      is_premium: event.current_item.is_premium ?? false,
-                      thumbnail_path: event.current_item.thumbnail_path,
-                      active_bidders_count:
-                        (event.current_item as any).active_bidders_count ?? 0,
-                      countdown_seconds: prev.countdown_seconds,
-                      my_bid_status: null,
-                      estimated_price: event.current_item.estimated_price,
-                      inspection_info: event.current_item.inspection_info,
-                      individual_info: event.current_item.individual_info,
-                      media: (event.current_item as any).media,
-                      phase: preBidRemaining > 0 ? 'pre_bid' : 'bidding',
-                      pre_bid_remaining_seconds: preBidRemaining,
-                    } as LaneItem)
-                  : null,
-                status: event.current_item ? 'active' : 'finished',
-              }
-            : lane
-        ),
-      };
-    });
+  const applyLaneChanged = (_event: LaneChangedEvent) => {
+    // レーン変更時はサーバーから最新状態を再取得する
+    // （自動入札による my_bid_status の変更を正確に反映するため）
+    queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
   };
 
   /** サーバーから強制再取得（エラー時・再接続時に使用） */

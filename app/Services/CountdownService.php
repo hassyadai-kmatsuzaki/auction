@@ -505,8 +505,9 @@ class CountdownService
             $this->startPreBidCountdown($lane);
 
             // 事前に指値を設定していたユーザーを自動で入札ONにする
+            $autoActivated = 0;
             try {
-                $this->setBidLimitAction->activatePendingBidLimits($nextItem->fresh());
+                $autoActivated = $this->setBidLimitAction->activatePendingBidLimits($nextItem->fresh());
             } catch (\Exception $e) {
                 Log::warning("Auto-bid activation error: " . $e->getMessage());
             }
@@ -516,7 +517,8 @@ class CountdownService
             $preBidRemaining = ($countdownState && ($countdownState['phase'] ?? '') === 'pre_bid')
                 ? $countdownState['remaining_seconds'] : 0;
 
-            $activeBidderCount = 0; // 新商品なので0
+            // ★ 自動入札で追加された入札者を含めた実際のカウントを取得
+            $activeBidderCount = BidParticipant::forItem($nextItem->id)->active()->count();
             $currentItemData = [
                 'id' => $nextItem->id,
                 'item_number' => $nextItem->item_number,
