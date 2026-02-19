@@ -73,7 +73,6 @@ export default function AuctionItems() {
   const queryClient = useQueryClient();
   // 指値モーダル
   const [limitModalItem, setLimitModalItem] = useState<ItemData | null>(null);
-  const [limitSettings, setLimitSettings] = useState<Record<number, BidLimitData | null>>({});
   const [isSettingLimit, setIsSettingLimit] = useState(false);
 
   // TanStack Query でデータ取得
@@ -90,27 +89,34 @@ export default function AuctionItems() {
   const lanes      = data?.lanes ?? [];
   const totalItems = data?.total_items ?? 0;
 
-  // お気に入り・指値を一括取得
+  // 全商品IDを算出
+  const allItemIds = lanes.flatMap((l: any) => l.items.map((i: any) => i.id)) as number[];
+
+  // 指値を TanStack Query で管理（画面更新しても保持される）
+  const { data: limitSettings = {} } = useQuery({
+    queryKey: ['bid-limits-batch', auctionId, allItemIds.join(',')],
+    queryFn: () => bidLimitApi.getMany(allItemIds),
+    enabled: allItemIds.length > 0,
+    staleTime: 10_000,
+  });
+
+  // お気に入り取得
   useEffect(() => {
-    const allIds = lanes.flatMap((l: any) => l.items.map((i: any) => i.id));
-    if (!allIds.length) return;
-    axios.post('/api/participant/favorites/check', { item_ids: allIds })
+    if (!allItemIds.length) return;
+    axios.post('/api/participant/favorites/check', { item_ids: allItemIds })
       .then((r) => { if (r.data.success) setFavoriteIds(new Set(r.data.data.favorite_item_ids)); })
       .catch(() => {});
-    // 指値の一括取得
-    bidLimitApi.getMany(allIds)
-      .then((limits) => setLimitSettings(limits))
-      .catch(() => {});
   }, [lanes]);
+
+  const invalidateLimits = () => {
+    queryClient.invalidateQueries({ queryKey: ['bid-limits-batch'] });
+  };
 
   const handleSetLimit = async (itemId: number, price: number) => {
     setIsSettingLimit(true);
     try {
       await bidLimitApi.set(itemId, price);
-      setLimitSettings((prev) => ({
-        ...prev,
-        [itemId]: { limit_price: price, is_triggered: false },
-      }));
+      invalidateLimits(); // キャッシュを無効化して最新を再取得
     } catch (err: any) {
       console.error('指値設定エラー:', err);
     } finally {
@@ -121,7 +127,7 @@ export default function AuctionItems() {
   const handleRemoveLimit = async (itemId: number) => {
     try {
       await bidLimitApi.remove(itemId);
-      setLimitSettings((prev) => ({ ...prev, [itemId]: null }));
+      invalidateLimits();
     } catch (err: any) {
       console.error('指値解除エラー:', err);
     }
