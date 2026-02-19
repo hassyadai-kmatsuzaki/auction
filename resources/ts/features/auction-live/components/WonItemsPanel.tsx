@@ -20,8 +20,8 @@ export const WonItemsPanel = React.memo(({ items, totalAmount }: Props) => {
         <EmojiEventsIcon color="warning" />
         あなたの落札一覧（{items.length}件）
       </Typography>
-      <TableContainer>
-        <Table size="small">
+      <TableContainer sx={{ overflowX: 'auto' }}>
+        <Table size="small" sx={{ '& th, & td': { whiteSpace: 'nowrap' } }}>
           <TableHead>
             <TableRow>
               <TableCell>No.</TableCell>

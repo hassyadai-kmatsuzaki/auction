@@ -197,7 +197,7 @@ export default function AuctionItems() {
       ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
           {currentItems.map((item) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+            <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
               <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ItemCard item={item} isFavorited={favoriteIds.has(item.id)}
                   onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}

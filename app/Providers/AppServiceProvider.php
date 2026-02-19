@@ -12,6 +12,7 @@ use App\Repositories\Eloquent\ItemRepository;
 use App\Repositories\Eloquent\LaneRepository;
 use App\Actions\Bid\FinalizeBidAction;
 use App\Actions\Bid\LeaveBidAction;
+use App\Actions\Bid\SetBidLimitAction;
 use App\Services\BidService;
 use App\Services\CountdownService;
 use Illuminate\Support\ServiceProvider;
@@ -35,11 +36,12 @@ class AppServiceProvider extends ServiceProvider
             return new BidService();
         });
 
-        // CountdownService: FinalizeBidAction + LeaveBidAction に依存
+        // CountdownService: FinalizeBidAction + LeaveBidAction + SetBidLimitAction に依存
         $this->app->singleton(CountdownService::class, function ($app) {
             return new CountdownService(
                 $app->make(FinalizeBidAction::class),
                 $app->make(LeaveBidAction::class),
+                $app->make(SetBidLimitAction::class),
             );
         });
     }

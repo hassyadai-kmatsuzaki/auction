@@ -349,17 +349,26 @@ export default function AuctionList() {
 
                 <CardActions sx={{ p: 3, pt: 0 }}>
                   {auction.status === 'live' ? (
-                    <Button
-                      variant="contained"
-                      color="success"
-                      fullWidth
-                      size="large"
-                      endIcon={<ArrowForwardIcon />}
-                      onClick={() => navigate(`/participant/auction/${auction.id}/live`)}
-                      sx={{ fontWeight: 600 }}
-                    >
-                      オークション会場へ
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
+                        sx={{ fontWeight: 600, flex: 1 }}
+                      >
+                        出品一覧
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="large"
+                        endIcon={<ArrowForwardIcon />}
+                        onClick={() => navigate(`/participant/auction/${auction.id}/live`)}
+                        sx={{ fontWeight: 600, flex: 1 }}
+                      >
+                        オークション会場へ
+                      </Button>
+                    </Box>
                   ) : auction.status === 'scheduled' ? (
                     /* 待機室が公開中かどうかでボタンを出し分け */
                     auction.entrance_allowed ? (

@@ -17,15 +17,19 @@ export const AuctionHeader = React.memo(
   ({ title, activeLaneCount, totalLaneCount, socketConnected, onRefresh }: Props) => (
     <Paper sx={{ p: 2, mb: 2 }}>
       <Container maxWidth="xl">
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="h5" fontWeight="bold">{title}</Typography>
+        <Box sx={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1.5, sm: 0 },
+        }}>
+          <Box sx={{ textAlign: { xs: 'center', sm: 'left' }, width: { xs: '100%', sm: 'auto' } }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>{title}</Typography>
             <Typography variant="body2" color="text.secondary">
               {activeLaneCount}/{totalLaneCount}レーン進行中
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton onClick={onRefresh} title="更新">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'center', sm: 'flex-end' } }}>
+            <IconButton onClick={onRefresh} title="更新" size="small">
               <RefreshIcon />
             </IconButton>
             <Chip
@@ -34,7 +38,7 @@ export const AuctionHeader = React.memo(
               icon={socketConnected ? <WifiIcon /> : <WifiOffIcon />}
               size="small"
             />
-            <Chip label="開催中" color="success" icon={<PlayArrowIcon />} />
+            <Chip label="開催中" color="success" icon={<PlayArrowIcon />} size="small" />
           </Box>
         </Box>
       </Container>

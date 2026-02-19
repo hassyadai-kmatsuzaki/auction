@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Actions\Bid\FinalizeBidAction;
 use App\Actions\Bid\LeaveBidAction;
+use App\Actions\Bid\SetBidLimitAction;
 use App\Models\Auction;
 use App\Models\BidLimitPrice;
 use App\Models\Item;
@@ -25,8 +26,9 @@ class CountdownService
     public const TICK_INTERVAL = 0.5;
 
     public function __construct(
-        private readonly FinalizeBidAction $finalizeBidAction,
-        private readonly LeaveBidAction    $leaveBidAction,
+        private readonly FinalizeBidAction  $finalizeBidAction,
+        private readonly LeaveBidAction     $leaveBidAction,
+        private readonly SetBidLimitAction  $setBidLimitAction,
     ) {}
 
     /** @deprecated 後方互換性のため残存 — CountdownService は BidService に依存しない */
@@ -501,6 +503,13 @@ class CountdownService
             $lane->refresh();
             $lane->load(['auction', 'currentItem']);
             $this->startPreBidCountdown($lane);
+
+            // 事前に指値を設定していたユーザーを自動で入札ONにする
+            try {
+                $this->setBidLimitAction->activatePendingBidLimits($nextItem->fresh());
+            } catch (\Exception $e) {
+                Log::warning("Auto-bid activation error: " . $e->getMessage());
+            }
 
             // 入札開始待機の残り秒数を取得
             $countdownState = $this->getCountdownState($lane->id);
