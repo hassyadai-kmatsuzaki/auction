@@ -103,7 +103,11 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
           <PreBidOverlay remainingSeconds={item.pre_bid_remaining_seconds ?? 0} />
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-            <CountdownChip seconds={item.countdown_seconds} isCompetitive={isCompetitive} />
+            <CountdownChip
+              seconds={item.countdown_seconds}
+              isCompetitive={isCompetitive}
+              competitiveSeconds={item.countdown_seconds_competitive}
+            />
             {item.active_bidders_count > 0 && (
               <Chip icon={<PeopleIcon />} label="入札中" size="small" color="error" />
             )}

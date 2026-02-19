@@ -84,6 +84,7 @@ class BidService
                     'phase'                    => $phase,
                     'pre_bid_remaining_seconds'=> $preBidRemaining,
                     'countdown_mode'           => $countdownMode,
+                    'countdown_seconds_competitive' => $countdownState['countdown_seconds_competitive'] ?? 1,
                     'my_limit_price'           => $myLimitPrice,
                     'my_limit_triggered'       => $myLimitTriggered,
                 ];

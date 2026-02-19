@@ -160,6 +160,8 @@ export interface LaneItem {
   phase?: 'bidding' | 'pre_bid';
   pre_bid_remaining_seconds?: number;
   countdown_mode?: 'default' | 'competitive';
+  /** 競合時カウントダウン設定秒数 */
+  countdown_seconds_competitive?: number;
 }
 
 export interface LiveLane {
