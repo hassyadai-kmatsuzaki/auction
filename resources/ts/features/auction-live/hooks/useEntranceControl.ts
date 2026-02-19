@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 export function useEntranceControl(
-  entranceAllowed: boolean,
+  entranceAllowed: boolean | null,  // null = 未確定
   entranceAt: string | null,
   onEntranceOpen: () => void
 ) {
@@ -9,7 +9,8 @@ export function useEntranceControl(
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (entranceAllowed || !entranceAt) {
+    // null（未確定）または true（入室許可）の場合はカウントダウン不要
+    if (entranceAllowed !== false || !entranceAt) {
       setCountdown(null);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

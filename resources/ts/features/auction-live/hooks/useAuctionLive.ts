@@ -14,8 +14,13 @@ export function useAuctionLive(auctionId: number) {
   const query = useQuery({
     queryKey: LIVE_STATE_QUERY_KEY(auctionId),
     queryFn: () => participantAuctionApi.getLiveState(auctionId),
-    // WebSocket接続中はポーリング不要。切断中は3秒ごとにフォールバック
-    refetchInterval: socketConnected ? false : 3000,
+    // scheduled（待機室）は常に5秒ポーリングして入室可否の変化を検知する
+    // live中はWebSocket優先、切断中は3秒フォールバック
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'scheduled') return 5000;
+      return socketConnected ? false : 3000;
+    },
     refetchOnWindowFocus: true,
     staleTime: 500,
     retry: 3,

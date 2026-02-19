@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Grid, CircularProgress, Alert, Button,
@@ -47,7 +47,8 @@ export default function AuctionLive() {
   // ローカルUIState（ダイアログ等）
   const [detailLane, setDetailLane] = useState<LiveLane | null>(null);
   const [agreed, setAgreed] = useState(false);
-  const [entranceAllowed, setEntranceAllowed] = useState(true);
+  // null = 未確定（APIレスポンス待ち）、true/false = 確定
+  const [entranceAllowed, setEntranceAllowed] = useState<boolean | null>(null);
   const [entranceAt, setEntranceAt] = useState<string | null>(null);
   const [startingCountdown, setStartingCountdown] = useState<number | null>(null);
   const [celebration, setCelebration] = useState<CelebrationItem | null>(null);
@@ -123,6 +124,10 @@ export default function AuctionLive() {
         refetch();
         refetchWon();
         showSnackbar(e.message || 'オークションが終了しました', 'success');
+      } else {
+        // 上記以外（管理者による待機室公開・閉鎖 等）は最新状態を再取得
+        refetch();
+        if (e.message) showSnackbar(e.message, 'info');
       }
     },
     onBidLimitReached: (e) => {
@@ -145,19 +150,24 @@ export default function AuctionLive() {
     },
   });
 
-  // liveState から入室制御情報を同期
-  if (liveState) {
+  // liveState から入室制御情報を同期（useEffect内でstateを更新：レンダリング中のsetState禁止パターン回避）
+  useEffect(() => {
+    if (!liveState) return;
+
     const ea = liveState.entrance_allowed;
-    if (ea !== undefined && ea !== entranceAllowed) {
+    if (ea !== undefined) {
       setEntranceAllowed(ea);
-      if (!ea && liveState.entrance_at && liveState.entrance_at !== entranceAt) {
+      if (!ea && liveState.entrance_at) {
         setEntranceAt(liveState.entrance_at);
+      } else if (ea) {
+        setEntranceAt(null); // 入室可能になったらリセット
       }
     }
-    if (liveState.status === 'starting' && liveState.starting_countdown && startingCountdown === null) {
+
+    if (liveState.status === 'starting' && liveState.starting_countdown) {
       setStartingCountdown(liveState.starting_countdown);
     }
-  }
+  }, [liveState]);
 
   // ========== ローディング / エラー ==========
   if (isLoading) {
@@ -180,7 +190,8 @@ export default function AuctionLive() {
   if (!liveState) return null;
 
   // ========== 入室不可 ==========
-  if (liveState.status === 'scheduled' && !entranceAllowed) {
+  // entranceAllowed === false のとき、または null（未確定）かつAPIで entrance_allowed が false の場合
+  if (liveState.status === 'scheduled' && entranceAllowed === false) {
     return (
       <EntranceBlocked
         title={liveState.auction_title}
@@ -193,8 +204,18 @@ export default function AuctionLive() {
   }
 
   // ========== 待機室 ==========
-  if (liveState.status === 'scheduled') {
+  // entranceAllowed === true のとき表示（null のときはローディング済みのため表示しない）
+  if (liveState.status === 'scheduled' && entranceAllowed === true) {
     return <WaitingRoom title={liveState.auction_title} />;
+  }
+
+  // scheduled で entranceAllowed が null（未確定）の場合はローディング表示
+  if (liveState.status === 'scheduled' && entranceAllowed === null) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   // ========== 開始カウントダウン ==========
