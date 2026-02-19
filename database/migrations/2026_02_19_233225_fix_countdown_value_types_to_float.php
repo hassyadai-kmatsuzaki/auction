@@ -19,9 +19,10 @@ return new class extends Migration
             'item_switch_delay_seconds',
         ];
 
+        // ENUM('string','integer','decimal','boolean','json') なので decimal を使用
         DB::table('system_settings')
             ->whereIn('setting_key', $keysToFix)
-            ->update(['value_type' => 'float']);
+            ->update(['value_type' => 'decimal']);
     }
 
     public function down(): void
