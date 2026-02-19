@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { LineConnectionCard } from '../../features/line-settings/components/LineConnectionCard';
+import { LineNotificationList } from '../../features/line-settings/components/LineNotificationList';
 import {
   Container,
   Box,
@@ -510,6 +512,12 @@ export default function ParticipantSettings() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* LINE連携 */}
+      <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <LineConnectionCard />
+        <LineNotificationList />
+      </Box>
 
       {/* スナックバー */}
       <Snackbar

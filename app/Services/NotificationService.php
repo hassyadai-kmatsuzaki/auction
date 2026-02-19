@@ -9,6 +9,7 @@ use App\Mail\PaymentConfirmedMail;
 use App\Mail\SellerPaymentReceivedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
+use App\Jobs\SendLineNotificationJob;
 use App\Models\Auction;
 use App\Models\SellerProfile;
 use App\Models\User;
@@ -18,6 +19,18 @@ use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
+    // ─── LINE通知ヘルパー ────────────────────────────────────────
+
+    /** LINE通知を非同期で送信 */
+    private function sendLineNotification(int $userId, string $type, string $text): void
+    {
+        try {
+            SendLineNotificationJob::dispatch($userId, $type, $text);
+        } catch (\Exception $e) {
+            Log::warning("LINE notification dispatch failed: {$type} user={$userId} - " . $e->getMessage());
+        }
+    }
+
     /**
      * 落札通知を送信（買受者向け）
      */
@@ -36,6 +49,15 @@ class NotificationService
             }
 
             Mail::to($user->email)->queue(new WonItemNotificationMail($wonItem));
+
+            // LINE通知
+            $item = $wonItem->item;
+            $lineText = "🎉 落札おめでとうございます！\n"
+                . ($item ? $item->species_name : '商品') . "\n"
+                . "¥" . number_format($wonItem->winning_price) . "/匹\n"
+                . "合計: ¥" . number_format($wonItem->total_amount) . "（税込）";
+            $this->sendLineNotification($user->id, 'won_item', $lineText);
+
             Log::info('落札通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
             return true;
         } catch (\Exception $e) {

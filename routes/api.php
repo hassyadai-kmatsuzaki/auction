@@ -40,6 +40,9 @@ use App\Http\Controllers\ManualController;
 |
 */
 
+// LINE Login（認証不要・コールバック）
+Route::get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController::class, 'callback']);
+
 // 認証API（ゲスト）
 Route::prefix('auth')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
@@ -218,4 +221,11 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::put('/settings/profile', [ParticipantSettingsController::class, 'updateProfile']);
     Route::put('/settings/notifications', [ParticipantSettingsController::class, 'updateNotificationSettings']);
     Route::post('/settings/notifications/test', [NotificationTestController::class, 'sendParticipantTest']);
+
+    // LINE連携
+    Route::get('/settings/line/redirect',       [\App\Http\Controllers\Auth\LineAuthController::class, 'redirect']);
+    Route::get('/settings/line/status',          [\App\Http\Controllers\Auth\LineAuthController::class, 'status']);
+    Route::delete('/settings/line/unlink',       [\App\Http\Controllers\Auth\LineAuthController::class, 'unlink']);
+    Route::get('/settings/line/notifications',   [\App\Http\Controllers\Participant\LineSettingsController::class, 'index']);
+    Route::put('/settings/line/notifications',   [\App\Http\Controllers\Participant\LineSettingsController::class, 'update']);
 });

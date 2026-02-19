@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Actions\Bid\FinalizeBidAction;
 use App\Actions\Bid\LeaveBidAction;
 use App\Actions\Bid\SetBidLimitAction;
+use App\Actions\Line\NotifyFavoriteApproachingAction;
 use App\Models\Auction;
 use App\Models\BidLimitPrice;
 use App\Models\Item;
@@ -26,9 +27,10 @@ class CountdownService
     public const TICK_INTERVAL = 0.5;
 
     public function __construct(
-        private readonly FinalizeBidAction  $finalizeBidAction,
-        private readonly LeaveBidAction     $leaveBidAction,
-        private readonly SetBidLimitAction  $setBidLimitAction,
+        private readonly FinalizeBidAction                $finalizeBidAction,
+        private readonly LeaveBidAction                   $leaveBidAction,
+        private readonly SetBidLimitAction                $setBidLimitAction,
+        private readonly NotifyFavoriteApproachingAction  $favoriteNotifyAction,
     ) {}
 
     /** @deprecated 後方互換性のため残存 — CountdownService は BidService に依存しない */
@@ -519,6 +521,13 @@ class CountdownService
             $countdownState = $this->getCountdownState($lane->id);
             $preBidRemaining = ($countdownState && ($countdownState['phase'] ?? '') === 'pre_bid')
                 ? $countdownState['remaining_seconds'] : 0;
+
+            // お気に入り順番接近通知（5個前のユーザーにLINE通知）
+            try {
+                $this->favoriteNotifyAction->execute($lane, $nextItem);
+            } catch (\Exception $e) {
+                Log::warning("Favorite notify error: " . $e->getMessage());
+            }
 
             // ★ 自動入札で追加された入札者を含めた実際のカウントを取得
             $activeBidderCount = BidParticipant::forItem($nextItem->id)->active()->count();
