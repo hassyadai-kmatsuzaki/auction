@@ -62,10 +62,23 @@ class SetBidLimitAction
                 }
             } else {
                 // 現在価格 < 指値 → 自動で入札ON
+                // JoinBidAction は pre_bid フェーズで拒否するため、直接参加させる
                 $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                 if (!$participant || !$participant->is_active) {
-                    $result = $this->joinBidAction->execute($item, $userId);
-                    $autoBidded = $result->success;
+                    BidParticipant::participate($item->id, $userId, true, null, 'auto-bid-from-limit');
+                    \App\Models\BidEvent::recordJoin($item->id, $userId, $item->current_price, null, 'auto-bid-from-limit');
+                    $autoBidded = true;
+
+                    // Pusherで入札者数変更を通知
+                    $lane = Lane::where('current_item_id', $item->id)->first();
+                    if ($lane && $item->auction) {
+                        $activeCount = BidParticipant::forItem($item->id)->active()->count();
+                        try {
+                            broadcast(new BidderUpdated($item->auction->id, $lane->id, $item->id, $activeCount, 'joined'));
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::warning("Auto-bid broadcast: " . $e->getMessage());
+                        }
+                    }
                 }
             }
         }

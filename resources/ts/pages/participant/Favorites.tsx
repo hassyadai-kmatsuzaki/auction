@@ -246,13 +246,14 @@ export default function Favorites() {
       ) : (
         <Grid container spacing={2}>
           {favorites.map((item) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+            <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
               <Card
                 sx={{
-                  height: '100%',
                   cursor: 'pointer',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   position: 'relative',
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
                   '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
                 }}
                 onClick={() => handleDetailOpen(item)}
