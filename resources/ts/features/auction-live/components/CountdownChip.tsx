@@ -9,7 +9,6 @@ interface Props {
 /**
  * 秒数を1秒刻みの整数で表示する
  * サーバーが0.5秒単位で送ってきても、繰り上げで整数秒に変換する
- * 例: 9.5 → 10秒, 9.0 → 9秒, 8.5 → 9秒
  */
 const formatSeconds = (s: number): string => {
   if (s <= 0) return '0秒';
@@ -18,30 +17,26 @@ const formatSeconds = (s: number): string => {
 
 /**
  * カウントダウン残り秒数チップ
- * React.memo でメモ化 → 秒数が変わった時だけ再レンダリング
+ *
+ * ■ 競合中（2人以上入札）の表示:
+ *   0.5秒ごとに価格が上がっていくため、「残り 1秒」のように固定表示。
+ *   点滅アニメーションは外し、赤ラベルで「競り上がり中」であることを伝える。
+ *
+ * ■ 通常（0〜1人入札）の表示:
+ *   10秒→9秒→...→1秒→0秒 のカウントダウンを表示。
  */
 export const CountdownChip = React.memo(({ seconds, isCompetitive }: Props) => (
   <Chip
-    label={`残り ${formatSeconds(seconds)}`}
+    label={isCompetitive ? `残り ${formatSeconds(seconds)}` : `残り ${formatSeconds(seconds)}`}
     size="small"
     color={
       isCompetitive
         ? 'error'
-        : Math.ceil(seconds) <= 3   // 整数秒ベースで色変え判定
+        : Math.ceil(seconds) <= 3
           ? 'warning'
           : 'default'
     }
-    sx={{
-      fontWeight: 'bold',
-      minWidth: 80,
-      ...(isCompetitive && {
-        animation: 'pulseOpacity 0.5s infinite',
-        '@keyframes pulseOpacity': {
-          '0%, 100%': { opacity: 1 },
-          '50%': { opacity: 0.65 },
-        },
-      }),
-    }}
+    sx={{ fontWeight: 'bold', minWidth: 80 }}
   />
 ));
 

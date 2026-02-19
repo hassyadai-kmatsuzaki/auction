@@ -81,10 +81,9 @@ class SetBidLimitAction
         return BidResultDto::success([], '上限価格の設定を解除しました');
     }
 
-    /** クイック入力の選択肢を生成（フロントエンドの補助） */
     private function buildQuickOptions(Item $item): array
     {
-        $base = $item->status === 'live' ? $item->current_price : $item->start_price;
+        $base = (int) floor($item->status === 'live' ? $item->current_price : $item->start_price);
         return [
             'base_price' => $base,
             'x1_5'       => (int) floor($base * 1.5),

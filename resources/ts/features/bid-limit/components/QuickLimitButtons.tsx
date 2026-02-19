@@ -29,7 +29,7 @@ export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSel
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
       <BoltIcon sx={{ fontSize: 16, color: 'warning.main' }} />
       <Typography variant="caption" color="text.secondary">
-        クイック入力（{isLive ? '現在価格' : '開始価格'} ¥{quickOptions.base_price.toLocaleString()} 基準）
+        クイック入力（{isLive ? '現在価格' : '開始価格'} ¥{Math.floor(quickOptions.base_price).toLocaleString()} 基準）
       </Typography>
     </Box>
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>

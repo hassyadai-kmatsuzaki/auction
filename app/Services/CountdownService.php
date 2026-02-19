@@ -204,26 +204,31 @@ class CountdownService
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
         // ========= 入札者数に応じた動的カウントダウン切り替え =========
-        $currentMode = $state['countdown_mode'] ?? 'default';
-        $defaultSeconds = $state['countdown_seconds_default'] ?? 10;
+        $currentMode       = $state['countdown_mode'] ?? 'default';
+        $defaultSeconds    = $state['countdown_seconds_default'] ?? 10;
         $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
 
+        // モード切り替えは「切り替え時のみ」remaining_seconds を上書き
         if ($activeBidderCount >= 2 && $currentMode === 'default') {
-            $state['countdown_mode'] = 'competitive';
+            $state['countdown_mode']    = 'competitive';
             $state['remaining_seconds'] = $competitiveSeconds;
         } elseif ($activeBidderCount < 2 && $currentMode === 'competitive') {
-            $state['countdown_mode'] = 'default';
+            $state['countdown_mode']    = 'default';
             $state['remaining_seconds'] = $defaultSeconds;
         }
 
         // カウントダウンを0.5秒減らす
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
-        // ブロードキャスト（0.5秒ごと）
+        // ★ ブロードキャストする表示値を決定
+        // 競合中は常に competitiveSeconds を表示値として送信（点滅防止）
+        // フロントは Math.ceil で整数秒表示するので安定する
+        $displaySeconds = $state['remaining_seconds'];
+
         try {
             broadcast(new CountdownTick(
                 $auction->id, $lane->id, $item->id,
-                (float) $state['remaining_seconds'],
+                (float) $displaySeconds,
                 $activeBidderCount, $item->current_price
             ));
         } catch (\Exception $e) {
@@ -237,7 +242,6 @@ class CountdownService
                 try {
                     $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
                 } catch (\Exception $e) {
-                    // 価格上昇が失敗してもレーンを止めない: カウントダウンをリセットして継続
                     Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - resetting countdown");
                     $this->resetCountdown($lane);
                 }

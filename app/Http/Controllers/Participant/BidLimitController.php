@@ -92,11 +92,11 @@ class BidLimitController extends Controller
         $item  = Item::findOrFail($itemId);
         $limit = BidLimitPrice::forItem($itemId)->forUser(Auth::id())->first();
 
-        $base = $item->status === 'live' ? $item->current_price : $item->start_price;
+        $base = (int) floor($item->status === 'live' ? $item->current_price : $item->start_price);
 
         return response()->json(['success' => true, 'data' => [
             'item_id'       => $item->id,
-            'limit_price'   => $limit?->limit_price,
+            'limit_price'   => $limit ? (int) floor($limit->limit_price) : null,
             'is_triggered'  => $limit?->is_triggered ?? false,
             'quick_options' => [
                 'base_price' => $base,
