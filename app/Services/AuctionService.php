@@ -61,17 +61,29 @@ class AuctionService
         $entranceAt = $startDateTime->copy()->subMinutes($venueOpenMinutes);
         $now        = now();
 
-        // 手動公開オーバーライドが有効、または自然に入室可能時刻を過ぎた場合
+        // 手動公開オーバーライドが有効か確認
         $manuallyOpened = $this->isEntranceManuallyOpened($auction->id);
 
-        if (!$manuallyOpened && $now->lt($entranceAt)) {
+        // ■ 入室可否の判定
+        // 以下のいずれかを満たす場合のみ入室を許可:
+        //   1. 管理者が手動で公開している
+        //   2. 入室可能時刻を過ぎている AND 開始時刻をまだ大幅に超過していない
+        //      （過去のオークションをscheduledに戻した場合のアクセスを防ぐ）
+        $isWithinEntranceWindow = $now->gte($entranceAt) && $now->lte($startDateTime->copy()->addHours(1));
+
+        if (!$manuallyOpened && !$isWithinEntranceWindow) {
+            // 入室不可
+            $message = $now->gt($startDateTime)
+                ? 'このオークションの入室受付は終了しました'
+                : "オークション開始{$venueOpenMinutes}分前から入室できます";
+
             return [
                 'entrance_check'                  => true,
                 'entrance_allowed'                 => false,
                 'entrance_at'                      => $entranceAt->toIso8601String(),
                 'start_at'                         => $startDateTime->toIso8601String(),
                 'venue_open_minutes_before_start'  => $venueOpenMinutes,
-                'message'                          => "オークション開始{$venueOpenMinutes}分前から入室できます",
+                'message'                          => $message,
                 'manually_opened'                  => false,
             ];
         }

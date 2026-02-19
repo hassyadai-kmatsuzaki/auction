@@ -385,6 +385,7 @@ export default function AuctionLive() {
         totalLaneCount={liveState.lanes.length}
         socketConnected={socketConnected}
         onRefresh={refetch}
+        onNavigateItems={() => navigate(`/participant/auction/${auctionId}/items`)}
       />
 
       <Container maxWidth="xl" sx={{ py: 2 }}>

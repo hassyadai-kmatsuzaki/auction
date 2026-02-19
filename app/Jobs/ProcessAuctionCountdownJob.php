@@ -94,6 +94,17 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 $lane = Lane::with(['auction', 'currentItem'])->find($laneId);
                 if ($lane && $lane->currentItem) {
                     $countdownService->startCountdown($lane);
+
+                    // ★ 最初の商品にも事前指値の自動入札を適用
+                    try {
+                        $setBidLimitAction = app(\App\Actions\Bid\SetBidLimitAction::class);
+                        $activated = $setBidLimitAction->activatePendingBidLimits($lane->currentItem);
+                        if ($activated > 0) {
+                            Log::info("Initial auto-bid: lane {$laneId}, activated {$activated} users");
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Initial auto-bid error lane {$laneId}: " . $e->getMessage());
+                    }
                 }
             }
 
@@ -122,7 +133,10 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         $iterations = 0;
         $idleIterations = 0; // 一時停止中の待機カウント
 
+        $consecutiveErrors = 0; // 連続エラーカウント
+
         while ($iterations < $this->maxIterations) {
+            try {
             // オークション状態を確認
             $auction = Auction::with('lanes')->find($this->auctionId);
             
@@ -208,6 +222,19 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 
                 if (!$hasActiveLanes && !$hasPausedLanes) {
                     Log::info("No active or paused lanes in auction {$this->auctionId}, stopping countdown job");
+                    break;
+                }
+            }
+
+            $consecutiveErrors = 0; // 正常完了したらリセット
+
+            } catch (\Exception $e) {
+                $consecutiveErrors++;
+                Log::error("Auction countdown loop error #{$consecutiveErrors}: " . $e->getMessage());
+
+                // 連続100回エラーが続いたら異常と判断してジョブ終了
+                if ($consecutiveErrors >= 100) {
+                    Log::critical("Auction {$this->auctionId}: Too many consecutive errors ({$consecutiveErrors}), stopping job");
                     break;
                 }
             }

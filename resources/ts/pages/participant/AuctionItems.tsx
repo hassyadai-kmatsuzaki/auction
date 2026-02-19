@@ -191,7 +191,14 @@ export default function AuctionItems() {
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {isLiveAuction && (
+              <Button size="small" variant="contained" color="success"
+                onClick={() => navigate(`/participant/auction/${auctionId}/live`)}
+                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                会場へ
+              </Button>
+            )}
             <IconButton onClick={() => setViewMode('grid')} color={viewMode === 'grid' ? 'primary' : 'default'}><ViewModuleIcon /></IconButton>
             <IconButton onClick={() => setViewMode('list')} color={viewMode === 'list' ? 'primary' : 'default'}><ViewListIcon /></IconButton>
           </Box>
@@ -286,33 +293,44 @@ export default function AuctionItems() {
           ))}
         </Grid>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+          <Table sx={{ '& th, & td': { whiteSpace: 'nowrap' } }}>
             <TableHead>
               <TableRow>
-                <TableCell>No.</TableCell><TableCell>品種名</TableCell>
-                <TableCell align="center">匹数</TableCell><TableCell align="right">開始価格</TableCell>
-                <TableCell>個体情報</TableCell><TableCell align="center">ステータス</TableCell>
-                <TableCell align="center">詳細</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>No.</TableCell>
+                <TableCell>品種名</TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>匹数</TableCell>
+                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>開始価格</TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>ステータス</TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>上限価格</TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>操作</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {currentItems.map((item) => {
                 const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
+                const limit = limitSettings[item.id];
                 return (
                   <TableRow key={item.id} hover sx={{ cursor: 'pointer' }}
                     onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}>
-                    <TableCell>{item.item_number}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.item_number}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {item.species_name}
                         {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
                       </Box>
                     </TableCell>
-                    <TableCell align="center">{item.quantity}匹</TableCell>
-                    <TableCell align="right">¥{Number(item.start_price).toLocaleString()}</TableCell>
-                    <TableCell>{item.inspection_info || '-'}</TableCell>
+                    <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{item.quantity}匹</TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{Number(item.start_price).toLocaleString()}</TableCell>
                     <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>
+                    <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                      <BidLimitBadge
+                        limitPrice={limit?.limit_price ?? null}
+                        isTriggered={limit?.is_triggered ?? false}
+                        onEdit={(e?: any) => { e?.stopPropagation?.(); setLimitModalItem(item); }}
+                        onRemove={() => handleRemoveLimit(item.id)}
+                      />
+                    </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <IconButton size="small" onClick={(e) => handleFavoriteToggle(e, item.id)}>

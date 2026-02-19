@@ -134,27 +134,13 @@ export default function AuctionForm() {
 
               <Box>
                 <Typography variant="h6" gutterBottom>オークション設定</Typography>
-                <Stack spacing={3} sx={{ mt: 2 }}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={4}>
-                      <TextField label="デフォルト入札単位" type="number" fullWidth required
-                        value={formData.default_bid_increment}
-                        onChange={(e) => setAuction({ default_bid_increment: parseInt(e.target.value) || 0 })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">円</InputAdornment> }} />
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <TextField label="カウントダウン秒数" type="number" fullWidth required
-                        value={formData.countdown_seconds}
-                        onChange={(e) => setAuction({ countdown_seconds: parseInt(e.target.value) || 0 })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                        inputProps={{ min: 1, max: 60 }} helperText="1〜60" />
-                    </Grid>
-                  </Grid>
-                  <FormControlLabel control={
-                    <Checkbox checked={formData.deposit_required}
-                      onChange={(e) => setAuction({ deposit_required: e.target.checked })} />}
-                    label="保証金必須" />
-                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  カウントダウン秒数・価格上昇率などはカスタム設定タブで設定できます
+                </Typography>
+                <FormControlLabel control={
+                  <Checkbox checked={formData.deposit_required}
+                    onChange={(e) => setAuction({ deposit_required: e.target.checked })} />}
+                  label="保証金必須" />
               </Box>
 
               <Divider />

@@ -28,7 +28,11 @@ import {
   PlayCircleOutline as PlayCircleOutlineIcon,
   ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
+import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
+import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
+import { bidLimitApi, type BidLimitData } from '../../api/participant/bidLimitApi';
 
 interface FavoriteItem {
   id: number;
@@ -66,6 +70,9 @@ export default function Favorites() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [videoDialogUrl, setVideoDialogUrl] = useState('');
+  const [limitModalItem, setLimitModalItem] = useState<FavoriteItem | null>(null);
+  const [isSettingLimit, setIsSettingLimit] = useState(false);
+  const queryClient = useQueryClient();
 
   const fetchFavorites = useCallback(async () => {
     try {
@@ -84,6 +91,25 @@ export default function Favorites() {
   useEffect(() => {
     fetchFavorites();
   }, [fetchFavorites]);
+
+  // 指値一括取得
+  const allItemIds = favorites.map(f => f.item_id);
+  const { data: limitSettings = {} } = useQuery({
+    queryKey: ['bid-limits-favorites', allItemIds.join(',')],
+    queryFn: () => bidLimitApi.getMany(allItemIds),
+    enabled: allItemIds.length > 0,
+    staleTime: 10_000,
+  });
+
+  const invalidateLimits = () => queryClient.invalidateQueries({ queryKey: ['bid-limits-favorites'] });
+
+  const handleSetLimit = async (itemId: number, price: number) => {
+    setIsSettingLimit(true);
+    try { await bidLimitApi.set(itemId, price); invalidateLimits(); } catch {} finally { setIsSettingLimit(false); }
+  };
+  const handleRemoveLimit = async (itemId: number) => {
+    try { await bidLimitApi.remove(itemId); invalidateLimits(); } catch {}
+  };
 
   const handleRemoveFavorite = async (e: React.MouseEvent, itemId: number) => {
     e.stopPropagation();
@@ -284,6 +310,15 @@ export default function Favorites() {
                   </Box>
                 </CardContent>
               </Card>
+              {/* 指値バッジ */}
+              <Box sx={{ px: 1.5, py: 1, bgcolor: 'background.paper', border: '1px solid', borderTop: 'none', borderColor: 'divider', borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }}>
+                <BidLimitBadge
+                  limitPrice={limitSettings[item.item_id]?.limit_price ?? null}
+                  isTriggered={limitSettings[item.item_id]?.is_triggered ?? false}
+                  onEdit={() => setLimitModalItem(item)}
+                  onRemove={() => handleRemoveLimit(item.item_id)}
+                />
+              </Box>
             </Grid>
           ))}
         </Grid>
@@ -474,6 +509,23 @@ export default function Favorites() {
           )}
         </Box>
       </Dialog>
+
+      {/* 指値設定モーダル */}
+      {limitModalItem && (
+        <BidLimitModal
+          open={!!limitModalItem}
+          onClose={() => setLimitModalItem(null)}
+          itemId={limitModalItem.item_id}
+          speciesName={limitModalItem.species_name}
+          currentLimitPrice={limitSettings[limitModalItem.item_id]?.limit_price ?? null}
+          currentPrice={limitModalItem.start_price}
+          quickOptions={null}
+          isLive={false}
+          isSetting={isSettingLimit}
+          onSet={(price) => { handleSetLimit(limitModalItem.item_id, price); setLimitModalItem(null); }}
+          onRemove={() => { handleRemoveLimit(limitModalItem.item_id); setLimitModalItem(null); }}
+        />
+      )}
     </Container>
   );
 }
