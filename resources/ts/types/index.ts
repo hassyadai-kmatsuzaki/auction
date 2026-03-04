@@ -141,6 +141,7 @@ export interface LaneItem {
   id: number;
   item_number: number;
   species_name: string;
+  seller_name?: string;
   quantity: number;
   quantity_unit?: string;
   current_price: number;
@@ -160,6 +161,7 @@ export interface LaneItem {
   phase?: 'bidding' | 'pre_bid' | 'freeze';
   pre_bid_remaining_seconds?: number;
   freeze_remaining_seconds?: number;
+  freeze_countdown_seconds?: number;
   countdown_mode?: 'default' | 'competitive';
   /** 競合時カウントダウン設定秒数 */
   countdown_seconds_competitive?: number;

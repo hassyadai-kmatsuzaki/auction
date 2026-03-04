@@ -28,7 +28,7 @@ class BidService
      */
     public function getLiveState(Auction $auction, ?int $userId = null): array
     {
-        $lanes            = $auction->lanes()->with(['currentItem.media', 'items'])->orderBy('lane_number')->get();
+        $lanes            = $auction->lanes()->with(['currentItem.media', 'currentItem.sellerProfile', 'items'])->orderBy('lane_number')->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
         // ★ N+1解消: 全アクティブアイテムのデータを一括取得
@@ -92,12 +92,14 @@ class BidService
                 $remainingSeconds = $countdownState['remaining_seconds'] ?? $defaultCountdown;
                 $phase            = $countdownState['phase'] ?? 'bidding';
                 $preBidRemaining  = $phase === 'pre_bid' ? ($countdownState['remaining_seconds'] ?? 0) : 0;
+                $freezeTotal      = (float) ($countdownState['freeze_countdown_seconds'] ?? 1);
                 $countdownMode    = $countdownState['countdown_mode'] ?? 'default';
 
                 $laneData['current_item'] = [
                     'id'                       => $item->id,
                     'item_number'              => $item->item_number,
                     'species_name'             => $item->species_name,
+                    'seller_name'              => $item->sellerProfile?->seller_name,
                     'quantity'                 => $item->quantity,
                     'quantity_unit'            => $item->quantity_unit ?? 'fish',
                     'current_price'            => $item->current_price,
@@ -114,6 +116,7 @@ class BidService
                     'pre_bid_remaining_seconds'=> $preBidRemaining,
                     'countdown_mode'           => $countdownMode,
                     'countdown_seconds_competitive' => $countdownState['countdown_seconds_competitive'] ?? 1,
+                    'freeze_countdown_seconds' => $freezeTotal,
                     'my_limit_price'           => $myLimitPrice,
                     'my_limit_triggered'       => $myLimitTriggered,
                 ];

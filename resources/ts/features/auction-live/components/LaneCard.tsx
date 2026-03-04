@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Card, CardMedia, CardContent, CardActions,
-  Box, Typography, Chip, IconButton, CircularProgress,
+  Box, Typography, Chip, IconButton,
 } from '@mui/material';
 import { Info as InfoIcon, People as PeopleIcon } from '@mui/icons-material';
 import type { LiveLane } from '@/types';
@@ -51,7 +51,11 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         height: '100%',
         border: item.my_bid_status === 'active' ? 3 : 1,
         borderColor: item.my_bid_status === 'active' ? 'success.main' : 'divider',
+        boxShadow: item.my_bid_status === 'active'
+          ? '0 0 12px 2px rgba(46, 125, 50, 0.35)'
+          : undefined,
         position: 'relative',
+        transition: 'border-color 0.3s, box-shadow 0.3s',
       }}
     >
       {/* レーン番号バッジ */}
@@ -84,8 +88,13 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         <Typography variant="caption" color="text.secondary">
           No.{item.item_number}
         </Typography>
-        <Typography variant="h6" gutterBottom>
+        <Typography variant="h6" sx={{ lineHeight: 1.3 }}>
           {item.species_name}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+          {item.seller_name ? `出品者：${item.seller_name}` : ''}
+          {item.seller_name && item.quantity ? ' / ' : ''}
+          {item.quantity ? `数量：${item.quantity}${item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}` : ''}
         </Typography>
 
         {/* 現在単価 */}
@@ -104,12 +113,11 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
           <PreBidOverlay remainingSeconds={item.pre_bid_remaining_seconds ?? 0} />
         ) : isFreeze ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CircularProgress size={20} thickness={6} sx={{ color: 'warning.main' }} />
-              <Typography variant="caption" color="warning.main" fontWeight="bold">
-                誤タップ防止中...
-              </Typography>
-            </Box>
+            <Chip
+              label={`ブロック中 ${Math.ceil(item.freeze_remaining_seconds ?? item.countdown_seconds)}秒`}
+              size="small"
+              sx={{ bgcolor: 'grey.300', color: 'grey.700', fontWeight: 600 }}
+            />
             {item.active_bidders_count > 0 && (
               <Chip icon={<PeopleIcon />} label="入札中" size="small" color="error" />
             )}
@@ -145,6 +153,8 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
           myBidStatus={item.my_bid_status}
           isPreBid={isPreBid}
           isFreeze={isFreeze}
+          freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
+          freezeTotalSeconds={item.freeze_countdown_seconds}
           isLoading={isLoading}
           onToggle={() => onBidToggle(item.id, item.my_bid_status)}
         />
