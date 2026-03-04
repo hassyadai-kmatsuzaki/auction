@@ -114,8 +114,8 @@ export default function AuctionLive() {
     auctionId,
     onPriceUpdated: (e) => {
       applyPriceUpdated(e);
-      // 価格上昇時に自分が自動離脱対象なら my_bid_status を inactive に更新
       if (user?.id && e.auto_left_user_ids?.includes(user.id)) {
+        // 即座にキャッシュを更新（UIの即時反映）
         queryClient.setQueryData(['auction-live', auctionId], (prev: any) => {
           if (!prev) return prev;
           return {
@@ -127,10 +127,17 @@ export default function AuctionLive() {
             ),
           };
         });
+        // サーバーからも再取得して確実に同期
+        queryClient.invalidateQueries({ queryKey: ['auction-live', auctionId] });
         showSnackbar('金額が上昇しました。再度入札してください。', 'info');
       }
     },
-    onBidderUpdated: (e) => { applyBidderUpdated(e); },
+    onBidderUpdated: (e) => {
+      applyBidderUpdated(e);
+      if (e.event_type === 'left') {
+        queryClient.invalidateQueries({ queryKey: ['auction-live', auctionId] });
+      }
+    },
     onLaneChanged: (e) => { applyLaneChanged(e); },
     onCountdownTick: (e) => { applyCountdownTick(e); },
     onItemSold: (e) => {

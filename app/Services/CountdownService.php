@@ -11,6 +11,7 @@ use App\Models\BidLimitPrice;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\BidParticipant;
+use App\Events\BidderUpdated;
 use App\Events\BidLimitReached;
 use App\Events\CountdownTick;
 use App\Events\LaneItemChanged;
@@ -422,6 +423,18 @@ class CountdownService
             ));
         } catch (\Exception $e) {
             Log::warning("PriceUpdated broadcast error: " . $e->getMessage());
+        }
+
+        // 自動離脱を全クライアントに通知（入札者数の同期）
+        if (count($autoLeftUserIds) > 0) {
+            try {
+                broadcast(new BidderUpdated(
+                    $auction->id, $lane->id, $item->id,
+                    $newActiveBidderCount, 'left'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("Auto-left BidderUpdated broadcast error: " . $e->getMessage());
+            }
         }
 
         try {
