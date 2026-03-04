@@ -263,8 +263,10 @@ class CountdownService
         if ($state['remaining_seconds'] <= 0) {
             if ($activeBidderCount >= 2) {
                 // 入札者2人以上 → 価格上昇 → フリーズカウントダウン
+                // 最後に入札した人を落札権利者として他を自動離脱
                 try {
-                    $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
+                    $lastBidder = $state['last_bidder_user_id'] ?? null;
+                    $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount, $lastBidder);
                 } catch (\Exception $e) {
                     Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - starting freeze");
                     $this->startFreezeCountdown($lane);
@@ -364,7 +366,7 @@ class CountdownService
      *
      * 入札者2人以上 → 即座に価格上昇 → フリーズカウントダウン開始
      */
-    protected function handlePriceIncrement(Lane $lane, Item $item, Auction $auction, int $activeBidderCount): void
+    protected function handlePriceIncrement(Lane $lane, Item $item, Auction $auction, int $activeBidderCount, ?int $lastBidderUserId = null): void
     {
         if ($item->status !== 'live' || $activeBidderCount <= 1) {
             return;
@@ -380,6 +382,24 @@ class CountdownService
 
             \App\Models\PriceEvent::recordAutoIncrement($item->id, $oldPrice, $newPrice, $activeBidderCount);
 
+            // 落札権利者（最後に入札した人）以外を自動離脱
+            $autoLeftUserIds = [];
+            if ($lastBidderUserId) {
+                $othersToLeave = BidParticipant::forItem($item->id)
+                    ->active()
+                    ->where('user_id', '!=', $lastBidderUserId)
+                    ->get();
+
+                foreach ($othersToLeave as $participant) {
+                    $participant->deactivate();
+                    $autoLeftUserIds[] = $participant->user_id;
+                }
+
+                if (count($autoLeftUserIds) > 0) {
+                    Log::info("Auto-left users on price increment: item={$item->id}, left=" . implode(',', $autoLeftUserIds) . ", holder={$lastBidderUserId}");
+                }
+            }
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -391,12 +411,14 @@ class CountdownService
         $this->startFreezeCountdown($lane);
 
         $freshItem = $item->fresh();
+        $newActiveBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
         try {
             broadcast(new \App\Events\PriceUpdated(
                 $auction->id, $lane->id, $item->id,
-                $freshItem->current_price, $activeBidderCount,
-                $auction->getBidCountdownSeconds()
+                $freshItem->current_price, $newActiveBidderCount,
+                $auction->getBidCountdownSeconds(),
+                $autoLeftUserIds
             ));
         } catch (\Exception $e) {
             Log::warning("PriceUpdated broadcast error: " . $e->getMessage());
@@ -417,7 +439,7 @@ class CountdownService
      * 2. フリーズカウントダウンを開始
      * 3. フリーズ後に落札カウントダウンを開始
      */
-    public function handleImmediatePriceIncrement(Lane $lane, Item $item, Auction $auction): void
+    public function handleImmediatePriceIncrement(Lane $lane, Item $item, Auction $auction, ?int $lastBidderUserId = null): void
     {
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
@@ -425,7 +447,7 @@ class CountdownService
             return;
         }
 
-        $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
+        $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount, $lastBidderUserId);
     }
 
     /**

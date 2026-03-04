@@ -20,17 +20,16 @@ class PriceUpdated implements ShouldBroadcastNow
     public float $newPrice;
     public int $activeBiddersCount;
     public int $countdownSeconds;
+    public array $autoLeftUserIds;
 
-    /**
-     * Create a new event instance.
-     */
     public function __construct(
         int $auctionId,
         int $laneId,
         int $itemId,
         float $newPrice,
         int $activeBiddersCount,
-        int $countdownSeconds
+        int $countdownSeconds,
+        array $autoLeftUserIds = []
     ) {
         $this->auctionId = $auctionId;
         $this->laneId = $laneId;
@@ -38,6 +37,7 @@ class PriceUpdated implements ShouldBroadcastNow
         $this->newPrice = $newPrice;
         $this->activeBiddersCount = $activeBiddersCount;
         $this->countdownSeconds = $countdownSeconds;
+        $this->autoLeftUserIds = $autoLeftUserIds;
     }
 
     /**
@@ -73,6 +73,7 @@ class PriceUpdated implements ShouldBroadcastNow
             'new_price' => $this->newPrice,
             'active_bidders_count' => $this->activeBiddersCount,
             'countdown_seconds' => $this->countdownSeconds,
+            'auto_left_user_ids' => $this->autoLeftUserIds,
         ];
     }
 }

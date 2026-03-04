@@ -9,6 +9,7 @@ export interface PriceUpdatedEvent {
   new_price: number;
   active_bidders_count: number;
   countdown_seconds: number;
+  auto_left_user_ids?: number[];
 }
 
 export interface BidderUpdatedEvent {

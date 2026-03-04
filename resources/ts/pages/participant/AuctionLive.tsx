@@ -112,7 +112,24 @@ export default function AuctionLive() {
   // WebSocketイベント購読
   useAuctionSocket({
     auctionId,
-    onPriceUpdated: (e) => { applyPriceUpdated(e); },
+    onPriceUpdated: (e) => {
+      applyPriceUpdated(e);
+      // 価格上昇時に自分が自動離脱対象なら my_bid_status を inactive に更新
+      if (user?.id && e.auto_left_user_ids?.includes(user.id)) {
+        queryClient.setQueryData(['auction-live', auctionId], (prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            lanes: prev.lanes.map((lane: any) =>
+              lane.current_item?.id === e.item_id
+                ? { ...lane, current_item: { ...lane.current_item, my_bid_status: 'inactive' } }
+                : lane
+            ),
+          };
+        });
+        showSnackbar('金額が上昇しました。再度入札してください。', 'info');
+      }
+    },
     onBidderUpdated: (e) => { applyBidderUpdated(e); },
     onLaneChanged: (e) => { applyLaneChanged(e); },
     onCountdownTick: (e) => { applyCountdownTick(e); },

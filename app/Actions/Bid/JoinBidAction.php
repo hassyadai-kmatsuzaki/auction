@@ -75,18 +75,26 @@ class JoinBidAction
             throw $e;
         }
 
-        // トランザクション外でブロードキャスト（失敗してもロールバックしない）
+        // カウントダウンキャッシュに最後の入札者を記録
         if ($lane) {
+            $cacheKey = "countdown:lane:{$lane->id}";
+            $state = Cache::get($cacheKey);
+            if ($state) {
+                $state['last_bidder_user_id'] = $userId;
+                Cache::put($cacheKey, $state, 3600);
+            }
+
             broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'joined'))
                 ->toOthers();
         }
 
         // 入札者が2人以上になった場合、即座に価格上昇 → フリーズカウントダウン
+        // 最後に入札した人（このユーザー）が落札権利者となり、他の入札者は自動離脱
         if ($activeBidderCount >= 2 && $lane) {
             try {
                 $lane->load('auction');
                 $countdownService = app(CountdownService::class);
-                $countdownService->handleImmediatePriceIncrement($lane, $item->fresh(), $auction);
+                $countdownService->handleImmediatePriceIncrement($lane, $item->fresh(), $auction, $userId);
             } catch (\Exception $e) {
                 Log::error("Immediate price increment error on join: " . $e->getMessage());
             }
