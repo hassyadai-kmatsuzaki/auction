@@ -187,6 +187,7 @@ class SystemSetting extends BaseModel
                 ['from_price' => 10000, 'to_price' => 49999, 'increment_amount' => 1000],
                 ['from_price' => 50000, 'to_price' => null,  'increment_amount' => 5000],
             ]),
+            'countdown_tiers' => self::get('default_countdown_tiers', []),
         ];
     }
 

@@ -64,9 +64,9 @@ class CountdownService
             return;
         }
         
-        $auctionSettings = $auction->getAuctionSettings();
-        $bidSeconds    = (float) ($auctionSettings['bid_countdown_seconds'] ?? 5);
-        $freezeSeconds = (float) ($auctionSettings['freeze_countdown_seconds'] ?? 1);
+        $countdownSeconds = $auction->calculateCountdownSeconds($item->current_price);
+        $bidSeconds    = $countdownSeconds['bid_countdown_seconds'];
+        $freezeSeconds = $countdownSeconds['freeze_countdown_seconds'];
 
         $cacheData = [
             'lane_id' => $lane->id,
@@ -105,8 +105,9 @@ class CountdownService
 
         $auctionSettings = $auction->getAuctionSettings();
         $preBidDelay   = (float) ($auctionSettings['item_switch_delay_seconds'] ?? 5);
-        $bidSeconds    = (float) ($auctionSettings['bid_countdown_seconds'] ?? 5);
-        $freezeSeconds = (float) ($auctionSettings['freeze_countdown_seconds'] ?? 1);
+        $countdownSeconds = $auction->calculateCountdownSeconds($item->current_price);
+        $bidSeconds    = $countdownSeconds['bid_countdown_seconds'];
+        $freezeSeconds = $countdownSeconds['freeze_countdown_seconds'];
 
         if ($preBidDelay <= 0) {
             $this->startCountdown($lane);
@@ -148,6 +149,17 @@ class CountdownService
         $state = Cache::get($this->getCacheKey($lane->id));
         if (!$state) {
             return;
+        }
+
+        // 新しい価格に基づいてカウントダウン秒数を再計算
+        $lane->load(['currentItem', 'auction']);
+        $item = $lane->currentItem;
+        $auction = $lane->auction;
+
+        if ($item && $auction) {
+            $countdownSeconds = $auction->calculateCountdownSeconds($item->current_price);
+            $state['bid_countdown_seconds']    = $countdownSeconds['bid_countdown_seconds'];
+            $state['freeze_countdown_seconds'] = $countdownSeconds['freeze_countdown_seconds'];
         }
 
         $freezeSeconds = (float) ($state['freeze_countdown_seconds'] ?? 1);
@@ -236,10 +248,10 @@ class CountdownService
         // ========= 入札カウントダウンフェーズ（bidding） =========
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
-        // オークション設定の同期（途中変更対応）
-        $liveSettings      = $auction->getAuctionSettings();
-        $latestBid         = (float) ($liveSettings['bid_countdown_seconds'] ?? 5);
-        $latestFreeze      = (float) ($liveSettings['freeze_countdown_seconds'] ?? 1);
+        // オークション設定の同期（金額帯テーブル対応・途中変更対応）
+        $latestCountdown = $auction->calculateCountdownSeconds($item->current_price);
+        $latestBid       = $latestCountdown['bid_countdown_seconds'];
+        $latestFreeze    = $latestCountdown['freeze_countdown_seconds'];
 
         if (($state['bid_countdown_seconds'] ?? null) != $latestBid) {
             $state['bid_countdown_seconds']    = $latestBid;
@@ -414,11 +426,13 @@ class CountdownService
         $freshItem = $item->fresh();
         $newActiveBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
+        $newCountdown = $auction->calculateCountdownSeconds($freshItem->current_price);
+
         try {
             broadcast(new \App\Events\PriceUpdated(
                 $auction->id, $lane->id, $item->id,
                 $freshItem->current_price, $newActiveBidderCount,
-                $auction->getBidCountdownSeconds(),
+                $newCountdown['bid_countdown_seconds'],
                 $autoLeftUserIds
             ));
         } catch (\Exception $e) {

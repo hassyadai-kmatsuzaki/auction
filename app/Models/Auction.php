@@ -304,19 +304,69 @@ class Auction extends BaseModel
     }
 
     /**
-     * フリーズ（誤タップ防止）カウントダウン秒数を取得
+     * 金額帯別カウントダウン秒数テーブルを取得
      */
-    public function getFreezeCountdownSeconds(): float
+    public function getCountdownTiers(): array
     {
-        return (float) ($this->getAuctionSettings()['freeze_countdown_seconds'] ?? 1);
+        return $this->getAuctionSettings()['countdown_tiers'] ?? [];
     }
 
     /**
-     * 落札カウントダウン秒数を取得
+     * 現在価格に基づいてカウントダウン秒数を計算（金額帯別テーブル方式）
+     *
+     * テーブルが設定されている場合はテーブルから取得、
+     * 未設定の場合は従来の単一値設定にフォールバック
+     *
+     * @return array{bid_countdown_seconds: float, freeze_countdown_seconds: float}
+     */
+    public function calculateCountdownSeconds(float $currentPrice): array
+    {
+        $tiers = $this->getCountdownTiers();
+
+        if (!empty($tiers)) {
+            foreach ($tiers as $tier) {
+                $from = (float) ($tier['from_price'] ?? 0);
+                $to   = $tier['to_price'] ?? null;
+
+                if ($currentPrice >= $from && ($to === null || $currentPrice <= $to)) {
+                    return [
+                        'bid_countdown_seconds'    => (float) ($tier['bid_countdown_seconds'] ?? $this->getFallbackBidCountdownSeconds()),
+                        'freeze_countdown_seconds' => (float) ($tier['freeze_countdown_seconds'] ?? $this->getFallbackFreezeCountdownSeconds()),
+                    ];
+                }
+            }
+        }
+
+        return [
+            'bid_countdown_seconds'    => $this->getFallbackBidCountdownSeconds(),
+            'freeze_countdown_seconds' => $this->getFallbackFreezeCountdownSeconds(),
+        ];
+    }
+
+    /**
+     * フリーズ（誤タップ防止）カウントダウン秒数を取得（単一値フォールバック）
+     */
+    public function getFreezeCountdownSeconds(): float
+    {
+        return $this->getFallbackFreezeCountdownSeconds();
+    }
+
+    /**
+     * 落札カウントダウン秒数を取得（単一値フォールバック）
      */
     public function getBidCountdownSeconds(): float
     {
+        return $this->getFallbackBidCountdownSeconds();
+    }
+
+    private function getFallbackBidCountdownSeconds(): float
+    {
         return (float) ($this->getAuctionSettings()['bid_countdown_seconds'] ?? 5);
+    }
+
+    private function getFallbackFreezeCountdownSeconds(): float
+    {
+        return (float) ($this->getAuctionSettings()['freeze_countdown_seconds'] ?? 1);
     }
 
     /**

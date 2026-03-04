@@ -173,6 +173,7 @@ export default function AuctionForm() {
                           post_sale_display_seconds: defaults.auction_settings.post_sale_display_seconds ?? 2,
                           auction_start_countdown_seconds: defaults.auction_settings.auction_start_countdown_seconds ?? 10,
                           price_increment_tiers: defaults.auction_settings.price_increment_tiers ?? [],
+                          countdown_tiers: defaults.auction_settings.countdown_tiers ?? [],
                         } as any);
                         if (defaults.fee_settings) setCustomFee({ ...defaults.fee_settings });
                         if (defaults.shipping_settings) setCustomShipping({ ...defaults.shipping_settings });
@@ -281,6 +282,85 @@ export default function AuctionForm() {
                   increment_amount: last?.increment_amount ?? 100,
                 });
                 setCustomAuction({ price_increment_tiers: tiers } as any);
+              }}>+ 行を追加</Button>
+
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>金額帯別カウントダウン秒数テーブル</Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>現在の価格に応じてカウントダウン秒数が変わります。空の場合は上記の単一値設定が使用されます。</Alert>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>下限金額</TableCell>
+                      <TableCell>上限金額</TableCell>
+                      <TableCell>落札カウント（秒）</TableCell>
+                      <TableCell>フリーズ（秒）</TableCell>
+                      <TableCell width={80} />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(formData.custom_auction_settings.countdown_tiers ?? []).map((tier: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.from_price}
+                            InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
+                              tiers[idx] = { ...tiers[idx], from_price: parseInt(e.target.value) || 0 };
+                              setCustomAuction({ countdown_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.to_price ?? ''} placeholder="上限なし"
+                            InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              tiers[idx] = { ...tiers[idx], to_price: val };
+                              setCustomAuction({ countdown_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.bid_countdown_seconds}
+                            InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                            inputProps={{ step: 0.5, min: 0.5 }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
+                              tiers[idx] = { ...tiers[idx], bid_countdown_seconds: parseFloat(e.target.value) || 5 };
+                              setCustomAuction({ countdown_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.freeze_countdown_seconds}
+                            InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                            inputProps={{ step: 0.5, min: 0.5 }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
+                              tiers[idx] = { ...tiers[idx], freeze_countdown_seconds: parseFloat(e.target.value) || 1 };
+                              setCustomAuction({ countdown_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" color="error" onClick={() => {
+                            const tiers = (formData.custom_auction_settings.countdown_tiers ?? []).filter((_: any, i: number) => i !== idx);
+                            setCustomAuction({ countdown_tiers: tiers } as any);
+                          }}>×</IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Button size="small" sx={{ mt: 1 }} onClick={() => {
+                const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
+                const last = tiers[tiers.length - 1];
+                tiers.push({
+                  from_price: last ? (last.to_price ?? last.from_price) + 1 : 0,
+                  to_price: null,
+                  bid_countdown_seconds: last?.bid_countdown_seconds ?? 5,
+                  freeze_countdown_seconds: last?.freeze_countdown_seconds ?? 1,
+                });
+                setCustomAuction({ countdown_tiers: tiers } as any);
               }}>+ 行を追加</Button>
 
               <Divider sx={{ my: 3 }} />

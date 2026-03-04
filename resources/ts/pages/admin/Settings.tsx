@@ -25,6 +25,13 @@ interface PriceIncrementTier {
   increment_amount: number;
 }
 
+interface CountdownTier {
+  from_price: number;
+  to_price: number | null;
+  bid_countdown_seconds: number;
+  freeze_countdown_seconds: number;
+}
+
 interface SettingsState {
   // システム
   site_name: string; contact_email: string; contact_phone: string; business_hours: string;
@@ -58,6 +65,14 @@ const DEFAULT_PRICE_INCREMENT_TIERS: PriceIncrementTier[] = [
   { from_price: 50000, to_price: null, increment_amount: 5000 },
 ];
 
+const DEFAULT_COUNTDOWN_TIERS: CountdownTier[] = [
+  { from_price: 0, to_price: 999, bid_countdown_seconds: 5, freeze_countdown_seconds: 1 },
+  { from_price: 1000, to_price: 4999, bid_countdown_seconds: 5, freeze_countdown_seconds: 1 },
+  { from_price: 5000, to_price: 9999, bid_countdown_seconds: 5, freeze_countdown_seconds: 1 },
+  { from_price: 10000, to_price: 49999, bid_countdown_seconds: 5, freeze_countdown_seconds: 1 },
+  { from_price: 50000, to_price: null, bid_countdown_seconds: 5, freeze_countdown_seconds: 1 },
+];
+
 const DEFAULT_SETTINGS: SettingsState = {
   site_name: '', contact_email: '', contact_phone: '', business_hours: '',
   price_increment_rate: '10', price_increment_min: '50', countdown_seconds: '3',
@@ -84,6 +99,7 @@ export default function AdminSettings() {
   const [editShippingDialog, setEditShippingDialog]   = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
   const [incrementTiers, setIncrementTiers]           = useState<PriceIncrementTier[]>(DEFAULT_PRICE_INCREMENT_TIERS);
+  const [countdownTiers, setCountdownTiers]           = useState<CountdownTier[]>(DEFAULT_COUNTDOWN_TIERS);
 
   const { rawSettings, isLoading, isSaving, save } = useSettings();
 
@@ -142,6 +158,7 @@ export default function AdminSettings() {
     });
     if (d.shipping?.shipping_rates?.value) setShippingRates(d.shipping.shipping_rates.value);
     if (d.auction?.default_price_increment_tiers?.value) setIncrementTiers(d.auction.default_price_increment_tiers.value);
+    if (d.auction?.default_countdown_tiers?.value) setCountdownTiers(d.auction.default_countdown_tiers.value);
   }, [rawSettings]);
 
   const handleSubmit = () => {
@@ -151,6 +168,7 @@ export default function AdminSettings() {
       auto_generate_invoice:        s.auto_generate_invoice,
       auto_generate_payment_notice: s.auto_generate_payment_notice,
       default_price_increment_tiers: incrementTiers,
+      default_countdown_tiers: countdownTiers,
     });
   };
 
@@ -303,6 +321,82 @@ export default function AdminSettings() {
                 </Grid>
               ))}
             </Grid>
+
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>金額帯別カウントダウン秒数テーブル</Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>現在の価格に応じてカウントダウン秒数が変わります。空の場合は上記の単一値設定が使用されます。</Alert>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>下限金額</TableCell>
+                    <TableCell>上限金額</TableCell>
+                    <TableCell>落札カウント（秒）</TableCell>
+                    <TableCell>フリーズ（秒）</TableCell>
+                    <TableCell width={80} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {countdownTiers.map((tier, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.from_price}
+                          InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                          onChange={(e) => {
+                            const next = [...countdownTiers];
+                            next[idx] = { ...next[idx], from_price: parseInt(e.target.value) || 0 };
+                            setCountdownTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.to_price ?? ''} placeholder="上限なし"
+                          InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                          onChange={(e) => {
+                            const next = [...countdownTiers];
+                            const val = e.target.value === '' ? null : parseInt(e.target.value);
+                            next[idx] = { ...next[idx], to_price: val };
+                            setCountdownTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.bid_countdown_seconds}
+                          InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                          inputProps={{ step: 0.5, min: 0.5 }}
+                          onChange={(e) => {
+                            const next = [...countdownTiers];
+                            next[idx] = { ...next[idx], bid_countdown_seconds: parseFloat(e.target.value) || 5 };
+                            setCountdownTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.freeze_countdown_seconds}
+                          InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
+                          inputProps={{ step: 0.5, min: 0.5 }}
+                          onChange={(e) => {
+                            const next = [...countdownTiers];
+                            next[idx] = { ...next[idx], freeze_countdown_seconds: parseFloat(e.target.value) || 1 };
+                            setCountdownTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="error" onClick={() => {
+                          setCountdownTiers(countdownTiers.filter((_, i) => i !== idx));
+                        }}>×</IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Button size="small" sx={{ mt: 1 }} onClick={() => {
+              const last = countdownTiers[countdownTiers.length - 1];
+              setCountdownTiers([...countdownTiers, {
+                from_price: last ? (last.to_price ?? last.from_price) + 1 : 0,
+                to_price: null,
+                bid_countdown_seconds: last?.bid_countdown_seconds ?? 5,
+                freeze_countdown_seconds: last?.freeze_countdown_seconds ?? 1,
+              }]);
+            }}>+ 行を追加</Button>
 
             <Divider sx={{ my: 3 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>会場・レーン設定</Typography>

@@ -28,6 +28,7 @@ export interface AuctionFormData {
     post_sale_display_seconds: number;
     auction_start_countdown_seconds: number;
     price_increment_tiers: Array<{ from_price: number; to_price: number | null; increment_amount: number }>;
+    countdown_tiers: Array<{ from_price: number; to_price: number | null; bid_countdown_seconds: number; freeze_countdown_seconds: number }>;
   };
   custom_fee_settings: {
     seller_commission_rate: number;
@@ -78,6 +79,7 @@ const DEFAULT_FORM_DATA: AuctionFormData = {
       { from_price: 10000, to_price: 49999, increment_amount: 1000 },
       { from_price: 50000, to_price: null, increment_amount: 5000 },
     ],
+    countdown_tiers: [],
   },
   custom_fee_settings: {
     seller_commission_rate: 10,
