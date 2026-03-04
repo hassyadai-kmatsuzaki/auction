@@ -26,6 +26,7 @@ import { ItemDetailDialog } from '../../features/auction-live/components/ItemDet
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { ConsentOverlay } from '../../features/auction-live/components/ConsentOverlay';
 import { WaitingRoom, EntranceBlocked, StartingCountdown } from '../../features/auction-live/components/WaitingRoom';
+import { UpcomingItems } from '../../features/auction-live/components/UpcomingItems';
 import type { LiveLane, LaneItem } from '../../types';
 
 interface CelebrationItem {
@@ -402,6 +403,10 @@ export default function AuctionLive() {
                     showSnackbar('入札開始待機中です。もう少々お待ちください。', 'error');
                     return;
                   }
+                  if (item?.phase === 'freeze') {
+                    showSnackbar('誤タップ防止中です。もう少々お待ちください。', 'error');
+                    return;
+                  }
                   handleBidToggle(itemId, status);
                 }}
                 onDetailOpen={(l) => setDetailLane(l)}
@@ -413,6 +418,9 @@ export default function AuctionLive() {
             </Grid>
           ))}
         </Grid>
+
+        {/* 次の商品 */}
+        <UpcomingItems lanes={liveState.lanes} />
 
         {/* 自分の入札状況 */}
         <MyBidStatus

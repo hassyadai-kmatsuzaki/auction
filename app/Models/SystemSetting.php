@@ -176,6 +176,17 @@ class SystemSetting extends BaseModel
             'default_bid_increment' => self::get('default_bid_increment', 100),
             'venue_open_minutes_before_start' => self::get('venue_open_minutes_before_start', 30),
             'item_switch_delay_seconds' => self::get('item_switch_delay_seconds', 5),
+            'freeze_countdown_seconds' => self::get('freeze_countdown_seconds', 1),
+            'bid_countdown_seconds' => self::get('bid_countdown_seconds', 5),
+            'post_sale_display_seconds' => self::get('post_sale_display_seconds', 2),
+            'auction_start_countdown_seconds' => self::get('auction_start_countdown_seconds', 10),
+            'price_increment_tiers' => self::get('default_price_increment_tiers', [
+                ['from_price' => 0,     'to_price' => 999,   'increment_amount' => 50],
+                ['from_price' => 1000,  'to_price' => 4999,  'increment_amount' => 100],
+                ['from_price' => 5000,  'to_price' => 9999,  'increment_amount' => 500],
+                ['from_price' => 10000, 'to_price' => 49999, 'increment_amount' => 1000],
+                ['from_price' => 50000, 'to_price' => null,  'increment_amount' => 5000],
+            ]),
         ];
     }
 

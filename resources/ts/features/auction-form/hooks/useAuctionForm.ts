@@ -21,9 +21,13 @@ export interface AuctionFormData {
     countdown_seconds: number;
     countdown_seconds_default: number;
     countdown_seconds_competitive: number;
-    auto_extend_seconds: number;
     venue_open_minutes_before_start: number;
     item_switch_delay_seconds: number;
+    freeze_countdown_seconds: number;
+    bid_countdown_seconds: number;
+    post_sale_display_seconds: number;
+    auction_start_countdown_seconds: number;
+    price_increment_tiers: Array<{ from_price: number; to_price: number | null; increment_amount: number }>;
   };
   custom_fee_settings: {
     seller_commission_rate: number;
@@ -61,9 +65,19 @@ const DEFAULT_FORM_DATA: AuctionFormData = {
     countdown_seconds: 3,
     countdown_seconds_default: 10,
     countdown_seconds_competitive: 1,
-    auto_extend_seconds: 10,
     venue_open_minutes_before_start: 30,
     item_switch_delay_seconds: 5,
+    freeze_countdown_seconds: 1,
+    bid_countdown_seconds: 5,
+    post_sale_display_seconds: 2,
+    auction_start_countdown_seconds: 10,
+    price_increment_tiers: [
+      { from_price: 0, to_price: 999, increment_amount: 50 },
+      { from_price: 1000, to_price: 4999, increment_amount: 100 },
+      { from_price: 5000, to_price: 9999, increment_amount: 500 },
+      { from_price: 10000, to_price: 49999, increment_amount: 1000 },
+      { from_price: 50000, to_price: null, increment_amount: 5000 },
+    ],
   },
   custom_fee_settings: {
     seller_commission_rate: 10,
@@ -165,10 +179,10 @@ export function useAuctionForm(auctionId?: number) {
       description:              formData.description,
       default_bid_increment:    formData.default_bid_increment,
       countdown_seconds:        formData.countdown_seconds,
-      deposit_required:         formData.deposit_required,
+      deposit_required:         false,
       upload_deadline:          formatLocalDateTime(formData.upload_deadline),
-      payment_deadline_hours:   formData.payment_deadline_hours,
-      shipping_deadline_hours:  formData.shipping_deadline_hours,
+      payment_deadline_hours:   24,
+      shipping_deadline_hours:  48,
       use_custom_settings:      formData.use_custom_settings,
       custom_auction_settings:  formData.use_custom_settings ? formData.custom_auction_settings : null,
       custom_fee_settings:      formData.use_custom_settings ? formData.custom_fee_settings : null,

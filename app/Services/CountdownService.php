@@ -47,11 +47,10 @@ class CountdownService
 
     /**
      * カウントダウンを開始
-     * 新商品が表示された直後 → 入札者0人なので「通常（default）」秒数を使用
+     * 新商品が表示された直後 → 落札カウントダウンを使用
      */
     public function startCountdown(Lane $lane): void
     {
-        // リレーションをロード
         $lane->load(['currentItem', 'auction']);
         
         $item = $lane->currentItem;
@@ -65,32 +64,25 @@ class CountdownService
         }
         
         $auctionSettings = $auction->getAuctionSettings();
-        // 通常カウントダウン（0〜1人入札時）
-        $defaultSeconds = $auctionSettings['countdown_seconds_default']
-            ?? $auctionSettings['countdown_seconds']
-            ?? 10;
-        // 競合カウントダウン（2人以上入札時）
-        $competitiveSeconds = $auctionSettings['countdown_seconds_competitive'] ?? 1;
+        $bidSeconds    = (float) ($auctionSettings['bid_countdown_seconds'] ?? 5);
+        $freezeSeconds = (float) ($auctionSettings['freeze_countdown_seconds'] ?? 1);
 
         $cacheData = [
             'lane_id' => $lane->id,
             'item_id' => $item->id,
             'auction_id' => $auction->id,
             'phase' => 'bidding',
-            'remaining_seconds' => $defaultSeconds,
+            'remaining_seconds' => $bidSeconds,
             'started_at' => now()->timestamp,
-            'countdown_seconds' => $defaultSeconds,
-            'countdown_seconds_default' => $defaultSeconds,
-            'countdown_seconds_competitive' => $competitiveSeconds,
-            'countdown_mode' => 'default', // 'default' or 'competitive'
+            'bid_countdown_seconds' => $bidSeconds,
+            'freeze_countdown_seconds' => $freezeSeconds,
             'is_running' => true,
             'pre_bid_remaining_seconds' => 0,
         ];
         
-        // カウントダウン状態をキャッシュに保存
-        Cache::put($this->getCacheKey($lane->id), $cacheData, 3600); // 1時間
+        Cache::put($this->getCacheKey($lane->id), $cacheData, 3600);
 
-        Log::info("Countdown started: lane {$lane->id}, item {$item->id}, default={$defaultSeconds}s, competitive={$competitiveSeconds}s");
+        Log::info("Countdown started: lane {$lane->id}, item {$item->id}, bid={$bidSeconds}s, freeze={$freezeSeconds}s");
     }
 
     /**
@@ -111,13 +103,10 @@ class CountdownService
         }
 
         $auctionSettings = $auction->getAuctionSettings();
-        $preBidDelay = $auctionSettings['item_switch_delay_seconds'] ?? 5;
-        $defaultSeconds = $auctionSettings['countdown_seconds_default']
-            ?? $auctionSettings['countdown_seconds']
-            ?? 10;
-        $competitiveSeconds = $auctionSettings['countdown_seconds_competitive'] ?? 1;
+        $preBidDelay   = (float) ($auctionSettings['item_switch_delay_seconds'] ?? 5);
+        $bidSeconds    = (float) ($auctionSettings['bid_countdown_seconds'] ?? 5);
+        $freezeSeconds = (float) ($auctionSettings['freeze_countdown_seconds'] ?? 1);
 
-        // 待機秒数が0の場合は即入札カウントダウンを開始
         if ($preBidDelay <= 0) {
             $this->startCountdown($lane);
             return;
@@ -130,10 +119,8 @@ class CountdownService
             'phase' => 'pre_bid',
             'remaining_seconds' => $preBidDelay,
             'started_at' => now()->timestamp,
-            'countdown_seconds' => $defaultSeconds,
-            'countdown_seconds_default' => $defaultSeconds,
-            'countdown_seconds_competitive' => $competitiveSeconds,
-            'countdown_mode' => 'default',
+            'bid_countdown_seconds' => $bidSeconds,
+            'freeze_countdown_seconds' => $freezeSeconds,
             'is_running' => true,
             'pre_bid_remaining_seconds' => $preBidDelay,
         ];
@@ -152,26 +139,54 @@ class CountdownService
     }
 
     /**
-     * カウントダウンをリセット（価格上昇時）
-     * 価格上昇は入札者2人以上の時に発生するため、競合秒数を使用
+     * 価格上昇後にフリーズカウントダウンを開始
+     * フリーズ → 落札カウントダウンの2段階
      */
-    public function resetCountdown(Lane $lane): void
+    public function startFreezeCountdown(Lane $lane): void
     {
         $state = Cache::get($this->getCacheKey($lane->id));
         if (!$state) {
             return;
         }
 
-        // 競合秒数を使用（価格上昇後 = 入札者2人以上）
-        $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
+        $freezeSeconds = (float) ($state['freeze_countdown_seconds'] ?? 1);
 
-        $state['remaining_seconds'] = $competitiveSeconds;
-        $state['countdown_mode'] = 'competitive';
+        $state['phase'] = 'freeze';
+        $state['remaining_seconds'] = $freezeSeconds;
         $state['started_at'] = now()->timestamp;
 
         Cache::put($this->getCacheKey($lane->id), $state, 3600);
 
-        Log::info("Countdown reset (competitive): lane {$lane->id}, {$competitiveSeconds}s");
+        Log::info("Freeze countdown started: lane {$lane->id}, {$freezeSeconds}s");
+    }
+
+    /**
+     * フリーズ終了後に落札カウントダウンを開始
+     */
+    public function startBidCountdown(Lane $lane): void
+    {
+        $state = Cache::get($this->getCacheKey($lane->id));
+        if (!$state) {
+            return;
+        }
+
+        $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
+
+        $state['phase'] = 'bidding';
+        $state['remaining_seconds'] = $bidSeconds;
+        $state['started_at'] = now()->timestamp;
+
+        Cache::put($this->getCacheKey($lane->id), $state, 3600);
+
+        Log::info("Bid countdown started: lane {$lane->id}, {$bidSeconds}s");
+    }
+
+    /**
+     * @deprecated 後方互換用 — startFreezeCountdown を使用
+     */
+    public function resetCountdown(Lane $lane): void
+    {
+        $this->startFreezeCountdown($lane);
     }
 
     /**
@@ -182,6 +197,12 @@ class CountdownService
      *   1. どのパスを通っても必ずキャッシュを更新する（or 明示的にstop/restart）
      *   2. 例外が発生してもレーンが止まらない（catchで復旧を試みる）
      *   3. カウントダウン終了後の moveToNextItem はトランザクション外でカウントダウンを開始
+     *
+     * ■ 2段階カウントダウン:
+     *   phase: 'pre_bid' → 'freeze' → 'bidding' → (落札/流札)
+     *   - pre_bid: 商品切り替え後の待機
+     *   - freeze: 誤タップ防止（ボタン無効化）
+     *   - bidding: 入札受付カウントダウン
      */
     public function tick(int $laneId): ?array
     {
@@ -199,52 +220,40 @@ class CountdownService
         $item = $lane->currentItem;
         $auction = $lane->auction;
 
-        // 入札開始待機フェーズの処理
         $phase = $state['phase'] ?? 'bidding';
+
+        // 入札開始待機フェーズ
         if ($phase === 'pre_bid') {
             return $this->tickPreBid($laneId, $lane, $item, $auction, $state);
         }
 
-        $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
-
-        // ========= オークション設定の同期（途中変更対応） =========
-        // $auction は毎tick Lane::with(['auction'])->find() で取得済みなのでDB追加クエリなし
-        $liveSettings       = $auction->getAuctionSettings();
-        $latestDefault      = $liveSettings['countdown_seconds_default'] ?? $liveSettings['countdown_seconds'] ?? 10;
-        $latestCompetitive  = $liveSettings['countdown_seconds_competitive'] ?? 1;
-
-        // キャッシュの設定値が古い場合は更新
-        if (($state['countdown_seconds_competitive'] ?? null) != $latestCompetitive) {
-            $state['countdown_seconds_competitive'] = $latestCompetitive;
-            $state['countdown_seconds_default']     = $latestDefault;
+        // フリーズ（誤タップ防止）フェーズ
+        if ($phase === 'freeze') {
+            return $this->tickFreeze($laneId, $lane, $item, $auction, $state);
         }
 
-        $currentMode       = $state['countdown_mode'] ?? 'default';
-        $defaultSeconds    = $state['countdown_seconds_default'] ?? 10;
-        $competitiveSeconds = $state['countdown_seconds_competitive'] ?? 1;
+        // ========= 入札カウントダウンフェーズ（bidding） =========
+        $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
-        // モード切り替えは「切り替え時のみ」remaining_seconds を上書き
-        if ($activeBidderCount >= 2 && $currentMode === 'default') {
-            $state['countdown_mode']    = 'competitive';
-            $state['remaining_seconds'] = $competitiveSeconds;
-        } elseif ($activeBidderCount < 2 && $currentMode === 'competitive') {
-            $state['countdown_mode']    = 'default';
-            $state['remaining_seconds'] = $defaultSeconds;
+        // オークション設定の同期（途中変更対応）
+        $liveSettings      = $auction->getAuctionSettings();
+        $latestBid         = (float) ($liveSettings['bid_countdown_seconds'] ?? 5);
+        $latestFreeze      = (float) ($liveSettings['freeze_countdown_seconds'] ?? 1);
+
+        if (($state['bid_countdown_seconds'] ?? null) != $latestBid) {
+            $state['bid_countdown_seconds']    = $latestBid;
+            $state['freeze_countdown_seconds'] = $latestFreeze;
         }
 
         // カウントダウンを0.5秒減らす
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
-        // ★ ブロードキャストする表示値を決定
-        // 競合中は常に competitiveSeconds を表示値として送信（点滅防止）
-        // フロントは Math.ceil で整数秒表示するので安定する
-        $displaySeconds = $state['remaining_seconds'];
-
         try {
             broadcast(new CountdownTick(
                 $auction->id, $lane->id, $item->id,
-                (float) $displaySeconds,
-                $activeBidderCount, $item->current_price
+                (float) $state['remaining_seconds'],
+                $activeBidderCount, $item->current_price,
+                'bidding'
             ));
         } catch (\Exception $e) {
             Log::warning("Broadcast error lane {$laneId}: " . $e->getMessage());
@@ -253,12 +262,12 @@ class CountdownService
         // カウントダウン終了時の処理
         if ($state['remaining_seconds'] <= 0) {
             if ($activeBidderCount >= 2) {
-                // 入札者2人以上 → 価格上昇してカウントダウンリセット
+                // 入札者2人以上 → 価格上昇 → フリーズカウントダウン
                 try {
                     $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
                 } catch (\Exception $e) {
-                    Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - resetting countdown");
-                    $this->resetCountdown($lane);
+                    Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - starting freeze");
+                    $this->startFreezeCountdown($lane);
                 }
                 return ['action' => 'price_increment', 'lane_id' => $laneId];
             } else {
@@ -267,16 +276,15 @@ class CountdownService
                     return $this->handleCountdownEnd($lane, $item, $auction, $activeBidderCount);
                 } catch (\Exception $e) {
                     Log::error("Countdown end FAILED lane {$laneId}: {$e->getMessage()} - attempting recovery");
-                    // 復旧: カウントダウンをdefaultに再設定して止まらないようにする
-                    $state['remaining_seconds'] = $defaultSeconds;
-                    $state['countdown_mode'] = 'default';
+                    $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
+                    $state['remaining_seconds'] = $bidSeconds;
+                    $state['phase'] = 'bidding';
                     Cache::put($this->getCacheKey($laneId), $state, 3600);
                     return ['action' => 'recovery', 'lane_id' => $laneId];
                 }
             }
         }
 
-        // ★ 重要: どのパスを通っても必ずキャッシュを更新する
         Cache::put($this->getCacheKey($laneId), $state, 3600);
 
         return ['action' => 'tick', 'remaining_seconds' => $state['remaining_seconds']];
@@ -287,50 +295,74 @@ class CountdownService
      */
     protected function tickPreBid(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
     {
-        // 0.5秒減算
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
         $state['pre_bid_remaining_seconds'] = $state['remaining_seconds'];
 
-        // pre_bidフェーズ用のブロードキャスト（0.5秒ごと）
         broadcast(new CountdownTick(
-            $auction->id,
-            $lane->id,
-            $item->id,
+            $auction->id, $lane->id, $item->id,
             (float) $state['remaining_seconds'],
-            0, // pre_bid中は入札者数0
-            $item->current_price,
-            'pre_bid' // フェーズ情報
+            0, $item->current_price,
+            'pre_bid'
         ));
 
         if ($state['remaining_seconds'] <= 0) {
-            // 待機完了 → 入札カウントダウンに移行（開始時は通常秒数を使用）
-            $defaultSeconds = $state['countdown_seconds_default'] ?? $state['countdown_seconds'] ?? 10;
+            $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
             $state['phase'] = 'bidding';
-            $state['remaining_seconds'] = (float) $defaultSeconds;
-            $state['countdown_mode'] = 'default';
+            $state['remaining_seconds'] = $bidSeconds;
             $state['pre_bid_remaining_seconds'] = 0;
             $state['started_at'] = now()->timestamp;
 
             Cache::put($this->getCacheKey($laneId), $state, 3600);
 
-            Log::info("Pre-bid ended, bidding started: lane {$laneId}, item {$item->id}, countdown={$defaultSeconds}s");
+            Log::info("Pre-bid ended, bidding started: lane {$laneId}, item {$item->id}, countdown={$bidSeconds}s");
 
-            return [
-                'action' => 'pre_bid_end',
-                'lane_id' => $laneId,
-            ];
+            return ['action' => 'pre_bid_end', 'lane_id' => $laneId];
         }
 
         Cache::put($this->getCacheKey($laneId), $state, 3600);
 
-        return [
-            'action' => 'pre_bid_tick',
-            'remaining_seconds' => $state['remaining_seconds'],
-        ];
+        return ['action' => 'pre_bid_tick', 'remaining_seconds' => $state['remaining_seconds']];
     }
 
     /**
-     * 価格上昇処理（BidServiceに依存せず直接実装）
+     * フリーズ（誤タップ防止）フェーズのティック処理（0.5秒ごと）
+     * フリーズ中は入札ボタンが無効化される
+     */
+    protected function tickFreeze(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
+    {
+        $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+
+        $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
+
+        broadcast(new CountdownTick(
+            $auction->id, $lane->id, $item->id,
+            (float) $state['remaining_seconds'],
+            $activeBidderCount, $item->current_price,
+            'freeze'
+        ));
+
+        if ($state['remaining_seconds'] <= 0) {
+            $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
+            $state['phase'] = 'bidding';
+            $state['remaining_seconds'] = $bidSeconds;
+            $state['started_at'] = now()->timestamp;
+
+            Cache::put($this->getCacheKey($laneId), $state, 3600);
+
+            Log::info("Freeze ended, bid countdown started: lane {$laneId}, item {$item->id}, countdown={$bidSeconds}s");
+
+            return ['action' => 'freeze_end', 'lane_id' => $laneId];
+        }
+
+        Cache::put($this->getCacheKey($laneId), $state, 3600);
+
+        return ['action' => 'freeze_tick', 'remaining_seconds' => $state['remaining_seconds']];
+    }
+
+    /**
+     * 価格上昇処理（金額帯別上昇幅テーブル対応）
+     *
+     * 入札者2人以上 → 即座に価格上昇 → フリーズカウントダウン開始
      */
     protected function handlePriceIncrement(Lane $lane, Item $item, Auction $auction, int $activeBidderCount): void
     {
@@ -340,11 +372,9 @@ class CountdownService
 
         DB::beginTransaction();
         try {
-            $oldPrice        = $item->current_price;
-            $incrementRate   = $auction->getPriceIncrementRate();
-            $incrementMin    = $auction->getPriceIncrementMin();
-            $increment       = max($oldPrice * ($incrementRate / 100), $incrementMin);
-            $newPrice        = $oldPrice + $increment;
+            $oldPrice  = $item->current_price;
+            $increment = $auction->calculatePriceIncrement($oldPrice);
+            $newPrice  = $oldPrice + $increment;
 
             $item->update(['current_price' => $newPrice]);
 
@@ -357,9 +387,8 @@ class CountdownService
             return;
         }
 
-        // ★ 重要: 価格更新が成功したらまずカウントダウンをリセット
-        // これにより、後続の処理で例外が発生してもレーンが止まらない
-        $this->resetCountdown($lane);
+        // 価格更新成功 → フリーズカウントダウン開始
+        $this->startFreezeCountdown($lane);
 
         $freshItem = $item->fresh();
 
@@ -367,18 +396,36 @@ class CountdownService
             broadcast(new \App\Events\PriceUpdated(
                 $auction->id, $lane->id, $item->id,
                 $freshItem->current_price, $activeBidderCount,
-                $auction->getAuctionSettings()['countdown_seconds'] ?? 3
+                $auction->getBidCountdownSeconds()
             ));
         } catch (\Exception $e) {
             Log::warning("PriceUpdated broadcast error: " . $e->getMessage());
         }
 
-        // 価格上昇後に指値チェック（失敗してもカウントダウンは既にリセット済みなので安全）
         try {
             $this->checkBidLimits($lane, $freshItem, $auction);
         } catch (\Exception $e) {
             Log::error("BidLimit check error after price increment: " . $e->getMessage());
         }
+    }
+
+    /**
+     * 入札者が参加した際の即時価格上昇処理
+     *
+     * 入札者が2人以上になった瞬間に呼ばれる:
+     * 1. 即座に価格を上昇
+     * 2. フリーズカウントダウンを開始
+     * 3. フリーズ後に落札カウントダウンを開始
+     */
+    public function handleImmediatePriceIncrement(Lane $lane, Item $item, Auction $auction): void
+    {
+        $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+
+        if ($activeBidderCount < 2) {
+            return;
+        }
+
+        $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount);
     }
 
     /**
@@ -421,16 +468,21 @@ class CountdownService
                 // 自動離脱（markAsTriggered成功後に実行）
                 $this->leaveBidAction->execute($item, $limit->user_id);
 
-                // ブロードキャストはトランザクション外で実行
                 broadcast(new BidLimitReached(
-                    $auction->id,
-                    $lane->id,
-                    $item->id,
-                    $limit->user_id,
-                    $item->current_price,
-                    $limit->limit_price,
+                    $auction->id, $lane->id, $item->id,
+                    $limit->user_id, $item->current_price, $limit->limit_price,
                     $item->species_name ?? ''
                 ));
+
+                // LINE通知（指値発動）
+                try {
+                    app(NotificationService::class)->sendBidLimitReachedNotification(
+                        $limit->user_id, $item->species_name ?? '商品',
+                        $limit->limit_price, $item->current_price
+                    );
+                } catch (\Exception $lineErr) {
+                    Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
+                }
 
                 Log::info("BidLimit triggered: item={$item->id}, user={$limit->user_id}, price={$item->current_price}, limit={$limit->limit_price}");
             } catch (\Exception $e) {
@@ -631,27 +683,25 @@ class CountdownService
         $state = Cache::get($this->getCacheKey($laneId));
         if (!$state) return;
 
-        // 設定値をDBから最新に更新
         $lane = Lane::with('auction')->find($laneId);
         if ($lane && $lane->auction) {
-            $settings           = $lane->auction->getAuctionSettings();
-            $newDefault         = $settings['countdown_seconds_default'] ?? $settings['countdown_seconds'] ?? 10;
-            $newCompetitive     = $settings['countdown_seconds_competitive'] ?? 1;
+            $settings      = $lane->auction->getAuctionSettings();
+            $newBid        = (float) ($settings['bid_countdown_seconds'] ?? 5);
+            $newFreeze     = (float) ($settings['freeze_countdown_seconds'] ?? 1);
 
-            $oldCompetitive = $state['countdown_seconds_competitive'] ?? null;
+            $oldBid = $state['bid_countdown_seconds'] ?? null;
 
-            $state['countdown_seconds_default']     = $newDefault;
-            $state['countdown_seconds_competitive']  = $newCompetitive;
-            $state['countdown_seconds']              = $newDefault;
+            $state['bid_countdown_seconds']    = $newBid;
+            $state['freeze_countdown_seconds'] = $newFreeze;
 
-            if ($oldCompetitive !== $newCompetitive) {
-                Log::info("Countdown settings refreshed on resume: lane {$laneId}, competitive {$oldCompetitive}→{$newCompetitive}");
+            if ($oldBid !== $newBid) {
+                Log::info("Countdown settings refreshed on resume: lane {$laneId}, bid {$oldBid}→{$newBid}, freeze→{$newFreeze}");
             }
         }
 
         $state['is_running'] = true;
         Cache::put($this->getCacheKey($laneId), $state, 3600);
-        Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s");
+        Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s, phase {$state['phase']}");
     }
 
     /**

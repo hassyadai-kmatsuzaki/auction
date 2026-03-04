@@ -270,6 +270,64 @@ class Auction extends BaseModel
     }
 
     /**
+     * 金額帯別上昇幅テーブルを取得
+     */
+    public function getPriceIncrementTiers(): array
+    {
+        return $this->getAuctionSettings()['price_increment_tiers'] ?? [];
+    }
+
+    /**
+     * 現在価格に基づいて上昇金額を計算（金額帯別テーブル方式）
+     *
+     * テーブルが設定されている場合はテーブルから取得、
+     * 未設定の場合は従来の rate/min 方式にフォールバック
+     */
+    public function calculatePriceIncrement(int $currentPrice): int
+    {
+        $tiers = $this->getPriceIncrementTiers();
+
+        if (!empty($tiers)) {
+            foreach ($tiers as $tier) {
+                $from = (int) ($tier['from_price'] ?? 0);
+                $to   = $tier['to_price'] ?? null;
+
+                if ($currentPrice >= $from && ($to === null || $currentPrice <= $to)) {
+                    return (int) ($tier['increment_amount'] ?? 100);
+                }
+            }
+        }
+
+        $rate = $this->getPriceIncrementRate();
+        $min  = $this->getPriceIncrementMin();
+        return (int) max($currentPrice * ($rate / 100), $min);
+    }
+
+    /**
+     * フリーズ（誤タップ防止）カウントダウン秒数を取得
+     */
+    public function getFreezeCountdownSeconds(): float
+    {
+        return (float) ($this->getAuctionSettings()['freeze_countdown_seconds'] ?? 1);
+    }
+
+    /**
+     * 落札カウントダウン秒数を取得
+     */
+    public function getBidCountdownSeconds(): float
+    {
+        return (float) ($this->getAuctionSettings()['bid_countdown_seconds'] ?? 5);
+    }
+
+    /**
+     * 落札確定後表示秒数を取得
+     */
+    public function getPostSaleDisplaySeconds(): float
+    {
+        return (float) ($this->getAuctionSettings()['post_sale_display_seconds'] ?? 2);
+    }
+
+    /**
      * 買受者手数料を計算
      *
      * @param float $price 落札金額

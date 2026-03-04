@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { Box, Typography, Grid, Card, CardContent, Button, Chip, Paper, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider, IconButton, Badge, Alert, Switch, FormControlLabel, Avatar, TextField, InputAdornment } from '@mui/material';
-import { PlayArrow, Pause, Stop, SkipNext, People, FiberManualRecord, Refresh, MeetingRoom, NoMeetingRoom, Gavel, AttachMoney, LocalShipping, Settings, LiveTv, List as ListIcon } from '@mui/icons-material';
+import { PlayArrow, Pause, Stop, SkipNext, People, FiberManualRecord, Refresh, MeetingRoom, NoMeetingRoom, Gavel, AttachMoney, LocalShipping, Settings, LiveTv, List as ListIcon, Image as ImageIcon, Upload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
 
 const meta: Meta = { title: 'Pages/管理者', tags: ['autodocs'] };
 export default meta;
@@ -72,6 +72,24 @@ export const LiveControl: StoryObj = {
           </Grid>
         ))}
       </Grid>
+    </Box>
+  ),
+};
+
+/** 生体管理 */
+export const ItemManagement: StoryObj = {
+  name: '生体管理',
+  render: () => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Box><Typography variant="h4" fontWeight="bold">生体管理</Typography><Typography variant="body2" color="text.secondary">第17回 大感謝祭オークション (2026/02/19)</Typography></Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="outlined" startIcon={<DownloadIcon />}>テンプレート</Button>
+          <Button variant="outlined" startIcon={<UploadIcon />}>一括インポート</Button>
+          <Button variant="outlined" startIcon={<ImageIcon />}>画像一括アップロード</Button>
+          <Button variant="contained">新規登録</Button>
+        </Box>
+      </Box>
     </Box>
   ),
 };

@@ -115,12 +115,13 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 'オークションが開始されました'
             ));
 
-            // オークション開始通知を送信
+            // オークション開始通知を送信（参加者 + 出品者）
             try {
                 $auctionForNotification = Auction::find($this->auctionId);
                 if ($auctionForNotification) {
-                    $notificationService = app(NotificationService::class);
+                    $notificationService = app(\App\Services\NotificationService::class);
                     $sentCount = $notificationService->sendAuctionStartNotification($auctionForNotification);
+                    $notificationService->sendSellerAuctionStartNotification($auctionForNotification);
                     Log::info("オークション開始通知送信: {$sentCount}件", ['auction_id' => $this->auctionId]);
                 }
             } catch (\Exception $e) {

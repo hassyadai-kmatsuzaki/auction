@@ -2,12 +2,15 @@
 
 namespace App\Actions\Line;
 
-use App\Jobs\SendLineNotificationJob;
+use App\Mail\FavoriteApproachingMail;
 use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
+use App\Models\User;
+use App\Services\LineService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * お気に入り順番接近通知
@@ -70,11 +73,27 @@ class NotifyFavoriteApproachingAction
                     . "レーン{$lane->lane_number} / {$lane->auction->title}\n"
                     . "準備してください！";
 
-                SendLineNotificationJob::dispatch(
-                    $favorite->user_id,
-                    'favorite_approaching',
-                    $text
-                );
+                // メール通知
+                try {
+                    $user = User::find($favorite->user_id);
+                    if ($user && $user->email) {
+                        Mail::to($user->email)->queue(new FavoriteApproachingMail(
+                            $item->species_name, $ahead,
+                            "レーン{$lane->lane_number}",
+                            $lane->auction->title,
+                            $user->name ?? ''
+                        ));
+                    }
+                } catch (\Exception $mailErr) {
+                    Log::warning("Favorite mail error: " . $mailErr->getMessage());
+                }
+
+                // LINE通知
+                try {
+                    app(LineService::class)->notify($favorite->user_id, 'favorite_approaching', $text);
+                } catch (\Exception $lineErr) {
+                    Log::warning("Favorite LINE error: " . $lineErr->getMessage());
+                }
             }
 
             if ($favorites->isNotEmpty()) {

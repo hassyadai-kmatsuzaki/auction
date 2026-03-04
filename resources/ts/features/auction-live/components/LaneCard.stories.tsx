@@ -22,6 +22,10 @@ const baseLane: LiveLane = {
     phase: 'bidding',
     pre_bid_remaining_seconds: 0,
   },
+  upcoming_items: [
+    { id: 102, item_number: 2, species_name: '三色ラメ幹之', quantity: 3, start_price: 5000, is_premium: false },
+    { id: 103, item_number: 3, species_name: '紅白ラメ', quantity: 5, start_price: 3000, is_premium: true },
+  ],
 };
 
 const meta: Meta<typeof LaneCard> = {

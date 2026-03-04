@@ -40,6 +40,17 @@ use App\Http\Controllers\ManualController;
 |
 */
 
+// ALB ヘルスチェック
+Route::get('/health', function () {
+    try {
+        \Illuminate\Support\Facades\DB::connection()->getPdo();
+        \Illuminate\Support\Facades\Cache::store('redis')->get('health-check');
+        return response()->json(['status' => 'ok'], 200);
+    } catch (\Exception $e) {
+        return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+    }
+});
+
 // LINE Login コールバック（ブラウザからリダイレクトされる。認証はController内で手動チェック）
 Route::get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController::class, 'callback']);
 
@@ -104,6 +115,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::delete('auctions/{auctionId}/items/{id}', [AdminItemController::class, 'destroy']);
     
     // 生体メディア管理
+    Route::post('auctions/{auctionId}/items/media/bulk-upload', [\App\Http\Controllers\Admin\ItemMediaBulkController::class, 'bulkUpload']);
     Route::post('auctions/{auctionId}/items/{id}/media', [AdminItemController::class, 'uploadMedia']);
     Route::delete('auctions/{auctionId}/items/{id}/media/{mediaId}', [AdminItemController::class, 'deleteMedia']);
     Route::put('auctions/{auctionId}/items/{id}/media/reorder', [AdminItemController::class, 'reorderMedia']);

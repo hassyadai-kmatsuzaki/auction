@@ -19,29 +19,37 @@ export default meta;
 export const Home: StoryObj = {
   name: 'ホーム',
   render: () => (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>ホーム</Typography>
-      <Paper sx={{ p: 3, mb: 3, bgcolor: 'success.50', border: '2px solid', borderColor: 'success.main' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PlayArrow sx={{ color: 'white', fontSize: 28 }} />
+    <Box>
+      {/* 開催中バナー */}
+      <Box sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)', color: 'white', py: 4, px: 2 }}>
+        <Container maxWidth="lg">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#ef4444', px: 1.5, py: 0.5, borderRadius: 1, fontSize: '0.8rem', fontWeight: 800 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'white' }} />LIVE
             </Box>
-            <Box><Typography variant="h6" fontWeight="bold" color="success.dark">オークション開催中！</Typography><Typography variant="body2" color="text.secondary">第17回 大感謝祭オークション</Typography></Box>
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>オークション開催中！</Typography>
           </Box>
-          <Button variant="contained" color="success" size="large" endIcon={<ArrowForward />}>今すぐ参加する</Button>
-        </Box>
-      </Paper>
-      <Grid container spacing={3}>
-        {[{ title: '落札数', value: '12', icon: <EmojiEvents color="warning" /> }, { title: '入札中', value: '3', icon: <Gavel color="primary" /> }, { title: '合計金額', value: '¥245,000', icon: <EmojiEvents color="success" /> }].map((s) => (
-          <Grid item xs={12} md={4} key={s.title}>
-            <Card><CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {s.icon}<Box><Typography variant="caption" color="text.secondary">{s.title}</Typography><Typography variant="h5" fontWeight="bold">{s.value}</Typography></Box>
-            </CardContent></Card>
-          </Grid>
-        ))}
-      </Grid>
-    </Container>
+          <Typography variant="h4" fontWeight="bold" sx={{ mb: 2 }}>第17回 大感謝祭オークション</Typography>
+          <Button variant="contained" size="large" endIcon={<ArrowForward />} sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 700, px: 4, '&:hover': { bgcolor: 'grey.100' } }}>今すぐ参加する</Button>
+        </Container>
+      </Box>
+      {/* 次回開催 */}
+      <Container maxWidth="lg" sx={{ pt: 3 }}>
+        <Card sx={{ border: '1px solid', borderColor: 'primary.100', mb: 3 }}>
+          <CardContent sx={{ p: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Event sx={{ color: 'primary.main', fontSize: 20 }} />
+              <Typography variant="subtitle2" color="primary.main" fontWeight={600}>次回開催予定</Typography>
+            </Box>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>第18回 春の特別オークション</Typography>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Typography variant="body2" color="text.secondary">2026年4月3日(金) 13:00〜</Typography>
+              <Box sx={{ bgcolor: 'primary.50', color: 'primary.main', px: 1, py: 0.25, borderRadius: 0.75, fontWeight: 700, fontSize: '0.75rem' }}>あと37日</Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   ),
 };
 
@@ -131,6 +139,31 @@ export const AuctionLive: StoryObj = {
             </Grid>
           ))}
         </Grid>
+        {/* 次の商品 */}
+        <Paper sx={{ mt: 3, p: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
+          <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
+            {[
+              { lane: 1, no: 111, name: 'ヒョウモントカゲモドキ', price: 18000 },
+              { lane: 1, no: 112, name: 'コーンスネーク', price: 12000 },
+              { lane: 2, no: 78, name: 'フトアゴヒゲトカゲ', price: 25000 },
+              { lane: 3, no: 56, name: 'ボールパイソン パステル', price: 45000 },
+            ].map((item) => (
+              <Box key={item.no} sx={{ flexShrink: 0, width: 140, borderRadius: 1.5, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+                <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">NO IMAGE</Typography>
+                </Box>
+                <Box sx={{ p: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5, mb: 0.25 }}>
+                    <Chip label={`L${item.lane}`} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} color="primary" variant="outlined" />
+                  </Box>
+                  <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.name}</Typography>
+                  <Typography variant="caption" color="primary.main" fontWeight="bold">¥{item.price.toLocaleString()}〜</Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
       </Container>
     </Box>
   ),

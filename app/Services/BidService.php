@@ -28,7 +28,7 @@ class BidService
      */
     public function getLiveState(Auction $auction, ?int $userId = null): array
     {
-        $lanes            = $auction->lanes()->with(['currentItem.media'])->orderBy('lane_number')->get();
+        $lanes            = $auction->lanes()->with(['currentItem.media', 'items'])->orderBy('lane_number')->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
         // ★ N+1解消: 全アクティブアイテムのデータを一括取得
@@ -118,6 +118,31 @@ class BidService
                     'my_limit_triggered'       => $myLimitTriggered,
                 ];
             }
+
+            // upcoming items: items after the current one in sequence order
+            $upcomingItems = [];
+            if ($lane->currentItem) {
+                $currentSeq = $lane->items
+                    ->where('id', $lane->currentItem->id)
+                    ->first()?->pivot?->sequence_order ?? 0;
+
+                $upcomingItems = $lane->items
+                    ->filter(fn ($i) => ($i->pivot->sequence_order ?? 0) > $currentSeq && $i->status === 'registered')
+                    ->sortBy(fn ($i) => $i->pivot->sequence_order)
+                    ->take(3)
+                    ->map(fn ($i) => [
+                        'id'             => $i->id,
+                        'item_number'    => $i->item_number,
+                        'species_name'   => $i->species_name,
+                        'quantity'       => $i->quantity,
+                        'start_price'    => $i->start_price,
+                        'thumbnail_path' => $i->thumbnail_path,
+                        'is_premium'     => $i->is_premium,
+                    ])
+                    ->values()
+                    ->toArray();
+            }
+            $laneData['upcoming_items'] = $upcomingItems;
 
             $lanesData[] = $laneData;
         }

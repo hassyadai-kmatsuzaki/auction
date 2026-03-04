@@ -9,8 +9,10 @@ use App\Models\BidLimitPrice;
 use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
+use App\Services\CountdownService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 入札参加アクション
@@ -34,14 +36,21 @@ class JoinBidAction
             return BidResultDto::failure('オークションが開催中ではありません。');
         }
 
-        // 入札開始待機フェーズ中は入札不可
+        // 入札開始待機フェーズ・フリーズフェーズ中は入札不可
         $lane = Lane::where('current_item_id', $item->id)->first();
         if ($lane) {
             $countdownState = Cache::get("countdown:lane:{$lane->id}");
-            if ($countdownState && ($countdownState['phase'] ?? 'bidding') === 'pre_bid') {
+            $phase = $countdownState['phase'] ?? 'bidding';
+            if ($countdownState && $phase === 'pre_bid') {
                 return BidResultDto::failure(
                     '入札開始待機中です。もう少々お待ちください。',
                     ['pre_bid_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0]
+                );
+            }
+            if ($countdownState && $phase === 'freeze') {
+                return BidResultDto::failure(
+                    '誤タップ防止中です。もう少々お待ちください。',
+                    ['freeze_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0]
                 );
             }
         }
@@ -72,11 +81,22 @@ class JoinBidAction
                 ->toOthers();
         }
 
+        // 入札者が2人以上になった場合、即座に価格上昇 → フリーズカウントダウン
+        if ($activeBidderCount >= 2 && $lane) {
+            try {
+                $lane->load('auction');
+                $countdownService = app(CountdownService::class);
+                $countdownService->handleImmediatePriceIncrement($lane, $item->fresh(), $auction);
+            } catch (\Exception $e) {
+                Log::error("Immediate price increment error on join: " . $e->getMessage());
+            }
+        }
+
         return BidResultDto::success([
             'participant_id'      => $participant->id,
             'item_id'             => $item->id,
             'is_active'           => true,
-            'current_price'       => $item->current_price,
+            'current_price'       => $item->fresh()->current_price,
             'active_bidder_count' => $activeBidderCount,
         ], '入札に参加しました。');
     }

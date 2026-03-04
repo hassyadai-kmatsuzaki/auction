@@ -117,7 +117,8 @@ export default function AuctionItems() {
     setIsSettingLimit(true);
     try {
       await bidLimitApi.set(itemId, price);
-      invalidateLimits(); // キャッシュを無効化して最新を再取得
+      invalidateLimits();
+      setFavoriteIds((prev) => { const next = new Set(prev); next.add(itemId); return next; });
     } catch (err: any) {
       console.error('指値設定エラー:', err);
     } finally {
@@ -129,6 +130,7 @@ export default function AuctionItems() {
     try {
       await bidLimitApi.remove(itemId);
       invalidateLimits();
+      setFavoriteIds((prev) => { const next = new Set(prev); next.delete(itemId); return next; });
     } catch (err: any) {
       console.error('指値解除エラー:', err);
     }

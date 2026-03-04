@@ -108,7 +108,11 @@ export default function Favorites() {
     try { await bidLimitApi.set(itemId, price); invalidateLimits(); } catch {} finally { setIsSettingLimit(false); }
   };
   const handleRemoveLimit = async (itemId: number) => {
-    try { await bidLimitApi.remove(itemId); invalidateLimits(); } catch {}
+    try {
+      await bidLimitApi.remove(itemId);
+      invalidateLimits();
+      setFavorites(prev => prev.filter(f => f.item_id !== itemId));
+    } catch {}
   };
 
   const handleRemoveFavorite = async (e: React.MouseEvent, itemId: number) => {

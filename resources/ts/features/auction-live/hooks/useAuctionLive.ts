@@ -40,14 +40,16 @@ export function useAuctionLive(auctionId: number) {
                 current_item: {
                   ...lane.current_item,
                   countdown_seconds:
-                    phase === 'pre_bid'
-                      ? lane.current_item.countdown_seconds
-                      : event.remaining_seconds,
+                    phase === 'bidding'
+                      ? event.remaining_seconds
+                      : lane.current_item.countdown_seconds,
                   active_bidders_count: event.active_bidders_count,
                   current_price: event.current_price,
                   phase,
                   pre_bid_remaining_seconds:
                     phase === 'pre_bid' ? event.remaining_seconds : 0,
+                  freeze_remaining_seconds:
+                    phase === 'freeze' ? event.remaining_seconds : 0,
                 },
               }
             : lane

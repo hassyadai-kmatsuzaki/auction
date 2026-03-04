@@ -19,6 +19,12 @@ const TabPanel = ({ children, value, index }: TabPanelProps) => (
   <div hidden={value !== index}>{value === index && <Box sx={{ py: 3 }}>{children}</Box>}</div>
 );
 
+interface PriceIncrementTier {
+  from_price: number;
+  to_price: number | null;
+  increment_amount: number;
+}
+
 interface SettingsState {
   // システム
   site_name: string; contact_email: string; contact_phone: string; business_hours: string;
@@ -27,6 +33,9 @@ interface SettingsState {
   countdown_seconds_default: string; countdown_seconds_competitive: string;
   default_lane_count: string; auto_extend_seconds: string; default_bid_increment: string;
   show_consent_screen: boolean; venue_open_minutes_before_start: string; item_switch_delay_seconds: string;
+  // 新カウントダウン設定
+  freeze_countdown_seconds: string; bid_countdown_seconds: string;
+  post_sale_display_seconds: string; auction_start_countdown_seconds: string;
   // 料金
   seller_registration_fee: string; seller_annual_fee: string; base_listing_fee: string;
   premium_plan_fee: string; default_commission_rate: string; seller_commission_min: string;
@@ -41,12 +50,22 @@ interface SettingsState {
   warranty_validity_days: string; auto_generate_invoice: boolean; auto_generate_payment_notice: boolean;
 }
 
+const DEFAULT_PRICE_INCREMENT_TIERS: PriceIncrementTier[] = [
+  { from_price: 0, to_price: 999, increment_amount: 50 },
+  { from_price: 1000, to_price: 4999, increment_amount: 100 },
+  { from_price: 5000, to_price: 9999, increment_amount: 500 },
+  { from_price: 10000, to_price: 49999, increment_amount: 1000 },
+  { from_price: 50000, to_price: null, increment_amount: 5000 },
+];
+
 const DEFAULT_SETTINGS: SettingsState = {
   site_name: '', contact_email: '', contact_phone: '', business_hours: '',
   price_increment_rate: '10', price_increment_min: '50', countdown_seconds: '3',
   countdown_seconds_default: '10', countdown_seconds_competitive: '1',
   default_lane_count: '6', auto_extend_seconds: '10', default_bid_increment: '100',
   show_consent_screen: false, venue_open_minutes_before_start: '30', item_switch_delay_seconds: '5',
+  freeze_countdown_seconds: '1', bid_countdown_seconds: '5',
+  post_sale_display_seconds: '2', auction_start_countdown_seconds: '10',
   seller_registration_fee: '3000', seller_annual_fee: '0', base_listing_fee: '500',
   premium_plan_fee: '300', default_commission_rate: '10', seller_commission_min: '500',
   buyer_registration_fee: '0', buyer_commission_rate: '5', buyer_commission_min: '300',
@@ -64,6 +83,7 @@ export default function AdminSettings() {
   const [shippingRates, setShippingRates]             = useState<any[]>([]);
   const [editShippingDialog, setEditShippingDialog]   = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
+  const [incrementTiers, setIncrementTiers]           = useState<PriceIncrementTier[]>(DEFAULT_PRICE_INCREMENT_TIERS);
 
   const { rawSettings, isLoading, isSaving, save } = useSettings();
 
@@ -87,6 +107,10 @@ export default function AdminSettings() {
       show_consent_screen:            d.auction?.show_consent_screen?.value ?? false,
       venue_open_minutes_before_start:String(d.auction?.venue_open_minutes_before_start?.value ?? '30'),
       item_switch_delay_seconds:      String(d.auction?.item_switch_delay_seconds?.value ?? '5'),
+      freeze_countdown_seconds:       String(d.auction?.freeze_countdown_seconds?.value ?? '1'),
+      bid_countdown_seconds:          String(d.auction?.bid_countdown_seconds?.value ?? '5'),
+      post_sale_display_seconds:      String(d.auction?.post_sale_display_seconds?.value ?? '2'),
+      auction_start_countdown_seconds:String(d.auction?.auction_start_countdown_seconds?.value ?? '10'),
       seller_registration_fee:        String(d.payment?.seller_registration_fee?.value ?? '3000'),
       seller_annual_fee:              String(d.payment?.seller_annual_fee?.value ?? '0'),
       base_listing_fee:               String(d.payment?.base_listing_fee?.value ?? '500'),
@@ -117,6 +141,7 @@ export default function AdminSettings() {
       auto_generate_payment_notice:   d.document?.auto_generate_payment_notice?.value ?? false,
     });
     if (d.shipping?.shipping_rates?.value) setShippingRates(d.shipping.shipping_rates.value);
+    if (d.auction?.default_price_increment_tiers?.value) setIncrementTiers(d.auction.default_price_increment_tiers.value);
   }, [rawSettings]);
 
   const handleSubmit = () => {
@@ -125,6 +150,7 @@ export default function AdminSettings() {
       show_consent_screen:          s.show_consent_screen,
       auto_generate_invoice:        s.auto_generate_invoice,
       auto_generate_payment_notice: s.auto_generate_payment_notice,
+      default_price_increment_tiers: incrementTiers,
     });
   };
 
@@ -181,10 +207,8 @@ export default function AdminSettings() {
             <Alert severity="info" sx={{ mb: 3 }}>この設定はシステム全体のデフォルト値です。オークション作成時に個別にカスタマイズできます。</Alert>
             <Grid container spacing={3}>
               {[
-                { label: '価格上昇率', k: 'price_increment_rate' as const, unit: '%', helper: '複数人入札時の価格上昇率' },
-                { label: '最低上昇金額', k: 'price_increment_min' as const, unit: '¥', prefix: true, helper: '最低でもこの金額は上昇' },
-                { label: 'カウントダウン秒数（通常）', k: 'countdown_seconds_default' as const, unit: '秒', step: 0.5, helper: '開始時・入札者0〜1人（0.5秒単位）' },
-                { label: 'カウントダウン秒数（競合時）', k: 'countdown_seconds_competitive' as const, unit: '秒', step: 0.5, helper: '入札者2人以上（0.5秒単位）' },
+                { label: '価格上昇率（フォールバック）', k: 'price_increment_rate' as const, unit: '%', helper: '金額帯テーブル未設定時のフォールバック' },
+                { label: '最低上昇金額（フォールバック）', k: 'price_increment_min' as const, unit: '¥', prefix: true, helper: '金額帯テーブル未設定時のフォールバック' },
                 { label: 'デフォルトレーン数', k: 'default_lane_count' as const, helper: '同時進行できるレーン数' },
                 { label: '自動延長秒数', k: 'auto_extend_seconds' as const, unit: '秒', helper: '終了直前の入札で延長' },
                 { label: 'デフォルト入札単位', k: 'default_bid_increment' as const, unit: '¥', prefix: true, helper: '価格上昇の単位' },
@@ -199,17 +223,94 @@ export default function AdminSettings() {
             </Grid>
 
             <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>金額帯別上昇幅テーブル</Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>現在の価格に応じて上昇金額が変わります。オークションごとにカスタム設定も可能です。</Alert>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>下限金額</TableCell>
+                    <TableCell>上限金額</TableCell>
+                    <TableCell>上昇金額</TableCell>
+                    <TableCell width={80} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {incrementTiers.map((tier, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.from_price}
+                          InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                          onChange={(e) => {
+                            const next = [...incrementTiers];
+                            next[idx] = { ...next[idx], from_price: parseInt(e.target.value) || 0 };
+                            setIncrementTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.to_price ?? ''}
+                          placeholder="上限なし"
+                          InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                          onChange={(e) => {
+                            const next = [...incrementTiers];
+                            const val = e.target.value === '' ? null : parseInt(e.target.value);
+                            next[idx] = { ...next[idx], to_price: val };
+                            setIncrementTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" type="number" value={tier.increment_amount}
+                          InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                          onChange={(e) => {
+                            const next = [...incrementTiers];
+                            next[idx] = { ...next[idx], increment_amount: parseInt(e.target.value) || 0 };
+                            setIncrementTiers(next);
+                          }} />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="error" onClick={() => {
+                          setIncrementTiers(incrementTiers.filter((_, i) => i !== idx));
+                        }}>×</IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Button size="small" sx={{ mt: 1 }} onClick={() => {
+              const last = incrementTiers[incrementTiers.length - 1];
+              setIncrementTiers([...incrementTiers, {
+                from_price: last ? (last.to_price ?? last.from_price) + 1 : 0,
+                to_price: null,
+                increment_amount: last?.increment_amount ?? 100,
+              }]);
+            }}>+ 行を追加</Button>
+
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>カウントダウン設定</Typography>
+            <Grid container spacing={3}>
+              {[
+                { label: 'オークション開始待機時間', k: 'auction_start_countdown_seconds' as const, unit: '秒', step: 1, helper: '開始前のカウントダウン（0〜3600秒）' },
+                { label: 'フリーズ（誤タップ防止）カウント', k: 'freeze_countdown_seconds' as const, unit: '秒', step: 0.5, helper: '入札直後の誤タップ防止（0.5〜10秒）' },
+                { label: '落札カウント', k: 'bid_countdown_seconds' as const, unit: '秒', step: 0.5, helper: '入札受付カウントダウン（0.5〜10秒）' },
+                { label: '商品開始毎カウント', k: 'item_switch_delay_seconds' as const, unit: '秒', step: 0.5, helper: '次の商品表示後の待機（0.5〜10秒）' },
+                { label: '落札確定後カウント', k: 'post_sale_display_seconds' as const, unit: '秒', step: 0.5, helper: '落札確定後の表示時間（0.5〜10秒）' },
+              ].map(({ label, k, unit, step, helper }) => (
+                <Grid item xs={12} sm={6} md={4} key={k}>
+                  <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                    InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
+                    inputProps={{ step, min: 0 }} />
+                </Grid>
+              ))}
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>会場・レーン設定</Typography>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6} md={4}>
                 <TextField fullWidth type="number" label="会場入室可能開始" value={s.venue_open_minutes_before_start} onChange={str('venue_open_minutes_before_start')}
                   InputProps={{ endAdornment: <InputAdornment position="end">分前</InputAdornment> }}
                   helperText="オークション開始の何分前から入室可能か" />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField fullWidth type="number" label="生体切り替え後の入札開始待機" value={s.item_switch_delay_seconds} onChange={str('item_switch_delay_seconds')}
-                  InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                  inputProps={{ step: 0.5, min: 0 }} helperText="次の生体表示後の待機秒数（0で待機なし、0.5秒単位）" />
               </Grid>
             </Grid>
 

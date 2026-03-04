@@ -7,6 +7,7 @@ use App\Events\BidderUpdated;
 use App\Events\BidLimitReached;
 use App\Models\BidLimitPrice;
 use App\Models\BidParticipant;
+use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
 
@@ -41,6 +42,8 @@ class SetBidLimitAction
             ['item_id' => $item->id, 'user_id' => $userId],
             ['limit_price' => $limitPrice, 'is_triggered' => false, 'triggered_at' => null]
         );
+
+        Favorite::firstOrCreate(['user_id' => $userId, 'item_id' => $item->id]);
 
         $triggered  = false;
         $autoBidded = false;
@@ -183,6 +186,8 @@ class SetBidLimitAction
         }
 
         BidLimitPrice::forItem($item->id)->forUser($userId)->delete();
+        Favorite::where('user_id', $userId)->where('item_id', $item->id)->delete();
+
         return BidResultDto::success([], '上限価格を解除し、入札から離脱しました');
     }
 

@@ -130,6 +130,18 @@ export default function ItemManagement() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
 
+  // 画像一括アップロード
+  const [bulkImageDialogOpen, setBulkImageDialogOpen] = useState(false);
+  const [bulkImageFile, setBulkImageFile] = useState<File | null>(null);
+  const [bulkImageUploading, setBulkImageUploading] = useState(false);
+  const [bulkImageResult, setBulkImageResult] = useState<{
+    total_files: number;
+    uploaded: number;
+    skipped: number;
+    errors: string[];
+    results: { item_number: number; uploaded_count: number }[];
+  } | null>(null);
+
   useEffect(() => {
     fetchItems();
   }, [auctionId, currentPage, filterStatus]);
@@ -322,6 +334,44 @@ export default function ItemManagement() {
     setImportResult(null);
   };
 
+  const handleBulkImageUpload = async () => {
+    if (!bulkImageFile) return;
+
+    try {
+      setBulkImageUploading(true);
+      setBulkImageResult(null);
+
+      const formData = new FormData();
+      formData.append('file', bulkImageFile);
+
+      const response = await axios.post(
+        `/api/admin/auctions/${auctionId}/items/media/bulk-upload`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      if (response.data.success) {
+        setBulkImageResult(response.data.data);
+        setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+        fetchItems();
+      }
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || '画像のアップロードに失敗しました。',
+        severity: 'error',
+      });
+    } finally {
+      setBulkImageUploading(false);
+    }
+  };
+
+  const handleCloseBulkImageDialog = () => {
+    setBulkImageDialogOpen(false);
+    setBulkImageFile(null);
+    setBulkImageResult(null);
+  };
+
   const handleSelectItem = (id: number, checked: boolean) => {
     if (checked) {
       setSelectedIds([...selectedIds, id]);
@@ -397,6 +447,13 @@ export default function ItemManagement() {
             onClick={() => setImportDialogOpen(true)}
           >
             一括インポート
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ImageIcon />}
+            onClick={() => setBulkImageDialogOpen(true)}
+          >
+            画像一括アップロード
           </Button>
           <Button
             variant="outlined"
@@ -830,6 +887,111 @@ export default function ItemManagement() {
             startIcon={importing ? <CircularProgress size={20} /> : <UploadIcon />}
           >
             {importing ? 'インポート中...' : 'インポート'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 画像一括アップロードダイアログ */}
+      <Dialog open={bulkImageDialogOpen} onClose={handleCloseBulkImageDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ImageIcon color="primary" />
+            画像一括アップロード
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              ZIPファイルに画像をまとめてアップロードできます。
+              <br />
+              ファイル名は <strong>生体番号_連番.jpg</strong>（例: 001_1.jpg, 001_2.jpg, 002_1.jpg）の形式にしてください。
+              <br />
+              連番1の画像が自動的にサムネイルに設定されます。
+            </Alert>
+
+            <Box
+              sx={{
+                border: '2px dashed',
+                borderColor: bulkImageFile ? 'primary.main' : 'grey.300',
+                borderRadius: 2,
+                p: 3,
+                textAlign: 'center',
+                bgcolor: bulkImageFile ? 'primary.50' : 'grey.50',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' },
+              }}
+              onClick={() => document.getElementById('bulk-image-file-input')?.click()}
+            >
+              <input
+                id="bulk-image-file-input"
+                type="file"
+                accept=".zip"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setBulkImageFile(file);
+                    setBulkImageResult(null);
+                  }
+                }}
+              />
+              {bulkImageFile ? (
+                <>
+                  <ImageIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {bulkImageFile.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ({(bulkImageFile.size / 1024 / 1024).toFixed(1)} MB) クリックして変更
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                  <Typography variant="body1">クリックしてZIPファイルを選択</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    最大500MBまで
+                  </Typography>
+                </>
+              )}
+            </Box>
+
+            {bulkImageResult && (
+              <Box sx={{ mt: 3 }}>
+                <Alert severity={bulkImageResult.errors.length > 0 ? 'warning' : 'success'}>
+                  {bulkImageResult.uploaded}件の画像をアップロードしました。
+                  {bulkImageResult.skipped > 0 && <> （スキップ: {bulkImageResult.skipped}件）</>}
+                </Alert>
+                {bulkImageResult.results.length > 0 && (
+                  <Box sx={{ mt: 2, maxHeight: 120, overflow: 'auto', bgcolor: 'grey.50', p: 1.5, borderRadius: 1 }}>
+                    {bulkImageResult.results.map((r) => (
+                      <Typography key={r.item_number} variant="body2">
+                        #{r.item_number}: {r.uploaded_count}枚
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+                {bulkImageResult.errors.length > 0 && (
+                  <Box sx={{ mt: 2, maxHeight: 120, overflow: 'auto', bgcolor: 'error.50', p: 1.5, borderRadius: 1 }}>
+                    {bulkImageResult.errors.map((err, i) => (
+                      <Typography key={i} variant="body2" color="error">{err}</Typography>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleCloseBulkImageDialog}>閉じる</Button>
+          <Button
+            variant="contained"
+            onClick={handleBulkImageUpload}
+            disabled={!bulkImageFile || bulkImageUploading}
+            startIcon={bulkImageUploading ? <CircularProgress size={20} /> : <UploadIcon />}
+          >
+            {bulkImageUploading ? 'アップロード中...' : 'アップロード'}
           </Button>
         </DialogActions>
       </Dialog>

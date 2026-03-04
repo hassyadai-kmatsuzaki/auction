@@ -6,6 +6,7 @@ import {
   Alert, Stack, Divider, InputAdornment, Tabs, Tab,
   Card, CardContent, Switch, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, MenuItem,
+  IconButton,
 } from '@mui/material';
 import {
   Save as SaveIcon, ArrowBack as ArrowBackIcon,
@@ -133,40 +134,11 @@ export default function AuctionForm() {
               <Divider />
 
               <Box>
-                <Typography variant="h6" gutterBottom>オークション設定</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  カウントダウン秒数・価格上昇率などはカスタム設定タブで設定できます
-                </Typography>
-                <FormControlLabel control={
-                  <Checkbox checked={formData.deposit_required}
-                    onChange={(e) => setAuction({ deposit_required: e.target.checked })} />}
-                  label="保証金必須" />
-              </Box>
-
-              <Divider />
-
-              <Box>
                 <Typography variant="h6" gutterBottom>期限設定</Typography>
                 <Stack spacing={3} sx={{ mt: 2 }}>
                   <DateTimePicker label="商品アップロード期限" value={formData.upload_deadline}
                     onChange={(d) => setAuction({ upload_deadline: d })}
                     slotProps={{ textField: { fullWidth: true, helperText: '出品者がアップロードできる期限' } }} />
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField label="入金期限" type="number" fullWidth required
-                        value={formData.payment_deadline_hours}
-                        onChange={(e) => setAuction({ payment_deadline_hours: parseInt(e.target.value) || 0 })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">時間</InputAdornment> }}
-                        helperText="落札後の入金期限" />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField label="発送期限" type="number" fullWidth required
-                        value={formData.shipping_deadline_hours}
-                        onChange={(e) => setAuction({ shipping_deadline_hours: parseInt(e.target.value) || 0 })}
-                        InputProps={{ endAdornment: <InputAdornment position="end">時間</InputAdornment> }}
-                        helperText="入金確認後の発送期限" />
-                    </Grid>
-                  </Grid>
                 </Stack>
               </Box>
             </Stack>
@@ -184,11 +156,34 @@ export default function AuctionForm() {
                 </Box>
                 <FormControlLabel control={
                   <Switch checked={formData.use_custom_settings}
-                    onChange={(e) => setAuction({ use_custom_settings: e.target.checked })} />}
-                  label={formData.use_custom_settings ? 'カスタム' : 'システムデフォルト'} />
+                    onChange={(e) => {
+                      const useCustom = e.target.checked;
+                      setAuction({ use_custom_settings: useCustom });
+                      if (useCustom && defaults && !isEdit) {
+                        setCustomAuction({
+                          price_increment_rate: defaults.auction_settings.price_increment_rate ?? 10,
+                          price_increment_min: defaults.auction_settings.price_increment_min ?? 50,
+                          countdown_seconds: defaults.auction_settings.countdown_seconds ?? 3,
+                          countdown_seconds_default: defaults.auction_settings.countdown_seconds_default ?? 10,
+                          countdown_seconds_competitive: defaults.auction_settings.countdown_seconds_competitive ?? 1,
+                          venue_open_minutes_before_start: defaults.auction_settings.venue_open_minutes_before_start ?? 30,
+                          item_switch_delay_seconds: defaults.auction_settings.item_switch_delay_seconds ?? 5,
+                          freeze_countdown_seconds: defaults.auction_settings.freeze_countdown_seconds ?? 1,
+                          bid_countdown_seconds: defaults.auction_settings.bid_countdown_seconds ?? 5,
+                          post_sale_display_seconds: defaults.auction_settings.post_sale_display_seconds ?? 2,
+                          auction_start_countdown_seconds: defaults.auction_settings.auction_start_countdown_seconds ?? 10,
+                          price_increment_tiers: defaults.auction_settings.price_increment_tiers ?? [],
+                        } as any);
+                        if (defaults.fee_settings) setCustomFee({ ...defaults.fee_settings });
+                        if (defaults.shipping_settings) setCustomShipping({ ...defaults.shipping_settings });
+                      }
+                    }} />}
+                  label="カスタム設定" />
               </Box>
               {!formData.use_custom_settings && (
-                <Alert severity="info">システムデフォルト設定を使用しています。</Alert>
+                <Alert severity="info">
+                  カスタム設定をONにすると、このオークション専用の設定を使用します。OFFの場合はシステム設定画面のデフォルト値が適用されます。
+                </Alert>
               )}
             </CardContent>
           </Card>
@@ -201,16 +196,100 @@ export default function AuctionForm() {
                 <GavelIcon sx={{ color: '#6366F1' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>オークション設定</Typography>
               </Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>カウントダウン設定</Typography>
+              <Grid container spacing={3}>
+                {[
+                  { label: 'オークション開始待機時間', key: 'auction_start_countdown_seconds', unit: '秒', systemKey: 'auction_start_countdown_seconds', step: 1, helper: '0〜3600秒' },
+                  { label: 'フリーズ（誤タップ防止）', key: 'freeze_countdown_seconds', unit: '秒', systemKey: 'freeze_countdown_seconds', step: 0.5, helper: '0.5〜10秒' },
+                  { label: '落札カウント', key: 'bid_countdown_seconds', unit: '秒', systemKey: 'bid_countdown_seconds', step: 0.5, helper: '0.5〜10秒' },
+                  { label: '商品開始毎カウント', key: 'item_switch_delay_seconds', unit: '秒', systemKey: 'item_switch_delay_seconds', step: 0.5, helper: '0.5〜10秒' },
+                  { label: '落札確定後カウント', key: 'post_sale_display_seconds', unit: '秒', systemKey: 'post_sale_display_seconds', step: 0.5, helper: '0.5〜10秒' },
+                  { label: '会場入室可能開始', key: 'venue_open_minutes_before_start', unit: '分前', systemKey: 'venue_open_minutes_before_start', step: 1 },
+                ].map(({ label, key, unit, systemKey, step, helper }) => (
+                  <Grid item xs={12} sm={6} md={3} key={key}>
+                    <TextField fullWidth type="number" label={label}
+                      value={(formData.custom_auction_settings as any)[key]}
+                      onChange={(e) => setCustomAuction({ [key]: parseFloat(e.target.value) || 0 })}
+                      InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
+                      inputProps={{ step, min: 0 }}
+                      helperText={defaults ? `システム: ${(defaults.auction_settings as any)[systemKey] ?? '-'}${unit}${helper ? `（${helper}）` : ''}` : helper} />
+                  </Grid>
+                ))}
+              </Grid>
+
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>金額帯別上昇幅テーブル</Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>現在の価格に応じて上昇金額が変わります。</Alert>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>下限金額</TableCell>
+                      <TableCell>上限金額</TableCell>
+                      <TableCell>上昇金額</TableCell>
+                      <TableCell width={80} />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(formData.custom_auction_settings.price_increment_tiers ?? []).map((tier: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.from_price}
+                            InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
+                              tiers[idx] = { ...tiers[idx], from_price: parseInt(e.target.value) || 0 };
+                              setCustomAuction({ price_increment_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.to_price ?? ''} placeholder="上限なし"
+                            InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              tiers[idx] = { ...tiers[idx], to_price: val };
+                              setCustomAuction({ price_increment_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" type="number" value={tier.increment_amount}
+                            InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                            onChange={(e) => {
+                              const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
+                              tiers[idx] = { ...tiers[idx], increment_amount: parseInt(e.target.value) || 0 };
+                              setCustomAuction({ price_increment_tiers: tiers } as any);
+                            }} />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" color="error" onClick={() => {
+                            const tiers = (formData.custom_auction_settings.price_increment_tiers ?? []).filter((_: any, i: number) => i !== idx);
+                            setCustomAuction({ price_increment_tiers: tiers } as any);
+                          }}>×</IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Button size="small" sx={{ mt: 1 }} onClick={() => {
+                const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
+                const last = tiers[tiers.length - 1];
+                tiers.push({
+                  from_price: last ? (last.to_price ?? last.from_price) + 1 : 0,
+                  to_price: null,
+                  increment_amount: last?.increment_amount ?? 100,
+                });
+                setCustomAuction({ price_increment_tiers: tiers } as any);
+              }}>+ 行を追加</Button>
+
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>価格上昇フォールバック設定</Typography>
               <Grid container spacing={3}>
                 {[
                   { label: '価格上昇率', key: 'price_increment_rate', unit: '%', systemKey: 'price_increment_rate', step: 1 },
                   { label: '最低上昇金額', key: 'price_increment_min', unit: '¥', systemKey: 'price_increment_min', prefix: true, step: 1 },
-                  { label: 'カウントダウン（通常）', key: 'countdown_seconds_default', unit: '秒', systemKey: 'countdown_seconds_default', step: 0.5, helper: '0〜1人入札時' },
-                  { label: 'カウントダウン（競合時）', key: 'countdown_seconds_competitive', unit: '秒', systemKey: 'countdown_seconds_competitive', step: 0.5, helper: '2人以上入札時' },
-                  { label: '自動延長秒数', key: 'auto_extend_seconds', unit: '秒', systemKey: 'auto_extend_seconds', step: 1 },
-                  { label: '会場入室可能開始', key: 'venue_open_minutes_before_start', unit: '分前', systemKey: 'venue_open_minutes_before_start', step: 1 },
-                  { label: '生体切り替え後の入札開始待機', key: 'item_switch_delay_seconds', unit: '秒', systemKey: 'item_switch_delay_seconds', step: 0.5, helper: '0で待機なし' },
-                ].map(({ label, key, unit, systemKey, prefix, step, helper }) => (
+                ].map(({ label, key, unit, systemKey, prefix, step }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
                     <TextField fullWidth type="number" label={label}
                       value={(formData.custom_auction_settings as any)[key]}
@@ -219,7 +298,7 @@ export default function AuctionForm() {
                         ? { startAdornment: <InputAdornment position="start">¥</InputAdornment> }
                         : { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                       inputProps={{ step, min: 0 }}
-                      helperText={defaults ? `システム: ${(defaults.auction_settings as any)[systemKey] ?? '-'}${unit}${helper ? `（${helper}）` : ''}` : helper} />
+                      helperText={defaults ? `システム: ${(defaults.auction_settings as any)[systemKey] ?? '-'}${unit}` : ''} />
                   </Grid>
                 ))}
               </Grid>

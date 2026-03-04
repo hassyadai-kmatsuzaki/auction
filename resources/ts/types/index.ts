@@ -157,11 +157,22 @@ export interface LaneItem {
   /** 自分の指値（上限価格） */
   my_limit_price?: number | null;
   my_limit_triggered?: boolean;
-  phase?: 'bidding' | 'pre_bid';
+  phase?: 'bidding' | 'pre_bid' | 'freeze';
   pre_bid_remaining_seconds?: number;
+  freeze_remaining_seconds?: number;
   countdown_mode?: 'default' | 'competitive';
   /** 競合時カウントダウン設定秒数 */
   countdown_seconds_competitive?: number;
+}
+
+export interface UpcomingItem {
+  id: number;
+  item_number: number;
+  species_name: string;
+  quantity: number;
+  start_price: number;
+  thumbnail_path?: string | null;
+  is_premium: boolean;
 }
 
 export interface LiveLane {
@@ -170,6 +181,7 @@ export interface LiveLane {
   lane_name: string | null;
   status: string;
   current_item: LaneItem | null;
+  upcoming_items?: UpcomingItem[];
 }
 
 export interface LiveState {
