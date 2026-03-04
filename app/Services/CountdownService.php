@@ -818,7 +818,7 @@ class CountdownService
      *   → 1,000円を超える次の上昇金額（例: 1,100円）まで価格上昇
      *   → Aさんは指値発動で離脱、Bさんが1,100円で落札権利保持
      */
-    protected function adjustPriceByBidLimits(Item $item, Auction $auction, Lane $lane): void
+    public function adjustPriceByBidLimits(Item $item, Auction $auction, Lane $lane): void
     {
         $limits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)

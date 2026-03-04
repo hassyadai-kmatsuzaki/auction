@@ -56,7 +56,7 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
             </Box>
           </Box>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ブロック中
+            ブロック中 {displaySeconds}秒
           </Typography>
         </Box>
       </Button>

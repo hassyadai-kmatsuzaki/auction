@@ -10,6 +10,7 @@ use App\Models\BidParticipant;
 use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
+use App\Services\CountdownService;
 
 /**
  * 入札上限価格（指値）を設定・更新するアクション
@@ -17,8 +18,8 @@ use App\Models\Lane;
 class SetBidLimitAction
 {
     public function __construct(
-        private readonly JoinBidAction  $joinBidAction,
-        private readonly LeaveBidAction $leaveBidAction,
+        private readonly JoinBidAction     $joinBidAction,
+        private readonly LeaveBidAction    $leaveBidAction,
     ) {}
 
     /**
@@ -72,7 +73,6 @@ class SetBidLimitAction
                     \App\Models\BidEvent::recordJoin($item->id, $userId, $item->current_price, null, 'auto-bid-from-limit');
                     $autoBidded = true;
 
-                    // Pusherで入札者数変更を通知
                     $lane = Lane::where('current_item_id', $item->id)->first();
                     if ($lane && $item->auction) {
                         $activeCount = BidParticipant::forItem($item->id)->active()->count();
@@ -80,6 +80,21 @@ class SetBidLimitAction
                             broadcast(new BidderUpdated($item->auction->id, $lane->id, $item->id, $activeCount, 'joined'));
                         } catch (\Exception $e) {
                             \Illuminate\Support\Facades\Log::warning("Auto-bid broadcast: " . $e->getMessage());
+                        }
+
+                        // 指値2名以上 → 2番目に低い指値の次の上昇金額まで価格を自動調整
+                        $activeLimitCount = BidLimitPrice::where('item_id', $item->id)
+                            ->where('is_triggered', false)
+                            ->where('limit_price', '>', $item->current_price)
+                            ->count();
+
+                        if ($activeLimitCount >= 2) {
+                            try {
+                                $countdownService = app(CountdownService::class);
+                                $countdownService->adjustPriceByBidLimits($item->fresh(), $item->auction, $lane);
+                            } catch (\Exception $e) {
+                                \Illuminate\Support\Facades\Log::error("adjustPriceByBidLimits on live limit set: " . $e->getMessage());
+                            }
                         }
                     }
                 }

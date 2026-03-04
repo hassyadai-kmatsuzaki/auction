@@ -1,16 +1,18 @@
 import React from 'react';
 import { Chip } from '@mui/material';
+import { Block as BlockIcon } from '@mui/icons-material';
 
 interface Props {
   seconds: number;
-  isCompetitive: boolean;
+  isCompetitive?: boolean;
   /** 競合時のカウントダウン設定秒数（固定表示用） */
   competitiveSeconds?: number;
+  /** フェーズ指定（freeze の場合はブロック中表示） */
+  phase?: 'bidding' | 'freeze';
 }
 
 const formatSeconds = (s: number): string => {
   if (s <= 0) return '0秒';
-  // 1秒未満は小数表示（例: 0.5秒）、1秒以上は整数表示（例: 10秒）
   if (s < 1) return `${s}秒`;
   return `${Math.ceil(s)}秒`;
 };
@@ -18,13 +20,28 @@ const formatSeconds = (s: number): string => {
 /**
  * カウントダウン残り秒数チップ
  *
- * ■ 競合中: 設定秒数を固定表示（レンダリングしない）
- *   例: 「5秒ごとに上昇」→ 常に「残り 5秒」と表示
- *
+ * ■ freeze: 「ブロック中 N秒」グレー表示
+ * ■ 競合中: 設定秒数を固定表示
  * ■ 通常: リアルタイムカウントダウン表示
  */
-export const CountdownChip = React.memo(({ seconds, isCompetitive, competitiveSeconds }: Props) => {
-  // 競合中は設定秒数を固定表示（0.5秒ごとの変化を見せない）
+export const CountdownChip = React.memo(({ seconds, isCompetitive, competitiveSeconds, phase }: Props) => {
+  if (phase === 'freeze') {
+    return (
+      <Chip
+        icon={<BlockIcon sx={{ fontSize: 16 }} />}
+        label={`ブロック中 ${formatSeconds(seconds)}`}
+        size="small"
+        sx={{
+          fontWeight: 'bold',
+          minWidth: 100,
+          bgcolor: 'grey.300',
+          color: 'grey.700',
+          '& .MuiChip-icon': { color: 'grey.600' },
+        }}
+      />
+    );
+  }
+
   const displaySeconds = isCompetitive && competitiveSeconds
     ? competitiveSeconds
     : seconds;
