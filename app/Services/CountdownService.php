@@ -395,39 +395,41 @@ class CountdownService
 
             \App\Models\PriceEvent::recordAutoIncrement($item->id, $oldPrice, $newPrice, $activeBidderCount);
 
-            // 落札権利者（最後に入札した人）以外を自動離脱
-            // ただし、有効な指値（limit_price > 新価格）を持つユーザーは保護して再入札
+            // 価格上昇時の入札者整理:
+            // - 有効な指値（limit_price > 新価格）を持つユーザー → 保護（入札継続）
+            // - 落札権利者（last_bidder）→ 1回分の権利として残す
+            // - それ以外 → 自動離脱（再入札が必要）
             $autoLeftUserIds = [];
             $autoReactivatedUserIds = [];
-            if ($lastBidderUserId) {
-                $othersToLeave = BidParticipant::forItem($item->id)
-                    ->active()
-                    ->where('user_id', '!=', $lastBidderUserId)
-                    ->get();
 
-                // 有効な指値を持つユーザーIDを一括取得
-                $protectedUserIds = BidLimitPrice::where('item_id', $item->id)
-                    ->where('is_triggered', false)
-                    ->where('limit_price', '>', $newPrice)
-                    ->pluck('user_id')
-                    ->toArray();
+            $allActive = BidParticipant::forItem($item->id)->active()->get();
 
-                foreach ($othersToLeave as $participant) {
-                    if (in_array($participant->user_id, $protectedUserIds)) {
-                        // 指値有効ユーザー: 一旦離脱→即再入札（フロントに離脱通知は送らない）
-                        $autoReactivatedUserIds[] = $participant->user_id;
-                    } else {
-                        $participant->deactivate();
-                        $autoLeftUserIds[] = $participant->user_id;
-                    }
-                }
+            // 有効な指値を持つユーザーIDを一括取得
+            $protectedUserIds = BidLimitPrice::where('item_id', $item->id)
+                ->where('is_triggered', false)
+                ->where('limit_price', '>', $newPrice)
+                ->pluck('user_id')
+                ->toArray();
 
-                if (count($autoLeftUserIds) > 0) {
-                    Log::info("Auto-left users on price increment: item={$item->id}, left=" . implode(',', $autoLeftUserIds) . ", holder={$lastBidderUserId}");
+            foreach ($allActive as $participant) {
+                if (in_array($participant->user_id, $protectedUserIds)) {
+                    // 指値有効ユーザー: 保護（入札継続）
+                    $autoReactivatedUserIds[] = $participant->user_id;
+                } elseif ($lastBidderUserId && $participant->user_id === $lastBidderUserId) {
+                    // 落札権利者: この1回分は残す（次回は再入札が必要）
+                    // do nothing
+                } else {
+                    // 指値なし or 発動済み & 落札権利者でない → 離脱
+                    $participant->deactivate();
+                    $autoLeftUserIds[] = $participant->user_id;
                 }
-                if (count($autoReactivatedUserIds) > 0) {
-                    Log::info("Bid-limit protected users on price increment: item={$item->id}, protected=" . implode(',', $autoReactivatedUserIds));
-                }
+            }
+
+            if (count($autoLeftUserIds) > 0) {
+                Log::info("Auto-left users on price increment: item={$item->id}, left=" . implode(',', $autoLeftUserIds) . ", holder={$lastBidderUserId}");
+            }
+            if (count($autoReactivatedUserIds) > 0) {
+                Log::info("Bid-limit protected users on price increment: item={$item->id}, protected=" . implode(',', $autoReactivatedUserIds));
             }
 
             DB::commit();
@@ -439,6 +441,14 @@ class CountdownService
 
         // 価格更新成功 → フリーズカウントダウン開始
         $this->startFreezeCountdown($lane);
+
+        // 落札権利者をクリア（次の価格上昇では再入札しない限り権利なし）
+        $cacheKey = $this->getCacheKey($lane->id);
+        $state = Cache::get($cacheKey);
+        if ($state) {
+            $state['last_bidder_user_id'] = null;
+            Cache::put($cacheKey, $state, 3600);
+        }
 
         $freshItem = $item->fresh();
         $newActiveBidderCount = BidParticipant::forItem($item->id)->active()->count();
@@ -502,20 +512,24 @@ class CountdownService
      * ■ 競合対策: markAsTriggered() に楽観的ロックを使用
      *             → 複数の価格上昇が同時に来ても二重発動しない
      */
-    protected function checkBidLimits(Lane $lane, Item $item, Auction $auction): void
+    protected function checkBidLimits(Lane $lane, Item $item, Auction $auction, array $protectedUserIds = []): void
     {
         // N+1修正: whereHasの代わりにwhereInサブクエリで1クエリに最適化
-        $limits = BidLimitPrice::where('item_id', $item->id)
+        $query = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('limit_price', '<=', $item->current_price) // 上限以下のものだけ取得
+            ->where('limit_price', '<=', $item->current_price)
             ->whereIn('user_id', function ($q) use ($item) {
-                // アクティブな入札者のuser_idのみ
                 $q->select('user_id')
                   ->from('bid_participants')
                   ->where('item_id', $item->id)
                   ->where('is_active', true);
-            })
-            ->get();
+            });
+
+        if (!empty($protectedUserIds)) {
+            $query->whereNotIn('user_id', $protectedUserIds);
+        }
+
+        $limits = $query->get();
 
         if ($limits->isEmpty()) {
             return;
@@ -823,42 +837,58 @@ class CountdownService
         $limits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
             ->orderBy('limit_price', 'asc')
+            ->orderBy('created_at', 'asc')
             ->get();
 
         if ($limits->count() < 2) {
             return;
         }
 
-        // 2番目に低い指値（= 最低指値の次）
-        $secondLowestLimit = $limits[1]->limit_price;
-        // 最低指値
         $lowestLimit = $limits[0]->limit_price;
+        $secondLowestLimit = $limits[1]->limit_price;
 
-        // 最低指値を超える次の上昇金額まで価格を上げる
         $currentPrice = $item->current_price;
         $targetPrice = $currentPrice;
+        $protectedUserIds = [];
 
-        while ($targetPrice <= $lowestLimit) {
-            $increment = $auction->calculatePriceIncrement($targetPrice);
-            $targetPrice += $increment;
-        }
+        // 同額指値の場合: 先に設定した方を保護し、その金額でスタート
+        if ($lowestLimit == $secondLowestLimit) {
+            $targetPrice = $lowestLimit;
 
-        // 2番目の指値も超えてしまう場合は、2番目の指値を超えない最大価格に調整
-        // （2番目の指値者を残すため）
-        if ($targetPrice > $secondLowestLimit) {
-            // 2番目の指値を超えないように再計算
-            $targetPrice = $currentPrice;
-            while (true) {
-                $increment = $auction->calculatePriceIncrement($targetPrice);
-                $nextPrice = $targetPrice + $increment;
-                if ($nextPrice > $secondLowestLimit) {
-                    break;
-                }
-                $targetPrice = $nextPrice;
+            // 同額の指値を持つユーザーのうち、最も早く設定した人を保護
+            $earliestUser = BidLimitPrice::where('item_id', $item->id)
+                ->where('is_triggered', false)
+                ->where('limit_price', $lowestLimit)
+                ->orderBy('created_at', 'asc')
+                ->first();
+
+            if ($earliestUser) {
+                $protectedUserIds[] = $earliestUser->user_id;
+                Log::info("adjustPriceByBidLimits: same-price limits detected, protecting earliest user={$earliestUser->user_id}, price={$lowestLimit}");
             }
-            // 最低でも最低指値は超える
-            if ($targetPrice <= $lowestLimit) {
-                $targetPrice = $lowestLimit + $auction->calculatePriceIncrement($lowestLimit);
+        } else {
+            // 通常ケース: 最低指値を超える次の上昇金額まで価格を上げる
+            while ($targetPrice <= $lowestLimit) {
+                $increment = $auction->calculatePriceIncrement($targetPrice);
+                $targetPrice += $increment;
+            }
+
+            // 2番目の指値も超えてしまう場合は調整
+            if ($targetPrice > $secondLowestLimit) {
+                $targetPrice = $currentPrice;
+                while (true) {
+                    $increment = $auction->calculatePriceIncrement($targetPrice);
+                    $nextPrice = $targetPrice + $increment;
+                    if ($nextPrice > $secondLowestLimit) {
+                        break;
+                    }
+                    $targetPrice = $nextPrice;
+                }
+                // 上昇幅の刻みでは最低指値を超えられない場合、
+                // 2番目の指値者の金額をそのまま価格に設定して落札権利を与える
+                if ($targetPrice <= $lowestLimit) {
+                    $targetPrice = $secondLowestLimit;
+                }
             }
         }
 
@@ -866,15 +896,14 @@ class CountdownService
             return;
         }
 
-        Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, lowest_limit={$lowestLimit}, second_limit={$secondLowestLimit}");
+        Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, lowest_limit={$lowestLimit}, second_limit={$secondLowestLimit}, protected=" . json_encode($protectedUserIds));
 
         $item->update(['current_price' => $targetPrice]);
         \App\Models\PriceEvent::recordAutoIncrement($item->id, $currentPrice, $targetPrice, $limits->count());
 
-        // 指値チェック: 新価格で指値発動するユーザーを離脱させる
         $freshItem = $item->fresh();
         try {
-            $this->checkBidLimits($lane, $freshItem, $auction);
+            $this->checkBidLimits($lane, $freshItem, $auction, $protectedUserIds);
         } catch (\Exception $e) {
             Log::error("adjustPriceByBidLimits checkBidLimits error: " . $e->getMessage());
         }

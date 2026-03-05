@@ -127,9 +127,9 @@ CIDR: 10.0.0.0/16
 
 サブネット構成:
 ┌─────────────────────────────────────────────┐
-│ Public Subnet (AZ-a)  : 10.0.1.0/24        │ ← ALB, NAT Gateway
+│ Public Subnet (AZ-a)  : 10.0.1.0/24        │ ← ALB, EC2
 │ Public Subnet (AZ-c)  : 10.0.2.0/24        │ ← ALB (Multi-AZ)
-│ Private Subnet (AZ-a) : 10.0.10.0/24       │ ← EC2, RDS, Redis
+│ Private Subnet (AZ-a) : 10.0.10.0/24       │ ← RDS, Redis
 │ Private Subnet (AZ-c) : 10.0.20.0/24       │ ← RDS Standby, Redis Replica
 └─────────────────────────────────────────────┘
 ```
@@ -138,22 +138,26 @@ CIDR: 10.0.0.0/16
 
 | サブネット | CIDR | AZ | 用途 |
 |-----------|------|-----|------|
-| public-a | 10.0.1.0/24 | ap-northeast-1a | ALB, NAT Gateway |
+| public-a | 10.0.1.0/24 | ap-northeast-1a | ALB, EC2 |
 | public-c | 10.0.2.0/24 | ap-northeast-1c | ALB (Multi-AZ) |
-| private-a | 10.0.10.0/24 | ap-northeast-1a | EC2, RDS Primary, Redis Primary |
+| private-a | 10.0.10.0/24 | ap-northeast-1a | RDS Primary, Redis Primary |
 | private-c | 10.0.20.0/24 | ap-northeast-1c | RDS Standby, Redis Replica |
 
 ### 3.3 ルートテーブル
 
-**Public サブネット:**
+**Public サブネット（ALB + EC2）:**
 ```
 0.0.0.0/0 → Internet Gateway (igw-xxxxx)
 ```
 
-**Private サブネット:**
+**Private サブネット（RDS + Redis）:**
 ```
-0.0.0.0/0 → NAT Gateway (nat-xxxxx)  ← composer/npm/外部API用
+10.0.0.0/16 → local（VPC内通信のみ）
+※ インターネットアクセス不要（EC2からのみ接続される）
 ```
+
+> **補足**: EC2をパブリックサブネットに配置するため、NAT Gateway は不要です。
+> これにより月額約$45のコスト削減になります。
 
 ### 3.4 セキュリティグループ設計
 
@@ -171,8 +175,11 @@ CIDR: 10.0.0.0/16
 |------|-------|--------|------|
 | インバウンド | 80 | sg-alb | ALBからのHTTP |
 | インバウンド | 8080 | sg-alb | ALBからのWebSocket |
-| インバウンド | 22 | 管理者IP | SSH（踏み台経由推奨） |
+| インバウンド | 22 | 3.112.23.0/29 | EC2 Instance Connect（東京リージョン） |
 | アウトバウンド | 全て | 0.0.0.0/0 | — |
+
+> **ポイント**: `3.112.23.0/29` は東京リージョン（ap-northeast-1）の EC2 Instance Connect 用IPレンジです。
+> これにより、AWSコンソールのブラウザSSHからのみ接続を許可し、外部からのSSHアクセスをブロックできます。
 
 #### sg-rds（RDS用）
 
@@ -190,105 +197,283 @@ CIDR: 10.0.0.0/16
 
 ---
 
-## 4. EC2 インスタンス構築
+## 4. EC2 インスタンス構築（画面の手順付き）
 
-### 4.1 インスタンス仕様
+> **この章では、AWSコンソールの画面を見ながら1ステップずつ進められるように説明します。**
 
-| 項目 | 推奨値 | 説明 |
+---
+
+### 4.1 EC2 インスタンスを作成する
+
+#### 手順1: EC2ダッシュボードを開く
+
+1. AWSコンソール（https://console.aws.amazon.com）にログイン
+2. 上部の検索バーに「**EC2**」と入力 → 「EC2」をクリック
+3. 左メニューの「**インスタンス**」をクリック
+4. 右上の「**インスタンスを起動**」ボタン（オレンジ色）をクリック
+
+#### 手順2: 名前を入力
+
+| 項目 | 入力値 |
+|------|--------|
+| 名前 | `auction-server` |
+
+#### 手順3: AMI（OS）を選択
+
+1. 「**Amazon Linux 2023 AMI**」を選択（デフォルトで選ばれています）
+2. アーキテクチャは「**64ビット (x86)**」のまま
+
+> **なぜ Amazon Linux 2023？**: AWSが提供する無料のLinux。EC2 Instance Connect がプリインストール済みです。
+
+#### 手順4: インスタンスタイプを選択
+
+| 項目 | 選択値 | 説明 |
 |------|--------|------|
-| AMI | Amazon Linux 2023 | 最新・長期サポート |
-| インスタンスタイプ | **t3.medium** | 2 vCPU / 4GB RAM（500人規模） |
-| ストレージ | gp3 30GB | アプリコード + ログ |
-| キーペア | 作成して安全に保管 | SSH接続用 |
-| IAMロール | EC2用ロール | CloudWatch Logs, S3アクセス |
-| サブネット | private-a | プライベートサブネット |
-| セキュリティグループ | sg-ec2 | 上記参照 |
+| インスタンスタイプ | **t3.medium** | 2 vCPU / 4GB RAM（同時接続500人規模に対応） |
 
-### 4.2 初期セットアップスクリプト
+> **コストの目安**: 約$30〜35/月（東京リージョン）
 
-SSH接続後、以下を実行:
+#### 手順5: キーペアの設定
+
+1. 「**キーペアなしで続行**」を選択
+
+> **理由**: EC2 Instance Connect（ブラウザSSH）で接続するため、キーペアは不要です。
+> キーペアのファイル管理が不要になり、セキュリティも向上します。
+
+#### 手順6: ネットワーク設定
+
+「**編集**」ボタンをクリックして、以下を設定します。
+
+| 項目 | 設定値 |
+|------|--------|
+| VPC | `auction-vpc`（作成済みのVPC） |
+| サブネット | **`public-a`**（10.0.1.0/24） |
+| パブリックIPの自動割り当て | **有効化** |
+| ファイアウォール（セキュリティグループ） | 「**既存のセキュリティグループを選択する**」 |
+| セキュリティグループ | **`sg-ec2`**（作成済み） |
+
+> **重要**: 「パブリックIPの自動割り当て」が「**有効化**」になっていることを必ず確認してください。
+> これがないと EC2 Instance Connect で接続できません。
+
+#### 手順7: ストレージの設定
+
+| 項目 | 設定値 |
+|------|--------|
+| サイズ | **30 GiB** |
+| ボリュームタイプ | **gp3** |
+
+#### 手順8: 高度な詳細（ユーザーデータ）
+
+1. 「**高度な詳細**」セクションを展開（クリックして開く）
+2. 一番下の「**ユーザーデータ**」欄に、以下をコピー＆ペースト
 
 ```bash
 #!/bin/bash
 
-# === 1. システムアップデート ===
+# === システムアップデート ===
 sudo dnf update -y
 
-# === 2. Nginx インストール ===
+# === Nginx インストール ===
 sudo dnf install -y nginx
 sudo systemctl enable nginx
 
-# === 3. PHP 8.2 + 拡張 インストール ===
+# === PHP 8.2 + 拡張 インストール ===
 sudo dnf install -y php8.2 php8.2-fpm php8.2-cli php8.2-common \
     php8.2-mysqlnd php8.2-pdo php8.2-mbstring php8.2-xml \
     php8.2-curl php8.2-zip php8.2-bcmath php8.2-intl \
     php8.2-redis php8.2-opcache php8.2-pcntl
 
-# Amazon Linux 2023 で php8.2 が無い場合は Remi リポジトリを使用:
-# sudo dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm
-# sudo dnf module reset php -y
-# sudo dnf module enable php:remi-8.2 -y
-# sudo dnf install -y php php-fpm php-cli php-common php-mysqlnd php-pdo \
-#     php-mbstring php-xml php-curl php-zip php-bcmath php-intl \
-#     php-redis php-opcache php-pcntl
-
 sudo systemctl enable php-fpm
 
-# === 4. Composer インストール ===
+# === Composer インストール ===
 curl -sS https://getcomposer.org/installer | php
 sudo mv composer.phar /usr/local/bin/composer
 
-# === 5. Node.js 20 LTS インストール ===
+# === Node.js 20 LTS インストール ===
 curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
 sudo dnf install -y nodejs
 
-# === 6. Supervisor インストール ===
+# === Supervisor インストール ===
 sudo dnf install -y supervisor
 sudo systemctl enable supervisord
 
-# === 7. Git インストール ===
+# === Git インストール ===
 sudo dnf install -y git
 
-# === 8. CloudWatch Agent インストール ===
+# === CloudWatch Agent インストール ===
 sudo dnf install -y amazon-cloudwatch-agent
 
-# === 9. アプリ用ディレクトリ作成 ===
+# === アプリ用ディレクトリ作成 ===
 sudo mkdir -p /var/www/auction
 sudo chown -R ec2-user:nginx /var/www/auction
 
-# === 10. ログディレクトリ ===
+# === ログディレクトリ ===
 sudo mkdir -p /var/log/auction
 sudo chown -R ec2-user:nginx /var/log/auction
 
-echo "=== セットアップ完了 ==="
+echo "=== 初期セットアップ完了 ==="
 ```
 
-### 4.3 アプリケーションデプロイ
+> **ユーザーデータとは？**: EC2が起動した時に自動で実行されるスクリプトです。
+> 上記を貼り付けておくと、必要なソフトウェアが全て自動でインストールされます。
+
+#### 手順9: インスタンスを起動
+
+1. 右側の「**概要**」パネルで設定内容を確認
+2. 「**インスタンスを起動**」ボタン（オレンジ色）をクリック
+3. 「**インスタンスの起動に成功しました**」と表示されれば完了
+
+> **起動には2〜3分かかります。** ユーザーデータのインストールも含めると **約5分** で準備完了です。
+
+---
+
+### 4.2 EC2 Instance Connect で接続する
+
+#### 手順1: インスタンスの状態を確認
+
+1. EC2 → 「**インスタンス**」をクリック
+2. `auction-server` の「インスタンスの状態」が「**実行中**」になるまで待つ
+3. 「ステータスチェック」が「**2/2 のチェックに合格しました**」になるまで待つ（約2分）
+
+#### 手順2: 接続する
+
+1. `auction-server` のチェックボックスにチェック
+2. 上部の「**接続**」ボタンをクリック
+3. 「**EC2 Instance Connect**」タブを選択（デフォルト）
+4. ユーザー名: **`ec2-user`**（そのまま）
+5. 「**接続**」ボタンをクリック
+
+> **ブラウザ上に黒い画面（ターミナル）が開けば接続成功です！**
+
+#### 接続できない場合のチェックリスト
+
+| 確認項目 | 確認方法 |
+|---------|---------|
+| インスタンスが「実行中」か | EC2 → インスタンス一覧で確認 |
+| パブリックIPがあるか | インスタンス詳細の「パブリック IPv4 アドレス」を確認 |
+| サブネットがパブリックか | サブネットのルートテーブルに `0.0.0.0/0 → igw-xxx` があるか |
+| セキュリティグループ | ポート22で `3.112.23.0/29` が許可されているか |
+| ステータスチェック | 「2/2 のチェックに合格」になっているか |
+
+---
+
+### 4.3 初期セットアップの確認
+
+EC2 Instance Connect で接続したら、ユーザーデータが正常に実行されたか確認します。
 
 ```bash
-# アプリコードを配置
-cd /var/www/auction
-git clone <your-repo-url> .
+# ユーザーデータのログを確認（エラーがないか）
+sudo cat /var/log/cloud-init-output.log | tail -5
+```
 
-# 依存関係インストール
+「`=== 初期セットアップ完了 ===`」と表示されていればOKです。
+
+もしまだ実行中の場合は数分待ってから再度確認してください。
+
+各ソフトウェアのバージョン確認:
+
+```bash
+nginx -v          # nginx version: 1.xx.x
+php -v            # PHP 8.2.x
+composer -V       # Composer version 2.x.x
+node -v           # v20.x.x
+git --version     # git version 2.x.x
+```
+
+> **もし PHP 8.2 がインストールされていない場合**（Amazon Linux 2023 のバージョンによる）:
+>
+> ```bash
+> sudo dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+> sudo dnf module reset php -y
+> sudo dnf module enable php:remi-8.2 -y
+> sudo dnf install -y php php-fpm php-cli php-common php-mysqlnd php-pdo \
+>     php-mbstring php-xml php-curl php-zip php-bcmath php-intl \
+>     php-redis php-opcache php-pcntl
+> sudo systemctl enable php-fpm
+> ```
+
+---
+
+### 4.4 アプリケーションのデプロイ
+
+EC2 Instance Connect で接続した状態で、以下のコマンドを **1行ずつコピー＆ペースト** して実行します。
+
+#### ステップ1: アプリコードの配置
+
+```bash
+cd /var/www/auction
+sudo git clone <あなたのリポジトリURL> .
+sudo chown -R ec2-user:nginx /var/www/auction
+```
+
+> `<あなたのリポジトリURL>` は GitHub などのリポジトリURLに置き換えてください。
+> 例: `https://github.com/yourname/auction.git`
+
+#### ステップ2: 依存パッケージのインストール
+
+```bash
+cd /var/www/auction
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
+```
 
-# .env 設定
+> **この処理には3〜5分かかります。** 途中でエラーが出なければ成功です。
+
+#### ステップ3: 環境設定ファイル（.env）の作成
+
+```bash
 cp .env.example .env
-# .env を本番値に編集（セクション18参照）
+```
 
-# Laravel セットアップ
+次に .env ファイルを編集します:
+
+```bash
+sudo nano .env
+```
+
+> **nano の使い方**:
+> - 矢印キーでカーソル移動
+> - 文字を入力・削除して編集
+> - 保存: `Ctrl + O` → `Enter`
+> - 終了: `Ctrl + X`
+
+.env の主要な設定値（セクション18に詳細テンプレートあり）:
+
+```
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://あなたのドメイン
+
+DB_HOST=（RDSのエンドポイント）
+DB_DATABASE=auction
+DB_USERNAME=admin
+DB_PASSWORD=（RDS作成時に設定したパスワード）
+
+REDIS_HOST=（ElastiCacheのエンドポイント）
+
+REVERB_HOST=0.0.0.0
+REVERB_PORT=8080
+```
+
+#### ステップ4: Laravel の初期設定
+
+```bash
 php artisan key:generate
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 php artisan migrate --force
+```
 
-# パーミッション
+#### ステップ5: パーミッションの設定
+
+```bash
 sudo chown -R ec2-user:nginx /var/www/auction
 sudo chmod -R 775 storage bootstrap/cache
 ```
+
+> **ここまで完了すれば、アプリケーションの配置は完了です！**
+> 次のセクション（Nginx設定、Supervisor設定）に進んでください。
 
 ---
 
@@ -875,47 +1060,43 @@ echo "=== デプロイ完了: $(date) ==="
 
 ### 14.1 EC2 セキュリティ
 
-```bash
-# SSH キーのパーミッション
-chmod 400 ~/.ssh/auction-key.pem
+EC2 Instance Connect を使用するため、SSH鍵の管理は不要です。
+セキュリティグループ（sg-ec2）で以下のみ許可しています:
 
-# 不要なポートを閉じる（sg-ec2 で制御）
-# SSH は踏み台サーバー経由 or SSM Session Manager 推奨
+| ポート | 許可元 | 用途 |
+|--------|--------|------|
+| 80 | sg-alb | ALBからのHTTP |
+| 8080 | sg-alb | ALBからのWebSocket |
+| 22 | 3.112.23.0/29 | EC2 Instance Connect（東京リージョン） |
 
-# ファイアウォール（EC2内部）
-sudo dnf install -y firewalld
-sudo systemctl enable firewalld
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-port=8080/tcp
-sudo firewall-cmd --reload
-```
+> **ポイント**: SSH（ポート22）は EC2 Instance Connect の AWS IPレンジのみ許可。
+> 外部からの直接SSH接続はブロックされます。
+
+#### EC2への接続方法
+
+1. AWSコンソール → EC2 → インスタンス → `auction-server` を選択
+2. 「**接続**」ボタン → 「**EC2 Instance Connect**」タブ → 「**接続**」
+
+> ブラウザ上でターミナルが開きます。SSH鍵やSSMの設定は不要です。
 
 ### 14.2 アプリケーションセキュリティ
 
+EC2 Instance Connect で接続後、以下を確認してください:
+
 ```bash
-# .env ファイルのパーミッション
+# .env ファイルのパーミッション（他ユーザーから読めないようにする）
 chmod 600 /var/www/auction/.env
 
 # storage ディレクトリ
 chmod -R 775 /var/www/auction/storage
 chmod -R 775 /var/www/auction/bootstrap/cache
-
-# デバッグモード OFF
-# .env: APP_DEBUG=false
-# .env: APP_ENV=production
 ```
 
-### 14.3 SSM Session Manager（SSH代替・推奨）
+.env ファイルで以下が設定されていることを確認:
 
-SSHポートを開放せずにEC2に接続できる:
-
-1. EC2にIAMロール `AmazonSSMManagedInstanceCore` を付与
-2. SSM Agent はAmazon Linux 2023にプリインストール済み
-3. AWSコンソール → Systems Manager → Session Manager で接続
-
-```bash
-# CLIから接続
-aws ssm start-session --target i-xxxxxxxxxxxxx
+```
+APP_DEBUG=false
+APP_ENV=production
 ```
 
 ---
@@ -1288,18 +1469,36 @@ redis-cli -h <endpoint> -a <password> --tls info memory
 
 ## 構築チェックリスト
 
-- [ ] VPC + サブネット + IGW + NAT Gateway 作成
-- [ ] セキュリティグループ 4つ作成（ALB, EC2, RDS, Redis）
+### 事前準備（VPC・ネットワーク）
+- [ ] VPC（auction-vpc）作成
+- [ ] パブリックサブネット 2つ作成（public-a, public-c）
+- [ ] プライベートサブネット 2つ作成（private-a, private-c）
+- [ ] インターネットゲートウェイ作成 → VPCにアタッチ
+- [ ] パブリックサブネットのルートテーブルに `0.0.0.0/0 → IGW` を追加
+- [ ] セキュリティグループ 4つ作成（sg-alb, sg-ec2, sg-rds, sg-redis）
+
+> **NAT Gateway は不要です**（EC2がパブリックサブネットにあるため）
+
+### データベース・キャッシュ（EC2より先に作成）
 - [ ] RDS MySQL 作成 + パラメータグループ設定
 - [ ] ElastiCache Redis 作成
-- [ ] EC2 インスタンス起動 + 初期セットアップ
+
+### EC2（メインサーバー）
+- [ ] EC2 インスタンス起動（パブリックサブネット、パブリックIP有効）
+- [ ] EC2 Instance Connect でブラウザから接続できることを確認
+- [ ] ユーザーデータの実行完了を確認（`nginx -v`, `php -v` 等）
+- [ ] アプリケーションコードをデプロイ
+- [ ] .env ファイルを本番値に設定
+- [ ] `php artisan migrate --force` 実行
 - [ ] Nginx + PHP-FPM + Supervisor 設定
-- [ ] アプリケーションデプロイ
+
+### SSL・ロードバランサー
 - [ ] ACM 証明書発行
 - [ ] ALB 作成 + ターゲットグループ + リスナー設定
 - [ ] Route 53 DNS レコード設定
+
+### 動作確認
+- [ ] HTTPS でサイトにアクセスできる
+- [ ] WebSocket 接続が正常（ブラウザコンソールで確認）
+- [ ] ヘルスチェックが合格している
 - [ ] CloudWatch Agent + アラート設定
-- [ ] SSL/HTTPS 動作確認
-- [ ] WebSocket 接続確認
-- [ ] ヘルスチェック確認
-- [ ] 負荷テスト実施
