@@ -62,7 +62,8 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         
         // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
-        Cache::put($jobKey, true, $this->timeout + 600); // timeout + 10分余裕
+        Cache::put($jobKey, true, $this->timeout + 600);
+        Cache::put("countdown_job_heartbeat:auction:{$this->auctionId}", now()->timestamp, 300);
 
         // === 10秒プレスタートカウントダウン ===
         $startAtKey = "auction:{$this->auctionId}:start_at";
@@ -138,9 +139,9 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         }
         
         $iterations = 0;
-        $idleIterations = 0; // 一時停止中の待機カウント
-
-        $consecutiveErrors = 0; // 連続エラーカウント
+        $idleIterations = 0;
+        $consecutiveErrors = 0;
+        $heartbeatKey = "countdown_job_heartbeat:auction:{$this->auctionId}";
 
         while ($iterations < $this->maxIterations) {
             try {
@@ -246,13 +247,18 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 }
             }
 
-            // 0.5秒待機
+            // ハートビート更新（5秒ごと）
+            if ($iterations % 10 === 0) {
+                Cache::put($heartbeatKey, now()->timestamp, 300);
+            }
+
             usleep((int)(self::TICK_INTERVAL * 1_000_000));
             $iterations++;
         }
 
-        // ジョブ実行中フラグをクリア
+        // ジョブ実行中フラグ・ハートビートをクリア
         Cache::forget($jobKey);
+        Cache::forget($heartbeatKey);
         
         Log::info("Auction countdown job COMPLETED for auction {$this->auctionId}, iterations: {$iterations}, idle: {$idleIterations}");
     }
