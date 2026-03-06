@@ -396,40 +396,47 @@ class CountdownService
             \App\Models\PriceEvent::recordAutoIncrement($item->id, $oldPrice, $newPrice, $activeBidderCount);
 
             // 価格上昇時の入札者整理:
-            // - 有効な指値（limit_price > 新価格）を持つユーザー → 保護（入札継続）
-            // - 落札権利者（last_bidder）→ 1回分の権利として残す
-            // - それ以外 → 自動離脱（再入札が必要）
+            // - 有効な指値（limit_price > 新価格）を持つユーザー → 入札継続
+            //   └ 指値が最も高いユーザーが落札権利者
+            // - 有効な指値ユーザーがいる場合 → 手動入札者は全員離脱
+            // - 有効な指値ユーザーがいない場合 → lastBidder が1回分残る（従来動作）
             $autoLeftUserIds = [];
-            $autoReactivatedUserIds = [];
 
             $allActive = BidParticipant::forItem($item->id)->active()->get();
 
-            // 有効な指値を持つユーザーIDを一括取得
-            $protectedUserIds = BidLimitPrice::where('item_id', $item->id)
+            // 有効な指値を持つユーザーを指値の高い順に取得
+            $validLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
                 ->where('limit_price', '>', $newPrice)
-                ->pluck('user_id')
-                ->toArray();
+                ->orderBy('limit_price', 'desc')
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            $protectedUserIds = $validLimits->pluck('user_id')->toArray();
+            $hasProtectedUsers = count($protectedUserIds) > 0;
+
+            // 落札権利者の決定:
+            // 有効な指値ユーザーがいれば指値最高者、いなければ lastBidder
+            $effectiveHolder = $hasProtectedUsers
+                ? $validLimits->first()->user_id
+                : $lastBidderUserId;
 
             foreach ($allActive as $participant) {
                 if (in_array($participant->user_id, $protectedUserIds)) {
-                    // 指値有効ユーザー: 保護（入札継続）
-                    $autoReactivatedUserIds[] = $participant->user_id;
-                } elseif ($lastBidderUserId && $participant->user_id === $lastBidderUserId) {
-                    // 落札権利者: この1回分は残す（次回は再入札が必要）
-                    // do nothing
+                    // 有効な指値ユーザー: 入札継続
+                } elseif (!$hasProtectedUsers && $lastBidderUserId && $participant->user_id === $lastBidderUserId) {
+                    // 指値ユーザーがいない場合のみ、lastBidder を1回分残す
                 } else {
-                    // 指値なし or 発動済み & 落札権利者でない → 離脱
                     $participant->deactivate();
                     $autoLeftUserIds[] = $participant->user_id;
                 }
             }
 
             if (count($autoLeftUserIds) > 0) {
-                Log::info("Auto-left users on price increment: item={$item->id}, left=" . implode(',', $autoLeftUserIds) . ", holder={$lastBidderUserId}");
+                Log::info("Auto-left users on price increment: item={$item->id}, left=" . implode(',', $autoLeftUserIds) . ", holder={$effectiveHolder}");
             }
-            if (count($autoReactivatedUserIds) > 0) {
-                Log::info("Bid-limit protected users on price increment: item={$item->id}, protected=" . implode(',', $autoReactivatedUserIds));
+            if ($hasProtectedUsers) {
+                Log::info("Bid-limit holder on price increment: item={$item->id}, holder={$effectiveHolder}, protected=" . implode(',', $protectedUserIds));
             }
 
             DB::commit();
@@ -442,11 +449,12 @@ class CountdownService
         // 価格更新成功 → フリーズカウントダウン開始
         $this->startFreezeCountdown($lane);
 
-        // 落札権利者をクリア（次の価格上昇では再入札しない限り権利なし）
+        // 落札権利者を更新:
+        // 指値最高者がいればその人を維持、いなければクリア
         $cacheKey = $this->getCacheKey($lane->id);
         $state = Cache::get($cacheKey);
         if ($state) {
-            $state['last_bidder_user_id'] = null;
+            $state['last_bidder_user_id'] = $hasProtectedUsers ? $effectiveHolder : null;
             Cache::put($cacheKey, $state, 3600);
         }
 
@@ -658,8 +666,9 @@ class CountdownService
                 Log::info("moveToNextItem: activatePendingBidLimits returned {$autoActivated} for item {$freshNext->id}");
 
                 // 指値2名以上 → 2番目に低い指値の次の上昇金額まで価格を自動調整
+                // startFreeze=false: pre_bidフェーズを維持する（商品切替直後なので）
                 if ($autoActivated >= 2) {
-                    $this->adjustPriceByBidLimits($freshNext, $auction, $lane);
+                    $this->adjustPriceByBidLimits($freshNext, $auction, $lane, false);
                 }
             } catch (\Exception $e) {
                 Log::error("Auto-bid activation error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
@@ -677,7 +686,8 @@ class CountdownService
                 Log::warning("Favorite notify error: " . $e->getMessage());
             }
 
-            // ★ 自動入札で追加された入札者を含めた実際のカウントを取得
+            // ★ 自動入札・指値調整後の最新状態を取得
+            $nextItem->refresh();
             $activeBidderCount = BidParticipant::forItem($nextItem->id)->active()->count();
             $currentItemData = [
                 'id' => $nextItem->id,
@@ -831,11 +841,17 @@ class CountdownService
      * 例: 開始100円、Aさん指値1,000円、Bさん指値2,000円
      *   → 1,000円を超える次の上昇金額（例: 1,100円）まで価格上昇
      *   → Aさんは指値発動で離脱、Bさんが1,100円で落札権利保持
+     *
+     * @param bool $startFreeze true=ライブ中の指値設定時（フリーズ開始）
+     *                          false=商品切替時（pre_bidフェーズを維持）
      */
-    public function adjustPriceByBidLimits(Item $item, Auction $auction, Lane $lane): void
+    public function adjustPriceByBidLimits(Item $item, Auction $auction, Lane $lane, bool $startFreeze = true): void
     {
+        $currentPrice = $item->current_price;
+
         $limits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
+            ->where('limit_price', '>', $currentPrice)
             ->orderBy('limit_price', 'asc')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -847,7 +863,6 @@ class CountdownService
         $lowestLimit = $limits[0]->limit_price;
         $secondLowestLimit = $limits[1]->limit_price;
 
-        $currentPrice = $item->current_price;
         $targetPrice = $currentPrice;
         $protectedUserIds = [];
 
@@ -865,6 +880,13 @@ class CountdownService
             if ($earliestUser) {
                 $protectedUserIds[] = $earliestUser->user_id;
                 Log::info("adjustPriceByBidLimits: same-price limits detected, protecting earliest user={$earliestUser->user_id}, price={$lowestLimit}");
+            }
+
+            // 同額より高い指値を持つユーザーも保護
+            foreach ($limits as $l) {
+                if ($l->limit_price > $targetPrice && !in_array($l->user_id, $protectedUserIds)) {
+                    $protectedUserIds[] = $l->user_id;
+                }
             }
         } else {
             // 通常ケース: 最低指値を超える次の上昇金額まで価格を上げる
@@ -890,22 +912,126 @@ class CountdownService
                     $targetPrice = $secondLowestLimit;
                 }
             }
+
+            // 2番目以降の指値者で、指値がまだ有効な人を保護
+            for ($i = 1; $i < $limits->count(); $i++) {
+                if ($limits[$i]->limit_price > $targetPrice) {
+                    $protectedUserIds[] = $limits[$i]->user_id;
+                } elseif ($limits[$i]->limit_price == $targetPrice) {
+                    $samePriceEarliest = BidLimitPrice::where('item_id', $item->id)
+                        ->where('is_triggered', false)
+                        ->where('limit_price', $targetPrice)
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+                    if ($samePriceEarliest && $samePriceEarliest->user_id === $limits[$i]->user_id) {
+                        $protectedUserIds[] = $limits[$i]->user_id;
+                    }
+                }
+            }
         }
 
         if ($targetPrice <= $currentPrice) {
             return;
         }
 
-        Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, lowest_limit={$lowestLimit}, second_limit={$secondLowestLimit}, protected=" . json_encode($protectedUserIds));
+        Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, lowest_limit={$lowestLimit}, second_limit={$secondLowestLimit}, protected=" . json_encode($protectedUserIds) . ", startFreeze={$startFreeze}");
 
         $item->update(['current_price' => $targetPrice]);
         \App\Models\PriceEvent::recordAutoIncrement($item->id, $currentPrice, $targetPrice, $limits->count());
 
         $freshItem = $item->fresh();
+
+        // 指値発動チェック（保護対象を除外して離脱させる）
+        $autoLeftUserIds = [];
         try {
-            $this->checkBidLimits($lane, $freshItem, $auction, $protectedUserIds);
+            $triggeredLimits = BidLimitPrice::where('item_id', $item->id)
+                ->where('is_triggered', false)
+                ->where('limit_price', '<=', $freshItem->current_price)
+                ->whereIn('user_id', function ($q) use ($item) {
+                    $q->select('user_id')
+                      ->from('bid_participants')
+                      ->where('item_id', $item->id)
+                      ->where('is_active', true);
+                })
+                ->when(!empty($protectedUserIds), fn ($q) => $q->whereNotIn('user_id', $protectedUserIds))
+                ->get();
+
+            foreach ($triggeredLimits as $tl) {
+                try {
+                    $triggered = $tl->markAsTriggered();
+                    if (!$triggered) continue;
+
+                    $this->leaveBidAction->execute($freshItem, $tl->user_id);
+                    $autoLeftUserIds[] = $tl->user_id;
+
+                    broadcast(new BidLimitReached(
+                        $auction->id, $lane->id, $item->id,
+                        $tl->user_id, $freshItem->current_price, $tl->limit_price,
+                        $freshItem->species_name ?? ''
+                    ));
+
+                    try {
+                        app(NotificationService::class)->sendBidLimitReachedNotification(
+                            $tl->user_id, $freshItem->species_name ?? '商品',
+                            $tl->limit_price, $freshItem->current_price
+                        );
+                    } catch (\Exception $lineErr) {
+                        Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
+                    }
+
+                    Log::info("adjustPriceByBidLimits: limit triggered user={$tl->user_id}, price={$freshItem->current_price}, limit={$tl->limit_price}");
+                } catch (\Exception $e) {
+                    Log::error("adjustPriceByBidLimits checkBidLimit error: user={$tl->user_id} - " . $e->getMessage());
+                }
+            }
         } catch (\Exception $e) {
             Log::error("adjustPriceByBidLimits checkBidLimits error: " . $e->getMessage());
+        }
+
+        if ($startFreeze) {
+            $this->startFreezeCountdown($lane);
+        }
+
+        // 指値最高者を落札権利者としてキャッシュに記録
+        $highestLimitUser = BidLimitPrice::where('item_id', $item->id)
+            ->where('is_triggered', false)
+            ->where('limit_price', '>', $freshItem->current_price)
+            ->orderBy('limit_price', 'desc')
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        if ($highestLimitUser) {
+            $cacheKey = $this->getCacheKey($lane->id);
+            $state = Cache::get($cacheKey);
+            if ($state) {
+                $state['last_bidder_user_id'] = $highestLimitUser->user_id;
+                Cache::put($cacheKey, $state, 3600);
+            }
+        }
+
+        $newActiveBidderCount = BidParticipant::forItem($item->id)->active()->count();
+        $newCountdown = $auction->calculateCountdownSeconds($freshItem->current_price);
+
+        try {
+            broadcast(new \App\Events\PriceUpdated(
+                $auction->id, $lane->id, $item->id,
+                $freshItem->current_price, $newActiveBidderCount,
+                $newCountdown['bid_countdown_seconds'],
+                $autoLeftUserIds
+            ));
+        } catch (\Exception $e) {
+            Log::warning("adjustPriceByBidLimits PriceUpdated broadcast error: " . $e->getMessage());
+        }
+
+        if (count($autoLeftUserIds) > 0) {
+            try {
+                broadcast(new BidderUpdated(
+                    $auction->id, $lane->id, $item->id,
+                    $newActiveBidderCount, 'left'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("adjustPriceByBidLimits BidderUpdated broadcast error: " . $e->getMessage());
+            }
         }
     }
 }

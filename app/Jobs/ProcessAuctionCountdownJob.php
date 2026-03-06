@@ -102,6 +102,12 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                         if ($activated > 0) {
                             Log::info("Initial auto-bid: lane {$laneId}, activated {$activated} users");
                         }
+
+                        // 指値2名以上 → 価格を自動調整（startFreeze=false: 最初のカウントダウンを維持）
+                        if ($activated >= 2) {
+                            $freshItem = $lane->currentItem->fresh();
+                            $countdownService->adjustPriceByBidLimits($freshItem, $lane->auction, $lane, false);
+                        }
                     } catch (\Exception $e) {
                         Log::warning("Initial auto-bid error lane {$laneId}: " . $e->getMessage());
                     }

@@ -66,7 +66,6 @@ class SetBidLimitAction
                 }
             } else {
                 // 現在価格 < 指値 → 自動で入札ON
-                // JoinBidAction は pre_bid フェーズで拒否するため、直接参加させる
                 $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                 if (!$participant || !$participant->is_active) {
                     BidParticipant::participate($item->id, $userId, true, null, 'auto-bid-from-limit');
@@ -81,20 +80,23 @@ class SetBidLimitAction
                         } catch (\Exception $e) {
                             \Illuminate\Support\Facades\Log::warning("Auto-bid broadcast: " . $e->getMessage());
                         }
+                    }
+                }
 
-                        // 指値2名以上 → 2番目に低い指値の次の上昇金額まで価格を自動調整
-                        $activeLimitCount = BidLimitPrice::where('item_id', $item->id)
-                            ->where('is_triggered', false)
-                            ->where('limit_price', '>', $item->current_price)
-                            ->count();
+                // 指値2名以上 → 価格を自動調整（既に入札中のユーザーが指値を設定した場合も含む）
+                $lane = $lane ?? Lane::where('current_item_id', $item->id)->first();
+                if ($lane && $item->auction) {
+                    $activeLimitCount = BidLimitPrice::where('item_id', $item->id)
+                        ->where('is_triggered', false)
+                        ->where('limit_price', '>', $item->current_price)
+                        ->count();
 
-                        if ($activeLimitCount >= 2) {
-                            try {
-                                $countdownService = app(CountdownService::class);
-                                $countdownService->adjustPriceByBidLimits($item->fresh(), $item->auction, $lane);
-                            } catch (\Exception $e) {
-                                \Illuminate\Support\Facades\Log::error("adjustPriceByBidLimits on live limit set: " . $e->getMessage());
-                            }
+                    if ($activeLimitCount >= 2) {
+                        try {
+                            $countdownService = app(CountdownService::class);
+                            $countdownService->adjustPriceByBidLimits($item->fresh(), $item->auction, $lane);
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error("adjustPriceByBidLimits on live limit set: " . $e->getMessage());
                         }
                     }
                 }
