@@ -240,8 +240,8 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 $consecutiveErrors++;
                 Log::error("Auction countdown loop error #{$consecutiveErrors}: " . $e->getMessage());
 
-                // 連続100回エラーが続いたら異常と判断してジョブ終了
-                if ($consecutiveErrors >= 100) {
+                // 連続1000回（約8分）エラーが続いたら異常と判断してジョブ終了
+                if ($consecutiveErrors >= 1000) {
                     Log::critical("Auction {$this->auctionId}: Too many consecutive errors ({$consecutiveErrors}), stopping job");
                     break;
                 }

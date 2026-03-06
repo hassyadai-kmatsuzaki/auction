@@ -313,12 +313,16 @@ class CountdownService
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
         $state['pre_bid_remaining_seconds'] = $state['remaining_seconds'];
 
-        broadcast(new CountdownTick(
-            $auction->id, $lane->id, $item->id,
-            (float) $state['remaining_seconds'],
-            0, $item->current_price,
-            'pre_bid'
-        ));
+        try {
+            broadcast(new CountdownTick(
+                $auction->id, $lane->id, $item->id,
+                (float) $state['remaining_seconds'],
+                0, $item->current_price,
+                'pre_bid'
+            ));
+        } catch (\Exception $e) {
+            Log::warning("Pre-bid broadcast error lane {$laneId}: " . $e->getMessage());
+        }
 
         if ($state['remaining_seconds'] <= 0) {
             $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
@@ -349,12 +353,16 @@ class CountdownService
 
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
-        broadcast(new CountdownTick(
-            $auction->id, $lane->id, $item->id,
-            (float) $state['remaining_seconds'],
-            $activeBidderCount, $item->current_price,
-            'freeze'
-        ));
+        try {
+            broadcast(new CountdownTick(
+                $auction->id, $lane->id, $item->id,
+                (float) $state['remaining_seconds'],
+                $activeBidderCount, $item->current_price,
+                'freeze'
+            ));
+        } catch (\Exception $e) {
+            Log::warning("Freeze broadcast error lane {$laneId}: " . $e->getMessage());
+        }
 
         if ($state['remaining_seconds'] <= 0) {
             $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
