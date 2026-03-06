@@ -47,8 +47,12 @@ class LeaveBidAction
         $auction = $item->auction;
         $lane    = Lane::where('current_item_id', $item->id)->first();
         if ($lane) {
-            broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'left'))
-                ->toOthers();
+            try {
+                broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'left'))
+                    ->toOthers();
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("LeaveBid BidderUpdated broadcast error: " . $e->getMessage());
+            }
         }
 
         return BidResultDto::success([

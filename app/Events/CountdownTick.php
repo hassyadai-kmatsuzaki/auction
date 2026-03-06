@@ -17,7 +17,7 @@ class CountdownTick implements ShouldBroadcastNow
     public int $itemId;
     public float $remainingSeconds;
     public int $activeBiddersCount;
-    public int $currentPrice;
+    public float $currentPrice;
     public string $phase;
 
     /**
@@ -29,7 +29,7 @@ class CountdownTick implements ShouldBroadcastNow
         int $itemId,
         float $remainingSeconds,
         int $activeBiddersCount,
-        int $currentPrice,
+        float $currentPrice,
         string $phase = 'bidding'
     ) {
         $this->auctionId = $auctionId;

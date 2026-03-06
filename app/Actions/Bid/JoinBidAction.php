@@ -84,8 +84,12 @@ class JoinBidAction
                 Cache::put($cacheKey, $state, 3600);
             }
 
-            broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'joined'))
-                ->toOthers();
+            try {
+                broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'joined'))
+                    ->toOthers();
+            } catch (\Exception $e) {
+                Log::warning("JoinBid BidderUpdated broadcast error: " . $e->getMessage());
+            }
         }
 
         // 入札者が2人以上になった場合、即座に価格上昇 → フリーズカウントダウン
@@ -100,12 +104,15 @@ class JoinBidAction
             }
         }
 
+        $freshItem = $item->fresh();
+        $latestBidderCount = BidParticipant::forItem($item->id)->active()->count();
+
         return BidResultDto::success([
             'participant_id'      => $participant->id,
             'item_id'             => $item->id,
             'is_active'           => true,
-            'current_price'       => $item->fresh()->current_price,
-            'active_bidder_count' => $activeBidderCount,
+            'current_price'       => $freshItem->current_price,
+            'active_bidder_count' => $latestBidderCount,
         ], '入札に参加しました。');
     }
 }

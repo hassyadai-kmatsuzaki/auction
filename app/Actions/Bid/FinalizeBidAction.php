@@ -89,11 +89,15 @@ class FinalizeBidAction
         // トランザクション外でブロードキャスト
         $lane = Lane::where('current_item_id', $item->id)->first();
         if ($lane) {
-            broadcast(new ItemSold(
-                $item->auction->id, $lane->id, $item->id,
-                $winnerId, $finalPrice,
-                $item->species_name ?? '', $item->item_number ?? 0, $item->quantity ?? 1
-            ));
+            try {
+                broadcast(new ItemSold(
+                    $item->auction->id, $lane->id, $item->id,
+                    $winnerId, $finalPrice,
+                    $item->species_name ?? '', $item->item_number ?? 0, $item->quantity ?? 1
+                ));
+            } catch (\Exception $e) {
+                Log::warning("ItemSold broadcast error: " . $e->getMessage());
+            }
         }
 
         // 非同期通知（失敗してもオークション処理に影響しない）

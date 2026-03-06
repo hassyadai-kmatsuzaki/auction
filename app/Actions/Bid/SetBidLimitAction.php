@@ -98,6 +98,18 @@ class SetBidLimitAction
                         } catch (\Exception $e) {
                             \Illuminate\Support\Facades\Log::error("adjustPriceByBidLimits on live limit set: " . $e->getMessage());
                         }
+                    } else {
+                        // 指値1名 + 手動入札者がいる場合、即座に価格上昇
+                        $totalActiveCount = BidParticipant::forItem($item->id)->active()->count();
+                        if ($totalActiveCount >= 2) {
+                            try {
+                                $lane->load('auction');
+                                $countdownService = app(CountdownService::class);
+                                $countdownService->handleImmediatePriceIncrement($lane, $item->fresh(), $item->auction, $userId);
+                            } catch (\Exception $e) {
+                                \Illuminate\Support\Facades\Log::error("Immediate price increment on limit set: " . $e->getMessage());
+                            }
+                        }
                     }
                 }
             }

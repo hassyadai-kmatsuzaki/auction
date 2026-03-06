@@ -79,6 +79,7 @@ class CountdownService
             'freeze_countdown_seconds' => $freezeSeconds,
             'is_running' => true,
             'pre_bid_remaining_seconds' => 0,
+            'last_bidder_user_id' => null,
         ];
         
         Cache::put($this->getCacheKey($lane->id), $cacheData, 3600);
@@ -125,6 +126,7 @@ class CountdownService
             'freeze_countdown_seconds' => $freezeSeconds,
             'is_running' => true,
             'pre_bid_remaining_seconds' => $preBidDelay,
+            'last_bidder_user_id' => null,
         ];
 
         Cache::put($this->getCacheKey($lane->id), $cacheData, 3600);
@@ -350,6 +352,7 @@ class CountdownService
     protected function tickFreeze(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
     {
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+        $freshPrice = $item->fresh()->current_price ?? $item->current_price;
 
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
@@ -357,7 +360,7 @@ class CountdownService
             broadcast(new CountdownTick(
                 $auction->id, $lane->id, $item->id,
                 (float) $state['remaining_seconds'],
-                $activeBidderCount, $item->current_price,
+                $activeBidderCount, $freshPrice,
                 'freeze'
             ));
         } catch (\Exception $e) {
@@ -423,16 +426,26 @@ class CountdownService
             $protectedUserIds = $validLimits->pluck('user_id')->toArray();
             $hasProtectedUsers = count($protectedUserIds) > 0;
 
-            // 落札権利者の決定:
-            // 有効な指値ユーザーがいれば指値最高者、いなければ lastBidder
+            // lastBidder が null の場合、最後に入札した人をフォールバック
+            $resolvedLastBidder = $lastBidderUserId;
+            if (!$resolvedLastBidder && !$hasProtectedUsers && $allActive->isNotEmpty()) {
+                $latestParticipant = BidParticipant::forItem($item->id)
+                    ->active()
+                    ->orderBy('activated_at', 'desc')
+                    ->first();
+                $resolvedLastBidder = $latestParticipant?->user_id;
+            }
+
             $effectiveHolder = $hasProtectedUsers
                 ? $validLimits->first()->user_id
-                : $lastBidderUserId;
+                : $resolvedLastBidder;
+
+            Log::info("handlePriceIncrement: item={$item->id}, oldPrice={$oldPrice}, newPrice={$newPrice}, activeCount=" . $allActive->count() . ", protectedUsers=" . json_encode($protectedUserIds) . ", hasProtected={$hasProtectedUsers}, lastBidder={$lastBidderUserId}, resolvedLastBidder={$resolvedLastBidder}, effectiveHolder={$effectiveHolder}");
 
             foreach ($allActive as $participant) {
                 if (in_array($participant->user_id, $protectedUserIds)) {
                     // 有効な指値ユーザー: 入札継続
-                } elseif (!$hasProtectedUsers && $lastBidderUserId && $participant->user_id === $lastBidderUserId) {
+                } elseif (!$hasProtectedUsers && $resolvedLastBidder && $participant->user_id === $resolvedLastBidder) {
                     // 指値ユーザーがいない場合のみ、lastBidder を1回分残す
                 } else {
                     $participant->deactivate();
@@ -737,13 +750,17 @@ class CountdownService
         }
 
         // レーン変更イベントをブロードキャスト
-        broadcast(new LaneItemChanged(
-            $auction->id,
-            $lane->id,
-            $lane->lane_number,
-            $previousItemId,
-            $currentItemData
-        ));
+        try {
+            broadcast(new LaneItemChanged(
+                $auction->id,
+                $lane->id,
+                $lane->lane_number,
+                $previousItemId,
+                $currentItemData
+            ));
+        } catch (\Exception $e) {
+            Log::warning("LaneItemChanged broadcast error: " . $e->getMessage());
+        }
 
         return $nextItem;
     }
@@ -847,11 +864,15 @@ class CountdownService
             ]);
 
             // ステータス変更イベントをブロードキャスト
-            broadcast(new AuctionStatusChanged(
-                $auction->id,
-                'finished',
-                'すべての出品が終了しました。オークションが自動終了しました。'
-            ));
+            try {
+                broadcast(new AuctionStatusChanged(
+                    $auction->id,
+                    'finished',
+                    'すべての出品が終了しました。オークションが自動終了しました。'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("AuctionStatusChanged broadcast error: " . $e->getMessage());
+            }
         }
     }
 
@@ -913,21 +934,40 @@ class CountdownService
             }
         } else {
             // 通常ケース: 最低指値を超える次の上昇金額まで価格を上げる
+            $safetyCounter = 0;
             while ($targetPrice <= $lowestLimit) {
                 $increment = $auction->calculatePriceIncrement($targetPrice);
+                if ($increment <= 0) {
+                    Log::error("adjustPriceByBidLimits: increment is 0 at price={$targetPrice}, breaking to avoid infinite loop");
+                    $targetPrice = $lowestLimit + 1;
+                    break;
+                }
                 $targetPrice += $increment;
+                if (++$safetyCounter > 10000) {
+                    Log::error("adjustPriceByBidLimits: safety counter exceeded at price={$targetPrice}");
+                    break;
+                }
             }
 
             // 2番目の指値も超えてしまう場合は調整
             if ($targetPrice > $secondLowestLimit) {
                 $targetPrice = $currentPrice;
+                $safetyCounter = 0;
                 while (true) {
                     $increment = $auction->calculatePriceIncrement($targetPrice);
+                    if ($increment <= 0) {
+                        Log::error("adjustPriceByBidLimits: increment is 0 in second loop at price={$targetPrice}");
+                        break;
+                    }
                     $nextPrice = $targetPrice + $increment;
                     if ($nextPrice > $secondLowestLimit) {
                         break;
                     }
                     $targetPrice = $nextPrice;
+                    if (++$safetyCounter > 10000) {
+                        Log::error("adjustPriceByBidLimits: safety counter exceeded in second loop at price={$targetPrice}");
+                        break;
+                    }
                 }
                 // 上昇幅の刻みでは最低指値を超えられない場合、
                 // 2番目の指値者の金額をそのまま価格に設定して落札権利を与える
@@ -964,7 +1004,8 @@ class CountdownService
 
         $freshItem = $item->fresh();
 
-        // 指値発動チェック（保護対象を除外して離脱させる）
+        // 指値発動チェック
+        // 保護対象ユーザーの指値も triggered にするが、離脱はさせない
         $autoLeftUserIds = [];
         try {
             $triggeredLimits = BidLimitPrice::where('item_id', $item->id)
@@ -976,13 +1017,19 @@ class CountdownService
                       ->where('item_id', $item->id)
                       ->where('is_active', true);
                 })
-                ->when(!empty($protectedUserIds), fn ($q) => $q->whereNotIn('user_id', $protectedUserIds))
                 ->get();
 
             foreach ($triggeredLimits as $tl) {
                 try {
                     $triggered = $tl->markAsTriggered();
                     if (!$triggered) continue;
+
+                    $isProtected = in_array($tl->user_id, $protectedUserIds);
+
+                    if ($isProtected) {
+                        Log::info("adjustPriceByBidLimits: limit triggered but user PROTECTED (stays active): user={$tl->user_id}, price={$freshItem->current_price}, limit={$tl->limit_price}");
+                        continue;
+                    }
 
                     $this->leaveBidAction->execute($freshItem, $tl->user_id);
                     $autoLeftUserIds[] = $tl->user_id;
