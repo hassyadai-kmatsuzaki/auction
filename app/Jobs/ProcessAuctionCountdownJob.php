@@ -58,7 +58,17 @@ class ProcessAuctionCountdownJob implements ShouldQueue
      */
     public function handle(CountdownService $countdownService): void
     {
-        Log::info("Auction countdown job STARTED for auction {$this->auctionId}");
+        // 排他制御: 同一オークションで複数ジョブが同時実行されるのを防ぐ
+        $lockKey = "countdown_job_lock:auction:{$this->auctionId}";
+        $lockAcquired = Cache::add($lockKey, getmypid(), $this->timeout + 60);
+
+        if (!$lockAcquired) {
+            $existingPid = Cache::get($lockKey);
+            Log::warning("Auction countdown job SKIPPED for auction {$this->auctionId}: another job is running (pid={$existingPid})");
+            return;
+        }
+
+        Log::info("Auction countdown job STARTED for auction {$this->auctionId} (pid=" . getmypid() . ")");
         
         // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
@@ -256,9 +266,10 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             $iterations++;
         }
 
-        // ジョブ実行中フラグ・ハートビートをクリア
+        // ジョブ実行中フラグ・ハートビート・ロックをクリア
         Cache::forget($jobKey);
         Cache::forget($heartbeatKey);
+        Cache::forget($lockKey);
         
         Log::info("Auction countdown job COMPLETED for auction {$this->auctionId}, iterations: {$iterations}, idle: {$idleIterations}");
     }
