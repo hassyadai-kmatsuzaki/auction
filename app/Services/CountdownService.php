@@ -499,6 +499,21 @@ class CountdownService
         } catch (\Exception $e) {
             Log::error("BidLimit check error after price increment: " . $e->getMessage());
         }
+
+        // 指値ユーザーが2名以上残っている場合、一気に価格調整
+        // （1段階ずつの無限ループを防止。フリーズは既に開始済みなので再開始しない）
+        $remainingLimits = BidLimitPrice::where('item_id', $item->id)
+            ->where('is_triggered', false)
+            ->where('limit_price', '>', $freshItem->current_price)
+            ->count();
+
+        if ($remainingLimits >= 2) {
+            try {
+                $this->adjustPriceByBidLimits($freshItem->fresh(), $auction, $lane, false);
+            } catch (\Exception $e) {
+                Log::error("adjustPriceByBidLimits after price increment: " . $e->getMessage());
+            }
+        }
     }
 
     /**
