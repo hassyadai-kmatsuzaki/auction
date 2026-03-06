@@ -12,9 +12,9 @@ interface Props {
 }
 
 const formatSeconds = (s: number): string => {
-  if (s <= 0) return '0秒';
-  if (s < 1) return `${s}秒`;
-  return `${Math.ceil(s)}秒`;
+  const rounded = Math.ceil(s);
+  if (rounded <= 0) return '0秒';
+  return `${rounded}秒`;
 };
 
 /**
