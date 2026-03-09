@@ -203,10 +203,6 @@ export default function ItemForm() {
         const response = await axios.post(`/api/admin/auctions/${auctionId}/items`, payload);
         if (response.data.success) {
           setSnackbar({ open: true, message: '生体を登録しました。', severity: 'success' });
-          // 新規作成時は編集画面に遷移してメディアアップロードできるようにする
-          const newItemId = response.data.data.item.id;
-          navigate(`/admin/auctions/${auctionId}/items/${newItemId}/edit`, { replace: true });
-          return;
         }
       }
       

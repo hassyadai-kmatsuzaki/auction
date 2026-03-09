@@ -166,7 +166,8 @@ export default function AuctionLive() {
       } else if (e.status === 'live') {
         setStartingEndsAt(null);
         setStartingCountdown(null);
-        countdownFinishedRef.current = false;
+        // countdownFinishedRef のリセットは liveState が 'live' に確定してから行う
+        // （ここで即リセットすると、refetch完了前に古い 'starting' 状態で再表示されるリスクがある）
         refetch();
       } else if (e.status === 'finished') {
         refetch();
@@ -329,13 +330,24 @@ export default function AuctionLive() {
   //
   // ■ 表示条件
   //   - カウントダウン完了済みでない（countdownFinishedRef）
-  //   - startingEndsAt が設定済み（WebSocketで開始カウントダウン受信）
-  //   - OR liveState.status が 'starting'（APIで取得済み）
-  //   - AND startingCountdown が 0 より大きい（まだカウント中）
+  //   - startingCountdown が 1 以上（0到達済みなら表示しない）
+  //   - startingEndsAt が設定済み OR liveState.status が 'starting'
+  //   - liveState.status が 'live' でない（ライブ開始後は表示しない）
   if (
     !countdownFinishedRef.current &&
+    liveState.status !== 'live' &&
     (startingEndsAt !== null || liveState.status === 'starting') &&
-    (startingCountdown === null || startingCountdown > 0)
+    startingCountdown !== null && startingCountdown > 0
+  ) {
+    return <StartingCountdown title={liveState.auction_title} count={startingCountdown} />;
+  }
+
+  // startingEndsAt が設定済みだがタイマーがまだ初期化されていない場合（starting受信直後）
+  // → 待機室に落ちないよう、カウントダウン画面を表示して待つ
+  if (
+    !countdownFinishedRef.current &&
+    liveState.status !== 'live' &&
+    (startingEndsAt !== null || liveState.status === 'starting')
   ) {
     return <StartingCountdown title={liveState.auction_title} count={startingCountdown ?? 10} />;
   }

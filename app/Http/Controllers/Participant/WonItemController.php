@@ -44,22 +44,25 @@ class WonItemController extends Controller
             'success' => true,
             'data' => [
                 'won_items' => $wonItems->map(function ($wonItem) {
+                    $item = $wonItem->item;
+                    $auction = $item?->auction;
+
                     return [
                         'id' => $wonItem->id,
-                        'item' => [
-                            'id' => $wonItem->item->id,
-                            'item_number' => $wonItem->item->item_number,
-                            'species_name' => $wonItem->item->species_name,
-                            'quantity' => $wonItem->item->quantity,
-                            'thumbnail_path' => $wonItem->item->thumbnail_path,
-                            'inspection_info' => $wonItem->item->inspection_info,
-                            'individual_info' => $wonItem->item->individual_info,
-                            'auction' => [
-                                'id' => $wonItem->item->auction->id,
-                                'title' => $wonItem->item->auction->title,
-                                'event_date' => $wonItem->item->auction->event_date->format('Y-m-d'),
-                            ],
-                        ],
+                        'item' => $item ? [
+                            'id' => $item->id,
+                            'item_number' => $item->item_number,
+                            'species_name' => $item->species_name,
+                            'quantity' => $item->quantity,
+                            'thumbnail_path' => $item->thumbnail_path,
+                            'inspection_info' => $item->inspection_info,
+                            'individual_info' => $item->individual_info,
+                            'auction' => $auction ? [
+                                'id' => $auction->id,
+                                'title' => $auction->title,
+                                'event_date' => $auction->event_date->format('Y-m-d'),
+                            ] : null,
+                        ] : null,
                         'winning_price' => $wonItem->winning_price,
                         'quantity' => $wonItem->quantity,
                         'total_amount' => $wonItem->total_amount,
@@ -98,27 +101,30 @@ class WonItemController extends Controller
             ->with(['item.auction', 'item.media'])
             ->findOrFail($id);
         
+        $item = $wonItem->item;
+        $auction = $item?->auction;
+
         return response()->json([
             'success' => true,
             'data' => [
                 'won_item' => [
                     'id' => $wonItem->id,
-                    'item' => [
-                        'id' => $wonItem->item->id,
-                        'item_number' => $wonItem->item->item_number,
-                        'species_name' => $wonItem->item->species_name,
-                        'quantity' => $wonItem->item->quantity,
-                        'thumbnail_path' => $wonItem->item->thumbnail_path,
-                        'inspection_info' => $wonItem->item->inspection_info,
-                        'individual_info' => $wonItem->item->individual_info,
-                        'notes' => $wonItem->item->notes,
-                        'media' => $this->transformMedia($wonItem->item->media),
-                        'auction' => [
-                            'id' => $wonItem->item->auction->id,
-                            'title' => $wonItem->item->auction->title,
-                            'event_date' => $wonItem->item->auction->event_date->format('Y-m-d'),
-                        ],
-                    ],
+                    'item' => $item ? [
+                        'id' => $item->id,
+                        'item_number' => $item->item_number,
+                        'species_name' => $item->species_name,
+                        'quantity' => $item->quantity,
+                        'thumbnail_path' => $item->thumbnail_path,
+                        'inspection_info' => $item->inspection_info,
+                        'individual_info' => $item->individual_info,
+                        'notes' => $item->notes,
+                        'media' => $this->transformMedia($item->media),
+                        'auction' => $auction ? [
+                            'id' => $auction->id,
+                            'title' => $auction->title,
+                            'event_date' => $auction->event_date->format('Y-m-d'),
+                        ] : null,
+                    ] : null,
                     'winning_price' => $wonItem->winning_price,
                     'quantity' => $wonItem->quantity,
                     'total_amount' => $wonItem->total_amount,

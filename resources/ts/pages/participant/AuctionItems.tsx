@@ -12,6 +12,7 @@ import {
   ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
   FavoriteBorder as FavoriteBorderIcon, Favorite as FavoriteIcon,
+  PriceCheck as PriceCheckIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
@@ -413,13 +414,25 @@ export default function AuctionItems() {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedItem(null)}>閉じる</Button>
-          {auction?.status === 'live' && (
-            <Button variant="contained" onClick={() => { setSelectedItem(null); navigate(`/participant/auctions/${auctionId}/live`); }}>
-              ライブ画面へ
-            </Button>
-          )}
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
+          <Box>
+            {selectedItem && (
+              <BidLimitBadge
+                limitPrice={limitSettings[selectedItem.id]?.limit_price ?? null}
+                isTriggered={limitSettings[selectedItem.id]?.is_triggered ?? false}
+                onEdit={() => setLimitModalItem(selectedItem)}
+                onRemove={() => handleRemoveLimit(selectedItem.id)}
+              />
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={() => setSelectedItem(null)}>閉じる</Button>
+            {auction?.status === 'live' && (
+              <Button variant="contained" onClick={() => { setSelectedItem(null); navigate(`/participant/auctions/${auctionId}/live`); }}>
+                ライブ画面へ
+              </Button>
+            )}
+          </Box>
         </DialogActions>
       </Dialog>
 
