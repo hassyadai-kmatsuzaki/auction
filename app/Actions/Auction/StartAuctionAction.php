@@ -57,6 +57,9 @@ class StartAuctionAction
         Cache::forget("countdown_job_heartbeat:auction:{$auction->id}");
         Cache::forget("countdown_job_finished:auction:{$auction->id}");
 
+        // 世代番号を0にリセット（新規開始なので古い世代の残骸をクリア）
+        Cache::put(ProcessAuctionCountdownJob::generationKey($auction->id), 0, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
+
         ProcessAuctionCountdownJob::dispatch($auction->id);
         Log::info("Dispatched auction countdown job for auction {$auction->id}");
     }

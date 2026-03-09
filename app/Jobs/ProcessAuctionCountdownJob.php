@@ -25,6 +25,7 @@ class ProcessAuctionCountdownJob implements ShouldQueue
 
     public int $auctionId;
     public int $maxIterations;
+    public int $generation;
 
     /**
      * The number of times the job may be attempted.
@@ -56,7 +57,25 @@ class ProcessAuctionCountdownJob implements ShouldQueue
     {
         $this->auctionId = $auctionId;
         $this->maxIterations = $maxIterations;
+        $this->generation = (int) Cache::get("countdown_job_generation:auction:{$auctionId}", 0);
         $this->onQueue('countdown'); // 専用キュー
+    }
+
+    /**
+     * 世代番号のキャッシュキーを取得
+     */
+    public static function generationKey(int $auctionId): string
+    {
+        return "countdown_job_generation:auction:{$auctionId}";
+    }
+
+    /**
+     * 現在の世代番号が有効かチェック（古い世代のジョブは自発的に終了すべき）
+     */
+    private function isCurrentGeneration(): bool
+    {
+        $current = (int) Cache::get(self::generationKey($this->auctionId), 0);
+        return $this->generation === $current;
     }
 
     /**
@@ -64,6 +83,12 @@ class ProcessAuctionCountdownJob implements ShouldQueue
      */
     public function handle(CountdownService $countdownService): void
     {
+        // 世代チェック: ディスパッチ後に世代が進んでいたら即終了
+        if (!$this->isCurrentGeneration()) {
+            Log::info("Auction countdown job SKIPPED for auction {$this->auctionId}: outdated generation (job={$this->generation}, current=" . Cache::get(self::generationKey($this->auctionId)) . ")");
+            return;
+        }
+
         // 排他制御: 同一オークションで複数ジョブが同時実行されるのを防ぐ
         $lockKey = "countdown_job_lock:auction:{$this->auctionId}";
         $lockAcquired = Cache::add($lockKey, getmypid(), $this->timeout + 60);
@@ -74,7 +99,7 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             return;
         }
 
-        Log::info("Auction countdown job STARTED for auction {$this->auctionId} (pid=" . getmypid() . ")");
+        Log::info("Auction countdown job STARTED for auction {$this->auctionId} (pid=" . getmypid() . ", generation={$this->generation})");
         
         // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
@@ -89,6 +114,13 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         if ($startAt) {
             Log::info("Pre-start countdown for auction {$this->auctionId}");
             while (true) {
+                if (!$this->isCurrentGeneration()) {
+                    Log::info("Auction {$this->auctionId}: generation superseded during pre-start (job={$this->generation}), stopping");
+                    Cache::forget($jobKey);
+                    Cache::forget("countdown_job_heartbeat:auction:{$this->auctionId}");
+                    Cache::forget($lockKey);
+                    return;
+                }
                 $remaining = max(0, $startAt - now()->timestamp);
                 if ($remaining <= 0) break;
 
@@ -160,6 +192,12 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         $heartbeatKey = "countdown_job_heartbeat:auction:{$this->auctionId}";
 
         while ($iterations < $this->maxIterations) {
+            // 世代チェック: 再開等で新しいジョブがディスパッチされたら自発的に終了
+            if (!$this->isCurrentGeneration()) {
+                Log::info("Auction {$this->auctionId}: generation superseded (job={$this->generation}), stopping gracefully");
+                break;
+            }
+
             try {
             // オークション状態を確認
             $auction = Auction::with('lanes')->find($this->auctionId);
@@ -276,14 +314,18 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             $iterations++;
         }
 
-        // 正常終了マーカーをセット（MonitorAuctionJobs が不要な再ディスパッチをしないように）
-        Cache::put("countdown_job_finished:auction:{$this->auctionId}", true, 120);
+        $superseded = !$this->isCurrentGeneration();
+
+        if (!$superseded) {
+            // 正常終了マーカーをセット（MonitorAuctionJobs が不要な再ディスパッチをしないように）
+            Cache::put("countdown_job_finished:auction:{$this->auctionId}", true, 120);
+        }
 
         // ジョブ実行中フラグ・ハートビート・ロックをクリア
         Cache::forget($jobKey);
         Cache::forget($heartbeatKey);
         Cache::forget($lockKey);
         
-        Log::info("Auction countdown job COMPLETED for auction {$this->auctionId}, iterations: {$iterations}, idle: {$idleIterations}");
+        Log::info("Auction countdown job COMPLETED for auction {$this->auctionId}, iterations: {$iterations}, idle: {$idleIterations}" . ($superseded ? ' (superseded by new generation)' : ''));
     }
 }

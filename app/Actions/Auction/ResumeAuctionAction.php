@@ -30,8 +30,6 @@ class ResumeAuctionAction
             $this->countdown->resumeCountdown($lane->id);
         }
 
-        // フェイルセーフ: ジョブが動いていなければ再ディスパッチ
-        // heartbeat が 30秒以上更新されていない場合はジョブが死んでいると判断
         $jobKey = "countdown_job_running:auction:{$auction->id}";
         $heartbeatKey = "countdown_job_heartbeat:auction:{$auction->id}";
         $lockKey = "countdown_job_lock:auction:{$auction->id}";
@@ -40,12 +38,19 @@ class ResumeAuctionAction
         $jobAlive = $heartbeat && $staleSec < 30;
 
         if (!$jobAlive) {
+            // 全ロックをクリア（先にクリアして新ジョブがロック取得できるようにする）
             Cache::forget($jobKey);
             Cache::forget($heartbeatKey);
             Cache::forget($lockKey);
             Cache::forget("countdown_job_finished:auction:{$auction->id}");
+
+            // 世代番号をインクリメント → 古いジョブは次のループで自発的に終了する
+            $genKey = ProcessAuctionCountdownJob::generationKey($auction->id);
+            $newGen = ((int) Cache::get($genKey, 0)) + 1;
+            Cache::put($genKey, $newGen, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
+
             $reason = $heartbeat ? "heartbeat {$staleSec}s stale" : 'heartbeat missing';
-            Log::info("Resume: Re-dispatching countdown job for auction {$auction->id} ({$reason})");
+            Log::info("Resume: Re-dispatching countdown job for auction {$auction->id} ({$reason}, generation={$newGen})");
             ProcessAuctionCountdownJob::dispatch($auction->id);
         } else {
             Log::info("Resume: Countdown job alive for auction {$auction->id} (heartbeat {$staleSec}s ago)");

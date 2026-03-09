@@ -65,10 +65,15 @@ class MonitorAuctionJobs extends Command
             return;
         }
 
-        // ジョブが死んでいると判断 → ロックをクリアして再ディスパッチ
+        // 全ロックをクリア（先にクリアして新ジョブがロック取得できるようにする）
         Cache::forget($jobKey);
         Cache::forget($heartbeatKey);
         Cache::forget($lockKey);
+
+        // 世代番号をインクリメント → 古いジョブは次のループで自発的に終了する
+        $genKey = ProcessAuctionCountdownJob::generationKey($auction->id);
+        $newGen = ((int) Cache::get($genKey, 0)) + 1;
+        Cache::put($genKey, $newGen, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
 
         ProcessAuctionCountdownJob::dispatch($auction->id);
 
