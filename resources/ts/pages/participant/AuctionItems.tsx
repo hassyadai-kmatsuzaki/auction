@@ -13,6 +13,7 @@ import {
   PlayCircleOutline as PlayCircleOutlineIcon,
   FavoriteBorder as FavoriteBorderIcon, Favorite as FavoriteIcon,
   PriceCheck as PriceCheckIcon,
+  MeetingRoom as MeetingRoomIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
@@ -200,6 +201,14 @@ export default function AuctionItems() {
                 onClick={() => navigate(`/participant/auction/${auctionId}/live`)}
                 sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                 会場へ
+              </Button>
+            )}
+            {auction?.status === 'scheduled' && (
+              <Button size="small" variant="outlined" color="primary"
+                startIcon={<MeetingRoomIcon />}
+                onClick={() => navigate(`/participant/auction/${auctionId}/live`)}
+                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                待機室へ
               </Button>
             )}
             <IconButton onClick={() => setViewMode('grid')} color={viewMode === 'grid' ? 'primary' : 'default'}><ViewModuleIcon /></IconButton>

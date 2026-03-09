@@ -16,6 +16,7 @@ import {
   AccessTime as AccessTimeIcon,
   OpenInNew as OpenInNewIcon,
   ArrowForward as ArrowForwardIcon,
+  ListAlt as ListAltIcon,
 } from '@mui/icons-material';
 import type { Auction } from '../../types';
 import AnnouncementList from '../../components/AnnouncementList';
@@ -194,20 +195,36 @@ export default function ParticipantHome() {
                 {scheduledAuction.description}
               </Typography>
             )}
-            <Button
-              variant="contained"
-              size="large"
-              endIcon={<ArrowForwardIcon />}
-              onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
-              sx={{
-                fontWeight: 700,
-                px: 4,
-                py: 1.5,
-                fontSize: '1rem',
-              }}
-            >
-              待機室へ入室
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                size="large"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
+                sx={{
+                  fontWeight: 700,
+                  px: 4,
+                  py: 1.5,
+                  fontSize: '1rem',
+                }}
+              >
+                待機室へ入室
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<ListAltIcon />}
+                onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/items`)}
+                sx={{
+                  fontWeight: 700,
+                  px: 4,
+                  py: 1.5,
+                  fontSize: '1rem',
+                }}
+              >
+                出品一覧
+              </Button>
+            </Box>
           </Container>
         </Box>
       ) : liveAuction && scheduledAuction ? (
@@ -242,15 +259,26 @@ export default function ParticipantHome() {
                   {getDaysUntil(scheduledAuction.event_date)}
                 </Box>
               </Box>
-              <Button
-                variant="outlined"
-                size="small"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
-                sx={{ fontWeight: 600 }}
-              >
-                待機室へ入室
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  endIcon={<ArrowForwardIcon />}
+                  onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
+                  sx={{ fontWeight: 600 }}
+                >
+                  待機室へ入室
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  startIcon={<ListAltIcon />}
+                  onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/items`)}
+                  sx={{ fontWeight: 600 }}
+                >
+                  出品一覧
+                </Button>
+              </Box>
             </CardContent>
           </Card>
         </Container>

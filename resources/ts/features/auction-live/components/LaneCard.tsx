@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Card, CardMedia, CardContent, CardActions,
-  Box, Typography, Chip, IconButton,
+  Box, Typography, Chip, IconButton, LinearProgress,
 } from '@mui/material';
 import { Info as InfoIcon, People as PeopleIcon } from '@mui/icons-material';
 import type { LiveLane } from '@/types';
@@ -178,14 +178,17 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         {isPreBid ? (
           <PreBidOverlay remainingSeconds={item.pre_bid_remaining_seconds ?? 0} />
         ) : isFreeze ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-            <CountdownChip
-              seconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
-              phase="freeze"
+          <Box sx={{ mb: 1 }}>
+            <LinearProgress
+              sx={{
+                height: 4,
+                borderRadius: 2,
+                bgcolor: 'grey.200',
+                '& .MuiLinearProgress-bar': {
+                  bgcolor: 'warning.main',
+                },
+              }}
             />
-            {item.active_bidders_count > 0 && (
-              <Chip icon={<PeopleIcon />} label="入札中" size="small" color="error" />
-            )}
           </Box>
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>

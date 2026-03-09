@@ -357,6 +357,7 @@ export default function AuctionLive() {
     return (
       <EntranceBlocked
         title={liveState.auction_title}
+        auctionId={auctionId}
         startAt={liveState.start_at}
         venueOpenMinutes={liveState.venue_open_minutes_before_start}
         message={liveState.message}
@@ -367,7 +368,7 @@ export default function AuctionLive() {
 
   // ========== 待機室 ==========
   if (liveState.status === 'scheduled' && entranceAllowed === true) {
-    return <WaitingRoom title={liveState.auction_title} />;
+    return <WaitingRoom title={liveState.auction_title} auctionId={auctionId} />;
   }
 
   // scheduled で entranceAllowed が null（未確定）の場合はローディング
@@ -469,7 +470,7 @@ export default function AuctionLive() {
         {/* レーングリッド */}
         <Grid container spacing={2}>
           {liveState.lanes.map((lane) => (
-            <Grid item xs={6} sm={6} md={4} key={lane.lane_id}>
+            <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
               <LaneCard
                 lane={lane}
                 isLoading={lane.current_item ? isLocked(lane.current_item.id) : false}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, CircularProgress, Box, Typography } from '@mui/material';
+import { Button, CircularProgress, Box, LinearProgress } from '@mui/material';
 import { PlayArrow as PlayArrowIcon, Pause as PauseIcon, Timer as TimerIcon } from '@mui/icons-material';
 
 interface Props {
@@ -26,40 +26,32 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
   }
 
   if (isFreeze) {
-    const remaining = freezeRemainingSeconds ?? 0;
-    const total = freezeTotalSeconds ?? 1;
-    const progress = total > 0 ? ((total - remaining) / total) * 100 : 0;
-    const displaySeconds = Math.ceil(remaining);
-
     return (
-      <Button
-        fullWidth variant="contained" size="large" disabled
-        sx={{
-          bgcolor: 'grey.300', color: 'grey.600',
-          '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.500' },
-          position: 'relative', py: 1.5,
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-            <CircularProgress
-              variant="determinate" value={progress} size={28} thickness={5}
-              sx={{ color: 'warning.main' }}
-            />
-            <Box sx={{
-              position: 'absolute', top: 0, left: 0, bottom: 0, right: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'warning.dark' }}>
-                {displaySeconds}
-              </Typography>
-            </Box>
-          </Box>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ブロック中 {displaySeconds}秒
-          </Typography>
-        </Box>
-      </Button>
+      <Box sx={{ width: '100%' }}>
+        <Button
+          fullWidth variant="contained" size="large" disabled
+          sx={{
+            bgcolor: 'grey.300', color: 'grey.600',
+            '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.500' },
+            position: 'relative', py: 1.5,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+          }}
+        >
+          入札準備中...
+        </Button>
+        <LinearProgress
+          sx={{
+            height: 4,
+            borderBottomLeftRadius: 4,
+            borderBottomRightRadius: 4,
+            bgcolor: 'grey.300',
+            '& .MuiLinearProgress-bar': {
+              bgcolor: 'warning.main',
+            },
+          }}
+        />
+      </Box>
     );
   }
 
