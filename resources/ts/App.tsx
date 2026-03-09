@@ -23,6 +23,9 @@ import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import SpecifiedCommercialTransaction from './pages/legal/SpecifiedCommercialTransaction';
 import TermsOfService from './pages/legal/TermsOfService';
 
+// EC（公開ページ・認証不要）
+import EcTop from './pages/ec/EcTop';
+
 // Error pages
 import NotFound from './pages/NotFound';
 
@@ -100,6 +103,9 @@ function App() {
             <Route path="/auth/set-password" element={<SetPassword />} />
             <Route path="/auth/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
             <Route path="/auth/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+
+          {/* EC（公開ページ・認証不要） */}
+          <Route path="/ec" element={<EcTop />} />
 
           {/* 法的ページ */}
           <Route path="/legal/privacy" element={<PrivacyPolicy />} />

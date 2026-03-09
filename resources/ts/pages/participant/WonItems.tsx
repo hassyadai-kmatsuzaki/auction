@@ -47,12 +47,12 @@ interface WonItemData {
     thumbnail_path?: string;
     inspection_info?: string;
     individual_info?: string;
-    auction: {
+    auction?: {
       id: number;
       title: string;
       event_date: string;
-    };
-  };
+    } | null;
+  } | null;
   winning_price: number;
   quantity: number;
   total_amount: number;
@@ -436,8 +436,8 @@ export default function WonItems() {
                 <Grid item xs={12} sm={3}>
                   <CardMedia
                     component="img"
-                    image={wonItem.item.thumbnail_path || '/img/noimage.png'}
-                    alt={wonItem.item.species_name}
+                    image={wonItem.item?.thumbnail_path || '/img/noimage.png'}
+                    alt={wonItem.item?.species_name || '商品'}
                     sx={{ borderRadius: 2, aspectRatio: '3/2', objectFit: 'cover', width: '100%' }}
                   />
                 </Grid>
@@ -445,7 +445,7 @@ export default function WonItems() {
                   {/* ヘッダー */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      No.{wonItem.item.item_number}
+                      No.{wonItem.item?.item_number ?? '-'}
                     </Typography>
                     <Chip
                       label={getPaymentStatusLabel(wonItem.payment_status)}
@@ -460,12 +460,12 @@ export default function WonItems() {
                   </Box>
 
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                    {wonItem.item.species_name}
+                    {wonItem.item?.species_name || '（削除された商品）'}
                   </Typography>
 
                   {/* オークション情報 */}
                   <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                    {wonItem.item.auction.title} ({wonItem.item.auction.event_date})
+                    {wonItem.item?.auction ? `${wonItem.item.auction.title} (${wonItem.item.auction.event_date})` : ''}
                   </Typography>
 
                   {/* 金額情報 */}
@@ -676,10 +676,10 @@ export default function WonItems() {
             <>
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  {selectedItem.item.species_name}
+                  {selectedItem.item?.species_name || '（削除された商品）'}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {selectedItem.item.auction.title}
+                  {selectedItem.item?.auction?.title || ''}
                 </Typography>
               </Box>
 
