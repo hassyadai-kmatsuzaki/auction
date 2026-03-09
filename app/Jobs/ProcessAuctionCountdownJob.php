@@ -133,6 +133,8 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 sleep(1);
             }
 
+            // カウントダウン完了: キャッシュを即座にクリアして
+            // APIポーリングが 'starting' を返さないようにする
             Cache::forget($startAtKey);
 
             // カウントダウン終了 → レーンのカウントダウンを実際に開始

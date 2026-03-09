@@ -64,6 +64,12 @@ export default function AuctionLive() {
   const [startingEndsAt, setStartingEndsAt] = useState<number | null>(null);
   const [startingCountdown, setStartingCountdown] = useState<number | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /**
+   * 開始カウントダウン完了フラグ
+   * カウントダウンが0に到達した後、APIポーリングやWebSocketで
+   * 再度 'starting' が返ってきても再表示しないためのガード
+   */
+  const countdownFinishedRef = useRef(false);
   const [celebration, setCelebration] = useState<CelebrationItem | null>(null);
   // 指値モーダル
   const [limitModalItemId, setLimitModalItemId] = useState<number | null>(null);
@@ -153,11 +159,14 @@ export default function AuctionLive() {
     },
     onAuctionStatus: (e) => {
       if (e.status === 'starting' && e.countdown_seconds) {
+        // カウントダウンが既に完了済みなら無視
+        if (countdownFinishedRef.current) return;
         // サーバーの残り秒数から「終了時刻」を計算（タイムスタンプ方式）
         setStartingEndsAt(Date.now() + e.countdown_seconds * 1000);
       } else if (e.status === 'live') {
         setStartingEndsAt(null);
         setStartingCountdown(null);
+        countdownFinishedRef.current = false;
         refetch();
       } else if (e.status === 'finished') {
         refetch();
@@ -214,7 +223,15 @@ export default function AuctionLive() {
       }
     }
 
+    // 'live' になったらカウントダウン完了フラグをリセット（次回のオークション用）
+    if (liveState.status === 'live') {
+      countdownFinishedRef.current = false;
+    }
+
     if (liveState.status === 'starting' && liveState.starting_countdown) {
+      // カウントダウンが既に完了済みなら無視（0到達後のAPIレスポンスによる再表示を防止）
+      if (countdownFinishedRef.current) return;
+
       // APIポーリングで取得した場合もタイムスタンプを設定
       // すでに startingEndsAt が設定されている場合は大きなずれがある時だけ上書き
       setStartingEndsAt(prev => {
@@ -231,10 +248,11 @@ export default function AuctionLive() {
    *
    * ■ 設計思想
    *   - startingEndsAt（終了時刻ms）を基準にカウントダウン表示値を算出
-   *   - 100ms ごとに Math.ceil((endsAt - Date.now()) / 1000) で表示値を更新
+   *   - 200ms ごとに Math.ceil((endsAt - Date.now()) / 1000) で表示値を更新
    *   - ローカルの setInterval は表示更新のみ（カウンター自体は保持しない）
    *   - ブラウザのタイマードリフトが蓄積しないため全ブラウザで誤差ゼロ
    *   - WebSocketやAPIポーリングで終了時刻が更新されれば自動的に補正される
+   *   - カウントダウン完了後は countdownFinishedRef で再表示を防止
    */
   useEffect(() => {
     if (countdownTimerRef.current) {
@@ -247,15 +265,23 @@ export default function AuctionLive() {
       return;
     }
 
+    // 既にカウントダウン完了済みなら再開しない
+    if (countdownFinishedRef.current) {
+      setStartingCountdown(0);
+      return;
+    }
+
     const tick = () => {
       const remaining = Math.ceil((startingEndsAt - Date.now()) / 1000);
       if (remaining <= 0) {
         setStartingCountdown(0);
+        countdownFinishedRef.current = true;
         if (countdownTimerRef.current) {
           clearInterval(countdownTimerRef.current);
           countdownTimerRef.current = null;
         }
-        // 終了したらライブ状態を再取得
+        // 完了後は startingEndsAt もクリアして再トリガーを防止
+        setStartingEndsAt(null);
         refetch();
         return;
       }
@@ -302,10 +328,12 @@ export default function AuctionLive() {
   //   scheduled チェックより前に置かないと WaitingRoom が表示されたままになる。
   //
   // ■ 表示条件
+  //   - カウントダウン完了済みでない（countdownFinishedRef）
   //   - startingEndsAt が設定済み（WebSocketで開始カウントダウン受信）
   //   - OR liveState.status が 'starting'（APIで取得済み）
   //   - AND startingCountdown が 0 より大きい（まだカウント中）
   if (
+    !countdownFinishedRef.current &&
     (startingEndsAt !== null || liveState.status === 'starting') &&
     (startingCountdown === null || startingCountdown > 0)
   ) {

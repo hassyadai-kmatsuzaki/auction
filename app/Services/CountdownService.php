@@ -558,16 +558,10 @@ class CountdownService
      */
     protected function checkBidLimits(Lane $lane, Item $item, Auction $auction, array $protectedUserIds = []): void
     {
-        // N+1修正: whereHasの代わりにwhereInサブクエリで1クエリに最適化
+        // 価格超過した全指値レコードを取得（アクティブ/非アクティブ問わず）
         $query = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('limit_price', '<=', $item->current_price)
-            ->whereIn('user_id', function ($q) use ($item) {
-                $q->select('user_id')
-                  ->from('bid_participants')
-                  ->where('item_id', $item->id)
-                  ->where('is_active', true);
-            });
+            ->where('limit_price', '<=', $item->current_price);
 
         if (!empty($protectedUserIds)) {
             $query->whereNotIn('user_id', $protectedUserIds);
@@ -579,9 +573,13 @@ class CountdownService
             return;
         }
 
+        // アクティブな入札者のIDを一括取得
+        $activeBidderUserIds = BidParticipant::where('item_id', $item->id)
+            ->where('is_active', true)
+            ->pluck('user_id')
+            ->toArray();
+
         foreach ($limits as $limit) {
-            // 競合対策: markAsTriggered() は楽観的ロックで二重発動を防ぐ
-            // false が返った場合は既に他のプロセスが処理済み
             try {
                 $triggered = $limit->markAsTriggered();
                 if (!$triggered) {
@@ -590,9 +588,12 @@ class CountdownService
 
                 $limitPrice = $limit->limit_price;
                 $limitUserId = $limit->user_id;
+                $isActiveBidder = in_array($limitUserId, $activeBidderUserIds);
 
-                // 自動離脱（markAsTriggered成功後に実行）
-                $this->leaveBidAction->execute($item, $limitUserId);
+                // アクティブ入札者のみ離脱処理
+                if ($isActiveBidder) {
+                    $this->leaveBidAction->execute($item, $limitUserId);
+                }
 
                 // 指値レコードを削除 → ユーザーは指値なしの状態になり手動入札可能
                 $limit->delete();
@@ -603,7 +604,6 @@ class CountdownService
                     $item->species_name ?? ''
                 ));
 
-                // LINE通知（指値発動）
                 try {
                     app(NotificationService::class)->sendBidLimitReachedNotification(
                         $limitUserId, $item->species_name ?? '商品',
@@ -613,7 +613,7 @@ class CountdownService
                     Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
                 }
 
-                Log::info("BidLimit triggered & cancelled: item={$item->id}, user={$limitUserId}, price={$item->current_price}, limit={$limitPrice}");
+                Log::info("BidLimit triggered & cancelled: item={$item->id}, user={$limitUserId}, active={$isActiveBidder}, price={$item->current_price}, limit={$limitPrice}");
             } catch (\Exception $e) {
                 Log::error("BidLimit check error: item={$item->id}, user={$limit->user_id} - " . $e->getMessage());
             }
@@ -1009,22 +1009,23 @@ class CountdownService
 
         $freshItem = $item->fresh();
 
-        // 指値発動チェック
-        // 保護対象ユーザーの指値も triggered にするが、離脱はさせない
+        // 指値発動チェック: 価格超過した全指値レコードを処理
+        // アクティブ入札者 → 離脱 + 削除 + 通知
+        // 非アクティブ入札者 → 削除のみ（再入札をブロックしないため）
         $autoLeftUserIds = [];
         try {
-            $triggeredLimits = BidLimitPrice::where('item_id', $item->id)
+            $allTriggeredLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
                 ->where('limit_price', '<=', $freshItem->current_price)
-                ->whereIn('user_id', function ($q) use ($item) {
-                    $q->select('user_id')
-                      ->from('bid_participants')
-                      ->where('item_id', $item->id)
-                      ->where('is_active', true);
-                })
                 ->get();
 
-            foreach ($triggeredLimits as $tl) {
+            // アクティブな入札者のIDを一括取得
+            $activeBidderUserIds = BidParticipant::where('item_id', $item->id)
+                ->where('is_active', true)
+                ->pluck('user_id')
+                ->toArray();
+
+            foreach ($allTriggeredLimits as $tl) {
                 try {
                     $triggered = $tl->markAsTriggered();
                     if (!$triggered) continue;
@@ -1032,18 +1033,19 @@ class CountdownService
                     $tlLimitPrice = $tl->limit_price;
                     $tlUserId = $tl->user_id;
                     $isProtected = in_array($tlUserId, $protectedUserIds);
+                    $isActiveBidder = in_array($tlUserId, $activeBidderUserIds);
 
                     if ($isProtected) {
-                        // 保護対象でも指値レコードは削除（発動済みなので）
                         $tl->delete();
                         Log::info("adjustPriceByBidLimits: limit triggered & cancelled, user PROTECTED (stays active): user={$tlUserId}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
                         continue;
                     }
 
-                    $this->leaveBidAction->execute($freshItem, $tlUserId);
-                    $autoLeftUserIds[] = $tlUserId;
+                    if ($isActiveBidder) {
+                        $this->leaveBidAction->execute($freshItem, $tlUserId);
+                        $autoLeftUserIds[] = $tlUserId;
+                    }
 
-                    // 指値レコードを削除 → ユーザーは指値なしの状態になり手動入札可能
                     $tl->delete();
 
                     broadcast(new BidLimitReached(
@@ -1061,7 +1063,7 @@ class CountdownService
                         Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
                     }
 
-                    Log::info("adjustPriceByBidLimits: limit triggered & cancelled user={$tlUserId}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
+                    Log::info("adjustPriceByBidLimits: limit triggered & cancelled user={$tlUserId}, active={$isActiveBidder}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
                 } catch (\Exception $e) {
                     Log::error("adjustPriceByBidLimits checkBidLimit error: user={$tl->user_id} - " . $e->getMessage());
                 }
