@@ -190,10 +190,24 @@ export default function ParticipantHome() {
               </Box>
             </Box>
             {scheduledAuction.description && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 {scheduledAuction.description}
               </Typography>
             )}
+            <Button
+              variant="contained"
+              size="large"
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
+              sx={{
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+              }}
+            >
+              待機室へ入室
+            </Button>
           </Container>
         </Box>
       ) : liveAuction && scheduledAuction ? (
@@ -209,7 +223,7 @@ export default function ParticipantHome() {
               <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
                 {scheduledAuction.title}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 1.5 }}>
                 <Typography variant="body2" color="text.secondary">
                   {formatDate(scheduledAuction.event_date)} {scheduledAuction.start_time || '未定'}〜
                 </Typography>
@@ -228,6 +242,15 @@ export default function ParticipantHome() {
                   {getDaysUntil(scheduledAuction.event_date)}
                 </Box>
               </Box>
+              <Button
+                variant="outlined"
+                size="small"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
+                sx={{ fontWeight: 600 }}
+              >
+                待機室へ入室
+              </Button>
             </CardContent>
           </Card>
         </Container>

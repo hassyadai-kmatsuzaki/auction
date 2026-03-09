@@ -11,7 +11,6 @@ interface Props {
 
 const formatSeconds = (s: number): string => {
   if (s <= 0) return '0秒';
-  if (s < 1) return `${s}秒`;
   return `${Math.ceil(s)}秒`;
 };
 
@@ -26,7 +25,7 @@ export const CountdownChip = React.memo(({ seconds, isCompetitive, phase }: Prop
     return (
       <Chip
         icon={<BlockIcon sx={{ fontSize: 16 }} />}
-        label={`ブロック中 ${formatSeconds(seconds)}`}
+        label="ブロック中"
         size="small"
         sx={{
           fontWeight: 'bold',
