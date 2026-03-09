@@ -42,13 +42,14 @@ class BidLimitReached implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'lane_id'       => $this->laneId,
-            'item_id'       => $this->itemId,
-            'user_id'       => $this->userId,
-            'current_price' => $this->currentPrice,
-            'limit_price'   => $this->limitPrice,
-            'species_name'  => $this->speciesName,
-            'message'       => "¥" . number_format($this->limitPrice) . " の上限に達したため自動的に入札オフになりました",
+            'lane_id'        => $this->laneId,
+            'item_id'        => $this->itemId,
+            'user_id'        => $this->userId,
+            'current_price'  => $this->currentPrice,
+            'limit_price'    => $this->limitPrice,
+            'species_name'   => $this->speciesName,
+            'limit_cancelled' => true,
+            'message'        => "¥" . number_format($this->limitPrice) . " の上限に達したため入札オフ・上限設定が解除されました。再度入札する場合は入札ボタンを押してください。",
         ];
     }
 }

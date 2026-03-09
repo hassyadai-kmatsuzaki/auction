@@ -59,6 +59,7 @@ export interface BidLimitReachedEvent {
   current_price: number;
   limit_price: number;
   species_name: string;
+  limit_cancelled: boolean;
   message: string;
 }
 

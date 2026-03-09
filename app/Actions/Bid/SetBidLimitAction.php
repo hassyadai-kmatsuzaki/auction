@@ -51,7 +51,7 @@ class SetBidLimitAction
 
         if ($item->status === 'live') {
             if ($item->current_price >= $limitPrice) {
-                // 既に上限以上 → 入札せず即発動
+                // 既に上限以上 → 入札せず即発動 → 指値レコード削除
                 $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                 if ($participant && $participant->is_active) {
                     $didTrigger = $limit->markAsTriggered();
@@ -59,9 +59,11 @@ class SetBidLimitAction
                         $this->leaveBidAction->execute($item, $userId);
                         $triggered = true;
                         $this->broadcastLimitReached($item, $userId, $limitPrice);
+                        $limit->delete();
                     }
                 } else {
                     $limit->markAsTriggered();
+                    $limit->delete();
                     $triggered = true;
                 }
             } else {

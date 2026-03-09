@@ -56,7 +56,9 @@ class JoinBidAction
         }
 
         // 指値（上限価格）が設定されており、現在価格が既に上限以上なら入札を拒否
-        $limit = BidLimitPrice::forItem($item->id)->forUser($userId)->notTriggered()->first();
+        // ※ 指値発動時にレコードは削除されるため、ここに到達するのは
+        //    発動前（limit_price > current_price）の指値のみ
+        $limit = BidLimitPrice::forItem($item->id)->forUser($userId)->first();
         if ($limit && $item->current_price >= $limit->limit_price) {
             return BidResultDto::failure(
                 "上限価格（¥" . number_format($limit->limit_price) . "）に達しているため入札できません。上限価格を変更してください。",

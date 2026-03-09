@@ -36,7 +36,7 @@ export function useBidLimit(itemId: number, auctionId?: number) {
       invalidateAll();
       if (data.data?.is_triggered) {
         showSnackbar(
-          `上限価格を設定しました（現在価格が上限に達しているため自動的に入札オフになりました）`,
+          `現在価格が上限に達しているため入札オフ・上限設定が解除されました`,
           'warning'
         );
       } else {

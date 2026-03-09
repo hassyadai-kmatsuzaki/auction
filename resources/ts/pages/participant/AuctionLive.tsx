@@ -171,20 +171,31 @@ export default function AuctionLive() {
     },
     onBidLimitReached: (e) => {
       if (e.user_id !== user?.id) return;
-      showSnackbar(e.message || `上限価格に達したため自動的に入札オフになりました`, 'warning');
-      // 入札状態をキャッシュ上でも即時更新
+      showSnackbar(
+        e.message || `上限価格に達したため入札オフ・上限設定が解除されました`,
+        'warning',
+      );
+      // 入札状態をキャッシュ上でも即時更新（指値解除済みなので my_limit_price も null に）
       queryClient.setQueryData(['auction-live', auctionId], (prev: any) => {
         if (!prev) return prev;
         return {
           ...prev,
           lanes: prev.lanes.map((lane: any) =>
             lane.current_item?.id === e.item_id
-              ? { ...lane, current_item: { ...lane.current_item, my_bid_status: 'inactive' } }
+              ? {
+                  ...lane,
+                  current_item: {
+                    ...lane.current_item,
+                    my_bid_status: 'inactive',
+                    my_limit_price: null,
+                    my_limit_triggered: false,
+                  },
+                }
               : lane
           ),
         };
       });
-      // 指値のキャッシュも更新（発動済みにする）
+      // 指値のキャッシュも無効化（レコード削除済みなので再取得で null になる）
       queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
     },
   });

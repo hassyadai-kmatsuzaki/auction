@@ -78,11 +78,184 @@ export default function AuctionForm() {
         <Typography variant="h4">オークション詳細</Typography>
       </Box>
       <Alert severity="warning" sx={{ mb: 3 }}>このオークションは編集できません。</Alert>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>{formData.title}</Typography>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{formData.description}</Typography>
+
+      <Paper sx={{ mb: 3 }}>
+        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+          <Tab icon={<SettingsIcon />} iconPosition="start" label="基本情報" />
+          <Tab icon={<GavelIcon />} iconPosition="start" label="カスタム設定" />
+        </Tabs>
       </Paper>
+
+      <TabPanel value={tabValue} index={0}>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>{formData.title}</Typography>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{formData.description}</Typography>
+        </Paper>
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={1}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>カスタム設定</Typography>
+                <Typography variant="body2" color="text.secondary">このオークション専用の設定（閲覧専用）</Typography>
+              </Box>
+              <Alert severity={formData.use_custom_settings ? 'success' : 'info'} sx={{ py: 0 }}>
+                {formData.use_custom_settings ? 'カスタム設定: ON' : 'カスタム設定: OFF（システムデフォルト使用）'}
+              </Alert>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {formData.use_custom_settings && (
+          <>
+            {/* オークション設定（閲覧） */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <GavelIcon sx={{ color: '#6366F1' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>オークション設定</Typography>
+                </Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>カウントダウン設定</Typography>
+                <Grid container spacing={3}>
+                  {[
+                    { label: 'オークション開始待機時間', key: 'auction_start_countdown_seconds', unit: '秒' },
+                    { label: 'フリーズ（誤タップ防止）', key: 'freeze_countdown_seconds', unit: '秒' },
+                    { label: '落札カウント', key: 'bid_countdown_seconds', unit: '秒' },
+                    { label: '商品開始毎カウント', key: 'item_switch_delay_seconds', unit: '秒' },
+                    { label: '会場入室可能開始', key: 'venue_open_minutes_before_start', unit: '分前' },
+                  ].map(({ label, key, unit }) => (
+                    <Grid item xs={12} sm={6} md={3} key={key}>
+                      <TextField fullWidth label={label} value={`${(formData.custom_auction_settings as any)[key]} ${unit}`}
+                        InputProps={{ readOnly: true }} variant="filled" />
+                    </Grid>
+                  ))}
+                </Grid>
+
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>金額帯別上昇幅テーブル</Typography>
+                {(formData.custom_auction_settings.price_increment_tiers ?? []).length > 0 ? (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>下限金額</TableCell>
+                          <TableCell>上限金額</TableCell>
+                          <TableCell>上昇金額</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(formData.custom_auction_settings.price_increment_tiers ?? []).map((tier: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell>¥{tier.from_price?.toLocaleString()}</TableCell>
+                            <TableCell>{tier.to_price != null ? `¥${tier.to_price.toLocaleString()}` : '上限なし'}</TableCell>
+                            <TableCell>¥{tier.increment_amount?.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">設定なし</Typography>
+                )}
+
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#6366F1' }}>金額帯別カウントダウン秒数テーブル</Typography>
+                {(formData.custom_auction_settings.countdown_tiers ?? []).length > 0 ? (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>下限金額</TableCell>
+                          <TableCell>上限金額</TableCell>
+                          <TableCell>落札カウント（秒）</TableCell>
+                          <TableCell>フリーズ（秒）</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(formData.custom_auction_settings.countdown_tiers ?? []).map((tier: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell>¥{tier.from_price?.toLocaleString()}</TableCell>
+                            <TableCell>{tier.to_price != null ? `¥${tier.to_price.toLocaleString()}` : '上限なし'}</TableCell>
+                            <TableCell>{tier.bid_countdown_seconds}秒</TableCell>
+                            <TableCell>{tier.freeze_countdown_seconds}秒</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">設定なし（単一値設定を使用）</Typography>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 料金設定（閲覧） */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <MoneyIcon sx={{ color: '#059669' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>料金設定</Typography>
+                </Box>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}><Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#059669' }}>出品者向け料金</Typography></Grid>
+                  {[
+                    { label: '基本出品料', key: 'base_listing_fee', prefix: '¥' },
+                    { label: 'プレミアム出品料', key: 'premium_listing_fee', prefix: '¥' },
+                    { label: '販売手数料率', key: 'seller_commission_rate', suffix: '%' },
+                    { label: '最低手数料', key: 'seller_commission_min', prefix: '¥' },
+                  ].map(({ label, key, prefix, suffix }) => (
+                    <Grid item xs={12} sm={6} md={3} key={key}>
+                      <TextField fullWidth label={label}
+                        value={`${prefix ?? ''}${(formData.custom_fee_settings as any)[key]}${suffix ?? ''}`}
+                        InputProps={{ readOnly: true }} variant="filled" />
+                    </Grid>
+                  ))}
+                  <Grid item xs={12}><Divider sx={{ my: 1 }} /><Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#3B82F6', mt: 2 }}>買受者向け料金</Typography></Grid>
+                  {[
+                    { label: '落札手数料率', key: 'buyer_commission_rate', suffix: '%' },
+                    { label: '最低手数料', key: 'buyer_commission_min', prefix: '¥' },
+                  ].map(({ label, key, prefix, suffix }) => (
+                    <Grid item xs={12} sm={6} md={3} key={key}>
+                      <TextField fullWidth label={label}
+                        value={`${prefix ?? ''}${(formData.custom_fee_settings as any)[key]}${suffix ?? ''}`}
+                        InputProps={{ readOnly: true }} variant="filled" />
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* 配送設定（閲覧） */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <ShippingIcon sx={{ color: '#F59E0B' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>配送・梱包設定</Typography>
+                </Box>
+                <Grid container spacing={3}>
+                  {[
+                    { label: '梱包料金', key: 'packaging_fee', prefix: '¥' },
+                    { label: '取扱手数料', key: 'handling_fee', prefix: '¥' },
+                    { label: '保険料率', key: 'insurance_fee_rate', suffix: '%' },
+                    { label: '夏季クール便', key: 'cooling_fee_summer', prefix: '¥' },
+                    { label: '冬季保温', key: 'heating_fee_winter', prefix: '¥' },
+                    { label: '配送料割引率', key: 'shipping_discount_rate', suffix: '%OFF' },
+                  ].map(({ label, key, prefix, suffix }) => (
+                    <Grid item xs={12} sm={6} md={3} key={key}>
+                      <TextField fullWidth label={label}
+                        value={`${prefix ?? ''}${(formData.custom_shipping_settings as any)[key]}${suffix ?? ''}`}
+                        InputProps={{ readOnly: true }} variant="filled" />
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </TabPanel>
     </Box>
   );
 

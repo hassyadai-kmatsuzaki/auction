@@ -585,30 +585,35 @@ class CountdownService
             try {
                 $triggered = $limit->markAsTriggered();
                 if (!$triggered) {
-                    // 既に別プロセスが発動済みのためスキップ
                     continue;
                 }
 
+                $limitPrice = $limit->limit_price;
+                $limitUserId = $limit->user_id;
+
                 // 自動離脱（markAsTriggered成功後に実行）
-                $this->leaveBidAction->execute($item, $limit->user_id);
+                $this->leaveBidAction->execute($item, $limitUserId);
+
+                // 指値レコードを削除 → ユーザーは指値なしの状態になり手動入札可能
+                $limit->delete();
 
                 broadcast(new BidLimitReached(
                     $auction->id, $lane->id, $item->id,
-                    $limit->user_id, $item->current_price, $limit->limit_price,
+                    $limitUserId, $item->current_price, $limitPrice,
                     $item->species_name ?? ''
                 ));
 
                 // LINE通知（指値発動）
                 try {
                     app(NotificationService::class)->sendBidLimitReachedNotification(
-                        $limit->user_id, $item->species_name ?? '商品',
-                        $limit->limit_price, $item->current_price
+                        $limitUserId, $item->species_name ?? '商品',
+                        $limitPrice, $item->current_price
                     );
                 } catch (\Exception $lineErr) {
                     Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
                 }
 
-                Log::info("BidLimit triggered: item={$item->id}, user={$limit->user_id}, price={$item->current_price}, limit={$limit->limit_price}");
+                Log::info("BidLimit triggered & cancelled: item={$item->id}, user={$limitUserId}, price={$item->current_price}, limit={$limitPrice}");
             } catch (\Exception $e) {
                 Log::error("BidLimit check error: item={$item->id}, user={$limit->user_id} - " . $e->getMessage());
             }
@@ -1024,32 +1029,39 @@ class CountdownService
                     $triggered = $tl->markAsTriggered();
                     if (!$triggered) continue;
 
-                    $isProtected = in_array($tl->user_id, $protectedUserIds);
+                    $tlLimitPrice = $tl->limit_price;
+                    $tlUserId = $tl->user_id;
+                    $isProtected = in_array($tlUserId, $protectedUserIds);
 
                     if ($isProtected) {
-                        Log::info("adjustPriceByBidLimits: limit triggered but user PROTECTED (stays active): user={$tl->user_id}, price={$freshItem->current_price}, limit={$tl->limit_price}");
+                        // 保護対象でも指値レコードは削除（発動済みなので）
+                        $tl->delete();
+                        Log::info("adjustPriceByBidLimits: limit triggered & cancelled, user PROTECTED (stays active): user={$tlUserId}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
                         continue;
                     }
 
-                    $this->leaveBidAction->execute($freshItem, $tl->user_id);
-                    $autoLeftUserIds[] = $tl->user_id;
+                    $this->leaveBidAction->execute($freshItem, $tlUserId);
+                    $autoLeftUserIds[] = $tlUserId;
+
+                    // 指値レコードを削除 → ユーザーは指値なしの状態になり手動入札可能
+                    $tl->delete();
 
                     broadcast(new BidLimitReached(
                         $auction->id, $lane->id, $item->id,
-                        $tl->user_id, $freshItem->current_price, $tl->limit_price,
+                        $tlUserId, $freshItem->current_price, $tlLimitPrice,
                         $freshItem->species_name ?? ''
                     ));
 
                     try {
                         app(NotificationService::class)->sendBidLimitReachedNotification(
-                            $tl->user_id, $freshItem->species_name ?? '商品',
-                            $tl->limit_price, $freshItem->current_price
+                            $tlUserId, $freshItem->species_name ?? '商品',
+                            $tlLimitPrice, $freshItem->current_price
                         );
                     } catch (\Exception $lineErr) {
                         Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
                     }
 
-                    Log::info("adjustPriceByBidLimits: limit triggered user={$tl->user_id}, price={$freshItem->current_price}, limit={$tl->limit_price}");
+                    Log::info("adjustPriceByBidLimits: limit triggered & cancelled user={$tlUserId}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
                 } catch (\Exception $e) {
                     Log::error("adjustPriceByBidLimits checkBidLimit error: user={$tl->user_id} - " . $e->getMessage());
                 }
