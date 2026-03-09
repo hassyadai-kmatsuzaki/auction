@@ -820,16 +820,18 @@ request_slowlog_timeout = 5
 ```ini
 ; === Laravel Queue Worker (countdown + default) ===
 [program:auction-queue-countdown]
-command=php /var/www/auction/artisan queue:work redis --queue=countdown --sleep=1 --tries=3 --timeout=7200 --memory=256
+command=php /var/www/auction/artisan queue:work redis --queue=countdown --sleep=1 --tries=1 --timeout=14400 --memory=256
 directory=/var/www/auction
 user=ec2-user
+numprocs=5
+process_name=%(program_name)s_%(process_num)02d
 autostart=true
 autorestart=true
 startsecs=5
 startretries=10
-stopwaitsecs=7200
+stopwaitsecs=14400
 redirect_stderr=true
-stdout_logfile=/var/log/auction/queue-countdown.log
+stdout_logfile=/var/log/auction/queue-countdown-%(process_num)02d.log
 stdout_logfile_maxbytes=50MB
 stdout_logfile_backups=5
 
@@ -1311,12 +1313,13 @@ REVERB_SCALING_ENABLED=true
 
 #### Queue Worker の注意
 
-カウントダウンジョブ（`ProcessAuctionCountdownJob`）は**1つのオークションにつき1つのワーカー**で処理される設計。
-複数EC2でも `countdown` キューのワーカーは**1台のみ**で実行すること。
+カウントダウンジョブ（`ProcessAuctionCountdownJob`）は**1つのオークションにつき1つのワーカー**を占有するロングランニングジョブ。
+同時開催オークション数以上の `countdown` ワーカーが必要（Supervisor の `numprocs` で設定）。
+世代番号（generation）による排他制御があるため、複数EC2で `countdown` ワーカーを実行しても安全。
 
 ```
-EC2 #1: queue:work redis --queue=countdown,default  ← カウントダウン担当
-EC2 #2: queue:work redis --queue=default             ← 通常ジョブのみ
+EC2 #1: numprocs=5 で countdown ワーカーを実行 → 最大5オークション同時開催可能
+EC2 #2: 必要に応じて追加の countdown ワーカーを実行
 ```
 
 #### セッション共有
