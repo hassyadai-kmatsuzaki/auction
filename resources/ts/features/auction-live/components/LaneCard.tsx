@@ -1,9 +1,9 @@
 import React from 'react';
 import {
   Card, CardMedia, CardContent, CardActions,
-  Box, Typography, Chip, IconButton, LinearProgress,
+  Box, Typography, Chip, IconButton,
 } from '@mui/material';
-import { Info as InfoIcon, People as PeopleIcon } from '@mui/icons-material';
+import { Info as InfoIcon } from '@mui/icons-material';
 import type { LiveLane } from '@/types';
 import { CountdownChip } from './CountdownChip';
 import { BidButton } from './BidButton';
@@ -177,28 +177,15 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         {/* カウントダウン表示 */}
         {isPreBid ? (
           <PreBidOverlay remainingSeconds={item.pre_bid_remaining_seconds ?? 0} />
-        ) : isFreeze ? (
-          <Box sx={{ mb: 1 }}>
-            <LinearProgress
-              sx={{
-                height: 4,
-                borderRadius: 2,
-                bgcolor: 'grey.200',
-                '& .MuiLinearProgress-bar': {
-                  bgcolor: 'warning.main',
-                },
-              }}
-            />
-          </Box>
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
             <CountdownChip
               seconds={item.countdown_seconds}
               isCompetitive={isCompetitive}
+              phase={isFreeze ? 'freeze' : 'bidding'}
+              freezeTotalSeconds={item.freeze_countdown_seconds}
+              freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
             />
-            {item.active_bidders_count > 0 && (
-              <Chip icon={<PeopleIcon />} label="入札中" size="small" color="error" />
-            )}
           </Box>
         )}
 

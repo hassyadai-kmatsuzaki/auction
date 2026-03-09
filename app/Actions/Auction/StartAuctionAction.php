@@ -66,8 +66,7 @@ class StartAuctionAction
 
     private function ensureLanes(Auction $auction): void
     {
-        $laneCount = $auction->custom_auction_settings['lane_count']
-            ?? config('auction.default_lane_count', 6);
+        $laneCount = $auction->lane_count ?: 1;
 
         $existing = $auction->lanes()->count();
         for ($i = $existing + 1; $i <= $laneCount; $i++) {

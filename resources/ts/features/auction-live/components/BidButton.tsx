@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button, CircularProgress, Box, LinearProgress } from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { Button, CircularProgress, Box } from '@mui/material';
 import { PlayArrow as PlayArrowIcon, Pause as PauseIcon, Timer as TimerIcon } from '@mui/icons-material';
 
 interface Props {
@@ -11,6 +11,74 @@ interface Props {
   isLoading: boolean;
   onToggle: () => void;
 }
+
+/**
+ * フリーズ中の円形プログレスボタン
+ * freezeTotalSeconds の時間でちょうど円が埋まるシームレスアニメーション
+ */
+const FreezeButton = React.memo(({ freezeRemainingSeconds = 0, freezeTotalSeconds = 1 }: {
+  freezeRemainingSeconds?: number;
+  freezeTotalSeconds?: number;
+}) => {
+  const total = freezeTotalSeconds || 1;
+  const animRef = useRef<number>(0);
+  const startRef = useRef<{ time: number; remaining: number } | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const remaining = freezeRemainingSeconds ?? 0;
+    startRef.current = { time: performance.now(), remaining };
+
+    const tick = () => {
+      if (!startRef.current) return;
+      const elapsed = (performance.now() - startRef.current.time) / 1000;
+      const currentRemaining = Math.max(0, startRef.current.remaining - elapsed);
+      const pct = ((total - currentRemaining) / total) * 100;
+      setProgress(Math.min(100, Math.max(0, pct)));
+      if (currentRemaining > 0) {
+        animRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    animRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [freezeRemainingSeconds, total]);
+
+  return (
+    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
+      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+        <CircularProgress
+          variant="determinate"
+          value={100}
+          size={36}
+          thickness={4}
+          sx={{ color: 'grey.200', position: 'absolute' }}
+        />
+        <CircularProgress
+          variant="determinate"
+          value={progress}
+          size={36}
+          thickness={4}
+          sx={{
+            color: 'warning.main',
+            transition: 'none',
+          }}
+        />
+      </Box>
+      <Button
+        fullWidth variant="contained" size="large" disabled
+        sx={{
+          bgcolor: 'grey.300', color: 'grey.600',
+          '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.500' },
+          py: 1.5,
+        }}
+      >
+        入札準備中...
+      </Button>
+    </Box>
+  );
+});
+FreezeButton.displayName = 'FreezeButton';
 
 /**
  * 入札ON/OFFボタン
@@ -27,31 +95,10 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
 
   if (isFreeze) {
     return (
-      <Box sx={{ width: '100%' }}>
-        <Button
-          fullWidth variant="contained" size="large" disabled
-          sx={{
-            bgcolor: 'grey.300', color: 'grey.600',
-            '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.500' },
-            position: 'relative', py: 1.5,
-            borderBottomLeftRadius: 0,
-            borderBottomRightRadius: 0,
-          }}
-        >
-          入札準備中...
-        </Button>
-        <LinearProgress
-          sx={{
-            height: 4,
-            borderBottomLeftRadius: 4,
-            borderBottomRightRadius: 4,
-            bgcolor: 'grey.300',
-            '& .MuiLinearProgress-bar': {
-              bgcolor: 'warning.main',
-            },
-          }}
-        />
-      </Box>
+      <FreezeButton
+        freezeRemainingSeconds={freezeRemainingSeconds}
+        freezeTotalSeconds={freezeTotalSeconds}
+      />
     );
   }
 

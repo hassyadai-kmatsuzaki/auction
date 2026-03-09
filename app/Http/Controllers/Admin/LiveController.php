@@ -356,7 +356,8 @@ class LiveController extends Controller
     private function createLanesIfNeeded(Auction $auction): void
     {
         if ($auction->lanes()->count() === 0) {
-            for ($i = 1; $i <= $auction->lane_count; $i++) {
+            $laneCount = $auction->lane_count ?: 1;
+            for ($i = 1; $i <= $laneCount; $i++) {
                 Lane::create([
                     'auction_id' => $auction->id,
                     'lane_number' => $i,
