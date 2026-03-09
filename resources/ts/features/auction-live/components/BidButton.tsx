@@ -13,8 +13,8 @@ interface Props {
 }
 
 /**
- * フリーズ中の円形プログレスボタン
- * freezeTotalSeconds の時間でちょうど円が埋まるシームレスアニメーション
+ * フリーズ中ボタン
+ * freezeTotalSeconds の時間でちょうど円が埋まるシームレスな円形ローディングをボタン内に表示
  */
 const FreezeButton = React.memo(({ freezeRemainingSeconds = 0, freezeTotalSeconds = 1 }: {
   freezeRemainingSeconds?: number;
@@ -44,38 +44,37 @@ const FreezeButton = React.memo(({ freezeRemainingSeconds = 0, freezeTotalSecond
     return () => cancelAnimationFrame(animRef.current);
   }, [freezeRemainingSeconds, total]);
 
-  return (
-    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
-      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-        <CircularProgress
-          variant="determinate"
-          value={100}
-          size={36}
-          thickness={4}
-          sx={{ color: 'grey.200', position: 'absolute' }}
-        />
-        <CircularProgress
-          variant="determinate"
-          value={progress}
-          size={36}
-          thickness={4}
-          sx={{
-            color: 'warning.main',
-            transition: 'none',
-          }}
-        />
-      </Box>
-      <Button
-        fullWidth variant="contained" size="large" disabled
-        sx={{
-          bgcolor: 'grey.300', color: 'grey.600',
-          '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.500' },
-          py: 1.5,
-        }}
-      >
-        入札準備中...
-      </Button>
+  const progressIcon = (
+    <Box sx={{ position: 'relative', display: 'inline-flex', width: 20, height: 20 }}>
+      <CircularProgress
+        variant="determinate"
+        value={100}
+        size={20}
+        thickness={4}
+        sx={{ color: 'grey.400', position: 'absolute' }}
+      />
+      <CircularProgress
+        variant="determinate"
+        value={progress}
+        size={20}
+        thickness={4}
+        sx={{ color: 'warning.main', transition: 'none' }}
+      />
     </Box>
+  );
+
+  return (
+    <Button
+      fullWidth variant="contained" size="large" disabled
+      startIcon={progressIcon}
+      sx={{
+        bgcolor: 'grey.300', color: 'grey.600',
+        '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.500' },
+        py: 1.5,
+      }}
+    >
+      入札準備中...
+    </Button>
   );
 });
 FreezeButton.displayName = 'FreezeButton';
