@@ -65,26 +65,72 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
 
   const isActive = myBidStatus === 'active';
 
+  if (isActive) {
+    return (
+      <Button
+        fullWidth
+        variant="contained"
+        size="large"
+        onClick={onToggle}
+        disabled={isLoading}
+        startIcon={
+          isLoading
+            ? <CircularProgress size={20} color="inherit" />
+            : <PauseIcon />
+        }
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%)',
+          backgroundSize: '200% 200%',
+          color: '#5D3A00',
+          fontWeight: 800,
+          fontSize: '1rem',
+          letterSpacing: '0.03em',
+          border: '1px solid rgba(255, 215, 0, 0.6)',
+          animation: 'btnGradientShift 3s ease-in-out infinite',
+          '@keyframes btnGradientShift': {
+            '0%, 100%': { backgroundPosition: '0% 50%' },
+            '50%':      { backgroundPosition: '100% 50%' },
+          },
+          '&:hover': {
+            background: 'linear-gradient(135deg, #FFC800 0%, #E09400 50%, #FFC800 100%)',
+            backgroundSize: '200% 200%',
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            top: 0, left: '-100%',
+            width: '60%', height: '100%',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
+            animation: 'btnShimmer 2.5s ease-in-out infinite',
+            '@keyframes btnShimmer': {
+              '0%':   { left: '-100%' },
+              '100%': { left: '200%' },
+            },
+          },
+        }}
+      >
+        入札中
+      </Button>
+    );
+  }
+
   return (
     <Button
       fullWidth
-      variant={isActive ? 'contained' : 'outlined'}
-      color={isActive ? 'warning' : 'primary'}
-      sx={isActive ? { bgcolor: '#D4A017', '&:hover': { bgcolor: '#B8860B' } } : undefined}
+      variant="outlined"
+      color="primary"
       size="large"
       onClick={onToggle}
       disabled={isLoading}
       startIcon={
-        isLoading ? (
-          <CircularProgress size={20} color="inherit" />
-        ) : isActive ? (
-          <PauseIcon />
-        ) : (
-          <PlayArrowIcon />
-        )
+        isLoading
+          ? <CircularProgress size={20} color="inherit" />
+          : <PlayArrowIcon />
       }
     >
-      {isActive ? '入札中' : '入札する'}
+      入札する
     </Button>
   );
 });

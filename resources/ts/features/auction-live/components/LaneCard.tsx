@@ -44,20 +44,86 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
   const isPreBid = item.phase === 'pre_bid';
   const isFreeze = item.phase === 'freeze';
   const isCompetitive = item.active_bidders_count >= 2;
+  const isMyBidActive = item.my_bid_status === 'active';
 
   return (
     <Card
       sx={{
         height: '100%',
-        border: item.my_bid_status === 'active' ? 3 : 1,
-        borderColor: item.my_bid_status === 'active' ? '#D4A017' : 'divider',
-        boxShadow: item.my_bid_status === 'active'
-          ? '0 0 14px 3px rgba(212, 160, 23, 0.45)'
-          : undefined,
         position: 'relative',
-        transition: 'border-color 0.3s, box-shadow 0.3s',
+        overflow: 'visible',
+        border: isMyBidActive ? '2px solid transparent' : 1,
+        borderColor: isMyBidActive ? undefined : 'divider',
+        borderRadius: 2,
+        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+        transform: isMyBidActive ? 'translateY(-2px)' : 'none',
+        ...(isMyBidActive && {
+          backgroundImage: 'linear-gradient(#fff, #fff), linear-gradient(135deg, #FFD700, #FFA500, #FFD700, #DAA520, #FFD700)',
+          backgroundOrigin: 'border-box',
+          backgroundClip: 'padding-box, border-box',
+          boxShadow: '0 0 18px 4px rgba(255, 215, 0, 0.35), 0 0 40px 8px rgba(255, 165, 0, 0.15)',
+          animation: 'activeBidGlow 2s ease-in-out infinite',
+          '@keyframes activeBidGlow': {
+            '0%, 100%': {
+              boxShadow: '0 0 18px 4px rgba(255, 215, 0, 0.35), 0 0 40px 8px rgba(255, 165, 0, 0.15)',
+            },
+            '50%': {
+              boxShadow: '0 0 24px 8px rgba(255, 215, 0, 0.55), 0 0 56px 12px rgba(255, 165, 0, 0.25)',
+            },
+          },
+        }),
       }}
     >
+      {/* 入札権利時のシマー（光の走査線）エフェクト */}
+      {isMyBidActive && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            borderRadius: 'inherit',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            zIndex: 2,
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0, left: '-100%',
+              width: '60%', height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.12), rgba(255, 255, 255, 0.18), rgba(255, 215, 0, 0.12), transparent)',
+              animation: 'shimmerSweep 3s ease-in-out infinite',
+              '@keyframes shimmerSweep': {
+                '0%':   { left: '-100%' },
+                '100%': { left: '200%' },
+              },
+            },
+          }}
+        />
+      )}
+
+      {/* 入札権利バッジ */}
+      {isMyBidActive && (
+        <Box
+          sx={{
+            position: 'absolute', top: -10, right: -6, zIndex: 3,
+            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+            color: '#5D3A00',
+            px: 1.5, py: 0.4,
+            borderRadius: '12px',
+            fontSize: '0.7rem',
+            fontWeight: 800,
+            letterSpacing: '0.04em',
+            boxShadow: '0 2px 8px rgba(255, 165, 0, 0.5)',
+            animation: 'badgePulse 2s ease-in-out infinite',
+            '@keyframes badgePulse': {
+              '0%, 100%': { transform: 'scale(1)' },
+              '50%':      { transform: 'scale(1.08)' },
+            },
+          }}
+        >
+          入札権利あり
+        </Box>
+      )}
+
       {/* レーン番号バッジ */}
       <Box
         sx={{
