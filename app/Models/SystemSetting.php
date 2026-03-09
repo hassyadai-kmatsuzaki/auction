@@ -168,16 +168,19 @@ class SystemSetting extends BaseModel
         return [
             'price_increment_rate' => self::get('price_increment_rate', 10),
             'price_increment_min' => self::get('price_increment_min', 50),
+            // @deprecated 以下3項目はフロントエンドで未使用。後方互換のため残存。
             'countdown_seconds' => self::get('countdown_seconds', 3),
             'countdown_seconds_default' => self::get('countdown_seconds_default', 10),
             'countdown_seconds_competitive' => self::get('countdown_seconds_competitive', 1),
             'max_lanes' => self::get('default_lane_count', 6),
+            // @deprecated 以下2項目はフロントエンドで未使用。後方互換のため残存。
             'auto_extend_seconds' => self::get('auto_extend_seconds', 10),
             'default_bid_increment' => self::get('default_bid_increment', 100),
             'venue_open_minutes_before_start' => self::get('venue_open_minutes_before_start', 30),
             'item_switch_delay_seconds' => self::get('item_switch_delay_seconds', 5),
             'freeze_countdown_seconds' => self::get('freeze_countdown_seconds', 1),
             'bid_countdown_seconds' => self::get('bid_countdown_seconds', 5),
+            // @deprecated フロントエンドで未使用。後方互換のため残存。
             'post_sale_display_seconds' => self::get('post_sale_display_seconds', 2),
             'auction_start_countdown_seconds' => self::get('auction_start_countdown_seconds', 10),
             'price_increment_tiers' => self::get('default_price_increment_tiers', [

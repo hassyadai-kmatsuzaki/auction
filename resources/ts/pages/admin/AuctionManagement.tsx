@@ -56,8 +56,6 @@ interface Auction {
   status: 'preparing' | 'scheduled' | 'live' | 'finished' | 'cancelled';
   description: string | null;
   lane_count: number;
-  default_bid_increment: string;
-  countdown_seconds: number;
   deposit_required: boolean;
   upload_deadline: string | null;
   payment_deadline_hours: number;

@@ -36,13 +36,12 @@ interface SettingsState {
   // システム
   site_name: string; contact_email: string; contact_phone: string; business_hours: string;
   // オークション
-  price_increment_rate: string; price_increment_min: string; countdown_seconds: string;
-  countdown_seconds_default: string; countdown_seconds_competitive: string;
-  default_lane_count: string; auto_extend_seconds: string; default_bid_increment: string;
+  price_increment_rate: string; price_increment_min: string;
+  default_lane_count: string;
   show_consent_screen: boolean; venue_open_minutes_before_start: string; item_switch_delay_seconds: string;
-  // 新カウントダウン設定
+  // カウントダウン設定
   freeze_countdown_seconds: string; bid_countdown_seconds: string;
-  post_sale_display_seconds: string; auction_start_countdown_seconds: string;
+  auction_start_countdown_seconds: string;
   // 料金
   seller_registration_fee: string; seller_annual_fee: string; base_listing_fee: string;
   premium_plan_fee: string; default_commission_rate: string; seller_commission_min: string;
@@ -75,12 +74,11 @@ const DEFAULT_COUNTDOWN_TIERS: CountdownTier[] = [
 
 const DEFAULT_SETTINGS: SettingsState = {
   site_name: '', contact_email: '', contact_phone: '', business_hours: '',
-  price_increment_rate: '10', price_increment_min: '50', countdown_seconds: '3',
-  countdown_seconds_default: '10', countdown_seconds_competitive: '1',
-  default_lane_count: '6', auto_extend_seconds: '10', default_bid_increment: '100',
+  price_increment_rate: '10', price_increment_min: '50',
+  default_lane_count: '6',
   show_consent_screen: false, venue_open_minutes_before_start: '30', item_switch_delay_seconds: '5',
   freeze_countdown_seconds: '1', bid_countdown_seconds: '5',
-  post_sale_display_seconds: '2', auction_start_countdown_seconds: '10',
+  auction_start_countdown_seconds: '10',
   seller_registration_fee: '3000', seller_annual_fee: '0', base_listing_fee: '500',
   premium_plan_fee: '300', default_commission_rate: '10', seller_commission_min: '500',
   buyer_registration_fee: '0', buyer_commission_rate: '5', buyer_commission_min: '300',
@@ -114,18 +112,12 @@ export default function AdminSettings() {
       business_hours:                 d.site?.business_hours?.value ?? '',
       price_increment_rate:           String(d.auction?.price_increment_rate?.value ?? '10'),
       price_increment_min:            String(d.auction?.price_increment_min?.value ?? '50'),
-      countdown_seconds:              String(d.auction?.countdown_seconds?.value ?? '3'),
-      countdown_seconds_default:      String(d.auction?.countdown_seconds_default?.value ?? '10'),
-      countdown_seconds_competitive:  String(d.auction?.countdown_seconds_competitive?.value ?? '1'),
       default_lane_count:             String(d.auction?.default_lane_count?.value ?? '6'),
-      auto_extend_seconds:            String(d.auction?.auto_extend_seconds?.value ?? '10'),
-      default_bid_increment:          String(d.auction?.default_bid_increment?.value ?? '100'),
       show_consent_screen:            d.auction?.show_consent_screen?.value ?? false,
       venue_open_minutes_before_start:String(d.auction?.venue_open_minutes_before_start?.value ?? '30'),
       item_switch_delay_seconds:      String(d.auction?.item_switch_delay_seconds?.value ?? '5'),
       freeze_countdown_seconds:       String(d.auction?.freeze_countdown_seconds?.value ?? '1'),
       bid_countdown_seconds:          String(d.auction?.bid_countdown_seconds?.value ?? '5'),
-      post_sale_display_seconds:      String(d.auction?.post_sale_display_seconds?.value ?? '2'),
       auction_start_countdown_seconds:String(d.auction?.auction_start_countdown_seconds?.value ?? '10'),
       seller_registration_fee:        String(d.payment?.seller_registration_fee?.value ?? '3000'),
       seller_annual_fee:              String(d.payment?.seller_annual_fee?.value ?? '0'),
@@ -228,8 +220,6 @@ export default function AdminSettings() {
                 { label: '価格上昇率（フォールバック）', k: 'price_increment_rate' as const, unit: '%', helper: '金額帯テーブル未設定時のフォールバック' },
                 { label: '最低上昇金額（フォールバック）', k: 'price_increment_min' as const, unit: '¥', prefix: true, helper: '金額帯テーブル未設定時のフォールバック' },
                 { label: 'デフォルトレーン数', k: 'default_lane_count' as const, helper: '同時進行できるレーン数' },
-                { label: '自動延長秒数', k: 'auto_extend_seconds' as const, unit: '秒', helper: '終了直前の入札で延長' },
-                { label: 'デフォルト入札単位', k: 'default_bid_increment' as const, unit: '¥', prefix: true, helper: '価格上昇の単位' },
               ].map(({ label, k, unit, prefix, step, helper }) => (
                 <Grid item xs={12} sm={6} md={4} key={k}>
                   <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
@@ -309,10 +299,9 @@ export default function AdminSettings() {
             <Grid container spacing={3}>
               {[
                 { label: 'オークション開始待機時間', k: 'auction_start_countdown_seconds' as const, unit: '秒', step: 1, helper: '開始前のカウントダウン（0〜3600秒）' },
-                { label: 'フリーズ（誤タップ防止）カウント', k: 'freeze_countdown_seconds' as const, unit: '秒', step: 0.5, helper: '入札直後の誤タップ防止（0.5〜10秒）' },
+                { label: 'フリーズ（誤タップ防止）カウント', k: 'freeze_countdown_seconds' as const, unit: '秒', step: 0.1, helper: '入札直後の誤タップ防止（0.1〜10秒）' },
                 { label: '落札カウント', k: 'bid_countdown_seconds' as const, unit: '秒', step: 0.5, helper: '入札受付カウントダウン（0.5〜10秒）' },
                 { label: '商品開始毎カウント', k: 'item_switch_delay_seconds' as const, unit: '秒', step: 0.5, helper: '次の商品表示後の待機（0.5〜10秒）' },
-                { label: '落札確定後カウント', k: 'post_sale_display_seconds' as const, unit: '秒', step: 0.5, helper: '落札確定後の表示時間（0.5〜10秒）' },
               ].map(({ label, k, unit, step, helper }) => (
                 <Grid item xs={12} sm={6} md={4} key={k}>
                   <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
@@ -371,7 +360,7 @@ export default function AdminSettings() {
                       <TableCell>
                         <TextField size="small" type="number" value={tier.freeze_countdown_seconds}
                           InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
-                          inputProps={{ step: 0.5, min: 0.5 }}
+                          inputProps={{ step: 0.1, min: 0.1 }}
                           onChange={(e) => {
                             const next = [...countdownTiers];
                             next[idx] = { ...next[idx], freeze_countdown_seconds: parseFloat(e.target.value) || 1 };

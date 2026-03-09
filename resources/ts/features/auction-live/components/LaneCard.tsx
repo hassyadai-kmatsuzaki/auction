@@ -126,7 +126,6 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
             <CountdownChip
               seconds={item.countdown_seconds}
               isCompetitive={isCompetitive}
-              competitiveSeconds={item.countdown_seconds_competitive}
             />
             {item.active_bidders_count > 0 && (
               <Chip icon={<PeopleIcon />} label="入札中" size="small" color="error" />

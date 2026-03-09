@@ -91,6 +91,7 @@ class AuctionController extends Controller
             'event_date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|date_format:H:i',
             'description' => 'nullable|string',
+            // @deprecated default_bid_increment, countdown_seconds はフロントエンドで未使用。DB互換のため残存。
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
@@ -142,6 +143,7 @@ class AuctionController extends Controller
             'start_time' => $request->start_time,
             'description' => $request->description,
             'lane_count' => 1, // 初期値1、レーン割り当て画面で管理
+            // @deprecated default_bid_increment, countdown_seconds はフロントエンドで未使用。DB互換のため残存。
             'default_bid_increment' => $request->default_bid_increment,
             'countdown_seconds' => $request->countdown_seconds,
             'deposit_required' => $request->boolean('deposit_required', false),
@@ -192,6 +194,7 @@ class AuctionController extends Controller
             'event_date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|date_format:H:i',
             'description' => 'nullable|string',
+            // @deprecated default_bid_increment, countdown_seconds はフロントエンドで未使用。DB互換のため残存。
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
@@ -227,6 +230,7 @@ class AuctionController extends Controller
             'event_date' => $request->event_date,
             'start_time' => $request->start_time,
             'description' => $request->description,
+            // @deprecated default_bid_increment, countdown_seconds はフロントエンドで未使用。DB互換のため残存。
             'default_bid_increment' => $request->default_bid_increment,
             'countdown_seconds' => $request->countdown_seconds,
             'deposit_required' => $request->boolean('deposit_required', false),

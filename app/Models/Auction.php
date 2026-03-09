@@ -22,8 +22,8 @@ class Auction extends BaseModel
         'status',
         'description',
         'lane_count',
-        'default_bid_increment',
-        'countdown_seconds',
+        'default_bid_increment',  // @deprecated フロントエンドで未使用。DB互換のため残存。
+        'countdown_seconds',      // @deprecated フロントエンドで未使用。bid_countdown_seconds に置き換え済み。
         'deposit_required',
         'upload_deadline',
         'payment_deadline_hours',
@@ -365,7 +365,7 @@ class Auction extends BaseModel
     }
 
     /**
-     * 落札確定後表示秒数を取得
+     * @deprecated フロントエンドで未使用。後方互換のため残存。
      */
     public function getPostSaleDisplaySeconds(): float
     {

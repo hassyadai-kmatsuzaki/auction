@@ -26,6 +26,7 @@ class StoreItemRequest extends FormRequest
             'species_name' => ['required', 'string', 'max:100'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100'],
             'start_price' => ['required', 'numeric', 'min:100', 'max:10000000'],
+            // @deprecated estimated_price, reserve_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'estimated_price' => ['nullable', 'numeric', 'min:0', 'gte:start_price'],
             'reserve_price' => ['nullable', 'numeric', 'min:0'],
             'bid_increment' => ['nullable', 'numeric', 'min:100'],

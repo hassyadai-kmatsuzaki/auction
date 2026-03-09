@@ -133,7 +133,7 @@ class BidService
                     'quantity'                 => $item->quantity,
                     'quantity_unit'            => $item->quantity_unit ?? 'fish',
                     'current_price'            => $item->current_price,
-                    'estimated_price'          => $item->estimated_price,
+                    'estimated_price'          => $item->estimated_price, // @deprecated フロントエンドで未使用。互換のため残存。
                     'inspection_info'          => $item->inspection_info,
                     'individual_info'          => $item->individual_info,
                     'is_premium'               => $item->is_premium,
@@ -144,8 +144,8 @@ class BidService
                     'my_bid_status'            => $myBidStatus,
                     'phase'                    => $phase,
                     'pre_bid_remaining_seconds'=> $preBidRemaining,
-                    'countdown_mode'           => $countdownMode,
-                    'countdown_seconds_competitive' => $countdownState['countdown_seconds_competitive'] ?? 1,
+                    'countdown_mode'           => $countdownMode, // @deprecated フロントエンドで未使用。互換のため残存。
+                    'countdown_seconds_competitive' => $countdownState['countdown_seconds_competitive'] ?? 1, // @deprecated フロントエンドで未使用。互換のため残存。
                     'freeze_countdown_seconds' => $freezeTotal,
                     'my_limit_price'           => $myLimitPrice,
                     'my_limit_triggered'       => $myLimitTriggered,

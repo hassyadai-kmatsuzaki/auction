@@ -5,8 +5,6 @@ import { Block as BlockIcon } from '@mui/icons-material';
 interface Props {
   seconds: number;
   isCompetitive?: boolean;
-  /** 競合時のカウントダウン設定秒数（固定表示用） */
-  competitiveSeconds?: number;
   /** フェーズ指定（freeze の場合はブロック中表示） */
   phase?: 'bidding' | 'freeze';
 }
@@ -21,10 +19,9 @@ const formatSeconds = (s: number): string => {
  * カウントダウン残り秒数チップ
  *
  * ■ freeze: 「ブロック中 N秒」グレー表示
- * ■ 競合中: 設定秒数を固定表示
  * ■ 通常: リアルタイムカウントダウン表示
  */
-export const CountdownChip = React.memo(({ seconds, isCompetitive, competitiveSeconds, phase }: Props) => {
+export const CountdownChip = React.memo(({ seconds, isCompetitive, phase }: Props) => {
   if (phase === 'freeze') {
     return (
       <Chip
@@ -42,13 +39,9 @@ export const CountdownChip = React.memo(({ seconds, isCompetitive, competitiveSe
     );
   }
 
-  const displaySeconds = isCompetitive && competitiveSeconds
-    ? competitiveSeconds
-    : seconds;
-
   return (
     <Chip
-      label={`残り ${formatSeconds(displaySeconds)}`}
+      label={`残り ${formatSeconds(seconds)}`}
       size="small"
       color={
         isCompetitive

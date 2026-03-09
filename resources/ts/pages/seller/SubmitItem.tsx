@@ -114,8 +114,7 @@ export default function SubmitItem() {
         auction_id: parseInt(formData.auction_id),
         species_name: formData.species_name,
         quantity: parseInt(formData.quantity),
-        start_price: 0, // デフォルト値
-        estimated_price: null,
+        start_price: 0,
         is_premium: formData.is_premium,
         individual_info: individualInfo || null,
         inspection_info: null,

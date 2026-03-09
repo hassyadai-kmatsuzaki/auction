@@ -28,6 +28,7 @@ class StoreAuctionRequest extends FormRequest
             'start_time' => ['nullable', 'date_format:H:i'],
             'description' => ['nullable', 'string', 'max:2000'],
             'lane_count' => ['nullable', 'integer', 'min:1', 'max:10'],
+            // @deprecated countdown_seconds, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'countdown_seconds' => ['nullable', 'integer', 'min:5', 'max:120'],
             'bid_increment' => ['nullable', 'numeric', 'min:100'],
             'entry_deadline' => ['nullable', 'date', 'before_or_equal:event_date'],

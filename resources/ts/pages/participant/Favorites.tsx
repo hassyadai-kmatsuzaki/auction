@@ -42,7 +42,6 @@ interface FavoriteItem {
   quantity: number;
   start_price: number;
   current_price: number;
-  estimated_price?: number;
   inspection_info?: string;
   individual_info?: string;
   is_premium: boolean;

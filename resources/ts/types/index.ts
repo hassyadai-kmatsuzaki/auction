@@ -31,8 +31,6 @@ export interface Auction {
   status: 'preparing' | 'scheduled' | 'live' | 'finished' | 'cancelled';
   description?: string;
   lane_count?: number;
-  default_bid_increment?: number;
-  countdown_seconds?: number;
   deposit_required?: boolean;
   upload_deadline?: string | null;
   payment_deadline_hours?: number;
@@ -57,7 +55,6 @@ export interface Item {
   quantity: number;
   start_price: number;
   current_price: number;
-  estimated_price?: number;
   inspection_info?: string;
   individual_info?: string;
   notes?: string;
@@ -145,7 +142,6 @@ export interface LaneItem {
   quantity: number;
   quantity_unit?: string;
   current_price: number;
-  estimated_price?: number;
   inspection_info?: string;
   individual_info?: string;
   is_premium: boolean;
@@ -162,9 +158,6 @@ export interface LaneItem {
   pre_bid_remaining_seconds?: number;
   freeze_remaining_seconds?: number;
   freeze_countdown_seconds?: number;
-  countdown_mode?: 'default' | 'competitive';
-  /** 競合時カウントダウン設定秒数 */
-  countdown_seconds_competitive?: number;
 }
 
 export interface UpcomingItem {

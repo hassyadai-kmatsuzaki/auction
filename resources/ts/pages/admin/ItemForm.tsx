@@ -87,9 +87,6 @@ export default function ItemForm() {
     species_name: '',
     quantity: '',
     start_price: '',
-    reserve_price: '',
-    estimated_price: '',
-    bid_increment: '100',
     inspection_info: '',
     individual_info: '',
     notes: '',
@@ -143,9 +140,6 @@ export default function ItemForm() {
           species_name: item.species_name || '',
           quantity: item.quantity?.toString() || '',
           start_price: item.start_price?.toString() || '',
-          reserve_price: item.reserve_price?.toString() || '',
-          estimated_price: item.estimated_price?.toString() || '',
-          bid_increment: item.bid_increment?.toString() || '100',
           inspection_info: item.inspection_info || '',
           individual_info: item.individual_info || '',
           notes: item.notes || '',
@@ -193,9 +187,6 @@ export default function ItemForm() {
         species_name: formData.species_name,
         quantity: parseInt(formData.quantity),
         start_price: parseFloat(formData.start_price),
-        reserve_price: formData.reserve_price ? parseFloat(formData.reserve_price) : null,
-        estimated_price: formData.estimated_price ? parseFloat(formData.estimated_price) : null,
-        bid_increment: parseFloat(formData.bid_increment),
         inspection_info: formData.inspection_info || null,
         individual_info: formData.individual_info || null,
         notes: formData.notes || null,
@@ -483,44 +474,6 @@ export default function ItemForm() {
                     />
                   </Grid>
 
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="最低落札価格"
-                      value={formData.reserve_price}
-                      onChange={handleChange('reserve_price')}
-                      InputProps={{
-                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
-                      }}
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="落札想定金額"
-                      value={formData.estimated_price}
-                      onChange={handleChange('estimated_price')}
-                      InputProps={{
-                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
-                      }}
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="入札単位"
-                      value={formData.bid_increment}
-                      onChange={handleChange('bid_increment')}
-                      InputProps={{
-                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
-                      }}
-                    />
-                  </Grid>
 
                   <Grid item xs={12} md={4}>
                     <FormControl fullWidth>

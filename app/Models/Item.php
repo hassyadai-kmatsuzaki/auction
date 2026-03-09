@@ -21,9 +21,9 @@ class Item extends BaseModel
         'quantity',
         'start_price',
         'current_price',
-        'reserve_price',
-        'estimated_price',
-        'bid_increment',
+        'reserve_price',      // @deprecated フロントエンドで未使用。DB互換のため残存。
+        'estimated_price',    // @deprecated フロントエンドで未使用。DB互換のため残存。
+        'bid_increment',      // @deprecated フロントエンドで未使用。実際の価格上昇はAuction::calculatePriceIncrement()で計算。
         'inspection_info',
         'individual_info',
         'notes',

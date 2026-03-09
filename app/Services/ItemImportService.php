@@ -122,6 +122,7 @@ class ItemImportService
             'quantity'          => (int) trim($row[self::COL_QUANTITY] ?? '1'),
             'start_price'       => (float) trim($row[self::COL_START_PRICE]),
             'current_price'     => (float) trim($row[self::COL_START_PRICE]),
+            // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。CSV互換のため残存。
             'reserve_price'     => !empty($row[self::COL_RESERVE_PRICE])  ? (float) trim($row[self::COL_RESERVE_PRICE]) : null,
             'estimated_price'   => !empty($row[self::COL_ESTIMATED])      ? (float) trim($row[self::COL_ESTIMATED])     : null,
             'bid_increment'     => !empty($row[self::COL_BID_INCREMENT])  ? (float) trim($row[self::COL_BID_INCREMENT]) : 100,

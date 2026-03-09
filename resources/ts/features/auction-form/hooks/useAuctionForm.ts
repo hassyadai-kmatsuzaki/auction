@@ -18,14 +18,10 @@ export interface AuctionFormData {
   custom_auction_settings: {
     price_increment_rate: number;
     price_increment_min: number;
-    countdown_seconds: number;
-    countdown_seconds_default: number;
-    countdown_seconds_competitive: number;
     venue_open_minutes_before_start: number;
     item_switch_delay_seconds: number;
     freeze_countdown_seconds: number;
     bid_countdown_seconds: number;
-    post_sale_display_seconds: number;
     auction_start_countdown_seconds: number;
     price_increment_tiers: Array<{ from_price: number; to_price: number | null; increment_amount: number }>;
     countdown_tiers: Array<{ from_price: number; to_price: number | null; bid_countdown_seconds: number; freeze_countdown_seconds: number }>;
@@ -63,14 +59,10 @@ const DEFAULT_FORM_DATA: AuctionFormData = {
   custom_auction_settings: {
     price_increment_rate: 10,
     price_increment_min: 50,
-    countdown_seconds: 3,
-    countdown_seconds_default: 10,
-    countdown_seconds_competitive: 1,
     venue_open_minutes_before_start: 30,
     item_switch_delay_seconds: 5,
     freeze_countdown_seconds: 1,
     bid_countdown_seconds: 5,
-    post_sale_display_seconds: 2,
     auction_start_countdown_seconds: 10,
     price_increment_tiers: [
       { from_price: 0, to_price: 999, increment_amount: 50 },

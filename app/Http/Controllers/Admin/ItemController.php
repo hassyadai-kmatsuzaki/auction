@@ -110,6 +110,7 @@ class ItemController extends Controller
             'species_name' => 'required|string|max:255',
             'quantity' => 'required|integer|min:1',
             'start_price' => 'required|numeric|min:1',
+            // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'reserve_price' => 'nullable|numeric|min:1',
             'estimated_price' => 'nullable|numeric|min:1',
             'bid_increment' => 'nullable|numeric|min:1',
@@ -140,6 +141,7 @@ class ItemController extends Controller
             'quantity' => $request->quantity,
             'start_price' => $request->start_price,
             'current_price' => $request->start_price,
+            // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'reserve_price' => $request->reserve_price,
             'estimated_price' => $request->estimated_price,
             'bid_increment' => $request->bid_increment ?? 100,
@@ -259,6 +261,7 @@ class ItemController extends Controller
             'species_name' => 'string|max:255',
             'quantity' => 'integer|min:1',
             'start_price' => 'numeric|min:1',
+            // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'reserve_price' => 'nullable|numeric|min:1',
             'estimated_price' => 'nullable|numeric|min:1',
             'bid_increment' => 'nullable|numeric|min:1',

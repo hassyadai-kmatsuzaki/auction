@@ -42,7 +42,6 @@ interface ItemDetail {
   quantity: number;
   start_price: number;
   current_price: number;
-  estimated_price: number | null;
   inspection_info: string | null;
   individual_info: string | null;
   notes: string | null;
@@ -450,17 +449,6 @@ export default function ItemDetail() {
                   ¥{item.start_price.toLocaleString()}
                 </Typography>
               </Box>
-
-              {item.estimated_price && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    落札想定価格
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    ¥{item.estimated_price.toLocaleString()}
-                  </Typography>
-                </Box>
-              )}
 
               {item.won_item && (
                 <>

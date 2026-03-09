@@ -46,7 +46,6 @@ interface Item {
   quantity: number;
   start_price: number;
   current_price: number;
-  estimated_price: number | null;
   is_premium: boolean;
   status: string;
   thumbnail_path: string | null;
