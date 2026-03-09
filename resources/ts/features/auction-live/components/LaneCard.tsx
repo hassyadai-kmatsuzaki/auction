@@ -50,9 +50,9 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
       sx={{
         height: '100%',
         border: item.my_bid_status === 'active' ? 3 : 1,
-        borderColor: item.my_bid_status === 'active' ? 'success.main' : 'divider',
+        borderColor: item.my_bid_status === 'active' ? '#D4A017' : 'divider',
         boxShadow: item.my_bid_status === 'active'
-          ? '0 0 12px 2px rgba(46, 125, 50, 0.35)'
+          ? '0 0 14px 3px rgba(212, 160, 23, 0.45)'
           : undefined,
         position: 'relative',
         transition: 'border-color 0.3s, box-shadow 0.3s',

@@ -1062,7 +1062,11 @@ class CountdownService
             $this->startFreezeCountdown($lane);
         }
 
-        // 指値最高者を落札権利者としてキャッシュに記録
+        // 落札権利者をキャッシュに記録
+        // 優先順位: 1) 指値がまだ有効なユーザー（最高額・先着順）
+        //           2) 保護されたユーザー（同額指値の先着者）
+        $effectiveHolder = null;
+
         $highestLimitUser = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
             ->where('limit_price', '>', $freshItem->current_price)
@@ -1071,11 +1075,18 @@ class CountdownService
             ->first();
 
         if ($highestLimitUser) {
+            $effectiveHolder = $highestLimitUser->user_id;
+        } elseif (!empty($protectedUserIds)) {
+            $effectiveHolder = $protectedUserIds[0];
+        }
+
+        if ($effectiveHolder) {
             $cacheKey = $this->getCacheKey($lane->id);
             $state = Cache::get($cacheKey);
             if ($state) {
-                $state['last_bidder_user_id'] = $highestLimitUser->user_id;
+                $state['last_bidder_user_id'] = $effectiveHolder;
                 Cache::put($cacheKey, $state, 3600);
+                Log::info("adjustPriceByBidLimits: set last_bidder_user_id={$effectiveHolder}");
             }
         }
 

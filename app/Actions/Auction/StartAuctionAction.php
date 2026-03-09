@@ -51,10 +51,11 @@ class StartAuctionAction
 
         broadcast(new AuctionStatusChanged($auction->id, 'starting', 'オークションが間もなく開始されます', self::PRE_START_COUNTDOWN));
 
-        // 古いロックが残っている場合はクリア（前回のオークションの残骸対策）
+        // 古いロック・フラグが残っている場合はクリア（前回のオークションの残骸対策）
         Cache::forget("countdown_job_lock:auction:{$auction->id}");
         Cache::forget("countdown_job_running:auction:{$auction->id}");
         Cache::forget("countdown_job_heartbeat:auction:{$auction->id}");
+        Cache::forget("countdown_job_finished:auction:{$auction->id}");
 
         ProcessAuctionCountdownJob::dispatch($auction->id);
         Log::info("Dispatched auction countdown job for auction {$auction->id}");

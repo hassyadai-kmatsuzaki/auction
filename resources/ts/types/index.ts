@@ -175,6 +175,9 @@ export interface UpcomingItem {
   start_price: number;
   thumbnail_path?: string | null;
   is_premium: boolean;
+  is_favorited?: boolean;
+  my_limit_price?: number | null;
+  my_limit_triggered?: boolean;
 }
 
 export interface LiveLane {

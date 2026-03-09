@@ -69,7 +69,8 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
     <Button
       fullWidth
       variant={isActive ? 'contained' : 'outlined'}
-      color={isActive ? 'success' : 'primary'}
+      color={isActive ? 'warning' : 'primary'}
+      sx={isActive ? { bgcolor: '#D4A017', '&:hover': { bgcolor: '#B8860B' } } : undefined}
       size="large"
       onClick={onToggle}
       disabled={isLoading}

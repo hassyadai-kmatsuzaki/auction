@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Auction;
 use App\Models\BidLimitPrice;
 use App\Models\BidParticipant;
+use App\Models\Favorite;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Support\Facades\Cache;
 
@@ -58,6 +59,35 @@ class BidService
                 ->where('user_id', $userId)
                 ->get()
                 ->keyBy('item_id')
+            : collect();
+
+        // upcoming_items 用: 全レーンの upcoming item ID を収集
+        $upcomingItemIds = [];
+        foreach ($lanes as $lane) {
+            if ($lane->currentItem) {
+                $currentSeq = $lane->items
+                    ->where('id', $lane->currentItem->id)
+                    ->first()?->pivot?->sequence_order ?? 0;
+                $lane->items
+                    ->filter(fn ($i) => ($i->pivot->sequence_order ?? 0) > $currentSeq && $i->status === 'registered')
+                    ->sortBy(fn ($i) => $i->pivot->sequence_order)
+                    ->take(3)
+                    ->each(function ($i) use (&$upcomingItemIds) { $upcomingItemIds[] = $i->id; });
+            }
+        }
+
+        $myUpcomingLimits = ($userId && !empty($upcomingItemIds))
+            ? BidLimitPrice::whereIn('item_id', $upcomingItemIds)
+                ->where('user_id', $userId)
+                ->get()
+                ->keyBy('item_id')
+            : collect();
+
+        $myUpcomingFavorites = ($userId && !empty($upcomingItemIds))
+            ? Favorite::where('user_id', $userId)
+                ->whereIn('item_id', $upcomingItemIds)
+                ->pluck('item_id')
+                ->flip()
             : collect();
 
         $lanesData = [];
@@ -133,15 +163,24 @@ class BidService
                     ->filter(fn ($i) => ($i->pivot->sequence_order ?? 0) > $currentSeq && $i->status === 'registered')
                     ->sortBy(fn ($i) => $i->pivot->sequence_order)
                     ->take(3)
-                    ->map(fn ($i) => [
-                        'id'             => $i->id,
-                        'item_number'    => $i->item_number,
-                        'species_name'   => $i->species_name,
-                        'quantity'       => $i->quantity,
-                        'start_price'    => $i->start_price,
-                        'thumbnail_path' => $i->thumbnail_path,
-                        'is_premium'     => $i->is_premium,
-                    ])
+                    ->map(function ($i) use ($userId, $myUpcomingLimits, $myUpcomingFavorites) {
+                        $data = [
+                            'id'             => $i->id,
+                            'item_number'    => $i->item_number,
+                            'species_name'   => $i->species_name,
+                            'quantity'       => $i->quantity,
+                            'start_price'    => $i->start_price,
+                            'thumbnail_path' => $i->thumbnail_path,
+                            'is_premium'     => $i->is_premium,
+                        ];
+                        if ($userId) {
+                            $limit = $myUpcomingLimits->get($i->id);
+                            $data['is_favorited']       = $myUpcomingFavorites->has($i->id);
+                            $data['my_limit_price']     = $limit?->limit_price;
+                            $data['my_limit_triggered'] = $limit?->is_triggered ?? false;
+                        }
+                        return $data;
+                    })
                     ->values()
                     ->toArray();
             }

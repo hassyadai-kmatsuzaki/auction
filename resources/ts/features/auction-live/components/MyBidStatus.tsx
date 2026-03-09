@@ -23,7 +23,7 @@ export const MyBidStatus = React.memo(({ lanes, onLeaveBid }: Props) => {
             <Chip
               key={lane.lane_id}
               label={`${lane.lane_name ?? `レーン${lane.lane_number}`}: ${lane.current_item?.species_name}`}
-              color="success"
+              sx={{ bgcolor: '#D4A017', color: 'white', '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.7)' } }}
               onDelete={() => lane.current_item && onLeaveBid(lane.current_item.id)}
             />
           ))

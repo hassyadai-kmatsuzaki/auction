@@ -28,6 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
         
         // 予定されたオークションを1分ごとに自動開始
         $schedule->command('auctions:start-scheduled')->everyMinute();
+
+        // ライブオークションのカウントダウンジョブ監視・自動復旧
+        $schedule->command('auctions:monitor-jobs')->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -94,16 +94,11 @@ class Auction extends BaseModel
      */
     public function canDelete(): bool
     {
-        // 準備中または予定中のみ削除可能
-        if (!in_array($this->status, ['preparing', 'scheduled'])) {
+        // 開催中（live）は削除不可
+        if ($this->status === 'live') {
             return false;
         }
-        
-        // 商品が登録されている場合は削除不可
-        if ($this->items()->count() > 0) {
-            return false;
-        }
-        
+
         return true;
     }
 

@@ -1,12 +1,19 @@
-import { Box, Typography, Paper, Chip } from '@mui/material';
-import { Pets as PetsIcon } from '@mui/icons-material';
+import { Box, Typography, Paper, Chip, IconButton, Tooltip } from '@mui/material';
+import {
+  Pets as PetsIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
+  PriceCheck as PriceCheckIcon,
+} from '@mui/icons-material';
 import type { LiveLane, UpcomingItem } from '@/types';
 
 interface Props {
   lanes: LiveLane[];
+  onFavoriteToggle?: (itemId: number) => void;
+  onLimitEdit?: (itemId: number) => void;
 }
 
-export function UpcomingItems({ lanes }: Props) {
+export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
   const items: (UpcomingItem & { laneNumber: number })[] = [];
 
   for (const lane of lanes) {
@@ -77,6 +84,29 @@ export function UpcomingItems({ lanes }: Props) {
               <Typography variant="caption" color="primary.main" fontWeight="bold">
                 ¥{Number(item.start_price).toLocaleString()}〜
               </Typography>
+
+              {/* お気に入り & 指値 */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.5 }}>
+                {onFavoriteToggle && (
+                  <IconButton size="small" onClick={() => onFavoriteToggle(item.id)} sx={{ p: 0.25 }}>
+                    {item.is_favorited
+                      ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} />
+                      : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
+                  </IconButton>
+                )}
+                {onLimitEdit && (
+                  <Tooltip title={item.my_limit_price ? `上限: ¥${Math.floor(item.my_limit_price).toLocaleString()}` : '上限設定'} arrow>
+                    <IconButton size="small" onClick={() => onLimitEdit(item.id)} sx={{ p: 0.25 }}>
+                      <PriceCheckIcon sx={{
+                        fontSize: 16,
+                        color: item.my_limit_price
+                          ? (item.my_limit_triggered ? 'grey.400' : 'primary.main')
+                          : 'grey.400',
+                      }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
             </Box>
           </Box>
         ))}

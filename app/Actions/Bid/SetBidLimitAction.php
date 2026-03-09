@@ -215,7 +215,6 @@ class SetBidLimitAction
         }
 
         BidLimitPrice::forItem($item->id)->forUser($userId)->delete();
-        Favorite::where('user_id', $userId)->where('item_id', $item->id)->delete();
 
         return BidResultDto::success([], '上限価格を解除し、入札から離脱しました');
     }

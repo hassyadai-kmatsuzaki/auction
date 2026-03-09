@@ -474,12 +474,14 @@ export default function AuctionManagement() {
             ステータス変更
           </MenuItem>
           
-          {selectedAuction?.status !== 'finished' && selectedAuction?.status !== 'cancelled' && (
-            <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-              <DeleteIcon sx={{ mr: 1, fontSize: 20 }} />
-              削除
-            </MenuItem>
-          )}
+          <MenuItem
+            onClick={handleDelete}
+            sx={{ color: 'error.main' }}
+            disabled={selectedAuction?.status === 'live'}
+          >
+            <DeleteIcon sx={{ mr: 1, fontSize: 20 }} />
+            削除
+          </MenuItem>
         </Menu>
 
         {/* 削除確認ダイアログ */}

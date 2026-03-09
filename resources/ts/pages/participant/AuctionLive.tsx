@@ -6,6 +6,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import { EmojiEvents as EmojiEventsIcon } from '@mui/icons-material';
+import axios from '@/lib/axios';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuctionSocket } from '../../hooks/useAuctionSocket';
@@ -444,7 +445,18 @@ export default function AuctionLive() {
         </Grid>
 
         {/* 次の商品 */}
-        <UpcomingItems lanes={liveState.lanes} />
+        <UpcomingItems
+          lanes={liveState.lanes}
+          onFavoriteToggle={async (itemId) => {
+            try {
+              await axios.post('/api/participant/favorites/toggle', { item_id: itemId });
+              refetch();
+            } catch {
+              showSnackbar('お気に入りの更新に失敗しました', 'error');
+            }
+          }}
+          onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
+        />
 
         {/* 自分の入札状況 */}
         <MyBidStatus

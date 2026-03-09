@@ -263,16 +263,10 @@ class AuctionController extends Controller
     {
         $auction = Auction::findOrFail($id);
 
-        // 削除可能かチェック
         if (!$auction->canDelete()) {
-            $message = '商品が登録されているため削除できません。';
-            if (!in_array($auction->status, ['preparing', 'scheduled'])) {
-                $message = 'このオークションは削除できません。';
-            }
-            
             return response()->json([
                 'success' => false,
-                'message' => $message,
+                'message' => '開催中のオークションは削除できません。',
             ], 403);
         }
 

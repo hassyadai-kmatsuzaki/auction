@@ -31,20 +31,24 @@ class ResumeAuctionAction
         }
 
         // フェイルセーフ: ジョブが動いていなければ再ディスパッチ
-        // heartbeat が 15秒以上更新されていない場合はジョブが死んでいると判断
+        // heartbeat が 30秒以上更新されていない場合はジョブが死んでいると判断
         $jobKey = "countdown_job_running:auction:{$auction->id}";
         $heartbeatKey = "countdown_job_heartbeat:auction:{$auction->id}";
         $lockKey = "countdown_job_lock:auction:{$auction->id}";
         $heartbeat = Cache::get($heartbeatKey);
-        $jobAlive = $heartbeat && (now()->timestamp - $heartbeat) < 15;
+        $staleSec = $heartbeat ? now()->timestamp - $heartbeat : null;
+        $jobAlive = $heartbeat && $staleSec < 30;
 
         if (!$jobAlive) {
-            // 古いロック・フラグをクリアしてから再ディスパッチ
             Cache::forget($jobKey);
             Cache::forget($heartbeatKey);
             Cache::forget($lockKey);
-            Log::info("Resume: Re-dispatching countdown job for auction {$auction->id} (heartbeat stale or missing)");
+            Cache::forget("countdown_job_finished:auction:{$auction->id}");
+            $reason = $heartbeat ? "heartbeat {$staleSec}s stale" : 'heartbeat missing';
+            Log::info("Resume: Re-dispatching countdown job for auction {$auction->id} ({$reason})");
             ProcessAuctionCountdownJob::dispatch($auction->id);
+        } else {
+            Log::info("Resume: Countdown job alive for auction {$auction->id} (heartbeat {$staleSec}s ago)");
         }
 
         broadcast(new AuctionStatusChanged($auction->id, 'resumed', 'オークションが再開されました'));

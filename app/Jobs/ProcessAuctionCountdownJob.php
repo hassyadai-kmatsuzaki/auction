@@ -42,6 +42,12 @@ class ProcessAuctionCountdownJob implements ShouldQueue
     public const TICK_INTERVAL = 0.5;
 
     /**
+     * Heartbeat TTL in seconds.
+     * Must be longer than any expected pause duration.
+     */
+    public const HEARTBEAT_TTL = 14400; // 4時間（ジョブtimeoutと同じ）
+
+    /**
      * Create a new job instance.
      *
      * maxIterations: 4時間分 = 4 * 60 * 60 / 0.5 = 28800
@@ -73,7 +79,7 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
         Cache::put($jobKey, true, $this->timeout + 600);
-        Cache::put("countdown_job_heartbeat:auction:{$this->auctionId}", now()->timestamp, 300);
+        Cache::put("countdown_job_heartbeat:auction:{$this->auctionId}", now()->timestamp, self::HEARTBEAT_TTL);
 
         // === 10秒プレスタートカウントダウン ===
         $startAtKey = "auction:{$this->auctionId}:start_at";
@@ -220,6 +226,10 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             // 一時停止中のレーンがある場合はループを継続（ジョブを終了しない）
             if ($pausedCount > 0 && $activeCount === 0) {
                 $idleIterations++;
+                // 一時停止中もハートビートを更新（5秒ごと）
+                if ($iterations % 10 === 0) {
+                    Cache::put($heartbeatKey, now()->timestamp, self::HEARTBEAT_TTL);
+                }
                 usleep((int)(self::TICK_INTERVAL * 1_000_000));
                 $iterations++;
                 continue;
@@ -259,12 +269,15 @@ class ProcessAuctionCountdownJob implements ShouldQueue
 
             // ハートビート更新（5秒ごと）
             if ($iterations % 10 === 0) {
-                Cache::put($heartbeatKey, now()->timestamp, 300);
+                Cache::put($heartbeatKey, now()->timestamp, self::HEARTBEAT_TTL);
             }
 
             usleep((int)(self::TICK_INTERVAL * 1_000_000));
             $iterations++;
         }
+
+        // 正常終了マーカーをセット（MonitorAuctionJobs が不要な再ディスパッチをしないように）
+        Cache::put("countdown_job_finished:auction:{$this->auctionId}", true, 120);
 
         // ジョブ実行中フラグ・ハートビート・ロックをクリア
         Cache::forget($jobKey);
