@@ -1,11 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography, CircularProgress, Button, Chip } from '@mui/material';
+import {
+  Box, Paper, Typography, CircularProgress, Button,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+} from '@mui/material';
 import {
   Timer as TimerIcon,
   ListAlt as ListAltIcon,
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
+import type { PriceIncrementTier, CountdownTier } from '../../../types';
 
 interface WaitingRoomProps {
   title: string;
@@ -13,63 +17,91 @@ interface WaitingRoomProps {
   startAt?: string;
   venueOpenMinutes?: number;
   message?: string;
-  countdownSeconds?: number;
-  priceIncrementRate?: number;
-  priceIncrementMin?: number;
+  priceIncrementTiers?: PriceIncrementTier[];
+  countdownTiers?: CountdownTier[];
 }
 
 interface EntranceBlockedProps extends WaitingRoomProps {
   entranceCountdown: string | null;
 }
 
+const formatPrice = (v: number) => `¥${v.toLocaleString()}`;
+
 /** 待機室（入室可能・オークション開始待ち） */
-export const WaitingRoom = React.memo(({ title, auctionId, countdownSeconds, priceIncrementRate, priceIncrementMin }: WaitingRoomProps) => {
+export const WaitingRoom = React.memo(({ title, auctionId, priceIncrementTiers, countdownTiers }: WaitingRoomProps) => {
   const navigate = useNavigate();
   return (
-    <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Paper elevation={6} sx={{ maxWidth: 500, mx: 2, p: 5, textAlign: 'center', borderRadius: 3 }}>
+    <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+      <Paper elevation={6} sx={{ maxWidth: 600, mx: 2, p: { xs: 3, sm: 5 }, textAlign: 'center', borderRadius: 3 }}>
         <TimerIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
         <Typography variant="h4" fontWeight="bold" gutterBottom>{title}</Typography>
         <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
           オークション開始をお待ちください
         </Typography>
 
-        {/* 上がり幅・秒数の表示 */}
-        {(countdownSeconds || priceIncrementRate) && (
-          <Box sx={{ display: 'flex', gap: 1.5, mb: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {countdownSeconds && (
-              <Box
-                sx={{
-                  display: 'flex', alignItems: 'center', gap: 1,
-                  bgcolor: '#fff7ed', border: '1px solid', borderColor: 'warning.200',
-                  borderRadius: 2, px: 2, py: 1.5, flex: '1 1 auto', minWidth: 160,
-                }}
-              >
-                <TimerIcon sx={{ color: 'warning.main' }} />
-                <Box sx={{ textAlign: 'left' }}>
-                  <Typography variant="caption" color="text.secondary">カウントダウン</Typography>
-                  <Typography variant="subtitle1" fontWeight="bold" color="warning.main">{countdownSeconds}秒</Typography>
-                </Box>
-              </Box>
-            )}
-            {priceIncrementRate && (
-              <Box
-                sx={{
-                  display: 'flex', alignItems: 'center', gap: 1,
-                  bgcolor: '#f0f7ff', border: '1px solid', borderColor: 'primary.200',
-                  borderRadius: 2, px: 2, py: 1.5, flex: '1 1 auto', minWidth: 160,
-                }}
-              >
-                <TrendingUpIcon sx={{ color: 'primary.main' }} />
-                <Box sx={{ textAlign: 'left' }}>
-                  <Typography variant="caption" color="text.secondary">上がり幅</Typography>
-                  <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
-                    {(priceIncrementRate * 100).toFixed(0)}%
-                    {priceIncrementMin ? <Chip label={`最低¥${priceIncrementMin.toLocaleString()}`} size="small" sx={{ ml: 0.5, fontSize: '0.65rem' }} /> : null}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+        {/* 金額帯別上昇幅テーブル */}
+        {priceIncrementTiers && priceIncrementTiers.length > 0 && (
+          <Box sx={{ mb: 2.5, textAlign: 'left' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+              <Typography variant="subtitle2" fontWeight="bold" color="primary.main">
+                金額帯別上昇幅テーブル
+              </Typography>
+            </Box>
+            <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#f0f7ff' }}>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>下限金額</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>上限金額</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>上昇幅</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {priceIncrementTiers.map((tier, i) => (
+                    <TableRow key={i}>
+                      <TableCell sx={{ fontSize: '0.8rem' }}>{formatPrice(tier.from_price)}</TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem' }}>{tier.to_price !== null ? formatPrice(tier.to_price) : '上限なし'}</TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{formatPrice(tier.increment_amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
+
+        {/* 金額帯別カウントダウン秒数テーブル */}
+        {countdownTiers && countdownTiers.length > 0 && (
+          <Box sx={{ mb: 2.5, textAlign: 'left' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <TimerIcon sx={{ color: 'warning.main', fontSize: 22 }} />
+              <Typography variant="subtitle2" fontWeight="bold" color="warning.main">
+                金額帯別カウントダウン秒数テーブル
+              </Typography>
+            </Box>
+            <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#fff7ed' }}>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>下限金額</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>上限金額</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>落札カウント（秒）</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>フリーズ（秒）</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {countdownTiers.map((tier, i) => (
+                    <TableRow key={i}>
+                      <TableCell sx={{ fontSize: '0.8rem' }}>{formatPrice(tier.from_price)}</TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem' }}>{tier.to_price !== null ? formatPrice(tier.to_price) : '上限なし'}</TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{tier.bid_countdown_seconds}秒</TableCell>
+                      <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{tier.freeze_countdown_seconds}秒</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Box>
         )}
 

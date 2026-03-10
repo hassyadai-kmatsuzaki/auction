@@ -131,6 +131,8 @@ class AuctionController extends Controller
                 'auction_title' => $auction->title,
                 'status'        => 'scheduled',
                 'countdown_seconds' => 0,
+                'price_increment_tiers' => $auction->getPriceIncrementTiers(),
+                'countdown_tiers'       => $auction->getCountdownTiers(),
                 'lanes'         => [],
             ];
 

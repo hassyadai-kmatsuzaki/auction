@@ -372,9 +372,8 @@ export default function AuctionLive() {
       <WaitingRoom
         title={liveState.auction_title}
         auctionId={auctionId}
-        countdownSeconds={liveState.countdown_seconds}
-        priceIncrementRate={liveState.price_increment_rate}
-        priceIncrementMin={liveState.price_increment_min}
+        priceIncrementTiers={liveState.price_increment_tiers}
+        countdownTiers={liveState.countdown_tiers}
       />
     );
   }
@@ -455,9 +454,8 @@ export default function AuctionLive() {
       {liveState.show_consent_screen && !agreed && (
         <ConsentOverlay
           onAgree={() => setAgreed(true)}
-          countdownSeconds={liveState.countdown_seconds}
-          priceIncrementRate={liveState.price_increment_rate}
-          priceIncrementMin={liveState.price_increment_min}
+          priceIncrementTiers={liveState.price_increment_tiers}
+          countdownTiers={liveState.countdown_tiers}
         />
       )}
 

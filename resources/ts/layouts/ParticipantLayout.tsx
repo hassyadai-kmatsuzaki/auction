@@ -163,68 +163,122 @@ export default function ParticipantLayout() {
         </Box>
       </Drawer>
 
-      {/* オークション状態バナー */}
+      {/* オークション開催中バナー（Homeページと同じデザイン） */}
       {liveAuction && !location.pathname.includes('/live') && (
         <Box
           sx={{
-            background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
             color: 'white',
-            py: 1,
+            py: { xs: 3, md: 4 },
             px: 2,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1.5,
-            '&:hover': { filter: 'brightness(1.1)' },
           }}
-          onClick={() => navigate(`/participant/auction/${liveAuction.id}/live`)}
         >
-          <Box
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 0.5,
-              bgcolor: '#ef4444',
-              px: 1,
-              py: 0.25,
-              borderRadius: 0.75,
-              fontSize: '0.7rem',
-              fontWeight: 800,
-              animation: 'pulse 2s infinite',
-              '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.7 } },
-            }}
-          >
-            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'white' }} />
-            LIVE
-          </Box>
-          <Typography variant="body2" fontWeight={700} sx={{ fontSize: { xs: '0.75rem', sm: '0.85rem' } }}>
-            {liveAuction.title} 開催中
-          </Typography>
-          <ArrowForwardIcon sx={{ fontSize: 16 }} />
+          <Container maxWidth="lg">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  bgcolor: '#ef4444',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 1,
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                  animation: 'livePulse 2s infinite',
+                  '@keyframes livePulse': {
+                    '0%, 100%': { opacity: 1 },
+                    '50%': { opacity: 0.7 },
+                  },
+                }}
+              >
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'white' }} />
+                LIVE
+              </Box>
+              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+                オークション開催中！
+              </Typography>
+            </Box>
+            <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' } }}>
+              {liveAuction.title}
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => navigate(`/participant/auction/${liveAuction.id}/live`)}
+              sx={{
+                bgcolor: 'white',
+                color: 'primary.main',
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                '&:hover': { bgcolor: 'grey.100' },
+              }}
+            >
+              今すぐ参加する
+            </Button>
+          </Container>
         </Box>
       )}
+
+      {/* 待機室バナー（開催中と同じ青系デザイン） */}
       {!liveAuction && scheduledAuction && !location.pathname.includes('/live') && (
         <Box
           sx={{
-            background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
             color: 'white',
-            py: 1,
+            py: { xs: 3, md: 4 },
             px: 2,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1.5,
-            '&:hover': { filter: 'brightness(1.1)' },
           }}
-          onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
         >
-          <PlayArrowIcon sx={{ fontSize: 18 }} />
-          <Typography variant="body2" fontWeight={700} sx={{ fontSize: { xs: '0.75rem', sm: '0.85rem' } }}>
-            {scheduledAuction.title} — 待機室へ入室
-          </Typography>
-          <ArrowForwardIcon sx={{ fontSize: 16 }} />
+          <Container maxWidth="lg">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 1,
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                <PlayArrowIcon sx={{ fontSize: 16 }} />
+                待機室
+              </Box>
+              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+                まもなく開催
+              </Typography>
+            </Box>
+            <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' } }}>
+              {scheduledAuction.title}
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/live`)}
+              sx={{
+                bgcolor: 'white',
+                color: 'primary.main',
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                '&:hover': { bgcolor: 'grey.100' },
+              }}
+            >
+              待機室へ入室
+            </Button>
+          </Container>
         </Box>
       )}
 

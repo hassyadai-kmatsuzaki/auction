@@ -182,6 +182,19 @@ export interface LiveLane {
   upcoming_items?: UpcomingItem[];
 }
 
+export interface PriceIncrementTier {
+  from_price: number;
+  to_price: number | null;
+  increment_amount: number;
+}
+
+export interface CountdownTier {
+  from_price: number;
+  to_price: number | null;
+  bid_countdown_seconds: number;
+  freeze_countdown_seconds: number;
+}
+
 export interface LiveState {
   auction_id: number;
   auction_title: string;
@@ -194,7 +207,11 @@ export interface LiveState {
   venue_open_minutes_before_start?: number;
   message?: string;
   show_consent_screen?: boolean;
+  price_increment_tiers?: PriceIncrementTier[];
+  countdown_tiers?: CountdownTier[];
+  /** @deprecated 単一値。ティアテーブルが空の場合のフォールバック用 */
   price_increment_rate?: number;
+  /** @deprecated 単一値。ティアテーブルが空の場合のフォールバック用 */
   price_increment_min?: number;
   lanes: LiveLane[];
 }

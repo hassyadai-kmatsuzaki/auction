@@ -189,11 +189,15 @@ class BidService
             $lanesData[] = $laneData;
         }
 
+        $auctionSettings = $auction->getAuctionSettings();
+
         return [
             'auction_id'    => $auction->id,
             'auction_title' => $auction->title,
             'status'        => $auction->status,
             'countdown_seconds' => $defaultCountdown,
+            'price_increment_tiers' => $auction->getPriceIncrementTiers(),
+            'countdown_tiers'       => $auction->getCountdownTiers(),
             'lanes'         => $lanesData,
         ];
     }
