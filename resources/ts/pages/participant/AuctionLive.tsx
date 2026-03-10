@@ -368,7 +368,15 @@ export default function AuctionLive() {
 
   // ========== 待機室 ==========
   if (liveState.status === 'scheduled' && entranceAllowed === true) {
-    return <WaitingRoom title={liveState.auction_title} auctionId={auctionId} />;
+    return (
+      <WaitingRoom
+        title={liveState.auction_title}
+        auctionId={auctionId}
+        countdownSeconds={liveState.countdown_seconds}
+        priceIncrementRate={liveState.price_increment_rate}
+        priceIncrementMin={liveState.price_increment_min}
+      />
+    );
   }
 
   // scheduled で entranceAllowed が null（未確定）の場合はローディング
@@ -443,9 +451,14 @@ export default function AuctionLive() {
   // ========== ライブ画面 ==========
   return (
     <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
-      {/* 同意画面 */}
+      {/* 同意画面（上がり幅・秒数の確認） */}
       {liveState.show_consent_screen && !agreed && (
-        <ConsentOverlay onAgree={() => setAgreed(true)} />
+        <ConsentOverlay
+          onAgree={() => setAgreed(true)}
+          countdownSeconds={liveState.countdown_seconds}
+          priceIncrementRate={liveState.price_increment_rate}
+          priceIncrementMin={liveState.price_increment_min}
+        />
       )}
 
       {/* 落札おめでとう演出 */}

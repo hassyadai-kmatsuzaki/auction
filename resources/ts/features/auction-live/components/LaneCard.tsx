@@ -120,7 +120,7 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
             },
           }}
         >
-          入札権利あり
+          最高入札者
         </Box>
       )}
 

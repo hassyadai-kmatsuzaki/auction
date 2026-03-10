@@ -37,6 +37,7 @@ const WonItems               = lazy(() => import('./pages/participant/WonItems')
 const Favorites              = lazy(() => import('./pages/participant/Favorites'));
 const ParticipantSettings    = lazy(() => import('./pages/participant/Settings'));
 const ParticipantManual      = lazy(() => import('./pages/participant/Manual'));
+const ParticipantDemo        = lazy(() => import('./pages/participant/Demo'));
 
 // Admin
 const AdminDashboard         = lazy(() => import('./pages/admin/Dashboard'));
@@ -120,6 +121,7 @@ function App() {
             <Route path="favorites" element={<Favorites />} />
             <Route path="won-items" element={<WonItems />} />
             <Route path="manual" element={<ParticipantManual />} />
+            <Route path="demo" element={<ParticipantDemo />} />
             <Route path="settings" element={<ParticipantSettings />} />
           </Route>
 

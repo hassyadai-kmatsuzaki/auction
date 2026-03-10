@@ -1,7 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography, CircularProgress, Button } from '@mui/material';
-import { Timer as TimerIcon, ListAlt as ListAltIcon } from '@mui/icons-material';
+import { Box, Paper, Typography, CircularProgress, Button, Chip } from '@mui/material';
+import {
+  Timer as TimerIcon,
+  ListAlt as ListAltIcon,
+  TrendingUp as TrendingUpIcon,
+} from '@mui/icons-material';
 
 interface WaitingRoomProps {
   title: string;
@@ -9,6 +13,9 @@ interface WaitingRoomProps {
   startAt?: string;
   venueOpenMinutes?: number;
   message?: string;
+  countdownSeconds?: number;
+  priceIncrementRate?: number;
+  priceIncrementMin?: number;
 }
 
 interface EntranceBlockedProps extends WaitingRoomProps {
@@ -16,7 +23,7 @@ interface EntranceBlockedProps extends WaitingRoomProps {
 }
 
 /** 待機室（入室可能・オークション開始待ち） */
-export const WaitingRoom = React.memo(({ title, auctionId }: WaitingRoomProps) => {
+export const WaitingRoom = React.memo(({ title, auctionId, countdownSeconds, priceIncrementRate, priceIncrementMin }: WaitingRoomProps) => {
   const navigate = useNavigate();
   return (
     <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -26,6 +33,46 @@ export const WaitingRoom = React.memo(({ title, auctionId }: WaitingRoomProps) =
         <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
           オークション開始をお待ちください
         </Typography>
+
+        {/* 上がり幅・秒数の表示 */}
+        {(countdownSeconds || priceIncrementRate) && (
+          <Box sx={{ display: 'flex', gap: 1.5, mb: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {countdownSeconds && (
+              <Box
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  bgcolor: '#fff7ed', border: '1px solid', borderColor: 'warning.200',
+                  borderRadius: 2, px: 2, py: 1.5, flex: '1 1 auto', minWidth: 160,
+                }}
+              >
+                <TimerIcon sx={{ color: 'warning.main' }} />
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography variant="caption" color="text.secondary">カウントダウン</Typography>
+                  <Typography variant="subtitle1" fontWeight="bold" color="warning.main">{countdownSeconds}秒</Typography>
+                </Box>
+              </Box>
+            )}
+            {priceIncrementRate && (
+              <Box
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  bgcolor: '#f0f7ff', border: '1px solid', borderColor: 'primary.200',
+                  borderRadius: 2, px: 2, py: 1.5, flex: '1 1 auto', minWidth: 160,
+                }}
+              >
+                <TrendingUpIcon sx={{ color: 'primary.main' }} />
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography variant="caption" color="text.secondary">上がり幅</Typography>
+                  <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
+                    {(priceIncrementRate * 100).toFixed(0)}%
+                    {priceIncrementMin ? <Chip label={`最低¥${priceIncrementMin.toLocaleString()}`} size="small" sx={{ ml: 0.5, fontSize: '0.65rem' }} /> : null}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        )}
+
         <Box sx={{ bgcolor: 'primary.50', border: '2px solid', borderColor: 'primary.200', borderRadius: 2, p: 3, mb: 3 }}>
           <CircularProgress size={30} sx={{ mb: 1 }} />
           <Typography variant="body1" color="text.secondary">まもなく開始されます...</Typography>

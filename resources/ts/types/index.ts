@@ -194,6 +194,8 @@ export interface LiveState {
   venue_open_minutes_before_start?: number;
   message?: string;
   show_consent_screen?: boolean;
+  price_increment_rate?: number;
+  price_increment_min?: number;
   lanes: LiveLane[];
 }
 
