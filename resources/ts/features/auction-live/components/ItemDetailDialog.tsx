@@ -1,20 +1,29 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Grid, Typography, Divider, Button, IconButton,
+  Box, Grid, Typography, Divider, Button, IconButton, Chip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
+  Person as PersonIcon,
+  Inventory as InventoryIcon,
 } from '@mui/icons-material';
 import type { LaneItem } from '@/types';
+import { BidButton } from './BidButton';
+import { CountdownChip } from './CountdownChip';
+import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
 
 interface Props {
   open: boolean;
   item: LaneItem | null;
   onClose: () => void;
+  isLoading?: boolean;
+  onBidToggle?: (itemId: number, currentStatus: 'active' | 'inactive' | null) => void;
+  onLimitEdit?: (itemId: number) => void;
+  onLimitRemove?: (itemId: number) => void;
 }
 
 type MediaEntry = { type: 'image' | 'video'; url: string };
@@ -46,7 +55,7 @@ const buildMediaList = (item: LaneItem | null): MediaEntry[] => {
   return list;
 };
 
-export const ItemDetailDialog = React.memo(({ open, item, onClose }: Props) => {
+export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove }: Props) => {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [videoDialogUrl, setVideoDialogUrl] = useState('');
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
@@ -123,16 +132,101 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose }: Props) => {
 
             {/* 右: 詳細 */}
             <Grid item xs={12} md={6}>
-              <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
-                ¥{item?.current_price ? Math.floor(item.current_price).toLocaleString() : '0'}
-              </Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" gutterBottom>数量</Typography>
-              <Typography variant="body1" gutterBottom>{item?.quantity}{unit}</Typography>
-              {item?.inspection_info && (
+              {/* プレミアムバッジ */}
+              {item?.is_premium && (
+                <Box sx={{ mb: 1 }}>
+                  <Chip label="プレミアム" color="warning" size="small" />
+                </Box>
+              )}
+
+              {/* 現在単価 */}
+              <Box sx={{ mb: 1 }}>
+                <Typography variant="caption" color="text.secondary">現在単価</Typography>
+                <Typography variant="h4" color="primary.main" fontWeight="bold">
+                  ¥{item?.current_price ? Math.floor(item.current_price).toLocaleString() : '0'}
+                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    /1{unit}
+                  </Typography>
+                </Typography>
+              </Box>
+
+              {/* 出品者・数量 */}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 1.5 }}>
+                {item?.seller_name && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {item.seller_name}
+                    </Typography>
+                  </Box>
+                )}
+                {item?.quantity != null && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <InventoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {item.quantity}{unit}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* カウントダウン */}
+              {item && item.phase !== 'pre_bid' && (
+                <Box sx={{ mb: 1.5 }}>
+                  <CountdownChip
+                    seconds={item.countdown_seconds}
+                    isCompetitive={item.active_bidders_count >= 2}
+                    phase={item.phase === 'freeze' ? 'freeze' : 'bidding'}
+                    freezeTotalSeconds={item.freeze_countdown_seconds}
+                    freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
+                  />
+                </Box>
+              )}
+
+              {/* 入札ボタン */}
+              {item && onBidToggle && (
+                <Box sx={{ mb: 1.5 }}>
+                  <BidButton
+                    myBidStatus={item.my_bid_status}
+                    isPreBid={item.phase === 'pre_bid'}
+                    isFreeze={item.phase === 'freeze'}
+                    freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
+                    freezeTotalSeconds={item.freeze_countdown_seconds}
+                    isLoading={isLoading ?? false}
+                    onToggle={() => onBidToggle(item.id, item.my_bid_status)}
+                  />
+                </Box>
+              )}
+
+              {/* 指値バッジ */}
+              {item && onLimitEdit && (
+                <Box sx={{ mb: 1.5 }}>
+                  <BidLimitBadge
+                    limitPrice={item.my_limit_price ?? null}
+                    isTriggered={item.my_limit_triggered ?? false}
+                    onEdit={() => onLimitEdit(item.id)}
+                    onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
+                    size="medium"
+                  />
+                </Box>
+              )}
+
+              {/* 個体情報 */}
+              {(item?.inspection_info || item?.individual_info) && (
                 <>
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2, color: 'primary.main' }}>個体情報</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{item.inspection_info}</Typography>
+                  <Divider sx={{ my: 1.5 }} />
+                  {item?.inspection_info && (
+                    <Box sx={{ mb: 1 }}>
+                      <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>検査情報</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{item.inspection_info}</Typography>
+                    </Box>
+                  )}
+                  {item?.individual_info && (
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>個体情報</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{item.individual_info}</Typography>
+                    </Box>
+                  )}
                 </>
               )}
             </Grid>

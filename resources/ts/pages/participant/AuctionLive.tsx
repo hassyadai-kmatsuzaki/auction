@@ -541,8 +541,28 @@ export default function AuctionLive() {
       {/* 詳細ダイアログ */}
       <ItemDetailDialog
         open={!!detailLane}
-        item={detailLane?.current_item as LaneItem | null}
+        item={
+          (detailLane
+            ? liveState.lanes.find(l => l.lane_id === detailLane.lane_id)?.current_item
+            : null) as LaneItem | null
+        }
         onClose={() => setDetailLane(null)}
+        isLoading={detailLane?.current_item ? isLocked(detailLane.current_item.id) : false}
+        onBidToggle={(itemId, status) => {
+          const lane = liveState.lanes.find(l => l.current_item?.id === itemId);
+          const item = lane?.current_item;
+          if (item?.phase === 'pre_bid') {
+            showSnackbar('入札開始待機中です。もう少々お待ちください。', 'error');
+            return;
+          }
+          if (item?.phase === 'freeze') {
+            showSnackbar('誤タップ防止中です。もう少々お待ちください。', 'error');
+            return;
+          }
+          handleBidToggle(itemId, status);
+        }}
+        onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
+        onLimitRemove={(itemId) => setLimitModalItemId(itemId)}
       />
 
       {/* スナックバー */}
