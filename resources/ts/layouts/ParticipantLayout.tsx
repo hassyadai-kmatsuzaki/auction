@@ -164,7 +164,7 @@ export default function ParticipantLayout() {
       </Drawer>
 
       {/* オークション開催中バナー（Homeページと同じデザイン） */}
-      {liveAuction && !location.pathname.includes('/live') && (
+      {liveAuction && !location.pathname.includes('/live') && location.pathname !== '/participant' && (
         <Box
           sx={{
             background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
@@ -226,7 +226,7 @@ export default function ParticipantLayout() {
       )}
 
       {/* 待機室バナー（開催中と同じ青系デザイン） */}
-      {!liveAuction && scheduledAuction && !location.pathname.includes('/live') && (
+      {!liveAuction && scheduledAuction && !location.pathname.includes('/live') && location.pathname !== '/participant' && (
         <Box
           sx={{
             background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
