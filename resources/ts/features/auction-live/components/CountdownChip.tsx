@@ -45,7 +45,7 @@ export const CountdownChip = React.memo(({ seconds, isCompetitive, phase }: Prop
       size="small"
       color={
         isCompetitive
-          ? 'error'
+          ? 'default'
           : Math.ceil(seconds) <= 3
             ? 'warning'
             : 'default'
