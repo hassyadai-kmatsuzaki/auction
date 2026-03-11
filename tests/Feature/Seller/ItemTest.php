@@ -285,4 +285,35 @@ class ItemTest extends TestCase
             'current_price' => 100,
         ]);
     }
+
+    public function test_concurrent_item_creation_generates_unique_item_numbers(): void
+    {
+        // 同じオークションに対して複数のアイテムを連続で作成
+        $responses = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $responses[] = $this->actingAs($this->seller, 'sanctum')
+                ->postJson('/api/seller/items', [
+                    'auction_id' => $this->auction->id,
+                    'species_name' => "生体 {$i}",
+                    'quantity' => 1,
+                ]);
+        }
+
+        // 全てのリクエストが成功することを確認
+        foreach ($responses as $response) {
+            $response->assertStatus(201)
+                ->assertJson(['success' => true]);
+        }
+
+        // item_numberが重複していないことを確認
+        $items = Item::where('auction_id', $this->auction->id)
+            ->orderBy('item_number')
+            ->get();
+        
+        $itemNumbers = $items->pluck('item_number')->toArray();
+        $uniqueItemNumbers = array_unique($itemNumbers);
+        
+        $this->assertEquals(count($itemNumbers), count($uniqueItemNumbers), 'item_numberが重複しています');
+        $this->assertEquals(5, count($items));
+    }
 }

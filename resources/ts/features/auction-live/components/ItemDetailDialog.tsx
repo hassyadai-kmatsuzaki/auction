@@ -193,8 +193,8 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                     freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
                     freezeTotalSeconds={item.freeze_countdown_seconds}
                     isLoading={isLoading ?? false}
-                    isTopBidder={item.my_bid_status === 'active' && item.active_bidder_count === 1}
-                    activeBidderCount={item.active_bidder_count}
+                    isTopBidder={item.my_bid_status === 'active' && item.active_bidders_count === 1}
+                    activeBidderCount={item.active_bidders_count}
                     onToggle={() => onBidToggle(item.id, item.my_bid_status)}
                   />
                 </Box>

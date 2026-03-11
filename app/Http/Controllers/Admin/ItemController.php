@@ -129,29 +129,40 @@ class ItemController extends Controller
             ], 422);
         }
         
-        // 生体番号を自動採番
-        $maxItemNumber = Item::where('auction_id', $auctionId)->max('item_number') ?? 0;
-        $itemNumber = $maxItemNumber + 1;
-        
-        $item = Item::create([
-            'auction_id' => $auctionId,
-            'seller_profile_id' => $request->seller_profile_id,
-            'item_number' => $itemNumber,
-            'species_name' => $request->species_name,
-            'quantity' => $request->quantity,
-            'start_price' => $request->start_price,
-            'current_price' => $request->start_price,
-            // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
-            'reserve_price' => $request->reserve_price,
-            'estimated_price' => $request->estimated_price,
-            'bid_increment' => $request->bid_increment ?? 100,
-            'inspection_info' => $request->inspection_info,
-            'individual_info' => $request->individual_info,
-            'notes' => $request->notes,
-            'is_premium' => $request->boolean('is_premium', false),
-            'unsold_action' => $request->unsold_action ?? 'return',
-            'status' => 'registered',
-        ]);
+        // トランザクションと行ロックで生体番号の重複を防ぐ
+        \DB::beginTransaction();
+        try {
+            // 行ロックを使用して最大item_numberを取得
+            $maxItemNumber = Item::where('auction_id', $auctionId)
+                ->lockForUpdate()
+                ->max('item_number') ?? 0;
+            $itemNumber = $maxItemNumber + 1;
+            
+            $item = Item::create([
+                'auction_id' => $auctionId,
+                'seller_profile_id' => $request->seller_profile_id,
+                'item_number' => $itemNumber,
+                'species_name' => $request->species_name,
+                'quantity' => $request->quantity,
+                'start_price' => $request->start_price,
+                'current_price' => $request->start_price,
+                // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
+                'reserve_price' => $request->reserve_price,
+                'estimated_price' => $request->estimated_price,
+                'bid_increment' => $request->bid_increment ?? 100,
+                'inspection_info' => $request->inspection_info,
+                'individual_info' => $request->individual_info,
+                'notes' => $request->notes,
+                'is_premium' => $request->boolean('is_premium', false),
+                'unsold_action' => $request->unsold_action ?? 'return',
+                'status' => 'registered',
+            ]);
+            
+            \DB::commit();
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            throw $e;
+        }
         
         return response()->json([
             'success' => true,

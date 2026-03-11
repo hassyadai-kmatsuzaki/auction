@@ -184,32 +184,43 @@ class ItemController extends Controller
             ], 422);
         }
         
-        // 生体番号を自動採番
-        $maxItemNumber = Item::where('auction_id', $auction->id)->max('item_number') ?? 0;
-        $itemNumber = $maxItemNumber + 1;
-        
         // 開始価格が未設定の場合はデフォルト値100円を設定
         $startPrice = $request->start_price ?? 100;
         if ($startPrice < 100) {
             $startPrice = 100;
         }
         
-        $item = Item::create([
-            'auction_id' => $request->auction_id,
-            'seller_profile_id' => $sellerProfile->id,
-            'item_number' => $itemNumber,
-            'species_name' => $request->species_name,
-            'quantity' => $request->quantity,
-            'start_price' => $startPrice,
-            'current_price' => $startPrice,
-            'estimated_price' => $request->estimated_price,
-            'inspection_info' => $request->inspection_info,
-            'individual_info' => $request->individual_info,
-            'notes' => $request->notes,
-            'is_premium' => $request->boolean('is_premium', false),
-            'unsold_action' => $request->unsold_action ?? 'return',
-            'status' => 'draft',
-        ]);
+        // トランザクションと行ロックで生体番号の重複を防ぐ
+        \DB::beginTransaction();
+        try {
+            // 行ロックを使用して最大item_numberを取得
+            $maxItemNumber = Item::where('auction_id', $auction->id)
+                ->lockForUpdate()
+                ->max('item_number') ?? 0;
+            $itemNumber = $maxItemNumber + 1;
+            
+            $item = Item::create([
+                'auction_id' => $request->auction_id,
+                'seller_profile_id' => $sellerProfile->id,
+                'item_number' => $itemNumber,
+                'species_name' => $request->species_name,
+                'quantity' => $request->quantity,
+                'start_price' => $startPrice,
+                'current_price' => $startPrice,
+                'estimated_price' => $request->estimated_price,
+                'inspection_info' => $request->inspection_info,
+                'individual_info' => $request->individual_info,
+                'notes' => $request->notes,
+                'is_premium' => $request->boolean('is_premium', false),
+                'unsold_action' => $request->unsold_action ?? 'return',
+                'status' => 'draft',
+            ]);
+            
+            \DB::commit();
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            throw $e;
+        }
         
         return response()->json([
             'success' => true,

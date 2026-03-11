@@ -1,30 +1,24 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Container, Typography, Button, Paper, Grid,
-  Stepper, Step, StepLabel, StepContent, Alert, IconButton,
-  Snackbar, Tooltip, Fade, Divider, Chip,
+  Alert, Snackbar, Chip, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import {
-  NavigateNext as NextIcon,
-  NavigateBefore as PrevIcon,
-  Refresh as RefreshIcon,
-  TrendingUp as TrendingUpIcon,
-  Timer as TimerIcon,
-  EmojiEvents as TrophyIcon,
   Gavel as GavelIcon,
-  Block as BlockIcon,
-  PlayCircleOutline as PlayCircleIcon,
+  EmojiEvents as TrophyIcon,
   Pets as PetsIcon,
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   Info as InfoIcon,
+  PlayArrow as PlayArrowIcon,
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem, UpcomingItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
+import { DemoTourPopover, TourStep } from '../../components/DemoTourPopover';
 
 // ─── Demo data builders ───
 
@@ -44,7 +38,7 @@ const makeLaneItem = (overrides: Partial<LaneItem> & { id: number; species_name:
   freeze_countdown_seconds: 3,
   my_limit_price: null,
   my_limit_triggered: false,
-  seller_name: `デモ出品者`,
+  seller_name: 'デモ出品者',
   ...overrides,
 });
 
@@ -75,34 +69,37 @@ const INITIAL_UPCOMING: (UpcomingItem & { laneNumber: number })[] = [
   { id: 12, item_number: 6, species_name: '夜桜ゴールド', start_price: 3500, thumbnail_path: '/img/noimage.png', is_premium: false, is_favorited: false, quantity: 1, laneNumber: 3 },
 ];
 
-interface WonEntry { species_name: string; winning_price: number; quantity: number; total_amount: number; }
-
-// ─── Steps ───
-
-const DEMO_STEPS = [
-  { title: 'オークション画面の見方', description: '3つのレーンが同時に進行しています。各レーンには品種名、現在価格、カウントダウンが表示されています。下にスクロールすると「次の商品」も確認できます。' },
-  { title: '入札してみよう', description: 'レーン1の「入札する」ボタンをタップしてみてください！カードが金色に光り「最高入札者」バッジが表示されます。', highlight: 'bid' as const },
-  { title: '他の参加者が入札', description: '「次へ」を押すと、他の参加者がレーン1に入札します。価格が上がりカウントダウンがリセットされます。', autoAction: 'opponent_bid' as const },
-  { title: 'フリーズ（誤タップ防止）', description: '価格上昇直後、数秒間入札ボタンが無効になる「フリーズ」状態になります。「次へ」で体験できます。', autoAction: 'freeze' as const },
-  { title: '新商品の入札開始待機', description: 'レーン3に新しい商品が来ました。入札開始まで数秒間の待機（pre_bid）フェーズがあります。「次へ」で体験できます。', autoAction: 'pre_bid' as const },
-  { title: '指値（上限価格）を設定', description: '指値を設定すると、価格がその金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してみてください。', highlight: 'limit' as const },
-  { title: '指値が発動！自動入札オフ', description: '「次へ」を押すと、相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認できます。', autoAction: 'limit_trigger' as const },
-  { title: '詳細ダイアログを確認', description: 'レーンカードの「i」ボタンを押すと、画像や個体情報を確認できます。試してみてください。', highlight: 'info' as const },
-  { title: '落札おめでとう！', description: '「次へ」でレーン2を落札します。紙吹雪の落札演出と結果テーブルが表示されます。', autoAction: 'win' as const },
-];
+interface WonEntry {
+  species_name: string;
+  winning_price: number;
+  quantity: number;
+  total_amount: number;
+}
 
 // ─── Component ───
 
 export default function Demo() {
+  const [tourActive, setTourActive] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [lanes, setLanes] = useState<LiveLane[]>(JSON.parse(JSON.stringify(INITIAL_LANES)));
   const [upcoming, setUpcoming] = useState(INITIAL_UPCOMING.map(u => ({ ...u })));
   const [wonItems, setWonItems] = useState<WonEntry[]>([]);
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
-  const [detailLane, setDetailLane] = useState<LiveLane | null>(null);
+  const [, setDetailLane] = useState<LiveLane | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
+
+  // Refs for tour targets
+  const laneCardRefs = useRef<(HTMLDivElement | null)[]>([null, null, null]);
+  const lane1Ref = useRef<HTMLDivElement | null>(null);
+  const lane2Ref = useRef<HTMLDivElement | null>(null);
+  const lane3Ref = useRef<HTMLDivElement | null>(null);
+  const upcomingRef = useRef<HTMLDivElement>(null);
+  const wonTableRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const allLanesRef = useRef<HTMLDivElement>(null);
 
   const notify = useCallback((message: string, severity: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -183,134 +180,172 @@ export default function Demo() {
       }));
       startCountdown(lane.lane_id, 15);
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
-      if (activeStep === 1) setTimeout(() => setActiveStep(2), 1500);
+
+      if (tourActive && activeStep === 2) {
+        setTimeout(() => setActiveStep(3), 1200);
+      }
     }
-  }, [lanes, activeStep, notify, updateLaneItem, startCountdown]);
+  }, [lanes, notify, updateLaneItem, startCountdown, tourActive, activeStep]);
 
-  const simulateOpponentBid = useCallback((laneId: number) => {
-    const lane = lanes.find(l => l.lane_id === laneId);
-    const price = lane?.current_item?.current_price ?? 3000;
-    const increment = Math.max(100, Math.round(price * 0.1));
-    updateLaneItem(laneId, item => ({
-      ...item,
-      current_price: item.current_price + increment,
-      active_bidders_count: Math.max(2, item.active_bidders_count),
-    }));
-    startCountdown(laneId, 15);
-    notify(`他の参加者がレーン${lane?.lane_number}に入札！ +¥${increment.toLocaleString()}`, 'warning');
-  }, [lanes, notify, updateLaneItem, startCountdown]);
+  // ─── Simulation helpers ───
 
-  const simulateFreeze = useCallback((laneId: number) => {
-    stopTimer(laneId);
-    const lane = lanes.find(l => l.lane_id === laneId);
-    const price = lane?.current_item?.current_price ?? 3000;
-    const increment = Math.max(100, Math.round(price * 0.1));
-    updateLaneItem(laneId, item => ({
-      ...item,
-      phase: 'freeze',
-      freeze_remaining_seconds: 3,
-      freeze_countdown_seconds: 3,
-      current_price: item.current_price + increment,
-      active_bidders_count: Math.max(2, item.active_bidders_count),
-    }));
-    notify('フリーズ中！入札ボタンが一時的に無効になります（誤タップ防止）', 'warning');
+  const simulateOpponentBid = useCallback((laneId: number): Promise<void> => {
+    return new Promise(resolve => {
+      updateLaneItem(laneId, item => {
+        const increment = Math.max(100, Math.round(item.current_price * 0.1));
+        notify(`他の参加者が入札！ +¥${increment.toLocaleString()}`, 'warning');
+        return {
+          ...item,
+          current_price: item.current_price + increment,
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+        };
+      });
+      startCountdown(laneId, 15);
+      setTimeout(resolve, 800);
+    });
+  }, [notify, updateLaneItem, startCountdown]);
 
-    let remaining = 3;
-    const freezeTimer = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(freezeTimer);
-        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
-        startCountdown(laneId, 15);
-        notify('フリーズ解除！入札可能になりました', 'success');
-      } else {
-        updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+  const simulateMultipleOpponentBids = useCallback(async (laneId: number, count: number) => {
+    for (let i = 0; i < count; i++) {
+      await new Promise(r => setTimeout(r, 600));
+      updateLaneItem(laneId, item => {
+        const increment = Math.max(100, Math.round(item.current_price * 0.1));
+        return {
+          ...item,
+          current_price: item.current_price + increment,
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+        };
+      });
+      startCountdown(laneId, 15);
+      if (i === 0) {
+        notify('他の参加者が入札！価格が上昇しています...', 'warning');
       }
-    }, 1000);
-  }, [lanes, stopTimer, updateLaneItem, startCountdown, notify]);
+    }
+  }, [updateLaneItem, startCountdown, notify]);
 
-  const simulatePreBid = useCallback((laneId: number) => {
-    stopTimer(laneId);
-    updateLaneItem(laneId, () => makeLaneItem({
-      id: 7,
-      species_name: '三色ラメ 新着',
-      current_price: 4500,
-      quantity: 3,
-      phase: 'pre_bid',
-      pre_bid_remaining_seconds: 5,
-      countdown_seconds: 15,
-      my_bid_status: null,
-      active_bidders_count: 0,
-      seller_name: 'デモ出品者D',
-    }));
-    notify('新商品がレーン3に登場！入札開始まで待機中...', 'info');
+  const simulateFreeze = useCallback((laneId: number): Promise<void> => {
+    return new Promise(resolve => {
+      stopTimer(laneId);
+      updateLaneItem(laneId, item => {
+        const increment = Math.max(100, Math.round(item.current_price * 0.1));
+        return {
+          ...item,
+          phase: 'freeze',
+          freeze_remaining_seconds: 3,
+          freeze_countdown_seconds: 3,
+          current_price: item.current_price + increment,
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+        };
+      });
+      notify('フリーズ中！入札ボタンが一時的に無効になります', 'warning');
 
-    let remaining = 5;
-    const preBidTimer = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(preBidTimer);
-        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', pre_bid_remaining_seconds: 0 }));
-        startCountdown(laneId, 15);
-        notify('入札開始！レーン3で入札できるようになりました', 'success');
-      } else {
-        updateLaneItem(laneId, item => ({ ...item, pre_bid_remaining_seconds: remaining }));
-      }
-    }, 1000);
+      let remaining = 3;
+      const freezeTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(freezeTimer);
+          updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+          startCountdown(laneId, 15);
+          notify('フリーズ解除！入札可能になりました', 'success');
+          resolve();
+        } else {
+          updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+        }
+      }, 1000);
+    });
   }, [stopTimer, updateLaneItem, startCountdown, notify]);
 
-  const simulateLimitTrigger = useCallback(() => {
-    const lane1 = lanes.find(l => l.lane_id === 1);
-    const limitPrice = lane1?.current_item?.my_limit_price;
-    if (!limitPrice) {
-      notify('先にレーン1で指値を設定してください', 'error');
-      return;
-    }
-    let currentPrice = lane1!.current_item!.current_price;
-    const steps: number[] = [];
-    while (currentPrice < limitPrice) {
-      const inc = Math.max(100, Math.round(currentPrice * 0.1));
-      currentPrice += inc;
-      steps.push(currentPrice);
-    }
+  const simulatePreBid = useCallback((laneId: number): Promise<void> => {
+    return new Promise(resolve => {
+      stopTimer(laneId);
+      updateLaneItem(laneId, () => makeLaneItem({
+        id: 7,
+        species_name: '三色ラメ 新着',
+        current_price: 4500,
+        quantity: 3,
+        phase: 'pre_bid',
+        pre_bid_remaining_seconds: 5,
+        countdown_seconds: 15,
+        my_bid_status: null,
+        active_bidders_count: 0,
+        seller_name: 'デモ出品者D',
+      }));
+      notify('新商品がレーン3に登場！入札開始まで待機中...', 'info');
 
-    let i = 0;
-    const interval = setInterval(() => {
-      if (i >= steps.length) {
-        clearInterval(interval);
-        updateLaneItem(1, item => ({ ...item, my_bid_status: 'inactive', my_limit_triggered: true }));
-        notify('指値に到達！自動で入札がオフになりました', 'error');
+      let remaining = 5;
+      const preBidTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(preBidTimer);
+          updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', pre_bid_remaining_seconds: 0 }));
+          startCountdown(laneId, 15);
+          notify('入札開始！レーン3で入札できるようになりました', 'success');
+          resolve();
+        } else {
+          updateLaneItem(laneId, item => ({ ...item, pre_bid_remaining_seconds: remaining }));
+        }
+      }, 1000);
+    });
+  }, [stopTimer, updateLaneItem, startCountdown, notify]);
+
+  const simulateLimitTrigger = useCallback((): Promise<void> => {
+    return new Promise(resolve => {
+      const lane1 = lanes.find(l => l.lane_id === 1);
+      const limitPrice = lane1?.current_item?.my_limit_price;
+      if (!limitPrice) {
+        notify('先にレーン1で指値を設定してください', 'error');
+        resolve();
         return;
       }
-      updateLaneItem(1, item => ({
-        ...item,
-        current_price: steps[i],
-        active_bidders_count: Math.max(2, item.active_bidders_count),
-      }));
-      notify(`他の参加者が入札！ ¥${steps[i].toLocaleString()}`, 'warning');
-      i++;
-    }, 800);
+      let currentPrice = lane1!.current_item!.current_price;
+      const steps: number[] = [];
+      while (currentPrice < limitPrice) {
+        const inc = Math.max(100, Math.round(currentPrice * 0.1));
+        currentPrice += inc;
+        steps.push(currentPrice);
+      }
+
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i >= steps.length) {
+          clearInterval(interval);
+          updateLaneItem(1, item => ({ ...item, my_bid_status: 'inactive', my_limit_triggered: true }));
+          notify('指値に到達！自動で入札がオフになりました', 'error');
+          resolve();
+          return;
+        }
+        updateLaneItem(1, item => ({
+          ...item,
+          current_price: steps[i],
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+        }));
+        notify(`他の参加者が入札！ ¥${steps[i].toLocaleString()}`, 'warning');
+        i++;
+      }, 800);
+    });
   }, [lanes, updateLaneItem, notify]);
 
-  const handleWin = useCallback(() => {
-    const lane2 = lanes.find(l => l.lane_id === 2);
-    if (!lane2?.current_item) return;
-    stopTimer(2);
-    updateLaneItem(2, item => ({ ...item, countdown_seconds: 0, my_bid_status: 'active' }));
+  const handleWin = useCallback((): Promise<void> => {
+    return new Promise(resolve => {
+      const lane2 = lanes.find(l => l.lane_id === 2);
+      if (!lane2?.current_item) { resolve(); return; }
+      stopTimer(2);
+      updateLaneItem(2, item => ({ ...item, countdown_seconds: 0, my_bid_status: 'active' }));
 
-    const price = lane2.current_item.current_price;
-    const qty = lane2.current_item.quantity;
-    setWonItems(prev => [...prev, {
-      species_name: lane2.current_item!.species_name,
-      winning_price: price,
-      quantity: qty,
-      total_amount: Math.floor(price * qty * 1.1),
-    }]);
-    setCelebration({ species_name: lane2.current_item.species_name, winning_price: price });
-    setTimeout(() => setCelebration(null), 4000);
+      const price = lane2.current_item.current_price;
+      const qty = lane2.current_item.quantity;
+      setWonItems(prev => [...prev, {
+        species_name: lane2.current_item!.species_name,
+        winning_price: price,
+        quantity: qty,
+        total_amount: Math.floor(price * qty * 1.1),
+      }]);
+      setCelebration({ species_name: lane2.current_item.species_name, winning_price: price });
+      setTimeout(() => { setCelebration(null); resolve(); }, 4000);
+    });
   }, [lanes, stopTimer, updateLaneItem]);
 
-  // ─── Limit modal handlers (for BidLimitModal) ───
+  // ─── Limit modal handlers ───
 
   const limitModalLane = lanes.find(l => l.lane_id === limitModalLaneId);
   const limitModalItem = limitModalLane?.current_item;
@@ -320,8 +355,10 @@ export default function Demo() {
     updateLaneItem(limitModalLaneId, item => ({ ...item, my_limit_price: price, my_limit_triggered: false }));
     setLimitModalLaneId(null);
     notify(`上限価格を ¥${price.toLocaleString()} に設定しました`, 'success');
-    if (activeStep === 5) setTimeout(() => setActiveStep(6), 1000);
-  }, [limitModalLaneId, updateLaneItem, notify, activeStep]);
+    if (tourActive && activeStep === 7) {
+      setTimeout(() => setActiveStep(8), 800);
+    }
+  }, [limitModalLaneId, updateLaneItem, notify, tourActive, activeStep]);
 
   const handleRemoveLimit = useCallback(() => {
     if (!limitModalLaneId) return;
@@ -330,24 +367,138 @@ export default function Demo() {
     notify('上限設定を解除しました', 'info');
   }, [limitModalLaneId, updateLaneItem, notify]);
 
-  // ─── Step Navigation ───
+  // Sync individual lane refs from the array ref
+  useEffect(() => {
+    lane1Ref.current = laneCardRefs.current[0];
+    lane2Ref.current = laneCardRefs.current[1];
+    lane3Ref.current = laneCardRefs.current[2];
+  });
 
-  const handleNextStep = () => {
+  // ─── Tour step definitions ───
+
+  const tourSteps: TourStep[] = [
+    {
+      targetRef: headerRef,
+      title: 'オークション体験デモへようこそ！',
+      description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。',
+      placement: 'bottom',
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: 'レーンカードの見方',
+      description: '各レーンには品種名、現在価格、カウントダウンが表示されています。3つのレーンが同時に進行するのがこのオークションの特徴です。',
+      placement: 'right',
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: '入札してみよう！',
+      description: 'レーン1の「入札する」ボタンをタップしてみてください！カードが金色に光り「最高入札者」バッジが表示されます。',
+      placement: 'right',
+      waitForAction: 'レーン1の「入札する」をタップ',
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: '他の参加者が入札してきた！',
+      description: '他の参加者がレーン1に入札してきます。価格が上がりカウントダウンがリセットされる様子を確認してください。',
+      placement: 'right',
+      autoAction: () => { simulateOpponentBid(1); },
+      autoActionDelay: 1000,
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: '入札合戦！連続入札が発生',
+      description: '複数の参加者が連続で入札してきます。実際のオークションでもこのように価格が競り上がっていきます。',
+      placement: 'right',
+      autoAction: () => { simulateMultipleOpponentBids(1, 3); },
+      autoActionDelay: 2500,
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: 'フリーズ（誤タップ防止）',
+      description: '価格上昇直後、数秒間入札ボタンが無効になる「フリーズ」状態になります。誤タップを防ぐ安全機能です。',
+      placement: 'right',
+      autoAction: () => { simulateFreeze(1); },
+      autoActionDelay: 4000,
+    },
+    {
+      targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
+      title: '新商品の入札開始待機',
+      description: 'レーン3に新しい商品が来ました。入札開始まで数秒間の待機（プレビッド）フェーズがあります。',
+      placement: 'left',
+      autoAction: () => { simulatePreBid(3); },
+      autoActionDelay: 6000,
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: '指値（上限価格）を設定しよう',
+      description: '指値を設定すると、価格がその金額に達したとき自動で入札がオフになります。レーン1の「上限設定」ボタンを押してみてください。',
+      placement: 'right',
+      waitForAction: 'レーン1の「上限設定」をタップ',
+    },
+    {
+      targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
+      title: '指値が発動！自動入札オフ',
+      description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。',
+      placement: 'right',
+      autoAction: () => { simulateLimitTrigger(); },
+      autoActionDelay: 3000,
+    },
+    {
+      targetRef: upcomingRef,
+      title: '次の商品を確認',
+      description: '下にスクロールすると「次の商品」を確認できます。お気に入り登録もできるので、気になる商品を事前にチェックしておきましょう。',
+      placement: 'top',
+    },
+    {
+      targetRef: lane2Ref as React.RefObject<HTMLDivElement | null>,
+      title: '落札の瞬間！',
+      description: 'レーン2を落札します。紙吹雪の落札演出と結果テーブルが表示されます。おめでとうございます！',
+      placement: 'left',
+      autoAction: () => {
+        updateLaneItem(2, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 }));
+        setTimeout(() => handleWin(), 500);
+      },
+      autoActionDelay: 4500,
+    },
+    {
+      targetRef: wonTableRef,
+      title: 'デモ完了！お疲れさまでした',
+      description: '落札結果がここに表示されます。実際のオークションでも同様の流れで進みます。「最初から」ボタンで何度でも練習できます。',
+      placement: 'top',
+    },
+  ];
+
+  // ─── Tour navigation ───
+
+  const handleTourNext = useCallback(() => {
     const nextStep = activeStep + 1;
-    if (nextStep >= DEMO_STEPS.length) return;
-    const step = DEMO_STEPS[nextStep];
-    if (step.autoAction === 'opponent_bid') simulateOpponentBid(1);
-    else if (step.autoAction === 'freeze') simulateFreeze(1);
-    else if (step.autoAction === 'pre_bid') simulatePreBid(3);
-    else if (step.autoAction === 'limit_trigger') simulateLimitTrigger();
-    else if (step.autoAction === 'win') {
-      updateLaneItem(2, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 }));
-      setTimeout(() => handleWin(), 500);
-    }
-    setActiveStep(nextStep);
-  };
+    if (nextStep >= tourSteps.length) return;
 
-  const handleReset = () => {
+    const step = tourSteps[nextStep];
+    if (step.autoAction) {
+      setIsAutoPlaying(true);
+      setActiveStep(nextStep);
+      step.autoAction();
+      setTimeout(() => {
+        setIsAutoPlaying(false);
+      }, step.autoActionDelay || 1500);
+    } else {
+      setActiveStep(nextStep);
+    }
+  }, [activeStep, tourSteps]);
+
+  const handleTourPrev = useCallback(() => {
+    if (activeStep > 0) {
+      setActiveStep(activeStep - 1);
+    }
+  }, [activeStep]);
+
+  const handleTourClose = useCallback(() => {
+    setTourActive(false);
+    setActiveStep(0);
+  }, []);
+
+  const handleReset = useCallback(() => {
     stopAllTimers();
     setActiveStep(0);
     setLanes(JSON.parse(JSON.stringify(INITIAL_LANES)));
@@ -356,7 +507,17 @@ export default function Demo() {
     setCelebration(null);
     setLimitModalLaneId(null);
     setDetailLane(null);
-  };
+    setIsAutoPlaying(false);
+    setTourActive(false);
+  }, [stopAllTimers]);
+
+  const handleStartTour = useCallback(() => {
+    handleReset();
+    setTimeout(() => {
+      setTourActive(true);
+      setActiveStep(0);
+    }, 100);
+  }, [handleReset]);
 
   const toggleFavorite = (itemId: number) => {
     setUpcoming(prev => prev.map(u => u.id === itemId ? { ...u, is_favorited: !u.is_favorited } : u));
@@ -366,13 +527,21 @@ export default function Demo() {
 
   return (
     <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
-      {/* 落札演出（実際のCelebrationOverlay） */}
+      {/* 落札演出 */}
       {celebration && (
         <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />
       )}
 
       {/* ヘッダー */}
-      <Box sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)', color: 'white', py: 3, px: 2 }}>
+      <Box
+        ref={headerRef}
+        sx={{
+          background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
+          color: 'white',
+          py: 3,
+          px: 2,
+        }}
+      >
         <Container maxWidth="xl">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
             <GavelIcon sx={{ fontSize: 32 }} />
@@ -380,82 +549,49 @@ export default function Demo() {
               オークション体験デモ
             </Typography>
           </Box>
-          <Typography variant="body2" sx={{ opacity: 0.9 }}>
-            3レーン同時進行・フリーズ・入札待機・指値発動・落札まで、すべての流れをナビ付きで体験
+          <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
+            実際のオークション画面を操作しながら、入札の流れを体験できます
           </Typography>
+          {!tourActive && (
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<PlayArrowIcon />}
+              onClick={handleStartTour}
+              sx={{
+                bgcolor: 'white',
+                color: 'primary.main',
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                '&:hover': { bgcolor: 'grey.100' },
+              }}
+            >
+              ガイド付きデモを開始
+            </Button>
+          )}
+          {tourActive && (
+            <Chip
+              label={`ガイド進行中 (${activeStep + 1}/${tourSteps.length})`}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+              }}
+            />
+          )}
         </Container>
       </Box>
 
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', lg: 'row' } }}>
-
-          {/* 左: ナビゲーション */}
-          <Box sx={{ width: { xs: '100%', lg: 320 }, flexShrink: 0 }}>
-            <Paper sx={{ p: 2, position: { lg: 'sticky' }, top: { lg: 80 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold">ガイド ({activeStep + 1}/{DEMO_STEPS.length})</Typography>
-                <Tooltip title="最初からやり直す">
-                  <IconButton size="small" onClick={handleReset}><RefreshIcon /></IconButton>
-                </Tooltip>
-              </Box>
-              <Stepper activeStep={activeStep} orientation="vertical">
-                {DEMO_STEPS.map((step, index) => (
-                  <Step key={index}>
-                    <StepLabel
-                      sx={{ cursor: 'pointer', '& .MuiStepLabel-label': { fontWeight: index === activeStep ? 700 : 400, fontSize: '0.85rem' } }}
-                      onClick={() => setActiveStep(index)}
-                    >
-                      {step.title}
-                    </StepLabel>
-                    <StepContent>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.8rem' }}>
-                        {step.description}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        {activeStep > 0 && (
-                          <Button size="small" startIcon={<PrevIcon />} onClick={() => setActiveStep(Math.max(0, activeStep - 1))}>前へ</Button>
-                        )}
-                        {activeStep < DEMO_STEPS.length - 1 && (
-                          <Button size="small" variant="contained" endIcon={<NextIcon />} onClick={handleNextStep}>次へ</Button>
-                        )}
-                        {activeStep === DEMO_STEPS.length - 1 && (
-                          <Button size="small" variant="outlined" startIcon={<RefreshIcon />} onClick={handleReset}>最初から</Button>
-                        )}
-                      </Box>
-                    </StepContent>
-                  </Step>
-                ))}
-              </Stepper>
-
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 1 }}>デモのルール</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TrendingUpIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-                  <Typography variant="caption">上がり幅: 10%（最低¥100）</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TimerIcon sx={{ fontSize: 14, color: 'warning.main' }} />
-                  <Typography variant="caption">カウントダウン: 15秒</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <BlockIcon sx={{ fontSize: 14, color: 'grey.500' }} />
-                  <Typography variant="caption">フリーズ: 3秒</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <PlayCircleIcon sx={{ fontSize: 14, color: 'info.main' }} />
-                  <Typography variant="caption">入札待機: 5秒</Typography>
-                </Box>
-              </Box>
-            </Paper>
-          </Box>
-
-          {/* 右: デモオークション画面（実際のコンポーネント使用） */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            {/* レーングリッド（実際の LaneCard を使用） */}
-            <Grid container spacing={2}>
-              {lanes.map(lane => (
-                <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+        {/* レーングリッド */}
+        <Box ref={allLanesRef}>
+          <Grid container spacing={2}>
+            {lanes.map((lane, idx) => (
+              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+                <Box ref={(el: HTMLDivElement | null) => { laneCardRefs.current[idx] = el; }}>
                   <LaneCard
                     lane={lane}
                     isLoading={false}
@@ -473,99 +609,141 @@ export default function Demo() {
                       }
                     }}
                   />
-                </Grid>
-              ))}
-            </Grid>
-
-            {/* 次の商品 */}
-            <Paper sx={{ mt: 3, p: 2 }}>
-              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
-              <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
-                {upcoming.map(item => (
-                  <Box key={item.id} sx={{
-                    flexShrink: 0, width: 150, borderRadius: 1.5,
-                    border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'background.paper',
-                  }}>
-                    <Box sx={{
-                      width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
-                    </Box>
-                    <Box sx={{ p: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
-                        <Chip label={`L${item.laneNumber}`} size="small"
-                          sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} color="primary" variant="outlined" />
-                        {item.is_premium && <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />}
-                      </Box>
-                      <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.species_name}</Typography>
-                      <Typography variant="caption" color="primary.main" fontWeight="bold">¥{item.start_price.toLocaleString()}〜</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.5 }}>
-                        <Tooltip title="詳細を見る" arrow>
-                          <IconButton size="small" sx={{ p: 0.25 }} onClick={() => notify(`${item.species_name} の詳細（デモ）`, 'info')}>
-                            <InfoIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                          </IconButton>
-                        </Tooltip>
-                        <IconButton size="small" onClick={() => toggleFavorite(item.id)} sx={{ p: 0.25 }}>
-                          {item.is_favorited
-                            ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} />
-                            : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
-                        </IconButton>
-                      </Box>
-                      <Box sx={{ mt: 0.5 }}>
-                        <BidLimitBadge
-                          limitPrice={null}
-                          isTriggered={false}
-                          onEdit={() => notify('次の商品への指値は、商品がレーンに来てから設定できます', 'info')}
-                        />
-                      </Box>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            </Paper>
-
-            {/* 落札結果テーブル */}
-            {wonItems.length > 0 && (
-              <Paper sx={{ mt: 3, p: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TrophyIcon color="warning" /> あなたの落札結果
-                </Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>品種</TableCell>
-                        <TableCell align="right">単価</TableCell>
-                        <TableCell align="right">数量</TableCell>
-                        <TableCell align="right">合計(税込)</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {wonItems.map((w, i) => (
-                        <TableRow key={i}>
-                          <TableCell>{w.species_name}</TableCell>
-                          <TableCell align="right">¥{w.winning_price.toLocaleString()}/匹</TableCell>
-                          <TableCell align="right">{w.quantity}匹</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{w.total_amount.toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow>
-                        <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>合計</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
-                          ¥{wonTotal.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-            )}
-          </Box>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
+
+        {/* 次の商品 */}
+        <Paper ref={upcomingRef} sx={{ mt: 3, p: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
+          <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
+            {upcoming.map(item => (
+              <Box key={item.id} sx={{
+                flexShrink: 0, width: 150, borderRadius: 1.5,
+                border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'background.paper',
+              }}>
+                <Box sx={{
+                  width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
+                </Box>
+                <Box sx={{ p: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+                    <Chip label={`L${item.laneNumber}`} size="small"
+                      sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} color="primary" variant="outlined" />
+                    {item.is_premium && <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />}
+                  </Box>
+                  <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.species_name}</Typography>
+                  <Typography variant="caption" color="primary.main" fontWeight="bold">¥{item.start_price.toLocaleString()}〜</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.5 }}>
+                    <IconButton size="small" sx={{ p: 0.25 }} onClick={() => notify(`${item.species_name} の詳細（デモ）`, 'info')}>
+                      <InfoIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => toggleFavorite(item.id)} sx={{ p: 0.25 }}>
+                      {item.is_favorited
+                        ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} />
+                        : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
+                    </IconButton>
+                  </Box>
+                  <Box sx={{ mt: 0.5 }}>
+                    <BidLimitBadge
+                      limitPrice={null}
+                      isTriggered={false}
+                      onEdit={() => notify('次の商品への指値は、商品がレーンに来てから設定できます', 'info')}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+
+        {/* 落札結果テーブル */}
+        <Box ref={wonTableRef}>
+          {wonItems.length > 0 && (
+            <Paper sx={{ mt: 3, p: 2 }}>
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TrophyIcon color="warning" /> あなたの落札結果
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>品種</TableCell>
+                      <TableCell align="right">単価</TableCell>
+                      <TableCell align="right">数量</TableCell>
+                      <TableCell align="right">合計(税込)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {wonItems.map((w, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{w.species_name}</TableCell>
+                        <TableCell align="right">¥{w.winning_price.toLocaleString()}/匹</TableCell>
+                        <TableCell align="right">{w.quantity}匹</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{w.total_amount.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>合計</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
+                        ¥{wonTotal.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+          {wonItems.length === 0 && (
+            <Paper sx={{ mt: 3, p: 2, bgcolor: 'grey.50' }}>
+              <Typography variant="body2" color="text.secondary" align="center">
+                落札した商品がここに表示されます
+              </Typography>
+            </Paper>
+          )}
+        </Box>
+
+        {/* フリーモード操作パネル（ツアー非アクティブ時） */}
+        {!tourActive && (
+          <Paper sx={{ mt: 3, p: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
+              フリーモード — 自由に操作できます
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              ガイドなしで自由に操作できます。「ガイド付きデモを開始」ボタンでチュートリアルを再開できます。
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button size="small" variant="outlined" onClick={() => simulateOpponentBid(1)}>
+                レーン1に他者入札
+              </Button>
+              <Button size="small" variant="outlined" onClick={() => simulateOpponentBid(2)}>
+                レーン2に他者入札
+              </Button>
+              <Button size="small" variant="outlined" onClick={() => simulateFreeze(1)}>
+                フリーズ体験
+              </Button>
+              <Button size="small" variant="outlined" onClick={() => simulatePreBid(3)}>
+                新商品登場
+              </Button>
+              <Button size="small" variant="outlined" onClick={() => {
+                updateLaneItem(2, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 }));
+                setTimeout(() => handleWin(), 500);
+              }}>
+                落札体験
+              </Button>
+              <Button size="small" variant="outlined" color="secondary" onClick={handleReset}>
+                リセット
+              </Button>
+            </Box>
+          </Paper>
+        )}
       </Container>
 
-      {/* 指値モーダル（実際の BidLimitModal を使用） */}
+      {/* 指値モーダル */}
       {limitModalLaneId && limitModalItem && (
         <BidLimitModal
           open={!!limitModalLaneId}
@@ -580,6 +758,19 @@ export default function Demo() {
           isRemoving={false}
           onSet={handleSetLimit}
           onRemove={handleRemoveLimit}
+        />
+      )}
+
+      {/* ツアーポップオーバー */}
+      {tourActive && (
+        <DemoTourPopover
+          steps={tourSteps}
+          activeStep={activeStep}
+          onNext={handleTourNext}
+          onPrev={handleTourPrev}
+          onClose={handleTourClose}
+          onReset={handleStartTour}
+          isAutoPlaying={isAutoPlaying}
         />
       )}
 
