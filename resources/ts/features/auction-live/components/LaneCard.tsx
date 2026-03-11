@@ -210,6 +210,8 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
           freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
           freezeTotalSeconds={item.freeze_countdown_seconds}
           isLoading={isLoading}
+          isTopBidder={item.my_bid_status === 'active' && item.active_bidder_count === 1}
+          activeBidderCount={item.active_bidder_count}
           onToggle={() => onBidToggle(item.id, item.my_bid_status)}
         />
         <IconButton color="primary" onClick={() => onDetailOpen(lane)}>

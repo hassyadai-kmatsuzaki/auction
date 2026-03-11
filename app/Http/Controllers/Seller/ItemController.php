@@ -148,7 +148,7 @@ class ItemController extends Controller
             'auction_id' => 'required|exists:auctions,id',
             'species_name' => 'required|string|max:255',
             'quantity' => 'required|integer|min:1',
-            'start_price' => 'required|numeric|min:1',
+            'start_price' => 'nullable|numeric|min:0',
             'estimated_price' => 'nullable|numeric|min:1',
             'inspection_info' => 'nullable|string',
             'individual_info' => 'nullable|string',
@@ -188,14 +188,20 @@ class ItemController extends Controller
         $maxItemNumber = Item::where('auction_id', $auction->id)->max('item_number') ?? 0;
         $itemNumber = $maxItemNumber + 1;
         
+        // 開始価格が未設定の場合はデフォルト値100円を設定
+        $startPrice = $request->start_price ?? 100;
+        if ($startPrice < 100) {
+            $startPrice = 100;
+        }
+        
         $item = Item::create([
             'auction_id' => $request->auction_id,
             'seller_profile_id' => $sellerProfile->id,
             'item_number' => $itemNumber,
             'species_name' => $request->species_name,
             'quantity' => $request->quantity,
-            'start_price' => $request->start_price,
-            'current_price' => $request->start_price,
+            'start_price' => $startPrice,
+            'current_price' => $startPrice,
             'estimated_price' => $request->estimated_price,
             'inspection_info' => $request->inspection_info,
             'individual_info' => $request->individual_info,
@@ -339,7 +345,7 @@ class ItemController extends Controller
         $validator = Validator::make($request->all(), [
             'species_name' => 'string|max:255',
             'quantity' => 'integer|min:1',
-            'start_price' => 'numeric|min:1',
+            'start_price' => 'nullable|numeric|min:0',
             'estimated_price' => 'nullable|numeric|min:1',
             'inspection_info' => 'nullable|string',
             'individual_info' => 'nullable|string',
@@ -355,23 +361,28 @@ class ItemController extends Controller
             ], 422);
         }
         
-        $item->update($request->only([
+        // 開始価格の処理
+        $updateData = $request->only([
             'species_name',
             'quantity',
-            'start_price',
             'estimated_price',
             'inspection_info',
             'individual_info',
             'notes',
             'is_premium',
             'unsold_action',
-        ]));
+        ]);
         
-        // 開始価格が変更された場合は現在価格も更新
         if ($request->has('start_price')) {
-            $item->current_price = $request->start_price;
-            $item->save();
+            $startPrice = $request->start_price ?? 100;
+            if ($startPrice < 100) {
+                $startPrice = 100;
+            }
+            $updateData['start_price'] = $startPrice;
+            $updateData['current_price'] = $startPrice;
         }
+        
+        $item->update($updateData);
         
         return response()->json([
             'success' => true,

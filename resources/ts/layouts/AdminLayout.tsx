@@ -72,6 +72,7 @@ export default function AdminLayout() {
   };
 
   const handleLogout = async () => {
+    setMobileOpen(false);
     await logout();
     navigate('/login');
   };

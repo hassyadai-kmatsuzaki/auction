@@ -35,6 +35,13 @@ class LeaveBidAction
                 return BidResultDto::failure('入札に参加していません。');
             }
 
+            // 最高入札者（落札権利者）は入札を解除できない
+            $activeBidders = BidParticipant::forItem($item->id)->active()->count();
+            if ($activeBidders === 1 && $participant->is_active) {
+                DB::rollBack();
+                return BidResultDto::failure('最高入札者は入札を解除できません。');
+            }
+
             $participant->deactivate();
             BidEvent::recordLeave($item->id, $userId, $item->current_price, $ipAddress, $userAgent);
             $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();

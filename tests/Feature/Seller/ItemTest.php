@@ -223,4 +223,66 @@ class ItemTest extends TestCase
                 ],
             ]);
     }
+
+    public function test_seller_can_create_item_with_default_start_price(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->postJson('/api/seller/items', [
+                'auction_id' => $this->auction->id,
+                'species_name' => 'ボールパイソン',
+                'quantity' => 1,
+                'start_price' => 100,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('items', [
+            'species_name' => 'ボールパイソン',
+            'seller_profile_id' => $this->sellerProfile->id,
+            'start_price' => 100,
+            'current_price' => 100,
+        ]);
+    }
+
+    public function test_seller_can_create_item_with_zero_start_price(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->postJson('/api/seller/items', [
+                'auction_id' => $this->auction->id,
+                'species_name' => 'ボールパイソン',
+                'quantity' => 1,
+                'start_price' => 0,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('items', [
+            'species_name' => 'ボールパイソン',
+            'seller_profile_id' => $this->sellerProfile->id,
+            'start_price' => 100,
+            'current_price' => 100,
+        ]);
+    }
+
+    public function test_seller_can_create_item_without_start_price(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->postJson('/api/seller/items', [
+                'auction_id' => $this->auction->id,
+                'species_name' => 'ボールパイソン',
+                'quantity' => 1,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('items', [
+            'species_name' => 'ボールパイソン',
+            'seller_profile_id' => $this->sellerProfile->id,
+            'start_price' => 100,
+            'current_price' => 100,
+        ]);
+    }
 }

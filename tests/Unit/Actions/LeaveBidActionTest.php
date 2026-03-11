@@ -26,21 +26,30 @@ class LeaveBidActionTest extends TestCase
     {
         $auction = Auction::factory()->create(['status' => 'live']);
         $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
-        $userId  = 1;
+        $userId1 = 1;
+        $userId2 = 2;
 
+        // 2人の入札者を作成（1人だけだと最高入札者で離脱できない）
         BidParticipant::create([
             'item_id'    => $item->id,
-            'user_id'    => $userId,
+            'user_id'    => $userId1,
             'is_active'  => true,
             'activated_at' => now(),
         ]);
 
-        $result = $this->action->execute($item, $userId);
+        BidParticipant::create([
+            'item_id'    => $item->id,
+            'user_id'    => $userId2,
+            'is_active'  => true,
+            'activated_at' => now(),
+        ]);
+
+        $result = $this->action->execute($item, $userId1);
 
         $this->assertTrue($result->success);
         $this->assertDatabaseHas('bid_participants', [
             'item_id'   => $item->id,
-            'user_id'   => $userId,
+            'user_id'   => $userId1,
             'is_active' => false,
         ]);
     }
@@ -84,5 +93,33 @@ class LeaveBidActionTest extends TestCase
         $result = $this->action->execute($item, $userId);
 
         $this->assertFalse($result->success);
+    }
+
+    /** @test */
+    public function test_最高入札者は入札を解除できない(): void
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
+        $userId  = 1;
+
+        // 1人だけの入札者（最高入札者）
+        BidParticipant::create([
+            'item_id'    => $item->id,
+            'user_id'    => $userId,
+            'is_active'  => true,
+            'activated_at' => now(),
+        ]);
+
+        $result = $this->action->execute($item, $userId);
+
+        $this->assertFalse($result->success);
+        $this->assertStringContainsString('最高入札者は入札を解除できません', $result->message);
+        
+        // データベースには変更がないことを確認
+        $this->assertDatabaseHas('bid_participants', [
+            'item_id'   => $item->id,
+            'user_id'   => $userId,
+            'is_active' => true,
+        ]);
     }
 }

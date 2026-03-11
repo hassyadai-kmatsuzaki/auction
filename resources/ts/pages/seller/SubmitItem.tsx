@@ -149,7 +149,7 @@ export default function SubmitItem() {
           species_name: item.species_name,
           quantity: parseInt(item.quantity),
           quantity_unit: item.quantity_unit,
-          start_price: 0,
+          start_price: 100,
           is_premium: item.is_premium,
           individual_info: individualInfo || null,
           inspection_info: null,
@@ -378,6 +378,7 @@ export default function SubmitItem() {
                           onChange={(e) => updateItem(index, 'individual_info', e.target.value)}
                           placeholder="体長、色、ラメの状態、健康状態など"
                           size="small"
+                          helperText="出品個体について、お伝えしたいことがあればご記載ください。(記載がなくても出品可能です。)"
                         />
                       </Grid>
                     </Grid>

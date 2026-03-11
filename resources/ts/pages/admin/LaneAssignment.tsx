@@ -32,6 +32,7 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Close as CloseIcon,
+  Reorder as ReorderIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -442,6 +443,15 @@ export default function LaneAssignment() {
         </Box>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
+            startIcon={<ReorderIcon />}
+            onClick={() => navigate(`/admin/auctions/${auctionId}/seller-order`)}
+            variant="outlined"
+            size="small"
+            disabled={auction?.status === 'live'}
+          >
+            出品者順序設定
+          </Button>
+          <Button
             startIcon={<RefreshIcon />}
             onClick={fetchData}
             variant="outlined"
@@ -758,9 +768,18 @@ export default function LaneAssignment() {
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
             登録済みの生体をレーンに自動で割り当てます。
-            プレミアム生体は優先的に上位に配置されます。
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
+            <strong>出品者順序が設定されている場合:</strong>
+            <br />
+            出品者順序に基づいて生体を割り当てます。各出品者内でプレミアム生体が優先されます。
+            <br />
+            <br />
+            <strong>出品者順序が未設定の場合:</strong>
+            <br />
+            生体番号順で割り当てます。プレミアム生体が優先的に上位に配置されます。
+          </Alert>
+          <Alert severity="warning">
             既存の割り当てをクリアするか、追加で割り当てるかを選択してください。
           </Alert>
         </DialogContent>

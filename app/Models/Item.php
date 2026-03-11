@@ -17,6 +17,7 @@ class Item extends BaseModel
         'auction_id',
         'seller_profile_id',
         'item_number',
+        'seller_display_order',
         'species_name',
         'quantity',
         'start_price',
@@ -44,6 +45,7 @@ class Item extends BaseModel
      */
     protected $casts = [
         'quantity' => 'integer',
+        'seller_display_order' => 'integer',
         'is_premium' => 'boolean',
         'live_started_at' => 'datetime',
         'live_ended_at' => 'datetime',

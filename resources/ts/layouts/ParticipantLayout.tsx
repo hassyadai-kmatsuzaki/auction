@@ -69,6 +69,7 @@ export default function ParticipantLayout() {
   ];
 
   const handleLogout = async () => {
+    setDrawerOpen(false);
     await logout();
     navigate('/login');
   };
@@ -152,7 +153,11 @@ export default function ParticipantLayout() {
           <Divider />
           <List>
             <ListItem disablePadding>
-              <ListItemButton onClick={handleLogout}>
+              <ListItemButton
+                onClick={() => {
+                  handleLogout();
+                }}
+              >
                 <ListItemIcon>
                   <LogoutIcon />
                 </ListItemIcon>

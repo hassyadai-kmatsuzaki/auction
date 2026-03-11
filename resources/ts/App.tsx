@@ -63,6 +63,7 @@ const BuyerDetail            = lazy(() => import('./pages/admin/BuyerDetail'));
 const DocumentManagement     = lazy(() => import('./pages/admin/DocumentManagement'));
 const AdminManual            = lazy(() => import('./pages/admin/Manual'));
 const LaneAssignment         = lazy(() => import('./pages/admin/LaneAssignment'));
+const SellerOrderPage        = lazy(() => import('./features/admin/auction-seller-order/pages/SellerOrderPage'));
 const Reports                = lazy(() => import('./pages/admin/Reports'));
 const DesignSystem           = lazy(() => import('./pages/admin/DesignSystem'));
 const AIAnalytics            = lazy(() => import('./pages/admin/AIAnalytics'));
@@ -172,6 +173,9 @@ function App() {
             
             {/* レーン割当 */}
             <Route path="auctions/:auctionId/lanes" element={<LaneAssignment />} />
+            
+            {/* 出品者順序管理 */}
+            <Route path="auctions/:auctionId/seller-order" element={<SellerOrderPage />} />
             
             {/* ライブ管理 */}
             <Route path="live" element={<LiveAuctions />} />

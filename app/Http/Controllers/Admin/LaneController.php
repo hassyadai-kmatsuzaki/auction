@@ -391,22 +391,16 @@ class LaneController extends Controller
                 ->delete();
         }
 
-        // 登録済みの生体を取得（プレミアム優先）
-        $premiumItems = Item::where('auction_id', $auctionId)
-            ->where('status', 'registered')
-            ->where('is_premium', true)
-            ->orderBy('item_number')
-            ->get();
+        // 出品者順序が設定されているかチェック
+        $hasSellerOrder = \App\Models\AuctionSellerOrder::where('auction_id', $auctionId)->exists();
 
-        $normalItems = Item::where('auction_id', $auctionId)
-            ->where('status', 'registered')
-            ->where(function ($q) {
-                $q->where('is_premium', false)->orWhereNull('is_premium');
-            })
-            ->orderBy('item_number')
-            ->get();
-
-        $items = $premiumItems->concat($normalItems);
+        if ($hasSellerOrder) {
+            // 出品者順序に基づいて生体を取得
+            $items = $this->getItemsBySellerOrder($auctionId);
+        } else {
+            // 従来通りの取得方法（プレミアム優先、item_number順）
+            $items = $this->getItemsByItemNumber($auctionId);
+        }
 
         // 既に割り当て済みを除外（全レーン横断で確認）
         $assignedIds = DB::table('lane_items')
@@ -465,8 +459,73 @@ class LaneController extends Controller
             'message' => $itemIndex . '件の生体を自動割り当てしました。',
             'data' => [
                 'assigned_count' => $itemIndex,
+                'used_seller_order' => $hasSellerOrder,
             ],
         ]);
+    }
+
+    /**
+     * 出品者順序に基づいて生体を取得
+     * 
+     * @param int $auctionId
+     * @return \Illuminate\Support\Collection
+     */
+    private function getItemsBySellerOrder($auctionId)
+    {
+        $sellerOrders = \App\Models\AuctionSellerOrder::where('auction_id', $auctionId)
+            ->orderBy('display_order')
+            ->get();
+
+        $allItems = collect();
+
+        foreach ($sellerOrders as $sellerOrder) {
+            // 各出品者内でプレミアム優先、seller_display_order順（NULLの場合はitem_number順）
+            $premiumItems = Item::where('auction_id', $auctionId)
+                ->where('seller_profile_id', $sellerOrder->seller_profile_id)
+                ->where('status', 'registered')
+                ->where('is_premium', true)
+                ->orderByRaw('seller_display_order IS NULL, seller_display_order, item_number')
+                ->get();
+
+            $normalItems = Item::where('auction_id', $auctionId)
+                ->where('seller_profile_id', $sellerOrder->seller_profile_id)
+                ->where('status', 'registered')
+                ->where(function ($q) {
+                    $q->where('is_premium', false)->orWhereNull('is_premium');
+                })
+                ->orderByRaw('seller_display_order IS NULL, seller_display_order, item_number')
+                ->get();
+
+            // 出品者内でプレミアムを先頭に
+            $allItems = $allItems->concat($premiumItems)->concat($normalItems);
+        }
+
+        return $allItems;
+    }
+
+    /**
+     * 従来通りの方法で生体を取得（プレミアム優先、item_number順）
+     * 
+     * @param int $auctionId
+     * @return \Illuminate\Support\Collection
+     */
+    private function getItemsByItemNumber($auctionId)
+    {
+        $premiumItems = Item::where('auction_id', $auctionId)
+            ->where('status', 'registered')
+            ->where('is_premium', true)
+            ->orderBy('item_number')
+            ->get();
+
+        $normalItems = Item::where('auction_id', $auctionId)
+            ->where('status', 'registered')
+            ->where(function ($q) {
+                $q->where('is_premium', false)->orWhereNull('is_premium');
+            })
+            ->orderBy('item_number')
+            ->get();
+
+        return $premiumItems->concat($normalItems);
     }
 
     /**

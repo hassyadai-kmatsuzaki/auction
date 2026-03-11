@@ -9,6 +9,8 @@ interface Props {
   freezeRemainingSeconds?: number;
   freezeTotalSeconds?: number;
   isLoading: boolean;
+  isTopBidder?: boolean;
+  activeBidderCount?: number;
   onToggle: () => void;
 }
 
@@ -82,8 +84,9 @@ FreezeButton.displayName = 'FreezeButton';
 /**
  * 入札ON/OFFボタン
  * pre_bid / freeze フェーズ中は無効化
+ * 最高入札者（1人だけの入札者）は入札解除不可
  */
-export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRemainingSeconds, freezeTotalSeconds, isLoading, onToggle }: Props) => {
+export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRemainingSeconds, freezeTotalSeconds, isLoading, isTopBidder, activeBidderCount, onToggle }: Props) => {
   if (isPreBid) {
     return (
       <Button fullWidth variant="outlined" color="inherit" size="large" disabled startIcon={<TimerIcon />}>
@@ -102,6 +105,8 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
   }
 
   const isActive = myBidStatus === 'active';
+  // 最高入札者（1人だけの入札者）は入札解除不可
+  const isOnlyBidder = isActive && activeBidderCount === 1;
 
   if (isActive) {
     return (
@@ -110,7 +115,7 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
         variant="contained"
         size="large"
         onClick={onToggle}
-        disabled={isLoading}
+        disabled={isLoading || isOnlyBidder}
         startIcon={
           isLoading
             ? <CircularProgress size={20} color="inherit" />
@@ -126,16 +131,23 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
           fontSize: '1rem',
           letterSpacing: '0.03em',
           border: '1px solid rgba(255, 215, 0, 0.6)',
-          animation: 'btnGradientShift 3s ease-in-out infinite',
+          animation: isOnlyBidder ? 'none' : 'btnGradientShift 3s ease-in-out infinite',
           '@keyframes btnGradientShift': {
             '0%, 100%': { backgroundPosition: '0% 50%' },
             '50%':      { backgroundPosition: '100% 50%' },
           },
           '&:hover': {
-            background: 'linear-gradient(135deg, #FFC800 0%, #E09400 50%, #FFC800 100%)',
+            background: isOnlyBidder 
+              ? 'linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%)'
+              : 'linear-gradient(135deg, #FFC800 0%, #E09400 50%, #FFC800 100%)',
             backgroundSize: '200% 200%',
           },
-          '&::after': {
+          '&.Mui-disabled': {
+            background: 'linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%)',
+            color: '#5D3A00',
+            opacity: 0.8,
+          },
+          '&::after': isOnlyBidder ? {} : {
             content: '""',
             position: 'absolute',
             top: 0, left: '-100%',
@@ -149,7 +161,7 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
           },
         }}
       >
-        入札中
+        {isOnlyBidder ? '最高入札者' : '入札中'}
       </Button>
     );
   }

@@ -132,6 +132,14 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('auctions/{auctionId}/lanes/auto-assign', [AdminLaneController::class, 'autoAssign']);
     Route::post('auctions/{auctionId}/lanes/bulk-unassign', [AdminLaneController::class, 'bulkUnassign']);
     
+    // 出品者順序管理
+    Route::prefix('auctions/{auctionId}/seller-order')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\SellerOrderController::class, 'index']);
+        Route::post('/randomize', [App\Http\Controllers\Admin\SellerOrderController::class, 'randomize']);
+        Route::put('/reorder', [App\Http\Controllers\Admin\SellerOrderController::class, 'reorder']);
+        Route::put('/{sellerProfileId}/items/reorder', [App\Http\Controllers\Admin\SellerOrderController::class, 'reorderItems']);
+    });
+    
     // ダッシュボード
     Route::get('dashboard', [AdminDashboardController::class, 'index']);
     Route::get('dashboard/sales-summary', [AdminDashboardController::class, 'salesSummary']);

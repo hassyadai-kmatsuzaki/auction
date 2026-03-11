@@ -102,6 +102,7 @@ export default function SellerLayout() {
   };
 
   const handleLogout = async () => {
+    setMobileOpen(false);
     await logout();
     navigate('/login');
   };
