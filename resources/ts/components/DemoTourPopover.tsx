@@ -173,7 +173,7 @@ export const DemoTourPopover: React.FC<Props> = ({
 
   return (
     <>
-      {/* Backdrop with spotlight cutout */}
+      {/* Backdrop with spotlight cutout (pointer-events: none so clicks pass through to underlying elements) */}
       <Box
         sx={{
           position: 'fixed',
@@ -182,9 +182,8 @@ export const DemoTourPopover: React.FC<Props> = ({
           right: 0,
           bottom: 0,
           zIndex: 1300,
-          pointerEvents: 'auto',
+          pointerEvents: 'none',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         <svg
           width="100%"
@@ -240,33 +239,6 @@ export const DemoTourPopover: React.FC<Props> = ({
           />
         )}
 
-        {/* Allow clicks on spotlight target */}
-        {spotlightRect && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: spotlightRect.top - SPOTLIGHT_PADDING,
-              left: spotlightRect.left - SPOTLIGHT_PADDING,
-              width: spotlightRect.width + SPOTLIGHT_PADDING * 2,
-              height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
-              pointerEvents: 'auto',
-              zIndex: 1,
-              cursor: 'pointer',
-            }}
-            onClick={(e) => {
-              const target = step.targetRef.current;
-              if (target) {
-                const clickEvent = new MouseEvent('click', {
-                  bubbles: true,
-                  cancelable: true,
-                  clientX: e.clientX,
-                  clientY: e.clientY,
-                });
-                target.dispatchEvent(clickEvent);
-              }
-            }}
-          />
-        )}
       </Box>
 
       {/* Popover */}
