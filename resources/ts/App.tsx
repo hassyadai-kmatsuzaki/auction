@@ -82,6 +82,9 @@ const SellerItemDetail       = lazy(() => import('./pages/seller/ItemDetail'));
 const SalesSettlement        = lazy(() => import('./pages/seller/SalesSettlement'));
 const SellerManual           = lazy(() => import('./pages/seller/Manual'));
 
+// Presentation（認証不要）
+const Presentation           = lazy(() => import('./pages/presentation/Presentation'));
+
 // ローディングフォールバック
 const PageLoader = () => (
   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -102,6 +105,9 @@ function App() {
             <Route path="/auth/set-password" element={<SetPassword />} />
             <Route path="/auth/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
             <Route path="/auth/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+
+          {/* プレゼンテーション（認証不要） */}
+          <Route path="/presentation" element={<Presentation />} />
 
           {/* 法的ページ */}
           <Route path="/legal/privacy" element={<PrivacyPolicy />} />

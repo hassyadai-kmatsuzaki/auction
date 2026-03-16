@@ -242,6 +242,15 @@ class LaneController extends Controller
      */
     public function assignItem(Request $request, $auctionId, $laneId)
     {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは操作できません。',
+            ], 400);
+        }
+
         $validator = Validator::make($request->all(), [
             'item_id' => 'required|exists:items,id',
             'position' => 'nullable|integer|min:1',
@@ -321,6 +330,15 @@ class LaneController extends Controller
      */
     public function removeItem($auctionId, $laneId, $itemId)
     {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは操作できません。',
+            ], 400);
+        }
+
         $lane = Lane::where('auction_id', $auctionId)->where('id', $laneId)->firstOrFail();
         
         $deleted = DB::table('lane_items')
@@ -349,6 +367,15 @@ class LaneController extends Controller
      */
     public function reorderItems(Request $request, $auctionId, $laneId)
     {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは操作できません。',
+            ], 400);
+        }
+
         $validator = Validator::make($request->all(), [
             'item_ids' => 'required|array',
             'item_ids.*' => 'exists:items,id',
@@ -387,7 +414,7 @@ class LaneController extends Controller
      * - 各レーン内の出品者グループ順序をランダムにシャッフル
      * - 既存割り当ての末尾に追加（既存は一切変更しない）
      */
-    public function autoAssign(Request $request, $auctionId)
+    public function autoAssign($auctionId)
     {
         $auction = Auction::findOrFail($auctionId);
 

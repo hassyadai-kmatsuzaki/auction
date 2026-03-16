@@ -21,23 +21,32 @@ class SellerOrderController extends Controller
 
         // 出品者順序を取得（display_order 昇順）
         $sellerOrders = AuctionSellerOrder::where('auction_id', $auctionId)
-            ->with('sellerProfile')
+            ->with('sellerProfile.user')
             ->orderBy('display_order')
-            ->get()
-            ->map(function ($order) use ($auctionId) {
-                $items = Item::where('auction_id', $auctionId)
-                    ->where('seller_profile_id', $order->seller_profile_id)
-                    ->orderByRaw('seller_display_order IS NULL, seller_display_order, item_number')
-                    ->get(['id', 'item_number', 'species_name', 'quantity', 'thumbnail_path', 'seller_display_order', 'is_premium', 'status']);
+            ->get();
+
+        // 全出品者の生体を一括取得し seller_profile_id でグループ化（N+1 回避）
+        $sellerProfileIds = $sellerOrders->pluck('seller_profile_id')->toArray();
+        $allItems = Item::where('auction_id', $auctionId)
+            ->whereIn('seller_profile_id', $sellerProfileIds)
+            ->orderByRaw('seller_display_order IS NULL, seller_display_order, item_number')
+            ->get(['id', 'item_number', 'species_name', 'quantity', 'thumbnail_path', 'seller_display_order', 'is_premium', 'status', 'seller_profile_id'])
+            ->groupBy('seller_profile_id');
+
+        $sellerOrders = $sellerOrders->map(function ($order) use ($allItems) {
+                $items = $allItems->get($order->seller_profile_id, collect());
 
                 return [
                     'id' => $order->id,
                     'seller_profile_id' => $order->seller_profile_id,
-                    'seller_name' => $order->sellerProfile->company_name ?? $order->sellerProfile->user->name ?? '不明',
+                    'seller_name' => $order->sellerProfile->seller_name
+                        ?? $order->sellerProfile->corporate_name
+                        ?? $order->sellerProfile->user?->name
+                        ?? '不明',
                     'seller_code' => $order->sellerProfile->seller_code ?? null,
                     'display_order' => $order->display_order,
                     'item_count' => $items->count(),
-                    'items' => $items,
+                    'items' => $items->values(),
                 ];
             });
 
@@ -125,7 +134,10 @@ class SellerOrderController extends Controller
 
                     return [
                         'seller_profile_id' => $order->seller_profile_id,
-                        'seller_name' => $order->sellerProfile->company_name ?? $order->sellerProfile->user->name ?? '不明',
+                        'seller_name' => $order->sellerProfile->seller_name
+                        ?? $order->sellerProfile->corporate_name
+                        ?? $order->sellerProfile->user?->name
+                        ?? '不明',
                         'display_order' => $order->display_order,
                         'item_count' => $itemCount,
                     ];
