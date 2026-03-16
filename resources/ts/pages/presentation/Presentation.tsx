@@ -4,7 +4,7 @@
  * 実際の参加者画面と完全に同じUIデザインを再現する。
  * API通信は一切行わず、フロントエンドのモックデータのみで動作する。
  * ParticipantLayout と同じヘッダー/フッター構造を使用し、
- * 各ページ（Home, AuctionList, AuctionItems, AuctionLive/Demo, WonItems）の
+ * 各ページ（Home, AuctionList, AuctionItems, Favorites, WonItems, Demo, Settings）の
  * UIをそのまま再現する。
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -16,6 +16,7 @@ import {
   Stepper, Step, StepLabel,
   Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton,
   Tooltip, Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Avatar, FormControlLabel, Switch, Link,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -31,6 +32,7 @@ import {
   Settings as SettingsIcon,
   Inventory as InventoryIcon,
   ArrowForward as ArrowForwardIcon,
+  ArrowBack as ArrowBackIcon,
   MeetingRoom as MeetingRoomIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
@@ -41,12 +43,22 @@ import {
   Edit as EditIcon,
   SportsEsports as DemoIcon,
   Info as InfoIcon,
+  Close as CloseIcon,
+  ViewModule as ViewModuleIcon,
+  ViewList as ViewListIcon,
+  Save as SaveIcon,
+  Person as PersonIcon,
+  Notifications as NotificationsIcon,
+  Email as EmailIcon,
+  ListAlt as ListAltIcon,
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem, UpcomingItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
+import { ItemCard } from '../../features/auction-items/components/ItemCard';
+import type { ItemData } from '../../features/auction-items/components/ItemCard';
 
 // ====================================================================
 // Mock Data
@@ -116,6 +128,22 @@ const MOCK_AUCTIONS: MockAuction[] = [
   { id: 3, title: '2026年早春オークション', event_date: '2026-03-01', start_time: '13:00', status: 'finished', total_items: 80, description: '早春の人気品種を集めたオークションです。' },
 ];
 
+interface MockAnnouncement {
+  id: number;
+  title: string;
+  content: string;
+  date: string;
+  is_important: boolean;
+}
+
+const MOCK_ANNOUNCEMENTS: MockAnnouncement[] = [
+  { id: 1, title: 'GWスペシャルオークション出品受付開始', content: 'ゴールデンウィーク限定の大型オークションの出品受付を開始しました。出品をご希望の方は、マイページの出品管理から申請をお願いいたします。締め切りは4月20日です。\n\n今回は特別に出品手数料を50%OFFとさせていただきます。この機会にぜひご出品ください。', date: '2026-03-15', is_important: true },
+  { id: 2, title: 'システムメンテナンスのお知らせ (3/20)', content: '下記日時にシステムメンテナンスを実施いたします。\n\n日時: 2026年3月20日(金) 02:00〜06:00\n\nメンテナンス中はサービスをご利用いただけません。ご不便をおかけしますが、ご理解のほどよろしくお願いいたします。', date: '2026-03-10', is_important: true },
+  { id: 3, title: '春季オークション出品者募集中', content: '2026年春季メダカオークションの出品者を募集しています。高品質な個体をお持ちの方はぜひご参加ください。詳細は出品ガイドをご確認ください。', date: '2026-03-01', is_important: false },
+  { id: 4, title: '新機能「指値（上限価格）」のご案内', content: '入札時に上限価格を設定できる「指値」機能をリリースしました。設定した金額に達すると自動的に入札がオフになります。予算管理にぜひご活用ください。\n\n設定方法: 出品一覧またはライブ画面のカード下部にある「上限設定」ボタンから設定できます。', date: '2026-02-20', is_important: false },
+  { id: 5, title: '利用規約の一部改定について', content: '2026年3月1日より利用規約の一部を改定いたしました。主な変更点は以下の通りです。\n\n・落札後の支払期限を72時間から48時間に短縮\n・配送方法の選択肢を追加\n・キャンセルポリシーの明確化\n\n詳細は利用規約ページをご確認ください。', date: '2026-02-15', is_important: false },
+];
+
 interface MockWonItem {
   id: number;
   item: {
@@ -141,38 +169,62 @@ interface MockWonItem {
 
 const MOCK_WON_ITEMS: MockWonItem[] = [
   {
-    id: 1, item: { id: 1, item_number: 12, species_name: '紅白ラメ ペア', quantity: 2, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    id: 1,
+    item: { id: 1, item_number: 12, species_name: '紅白ラメ ペア', quantity: 2, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
     winning_price: 8500, quantity: 2, total_amount: 18700, commission_amount: 1700,
     payment_status: 'confirmed', delivery_status: 'shipped',
-    shipping_address: '東京都渋谷区1-2-3', tracking_number: '1234-5678-9012', shipping_company: 'ヤマト運輸', shipped_at: '2026-03-10',
+    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', tracking_number: '1234-5678-9012', shipping_company: 'ヤマト運輸', shipped_at: '2026-03-10',
   },
   {
-    id: 2, item: { id: 2, item_number: 28, species_name: '幹之フルボディ 5匹セット', quantity: 5, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    id: 2,
+    item: { id: 2, item_number: 28, species_name: '幹之フルボディ 5匹セット', quantity: 5, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
     winning_price: 12000, quantity: 5, total_amount: 66000, commission_amount: 6000,
     payment_status: 'confirmed', delivery_status: 'completed',
-    shipping_address: '東京都渋谷区1-2-3', shipped_at: '2026-03-08',
+    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', shipped_at: '2026-03-08',
   },
   {
-    id: 3, item: { id: 3, item_number: 55, species_name: '楊貴妃ダルマ', quantity: 1, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    id: 3,
+    item: { id: 3, item_number: 55, species_name: '楊貴妃ダルマ', quantity: 1, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
     winning_price: 4200, quantity: 1, total_amount: 4620, commission_amount: 420,
     payment_status: 'pending', payment_deadline: '2026-03-19', delivery_status: 'pending',
     shipping_address: '未設定',
   },
+  {
+    id: 4,
+    item: { id: 4, item_number: 71, species_name: 'サファイア ペア', quantity: 2, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 15000, quantity: 2, total_amount: 33000, commission_amount: 3000,
+    payment_status: 'paid', delivery_status: 'preparing',
+    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101',
+  },
 ];
 
-const MOCK_ITEMS = [
-  { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 2000, current_price: 2000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 2, item_number: 2, species_name: '幹之フルボディ 5匹セット', quantity: 5, start_price: 3000, current_price: 3000, status: 'registered', is_premium: true, thumbnail_path: '/img/noimage.png' },
+// 3 lanes x 4+ items each = 14 items
+const MOCK_ITEMS: ItemData[] = [
+  { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 2000, current_price: 3500, status: 'live', is_premium: false, thumbnail_path: '/img/noimage.png', inspection_info: '体長3cm前後、発色良好' },
+  { id: 2, item_number: 2, species_name: '幹之フルボディ 5匹セット', quantity: 5, start_price: 3000, current_price: 3000, status: 'registered', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: 'フルボディ確認済み' },
   { id: 3, item_number: 3, species_name: '楊貴妃ダルマ', quantity: 1, start_price: 1500, current_price: 1500, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 4, item_number: 4, species_name: '三色ラメ', quantity: 3, start_price: 4000, current_price: 4000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 6000, current_price: 6000, status: 'registered', is_premium: true, thumbnail_path: '/img/noimage.png' },
+  { id: 4, item_number: 4, species_name: '三色ラメ 3匹セット', quantity: 3, start_price: 4000, current_price: 4000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png', inspection_info: '三色バランス良好' },
+  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 6000, current_price: 8000, status: 'live', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: '漆黒度S級' },
   { id: 6, item_number: 6, species_name: '夜桜ゴールド', quantity: 1, start_price: 3500, current_price: 3500, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 7, item_number: 7, species_name: '煌 (きらめき)', quantity: 3, start_price: 5000, current_price: 8500, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png' },
+  { id: 7, item_number: 7, species_name: '煌 (きらめき) 3匹セット', quantity: 3, start_price: 5000, current_price: 8500, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: 'ラメ数100以上' },
   { id: 8, item_number: 8, species_name: 'サファイア ペア', quantity: 2, start_price: 8000, current_price: 12000, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png' },
+  { id: 9, item_number: 9, species_name: 'ブラックダイヤ', quantity: 1, start_price: 4500, current_price: 4500, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png', inspection_info: '体外光あり' },
+  { id: 10, item_number: 10, species_name: '松井ヒレ長 ペア', quantity: 2, start_price: 3000, current_price: 3000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
+  { id: 11, item_number: 11, species_name: '女雛 3匹セット', quantity: 3, start_price: 2500, current_price: 2500, status: 'unsold', is_premium: false, thumbnail_path: '/img/noimage.png' },
+  { id: 12, item_number: 12, species_name: 'ユリシス ペア', quantity: 2, start_price: 7000, current_price: 10500, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: '青体外光確認済み' },
+  { id: 13, item_number: 13, species_name: '琥珀透明鱗', quantity: 1, start_price: 2000, current_price: 2000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
+  { id: 14, item_number: 14, species_name: '白ラメ幹之 5匹セット', quantity: 5, start_price: 4000, current_price: 4000, status: 'unsold', is_premium: false, thumbnail_path: '/img/noimage.png' },
+];
+
+// Lane assignment: items 1-5 = lane1, items 6-10 = lane2, items 11-14 = lane3
+const MOCK_LANES = [
+  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter((_, i) => i < 5) },
+  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter((_, i) => i >= 5 && i < 10) },
+  { lane_name: 'レーン 3', items: MOCK_ITEMS.filter((_, i) => i >= 10) },
 ];
 
 // ====================================================================
-// Helper functions (copied from actual pages)
+// Helper functions
 // ====================================================================
 
 function getDaysUntil(dateString: string): string {
@@ -235,49 +287,59 @@ const getDeliveryStepIndex = (status: string) => {
   }
 };
 
+const getTrackingUrl = (trackingNumber: string, company: string) => {
+  const cleanNumber = trackingNumber.replace(/-/g, '');
+  switch (company) {
+    case 'ヤマト運輸':
+      return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${cleanNumber}`;
+    case '佐川急便':
+      return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${cleanNumber}`;
+    case '日本郵便':
+      return `https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=${cleanNumber}`;
+    default:
+      return '';
+  }
+};
+
 // ====================================================================
-// Sub-components (実際の画面と同じUI)
+// Sub-components
 // ====================================================================
 
-/* ─── Tab 0: ホーム（Home.tsx と同じデザイン） ─── */
-function HomeTab() {
+/* ─── HOME (matches Home.tsx) ─── */
+function HomeTab({ onNavigate }: { onNavigate: (page: string) => void }) {
   const liveAuction = MOCK_AUCTIONS.find(a => a.status === 'live')!;
   const scheduledAuction = MOCK_AUCTIONS.find(a => a.status === 'scheduled')!;
+  const [announcementDetail, setAnnouncementDetail] = useState<MockAnnouncement | null>(null);
 
   return (
     <Box>
-      {/* 開催中のオークション - 大型バナー（Home.tsx と同じ） */}
+      {/* LIVE banner */}
       <Box
         sx={{
           background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
-          color: 'white',
-          py: { xs: 3, md: 4 },
-          px: 2,
+          color: 'white', py: { xs: 3, md: 4 }, px: 2,
         }}
       >
         <Container maxWidth="lg">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-            <Box
-              sx={{
-                display: 'inline-flex', alignItems: 'center', gap: 0.75,
-                bgcolor: '#ef4444', px: 1.5, py: 0.5, borderRadius: 1,
-                fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.05em',
-                animation: 'pulse 2s infinite',
-                '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.7 } },
-              }}
-            >
+            <Box sx={{
+              display: 'inline-flex', alignItems: 'center', gap: 0.75,
+              bgcolor: '#ef4444', px: 1.5, py: 0.5, borderRadius: 1,
+              fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.05em',
+              animation: 'pulse 2s infinite',
+              '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.7 } },
+            }}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'white' }} />
               LIVE
             </Box>
-            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
-              オークション開催中！
-            </Typography>
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>オークション開催中！</Typography>
           </Box>
           <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' } }}>
             {liveAuction.title}
           </Typography>
           <Button
             variant="contained" size="large" endIcon={<ArrowForwardIcon />}
+            onClick={() => onNavigate('demo')}
             sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 700, px: 4, py: 1.5, fontSize: '1rem', '&:hover': { bgcolor: 'grey.100' } }}
           >
             今すぐ参加する
@@ -285,37 +347,28 @@ function HomeTab() {
         </Container>
       </Box>
 
-      {/* 次回開催予定（Home.tsx 次回予定セクションと同じ） */}
+      {/* Next auction card */}
       <Container maxWidth="lg" sx={{ pt: 3 }}>
         <Card sx={{ border: '1px solid', borderColor: 'primary.100' }}>
           <CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <EventIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-              <Typography variant="subtitle2" color="primary.main" fontWeight={600}>
-                次回開催予定
-              </Typography>
+              <Typography variant="subtitle2" color="primary.main" fontWeight={600}>次回開催予定</Typography>
             </Box>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
-              {scheduledAuction.title}
-            </Typography>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>{scheduledAuction.title}</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 1.5 }}>
               <Typography variant="body2" color="text.secondary">
                 {formatDate(scheduledAuction.event_date)} {scheduledAuction.start_time}〜
               </Typography>
-              <Box
-                sx={{
-                  display: 'inline-flex', bgcolor: 'primary.50', color: 'primary.main',
-                  px: 1, py: 0.25, borderRadius: 0.75, fontWeight: 700, fontSize: '0.75rem',
-                }}
-              >
+              <Box sx={{ display: 'inline-flex', bgcolor: 'primary.50', color: 'primary.main', px: 1, py: 0.25, borderRadius: 0.75, fontWeight: 700, fontSize: '0.75rem' }}>
                 {getDaysUntil(scheduledAuction.event_date)}
               </Box>
             </Box>
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              <Button variant="outlined" size="small" endIcon={<ArrowForwardIcon />} sx={{ fontWeight: 600 }}>
+              <Button variant="outlined" size="small" endIcon={<ArrowForwardIcon />} onClick={() => onNavigate('demo')} sx={{ fontWeight: 600 }}>
                 待機室へ入室
               </Button>
-              <Button variant="text" size="small" startIcon={<InventoryIcon />} sx={{ fontWeight: 600 }}>
+              <Button variant="text" size="small" startIcon={<ListAltIcon />} onClick={() => onNavigate('items')} sx={{ fontWeight: 600 }}>
                 出品一覧
               </Button>
             </Box>
@@ -324,18 +377,15 @@ function HomeTab() {
       </Container>
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* お知らせ（AnnouncementList と同じデザイン） */}
+        {/* Announcements */}
         <Box sx={{ mb: 5 }}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>お知らせ</Typography>
-          {[
-            { title: 'GWスペシャルオークション出品受付開始', date: '2026-03-15', important: true },
-            { title: 'システムメンテナンスのお知らせ (3/20)', date: '2026-03-10', important: false },
-            { title: '春季オークション出品者募集中', date: '2026-03-01', important: false },
-          ].map((a, i) => (
-            <Card key={i} sx={{ mb: 1, cursor: 'pointer', '&:hover': { bgcolor: 'grey.50' } }}>
+          {MOCK_ANNOUNCEMENTS.map((a) => (
+            <Card key={a.id} sx={{ mb: 1, cursor: 'pointer', '&:hover': { bgcolor: 'grey.50' } }}
+              onClick={() => setAnnouncementDetail(a)}>
               <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {a.important && <Chip label="重要" size="small" color="error" />}
+                  {a.is_important && <Chip label="重要" size="small" color="error" />}
                   <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>{a.title}</Typography>
                   <Typography variant="caption" color="text.secondary">{a.date}</Typography>
                 </Box>
@@ -344,32 +394,21 @@ function HomeTab() {
           ))}
         </Box>
 
-        {/* 広告（Home.tsx と同じ） */}
+        {/* Sponsored ad */}
         <Box sx={{ mb: 5 }}>
           <Card sx={{ bgcolor: '#FAFAFA', border: '1px solid', borderColor: 'grey.200', position: 'relative' }}>
-            <Box sx={{ position: 'absolute', top: 12, right: 12, color: 'text.secondary', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.05em' }}>
-              SPONSORED
-            </Box>
+            <Box sx={{ position: 'absolute', top: 12, right: 12, color: 'text.secondary', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.05em' }}>SPONSORED</Box>
             <CardContent sx={{ p: 2.5 }}>
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} sm={3}>
-                  <Box component="img" src="/img/noimage.png" alt="広告"
-                    sx={{ width: '100%', maxWidth: 120, height: 'auto', borderRadius: 1.5 }} />
+                  <Box component="img" src="/img/noimage.png" alt="広告" sx={{ width: '100%', maxWidth: 120, height: 'auto', borderRadius: 1.5 }} />
                 </Grid>
                 <Grid item xs={12} sm={9}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    高品質メダカ用飼料「極」新発売！
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
-                    色揚げ効果抜群！プロブリーダー推奨の最高級飼料。今なら初回購入20%OFF
-                  </Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>高品質メダカ用飼料「極」新発売！</Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>色揚げ効果抜群！プロブリーダー推奨の最高級飼料。今なら初回購入20%OFF</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      提供: メダカフード株式会社
-                    </Typography>
-                    <Button variant="outlined" size="small" endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />} sx={{ fontSize: '0.75rem' }}>
-                      詳しく見る
-                    </Button>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>提供: メダカフード株式会社</Typography>
+                    <Button variant="outlined" size="small" endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />} sx={{ fontSize: '0.75rem' }}>詳しく見る</Button>
                   </Box>
                 </Grid>
               </Grid>
@@ -377,12 +416,32 @@ function HomeTab() {
           </Card>
         </Box>
       </Container>
+
+      {/* Announcement detail dialog */}
+      <Dialog open={!!announcementDetail} onClose={() => setAnnouncementDetail(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {announcementDetail?.is_important && <Chip label="重要" size="small" color="error" />}
+              <Typography variant="h6">{announcementDetail?.title}</Typography>
+            </Box>
+            <IconButton onClick={() => setAnnouncementDetail(null)}><CloseIcon /></IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>{announcementDetail?.date}</Typography>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>{announcementDetail?.content}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAnnouncementDetail(null)}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
 
-/* ─── Tab 1: オークション一覧（AuctionList.tsx と同じデザイン） ─── */
-function AuctionListTab() {
+/* ─── AUCTION LIST (matches AuctionList.tsx) ─── */
+function AuctionListTab({ onNavigate }: { onNavigate: (page: string) => void }) {
   const [tabValue, setTabValue] = useState(0);
 
   const liveAuctions = MOCK_AUCTIONS.filter(a => a.status === 'live');
@@ -403,65 +462,44 @@ function AuctionListTab() {
 
   const getStatusChip = (status: string) => {
     switch (status) {
-      case 'live':
-        return <Chip icon={<PlayArrowIcon />} label="開催中" color="success" size="small" sx={{ fontWeight: 600 }} />;
-      case 'scheduled':
-        return <Chip icon={<ScheduleIcon />} label="開催予定" color="primary" size="small" variant="outlined" />;
-      case 'finished':
-        return <Chip icon={<CheckCircleIcon />} label="終了" size="small" variant="outlined" />;
-      default:
-        return <Chip label={status} size="small" />;
+      case 'live': return <Chip icon={<PlayArrowIcon />} label="開催中" color="success" size="small" sx={{ fontWeight: 600 }} />;
+      case 'scheduled': return <Chip icon={<ScheduleIcon />} label="開催予定" color="primary" size="small" variant="outlined" />;
+      case 'finished': return <Chip icon={<CheckCircleIcon />} label="終了" size="small" variant="outlined" />;
+      default: return <Chip label={status} size="small" />;
     }
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* ヘッダー */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 700 }}>
           <GavelIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           オークション一覧
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          開催中・開催予定のオークションを確認できます
-        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>開催中・開催予定のオークションを確認できます</Typography>
       </Box>
 
-      {/* 開催中バナー */}
       {liveAuctions.length > 0 && (
-        <Paper
-          elevation={0}
-          sx={{ mb: 4, p: 3, bgcolor: 'success.50', border: '2px solid', borderColor: 'success.main', borderRadius: 2 }}
-        >
+        <Paper elevation={0} sx={{ mb: 4, p: 3, bgcolor: 'success.50', border: '2px solid', borderColor: 'success.main', borderRadius: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: 'success.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <PlayArrowIcon sx={{ color: 'white', fontSize: 28 }} />
               </Box>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.dark' }}>
-                  オークション開催中！
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {liveAuctions[0].title}
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.dark' }}>オークション開催中！</Typography>
+                <Typography variant="body2" color="text.secondary">{liveAuctions[0].title}</Typography>
               </Box>
             </Box>
-            <Button variant="contained" color="success" size="large" endIcon={<ArrowForwardIcon />} sx={{ fontWeight: 600 }}>
+            <Button variant="contained" color="success" size="large" endIcon={<ArrowForwardIcon />} onClick={() => onNavigate('demo')} sx={{ fontWeight: 600 }}>
               今すぐ参加する
             </Button>
           </Box>
         </Paper>
       )}
 
-      {/* タブ */}
       <Paper elevation={0} sx={{ mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-        <Tabs
-          value={tabValue}
-          onChange={(_, newValue) => setTabValue(newValue)}
-          variant="fullWidth"
-          sx={{ '& .MuiTab-root': { py: 2, fontWeight: 600 } }}
-        >
+        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth" sx={{ '& .MuiTab-root': { py: 2, fontWeight: 600 } }}>
           <Tab label={`開催中・予定 (${liveAuctions.length + scheduledAuctions.length})`} />
           <Tab label={`開催中 (${liveAuctions.length})`} />
           <Tab label={`予定 (${scheduledAuctions.length})`} />
@@ -469,149 +507,158 @@ function AuctionListTab() {
         </Tabs>
       </Paper>
 
-      {/* オークションカード */}
-      <Grid container spacing={3}>
-        {filteredAuctions.map((auction) => (
-          <Grid item xs={12} md={6} key={auction.id}>
-            <Card
-              elevation={0}
-              sx={{
+      {filteredAuctions.length === 0 ? (
+        <Paper elevation={0} sx={{ p: 6, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 2 }}>
+          <GavelIcon sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>該当するオークションはありません</Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={3}>
+          {filteredAuctions.map((auction) => (
+            <Grid item xs={12} md={6} key={auction.id}>
+              <Card elevation={0} sx={{
                 height: '100%', display: 'flex', flexDirection: 'column',
                 border: auction.status === 'live' ? '2px solid' : '1px solid',
                 borderColor: auction.status === 'live' ? 'success.main' : 'divider',
                 borderRadius: 2, transition: 'all 0.2s',
                 '&:hover': { borderColor: auction.status === 'live' ? 'success.dark' : 'primary.main', boxShadow: 2 },
-              }}
-            >
-              <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, flex: 1, mr: 1 }}>
-                    {auction.title}
-                  </Typography>
-                  {getStatusChip(auction.status)}
-                </Box>
-                <Divider sx={{ my: 2 }} />
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <EventIcon fontSize="small" sx={{ color: 'primary.main' }} />
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" display="block">開催日</Typography>
-                        <Typography variant="body2" fontWeight={600}>{formatDate(auction.event_date)}</Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <AccessTimeIcon fontSize="small" sx={{ color: 'primary.main' }} />
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" display="block">開始時刻</Typography>
-                        <Typography variant="body2" fontWeight={600}>{auction.start_time}〜</Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                  {auction.total_items !== undefined && (
-                    <Grid item xs={12}>
+              }}>
+                <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, flex: 1, mr: 1 }}>{auction.title}</Typography>
+                    {getStatusChip(auction.status)}
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <InventoryIcon fontSize="small" sx={{ color: 'primary.main' }} />
+                        <EventIcon fontSize="small" sx={{ color: 'primary.main' }} />
                         <Box>
-                          <Typography variant="caption" color="text.secondary" display="block">出品数</Typography>
-                          <Typography variant="body2" fontWeight={600}>{auction.total_items}点</Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">開催日</Typography>
+                          <Typography variant="body2" fontWeight={600}>{formatDate(auction.event_date)}</Typography>
                         </Box>
                       </Box>
                     </Grid>
+                    <Grid item xs={6}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AccessTimeIcon fontSize="small" sx={{ color: 'primary.main' }} />
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" display="block">開始時刻</Typography>
+                          <Typography variant="body2" fontWeight={600}>{auction.start_time}〜</Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                    {auction.total_items !== undefined && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <InventoryIcon fontSize="small" sx={{ color: 'primary.main' }} />
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" display="block">出品数</Typography>
+                            <Typography variant="body2" fontWeight={600}>{auction.total_items}点</Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                  {auction.description && (
+                    <Typography variant="body2" color="text.secondary"
+                      sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {auction.description}
+                    </Typography>
                   )}
-                </Grid>
-                {auction.description && (
-                  <Typography variant="body2" color="text.secondary"
-                    sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                    {auction.description}
-                  </Typography>
-                )}
-              </CardContent>
-              <CardActions sx={{ p: 3, pt: 0 }}>
-                {auction.status === 'live' ? (
-                  <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
-                    <Button variant="outlined" size="large" sx={{ fontWeight: 600, flex: 1 }}>出品一覧</Button>
-                    <Button variant="contained" color="success" size="large" endIcon={<ArrowForwardIcon />} sx={{ fontWeight: 600, flex: 1 }}>
-                      オークション会場へ
-                    </Button>
-                  </Box>
-                ) : auction.status === 'scheduled' ? (
-                  auction.entrance_allowed ? (
+                </CardContent>
+                <CardActions sx={{ p: 3, pt: 0 }}>
+                  {auction.status === 'live' ? (
                     <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
-                      <Button variant="outlined" size="large" sx={{ fontWeight: 600, flex: 1 }}>出品一覧</Button>
-                      <Button variant="contained" color="primary" size="large" startIcon={<MeetingRoomIcon />} sx={{ fontWeight: 600, flex: 1 }}>
-                        待機室へ入室
+                      <Button variant="outlined" size="large" onClick={() => onNavigate('items')} sx={{ fontWeight: 600, flex: 1 }}>出品一覧</Button>
+                      <Button variant="contained" color="success" size="large" endIcon={<ArrowForwardIcon />} onClick={() => onNavigate('demo')} sx={{ fontWeight: 600, flex: 1 }}>
+                        オークション会場へ
                       </Button>
                     </Box>
+                  ) : auction.status === 'scheduled' ? (
+                    auction.entrance_allowed ? (
+                      <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+                        <Button variant="outlined" size="large" onClick={() => onNavigate('items')} sx={{ fontWeight: 600, flex: 1 }}>出品一覧</Button>
+                        <Button variant="contained" color="primary" size="large" startIcon={<MeetingRoomIcon />} onClick={() => onNavigate('demo')} sx={{ fontWeight: 600, flex: 1 }}>
+                          待機室へ入室
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Button variant="outlined" fullWidth size="large" onClick={() => onNavigate('items')} sx={{ fontWeight: 600 }}>出品一覧を見る</Button>
+                    )
                   ) : (
-                    <Button variant="outlined" fullWidth size="large" sx={{ fontWeight: 600 }}>出品一覧を見る</Button>
-                  )
-                ) : (
-                  <Button variant="text" fullWidth size="large">結果を見る</Button>
-                )}
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                    <Button variant="text" fullWidth size="large" onClick={() => onNavigate('items')}>結果を見る</Button>
+                  )}
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
     </Container>
   );
 }
 
-/* ─── Tab 2: 出品一覧（AuctionItems.tsx と同じデザイン） ─── */
-function ItemListTab() {
-  const [favorites, setFavorites] = useState<Set<number>>(new Set([2, 5]));
-  const [selectedItem, setSelectedItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
+/* ─── AUCTION ITEMS (matches AuctionItems.tsx) ─── */
+function ItemListTab({ favoriteIds, setFavoriteIds, limitSettings, setLimitSettings, onNavigate }: {
+  favoriteIds: Set<number>;
+  setFavoriteIds: React.Dispatch<React.SetStateAction<Set<number>>>;
+  limitSettings: Record<number, { limit_price: number | null; is_triggered: boolean }>;
+  setLimitSettings: React.Dispatch<React.SetStateAction<Record<number, { limit_price: number | null; is_triggered: boolean }>>>;
+  onNavigate: (page: string) => void;
+}) {
+  const [selectedLane, setSelectedLane] = useState(0);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [selectedItem, setSelectedItem] = useState<ItemData | null>(null);
+  const [limitModalItem, setLimitModalItem] = useState<ItemData | null>(null);
 
   const toggleFav = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    setFavorites(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setFavoriteIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   };
 
+  const allLaneItems: ItemData[] = selectedLane === 0
+    ? MOCK_ITEMS
+    : MOCK_LANES[selectedLane - 1]?.items ?? [];
+
   const activeFilter = statusFilter;
-  const currentItems = activeFilter.length > 0
-    ? MOCK_ITEMS.filter(item => activeFilter.includes(item.status))
-    : MOCK_ITEMS;
+  const currentItems = activeFilter.length > 0 ? allLaneItems.filter(item => activeFilter.includes(item.status)) : allLaneItems;
+  const totalItems = MOCK_ITEMS.length;
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
-      {/* ヘッダー（AuctionItems.tsx と同じ） */}
+      {/* Header */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton onClick={() => onNavigate('home')}><ArrowBackIcon /></IconButton>
             <Box>
               <Typography variant="h5" fontWeight="bold">2026年春季メダカオークション</Typography>
               <Typography variant="body2" color="text.secondary">
-                {currentItems.length}件表示 / 全{MOCK_ITEMS.length}点の出品
+                {activeFilter.length > 0 ? `${currentItems.length}件表示 / 全${totalItems}点` : `全${totalItems}点の出品`}
               </Typography>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button size="small" variant="contained" color="success" sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-              会場へ
-            </Button>
+            <Button size="small" variant="contained" color="success" onClick={() => onNavigate('demo')} sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>会場へ</Button>
+            <IconButton onClick={() => setViewMode('grid')} color={viewMode === 'grid' ? 'primary' : 'default'}><ViewModuleIcon /></IconButton>
+            <IconButton onClick={() => setViewMode('list')} color={viewMode === 'list' ? 'primary' : 'default'}><ViewListIcon /></IconButton>
           </Box>
         </Box>
       </Paper>
 
-      {/* レーンタブ */}
+      {/* Lane Tabs */}
       <Paper sx={{ mb: 2 }}>
-        <Tabs value={0} variant="scrollable" scrollButtons="auto">
-          <Tab label={`すべて (${MOCK_ITEMS.length})`} />
-          <Tab label="レーン 1 (3)" />
-          <Tab label="レーン 2 (3)" />
-          <Tab label="レーン 3 (2)" />
+        <Tabs value={selectedLane} onChange={(_, v) => setSelectedLane(v)} variant="scrollable" scrollButtons="auto">
+          <Tab label={`すべて (${totalItems})`} />
+          {MOCK_LANES.map((lane, i) => (
+            <Tab key={i} label={`${lane.lane_name} (${lane.items.length})`} />
+          ))}
         </Tabs>
       </Paper>
 
-      {/* ステータスフィルター */}
+      {/* Status filter chips */}
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>表示:</Typography>
         {[
@@ -627,10 +674,8 @@ function ItemListTab() {
             <Chip key={key} label={label} size="small" color={isActive ? color : 'default'}
               variant={isActive ? 'filled' : 'outlined'}
               onClick={() => {
-                if (isAll) { setStatusFilter([]); }
-                else {
-                  setStatusFilter(prev => prev.includes(key) ? prev.filter(s => s !== key) : [...prev, key]);
-                }
+                if (isAll) setStatusFilter([]);
+                else setStatusFilter(prev => prev.includes(key) ? prev.filter(s => s !== key) : [...prev, key]);
               }}
               sx={{ cursor: 'pointer', fontWeight: isActive ? 600 : 400 }}
             />
@@ -638,70 +683,85 @@ function ItemListTab() {
         })}
       </Box>
 
-      {/* アイテムグリッド（ItemCard と同じデザイン） */}
-      <Grid container spacing={2}>
-        {currentItems.map(item => {
-          const status = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
-          return (
+      {/* Items */}
+      {currentItems.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">出品がありません</Typography></Paper>
+      ) : viewMode === 'grid' ? (
+        <Grid container spacing={2}>
+          {currentItems.map(item => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
               <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <Card
-                  sx={{
-                    height: '100%', cursor: 'pointer', position: 'relative',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
-                  }}
+                <ItemCard item={item} isFavorited={favoriteIds.has(item.id)}
                   onClick={() => setSelectedItem(item)}
-                >
-                  <IconButton
-                    onClick={(e) => toggleFav(e, item.id)}
-                    sx={{ position: 'absolute', top: 4, left: 4, zIndex: 2, bgcolor: 'rgba(255,255,255,0.85)', width: 32, height: 32 }}
-                    size="small"
-                  >
-                    {favorites.has(item.id)
-                      ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 20 }} />
-                      : <FavoriteBorderIcon sx={{ color: 'grey.500', fontSize: 20 }} />}
-                  </IconButton>
-                  {item.is_premium && (
-                    <Chip label="プレミアム" color="warning" size="small"
-                      sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />
-                  )}
-                  <CardMedia component="img" image={item.thumbnail_path} alt={item.species_name}
-                    sx={{ aspectRatio: '3/2', objectFit: 'cover' }} />
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>
-                      <Chip label={status.label} color={status.color} size="small" />
-                    </Box>
-                    <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="h6" color="primary.main" fontWeight="bold">
-                        ¥{Number(item.start_price).toLocaleString()}〜
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
-                    </Box>
-                  </CardContent>
-                </Card>
-                {/* 指値バッジ（AuctionItems.tsx と同じ配置） */}
-                <Box sx={{
-                  px: 1.5, py: 1, bgcolor: 'background.paper',
-                  border: '1px solid', borderTop: 'none', borderColor: 'divider',
-                  borderBottomLeftRadius: 2, borderBottomRightRadius: 2,
-                }}>
-                  <BidLimitBadge limitPrice={null} isTriggered={false} onEdit={() => {}} />
+                  onFavoriteToggle={(e) => toggleFav(e, item.id)} />
+                <Box sx={{ px: 1.5, py: 1, bgcolor: 'background.paper', border: '1px solid', borderTop: 'none', borderColor: 'divider', borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }}>
+                  <BidLimitBadge
+                    limitPrice={limitSettings[item.id]?.limit_price ?? null}
+                    isTriggered={limitSettings[item.id]?.is_triggered ?? false}
+                    onEdit={() => setLimitModalItem(item)}
+                    onRemove={() => setLimitSettings(prev => { const n = { ...prev }; delete n[item.id]; return n; })}
+                  />
                 </Box>
               </Box>
             </Grid>
-          );
-        })}
-      </Grid>
+          ))}
+        </Grid>
+      ) : (
+        <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+          <Table sx={{ '& th, & td': { whiteSpace: 'nowrap' } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>No.</TableCell>
+                <TableCell>品種名</TableCell>
+                <TableCell align="center">匹数</TableCell>
+                <TableCell align="right">開始価格</TableCell>
+                <TableCell align="center">ステータス</TableCell>
+                <TableCell align="center">上限価格</TableCell>
+                <TableCell align="center">操作</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {currentItems.map(item => {
+                const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
+                return (
+                  <TableRow key={item.id} hover sx={{ cursor: 'pointer' }} onClick={() => setSelectedItem(item)}>
+                    <TableCell>{item.item_number}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {item.species_name}
+                        {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">{item.quantity}匹</TableCell>
+                    <TableCell align="right">¥{Number(item.start_price).toLocaleString()}</TableCell>
+                    <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>
+                    <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                      <BidLimitBadge
+                        limitPrice={limitSettings[item.id]?.limit_price ?? null}
+                        isTriggered={limitSettings[item.id]?.is_triggered ?? false}
+                        onEdit={() => setLimitModalItem(item)}
+                        onRemove={() => setLimitSettings(prev => { const n = { ...prev }; delete n[item.id]; return n; })}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); toggleFav(e, item.id); }}>
+                        {favoriteIds.has(item.id) ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 18 }} /> : <FavoriteBorderIcon sx={{ color: 'grey.500', fontSize: 18 }} />}
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
-      {/* 詳細ダイアログ（AuctionItems.tsx と同じ） */}
+      {/* Detail dialog */}
       <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="md" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6">No.{selectedItem?.item_number} {selectedItem?.species_name}</Typography>
-            <IconButton onClick={() => setSelectedItem(null)}><CheckCircleIcon /></IconButton>
+            <IconButton onClick={() => setSelectedItem(null)}><CloseIcon /></IconButton>
           </Box>
         </DialogTitle>
         <DialogContent dividers>
@@ -723,26 +783,228 @@ function ItemListTab() {
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" gutterBottom>匹数</Typography>
               <Typography variant="body1" gutterBottom>{selectedItem?.quantity}匹セット</Typography>
+              {selectedItem?.inspection_info && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 2, color: 'primary.main' }} gutterBottom>個体情報</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.inspection_info}</Typography>
+                </>
+              )}
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
           <Box>
-            <BidLimitBadge limitPrice={null} isTriggered={false} onEdit={() => {}} />
+            {selectedItem && (
+              <BidLimitBadge
+                limitPrice={limitSettings[selectedItem.id]?.limit_price ?? null}
+                isTriggered={limitSettings[selectedItem.id]?.is_triggered ?? false}
+                onEdit={() => setLimitModalItem(selectedItem)}
+                onRemove={() => setLimitSettings(prev => { const n = { ...prev }; delete n[selectedItem.id]; return n; })}
+              />
+            )}
           </Box>
-          <Button onClick={() => setSelectedItem(null)}>閉じる</Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={() => setSelectedItem(null)}>閉じる</Button>
+            <Button variant="contained" onClick={() => { setSelectedItem(null); onNavigate('demo'); }}>ライブ画面へ</Button>
+          </Box>
         </DialogActions>
       </Dialog>
+
+      {/* BidLimitModal */}
+      {limitModalItem && (
+        <BidLimitModal
+          open={!!limitModalItem}
+          onClose={() => setLimitModalItem(null)}
+          itemId={limitModalItem.id}
+          speciesName={limitModalItem.species_name}
+          currentLimitPrice={limitSettings[limitModalItem.id]?.limit_price ?? null}
+          currentPrice={limitModalItem.start_price}
+          quickOptions={null}
+          isLive={false}
+          isSetting={false}
+          onSet={(price) => {
+            setLimitSettings(prev => ({ ...prev, [limitModalItem.id]: { limit_price: price, is_triggered: false } }));
+            setFavoriteIds(prev => { const n = new Set(prev); n.add(limitModalItem.id); return n; });
+            setLimitModalItem(null);
+          }}
+          onRemove={() => {
+            setLimitSettings(prev => { const n = { ...prev }; delete n[limitModalItem.id]; return n; });
+            setLimitModalItem(null);
+          }}
+        />
+      )}
     </Container>
   );
 }
 
-/* ─── Tab 4: 落札管理（WonItems.tsx と同じデザイン） ─── */
+/* ─── FAVORITES (matches Favorites.tsx) ─── */
+function FavoritesTab({ favoriteIds, setFavoriteIds, limitSettings, setLimitSettings, onNavigate }: {
+  favoriteIds: Set<number>;
+  setFavoriteIds: React.Dispatch<React.SetStateAction<Set<number>>>;
+  limitSettings: Record<number, { limit_price: number | null; is_triggered: boolean }>;
+  setLimitSettings: React.Dispatch<React.SetStateAction<Record<number, { limit_price: number | null; is_triggered: boolean }>>>;
+  onNavigate: (page: string) => void;
+}) {
+  const [selectedItem, setSelectedItem] = useState<ItemData | null>(null);
+  const [limitModalItem, setLimitModalItem] = useState<ItemData | null>(null);
+
+  const favoriteItems = MOCK_ITEMS.filter(item => favoriteIds.has(item.id));
+
+  const removeFav = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    setFavoriteIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  return (
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton onClick={() => onNavigate('home')}><ArrowBackIcon /></IconButton>
+          <Box>
+            <Typography variant="h5" fontWeight="bold">お気に入り</Typography>
+            <Typography variant="body2" color="text.secondary">{favoriteItems.length}件のお気に入り</Typography>
+          </Box>
+        </Box>
+      </Paper>
+
+      {favoriteItems.length === 0 ? (
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <FavoriteIcon sx={{ fontSize: 48, color: 'grey.300', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>お気に入りはまだありません</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            オークションの出品一覧からハートアイコンをタップして追加できます
+          </Typography>
+          <Button variant="contained" onClick={() => onNavigate('items')}>出品一覧へ</Button>
+        </Paper>
+      ) : (
+        <Grid container spacing={2}>
+          {favoriteItems.map(item => (
+            <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
+              <Card
+                sx={{
+                  cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', position: 'relative',
+                  borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
+                }}
+                onClick={() => setSelectedItem(item)}
+              >
+                <IconButton
+                  onClick={(e) => removeFav(e, item.id)}
+                  sx={{ position: 'absolute', top: 4, left: 4, zIndex: 2, bgcolor: 'rgba(255,255,255,0.85)', '&:hover': { bgcolor: 'rgba(255,255,255,1)' }, width: 32, height: 32 }}
+                  size="small"
+                >
+                  <FavoriteIcon sx={{ color: '#ef4444', fontSize: 20 }} />
+                </IconButton>
+                {item.is_premium && <Chip label="プレミアム" color="warning" size="small" sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />}
+                <CardMedia component="img" image={item.thumbnail_path || '/img/noimage.png'} alt={item.species_name} sx={{ aspectRatio: '3/2', objectFit: 'cover' }} />
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>
+                    {(() => { const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const }; return <Chip label={s.label} color={s.color} size="small" />; })()}
+                  </Box>
+                  <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="h6" color="primary.main" fontWeight="bold">¥{Number(item.start_price).toLocaleString()}〜</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+              <Box sx={{ px: 1.5, py: 1, bgcolor: 'background.paper', border: '1px solid', borderTop: 'none', borderColor: 'divider', borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }}>
+                <BidLimitBadge
+                  limitPrice={limitSettings[item.id]?.limit_price ?? null}
+                  isTriggered={limitSettings[item.id]?.is_triggered ?? false}
+                  onEdit={() => setLimitModalItem(item)}
+                  onRemove={() => setLimitSettings(prev => { const n = { ...prev }; delete n[item.id]; return n; })}
+                />
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+
+      {/* Detail dialog */}
+      <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6">No.{selectedItem?.item_number} {selectedItem?.species_name}</Typography>
+            <IconButton onClick={() => setSelectedItem(null)}><CloseIcon /></IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ borderRadius: 2, overflow: 'hidden', bgcolor: 'grey.100' }}>
+                <img src={selectedItem?.thumbnail_path || '/img/noimage.png'} alt={selectedItem?.species_name}
+                  style={{ width: '100%', maxHeight: 400, objectFit: 'contain', display: 'block' }} />
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                {selectedItem?.is_premium && <Chip label="プレミアム" color="warning" />}
+                {selectedItem && (() => { const s = STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }; return <Chip label={s.label} color={s.color} />; })()}
+              </Box>
+              <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
+                ¥{Number(selectedItem?.start_price || 0).toLocaleString()}〜
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" gutterBottom>匹数</Typography>
+              <Typography variant="body1" gutterBottom>{selectedItem?.quantity}匹セット</Typography>
+              {selectedItem?.inspection_info && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 2, color: 'primary.main' }} gutterBottom>個体情報</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.inspection_info}</Typography>
+                </>
+              )}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedItem(null)}>閉じる</Button>
+          <Button variant="outlined" onClick={() => { setSelectedItem(null); onNavigate('items'); }}>出品一覧へ</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* BidLimitModal */}
+      {limitModalItem && (
+        <BidLimitModal
+          open={!!limitModalItem}
+          onClose={() => setLimitModalItem(null)}
+          itemId={limitModalItem.id}
+          speciesName={limitModalItem.species_name}
+          currentLimitPrice={limitSettings[limitModalItem.id]?.limit_price ?? null}
+          currentPrice={limitModalItem.start_price}
+          quickOptions={null}
+          isLive={false}
+          isSetting={false}
+          onSet={(price) => {
+            setLimitSettings(prev => ({ ...prev, [limitModalItem.id]: { limit_price: price, is_triggered: false } }));
+            setLimitModalItem(null);
+          }}
+          onRemove={() => {
+            setLimitSettings(prev => { const n = { ...prev }; delete n[limitModalItem.id]; return n; });
+            setLimitModalItem(null);
+          }}
+        />
+      )}
+    </Container>
+  );
+}
+
+/* ─── WON ITEMS (matches WonItems.tsx) ─── */
 function WonItemsTab() {
   const [activeTab, setActiveTab] = useState('all');
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MockWonItem | null>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '' });
+  const [editAddressOpen, setEditAddressOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MockWonItem | null>(null);
+  const [addressForm, setAddressForm] = useState({
+    shipping_postal_code: '', shipping_prefecture: '', shipping_city: '',
+    shipping_address_line1: '', shipping_address_line2: '', shipping_name: '', shipping_phone: '',
+  });
+  const [wonItemAddresses, setWonItemAddresses] = useState<Record<number, string>>({});
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  const getWonItemAddress = (item: MockWonItem) => wonItemAddresses[item.id] ?? item.shipping_address;
 
   const summary = {
     total_amount: MOCK_WON_ITEMS.reduce((s, w) => s + w.total_amount, 0),
@@ -769,14 +1031,36 @@ function WonItemsTab() {
     completed: MOCK_WON_ITEMS.filter(i => i.delivery_status === 'completed').length,
   };
 
+  const handleEditAddress = (item: MockWonItem) => {
+    setAddressForm({
+      shipping_postal_code: '150-0001', shipping_prefecture: '東京都',
+      shipping_city: '渋谷区', shipping_address_line1: '神宮前1-2-3',
+      shipping_address_line2: 'メダカハイツ101', shipping_name: 'デモ ユーザー', shipping_phone: '090-1234-5678',
+    });
+    setEditingItem(item);
+    setEditAddressOpen(true);
+  };
+
+  const handleSaveAddress = () => {
+    if (!editingItem) return;
+    const addr = `〒${addressForm.shipping_postal_code} ${addressForm.shipping_prefecture}${addressForm.shipping_city}${addressForm.shipping_address_line1} ${addressForm.shipping_address_line2}`;
+    setWonItemAddresses(prev => ({ ...prev, [editingItem.id]: addr }));
+    setSnackbar({ open: true, message: '配送先を更新しました', severity: 'success' });
+    setEditAddressOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>落札管理</Typography>
-      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-        落札した商品の支払い状況と配送状況を確認できます
-      </Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>落札した商品の支払い状況と配送状況を確認できます</Typography>
 
-      {/* サマリー（WonItems.tsx と同じ） */}
+      {/* Summary */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={4}>
           <Paper sx={{ p: 2.5 }}>
@@ -798,10 +1082,9 @@ function WonItemsTab() {
         </Grid>
       </Grid>
 
-      {/* タブフィルター */}
+      {/* Tab filter */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto" sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tab label={`すべて (${tabCounts.all})`} value="all" />
           <Tab label={`支払い待ち (${tabCounts.payment_pending})`} value="payment_pending" />
           <Tab label={`発送待ち (${tabCounts.shipping_pending})`} value="shipping_pending" />
@@ -810,10 +1093,12 @@ function WonItemsTab() {
         </Tabs>
       </Paper>
 
-      {/* 落札商品一覧（WonItems.tsx と同じカードデザイン） */}
+      {/* Won items list */}
       {filteredItems.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">該当する商品はありません。</Typography>
+          <Typography variant="body1" color="text.secondary">
+            {activeTab === 'all' ? '落札した商品はまだありません。' : '該当する商品はありません。'}
+          </Typography>
         </Paper>
       ) : (
         filteredItems.map((wonItem) => (
@@ -821,25 +1106,19 @@ function WonItemsTab() {
             <CardContent sx={{ p: 3 }}>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={3}>
-                  <CardMedia component="img" image={wonItem.item.thumbnail_path}
-                    alt={wonItem.item.species_name}
+                  <CardMedia component="img" image={wonItem.item.thumbnail_path} alt={wonItem.item.species_name}
                     sx={{ borderRadius: 2, aspectRatio: '3/2', objectFit: 'cover', width: '100%' }} />
                 </Grid>
                 <Grid item xs={12} sm={9}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      No.{wonItem.item.item_number}
-                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>No.{wonItem.item.item_number}</Typography>
                     <Chip label={getPaymentStatusLabel(wonItem.payment_status)} size="small"
                       sx={{ ...getPaymentStatusColor(wonItem.payment_status), fontWeight: 600, fontSize: '0.7rem' }} />
                     <Chip label={getDeliveryStatusLabel(wonItem.delivery_status)} size="small"
                       sx={{ bgcolor: '#DBEAFE', color: '#3B82F6', fontWeight: 600, fontSize: '0.7rem' }} />
                   </Box>
 
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                    {wonItem.item.species_name}
-                  </Typography>
-
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{wonItem.item.species_name}</Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
                     {wonItem.item.auction.title} ({wonItem.item.auction.event_date})
                   </Typography>
@@ -870,6 +1149,7 @@ function WonItemsTab() {
                     </Grid>
                   </Grid>
 
+                  {/* Tracking info */}
                   {wonItem.tracking_number && (
                     <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, mb: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -882,33 +1162,40 @@ function WonItemsTab() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         <Typography variant="body2">{wonItem.shipping_company}: </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                          {wonItem.tracking_number}
-                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>{wonItem.tracking_number}</Typography>
                         <Tooltip title="コピー">
-                          <IconButton size="small" onClick={() => setSnackbar({ open: true, message: 'コピーしました' })}>
+                          <IconButton size="small" onClick={() => handleCopy(wonItem.tracking_number!)}>
                             <CopyIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         </Tooltip>
+                        {wonItem.shipping_company && (
+                          <Button size="small" variant="outlined" endIcon={<OpenInNewIcon />}
+                            component={Link} href={getTrackingUrl(wonItem.tracking_number, wonItem.shipping_company)} target="_blank">
+                            配送状況を確認
+                          </Button>
+                        )}
                       </Box>
                     </Box>
                   )}
 
+                  {/* Shipping address */}
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>配送先</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2">{wonItem.shipping_address || '未設定'}</Typography>
+                      <Typography variant="body2">{getWonItemAddress(wonItem)}</Typography>
                       {wonItem.payment_status === 'pending' && (
-                        <Button size="small" startIcon={<EditIcon />}>
-                          {wonItem.shipping_address !== '未設定' ? '変更' : '設定'}
+                        <Button size="small" startIcon={<EditIcon />} onClick={() => handleEditAddress(wonItem)}>
+                          {getWonItemAddress(wonItem) !== '未設定' ? '変更' : '設定'}
                         </Button>
                       )}
                     </Box>
                   </Box>
 
+                  {/* Action buttons */}
                   <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {wonItem.payment_status === 'pending' && (
-                      <Button variant="contained" color="warning" startIcon={<ReceiptIcon />}>
+                      <Button variant="contained" color="warning" startIcon={<ReceiptIcon />}
+                        onClick={() => setSnackbar({ open: true, message: '請求書画面に遷移します（デモ）', severity: 'success' })}>
                         請求書を確認・支払い
                       </Button>
                     )}
@@ -920,19 +1207,57 @@ function WonItemsTab() {
         ))
       )}
 
-      {/* 配送詳細ダイアログ（WonItems.tsx と同じ） */}
+      {/* Address edit dialog */}
+      <Dialog open={editAddressOpen} onClose={() => setEditAddressOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>配送先住所の変更</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>※ 入金確認前のみ変更可能です</Typography>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="郵便番号" value={addressForm.shipping_postal_code}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_postal_code: e.target.value })} placeholder="123-4567" />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="都道府県" value={addressForm.shipping_prefecture}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_prefecture: e.target.value })} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="市区町村" value={addressForm.shipping_city}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_city: e.target.value })} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="番地" value={addressForm.shipping_address_line1}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_address_line1: e.target.value })} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="建物名・部屋番号（任意）" value={addressForm.shipping_address_line2}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_address_line2: e.target.value })} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="受取人氏名" value={addressForm.shipping_name}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_name: e.target.value })} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="電話番号" value={addressForm.shipping_phone}
+                onChange={(e) => setAddressForm({ ...addressForm, shipping_phone: e.target.value })} />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditAddressOpen(false)}>キャンセル</Button>
+          <Button onClick={handleSaveAddress} variant="contained">保存</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Tracking detail dialog */}
       <Dialog open={trackingDetailOpen} onClose={() => setTrackingDetailOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>配送状況詳細</DialogTitle>
         <DialogContent>
           {selectedItem && (
             <>
               <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  {selectedItem.item.species_name}
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {selectedItem.item.auction.title}
-                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{selectedItem.item.species_name}</Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>{selectedItem.item.auction.title}</Typography>
               </Box>
               <Divider sx={{ my: 2 }} />
               <Stepper activeStep={getDeliveryStepIndex(selectedItem.delivery_status)} sx={{ mb: 3 }}>
@@ -945,14 +1270,18 @@ function WonItemsTab() {
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>伝票番号</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="h6" sx={{ fontFamily: 'monospace' }}>{selectedItem.tracking_number}</Typography>
-                    <IconButton size="small" onClick={() => setSnackbar({ open: true, message: 'コピーしました' })}>
+                    <IconButton size="small" onClick={() => handleCopy(selectedItem.tracking_number!)}>
                       <CopyIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                    {selectedItem.shipping_company}
-                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{selectedItem.shipping_company}</Typography>
                 </Box>
+              )}
+              {selectedItem.tracking_number && selectedItem.shipping_company && (
+                <Button fullWidth variant="contained" endIcon={<OpenInNewIcon />}
+                  component={Link} href={getTrackingUrl(selectedItem.tracking_number, selectedItem.shipping_company)} target="_blank">
+                  {selectedItem.shipping_company}の配送状況ページを開く
+                </Button>
               )}
             </>
           )}
@@ -962,12 +1291,170 @@ function WonItemsTab() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000}
-        onClose={() => setSnackbar({ open: false, message: '' })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity="success" onClose={() => setSnackbar({ open: false, message: '' })}>
-          {snackbar.message}
-        </Alert>
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>{snackbar.message}</Alert>
+      </Snackbar>
+    </Container>
+  );
+}
+
+/* ─── SETTINGS (matches Settings.tsx) ─── */
+function SettingsTab() {
+  const [tabValue, setTabValue] = useState(0);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [profile, setProfile] = useState({
+    name: 'デモ ユーザー', email: 'demo@example.com', phone: '090-1234-5678',
+    postal_code: '150-0001', prefecture: '東京都', city: '渋谷区',
+    address_line1: '神宮前1-2-3', address_line2: 'メダカハイツ101',
+  });
+  const [notifications, setNotifications] = useState({
+    email_won_item: true, email_payment_confirmed: true, email_shipping: true,
+    email_new_auction: true, email_auction_start: true,
+  });
+
+  const handleProfileChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProfile({ ...profile, [field]: e.target.value });
+  };
+
+  function TabPanel({ children, value, index }: { children: React.ReactNode; value: number; index: number }) {
+    return <div hidden={value !== index}>{value === index && <Box sx={{ pt: 3 }}>{children}</Box>}</div>;
+  }
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>アカウント設定</Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>プロフィールと通知設定を管理します</Typography>
+      </Box>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={3}>
+          <Card>
+            <CardContent sx={{ p: 3, textAlign: 'center' }}>
+              <Avatar sx={{ width: 80, height: 80, bgcolor: '#3B82F6', fontSize: '2rem', mx: 'auto', mb: 2 }}>
+                {profile.name.charAt(0)}
+              </Avatar>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>{profile.name}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mt: 1 }}>
+                <EmailIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>{profile.email}</Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={9}>
+          <Card>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+                <Tab icon={<PersonIcon />} label="プロフィール" iconPosition="start" />
+                <Tab icon={<NotificationsIcon />} label="通知設定" iconPosition="start" />
+              </Tabs>
+            </Box>
+
+            <TabPanel value={tabValue} index={0}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <PersonIcon sx={{ color: '#3B82F6' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>基本情報</Typography>
+                </Box>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <TextField fullWidth required label="お名前" value={profile.name} onChange={handleProfileChange('name')} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField fullWidth label="メールアドレス" value={profile.email} disabled helperText="メールアドレスは変更できません" />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField fullWidth label="電話番号" value={profile.phone} onChange={handleProfileChange('phone')} />
+                  </Grid>
+                </Grid>
+                <Divider sx={{ my: 4 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <SettingsIcon sx={{ color: '#059669' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>配送先住所（デフォルト）</Typography>
+                </Box>
+                <Alert severity="info" sx={{ mb: 3 }}>落札時の配送先として使用されます。落札ごとに変更することも可能です。</Alert>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={3}>
+                    <TextField fullWidth label="郵便番号" value={profile.postal_code} onChange={handleProfileChange('postal_code')} placeholder="123-4567" />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <TextField fullWidth label="都道府県" value={profile.prefecture} onChange={handleProfileChange('prefecture')} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField fullWidth label="市区町村" value={profile.city} onChange={handleProfileChange('city')} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField fullWidth label="住所1" value={profile.address_line1} onChange={handleProfileChange('address_line1')} placeholder="番地・丁目" />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField fullWidth label="住所2（建物名など）" value={profile.address_line2} onChange={handleProfileChange('address_line2')} placeholder="マンション名・部屋番号" />
+                  </Grid>
+                </Grid>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                  <Button variant="contained" size="large" startIcon={<SaveIcon />}
+                    onClick={() => setSnackbar({ open: true, message: 'プロフィールを保存しました。', severity: 'success' })}>
+                    変更を保存
+                  </Button>
+                </Box>
+              </CardContent>
+            </TabPanel>
+
+            <TabPanel value={tabValue} index={1}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <NotificationsIcon sx={{ color: '#F59E0B' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>メール通知設定</Typography>
+                </Box>
+                <Alert severity="info" sx={{ mb: 3 }}>受け取りたいメール通知を選択してください。重要なお知らせは設定に関わらず送信されます。</Alert>
+
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#059669' }}>取引に関する通知</Typography>
+                  {[
+                    { key: 'email_won_item', label: '落札通知', desc: '商品を落札した際にメールでお知らせします' },
+                    { key: 'email_payment_confirmed', label: '入金確認通知', desc: '入金が確認された際にメールでお知らせします' },
+                    { key: 'email_shipping', label: '発送通知', desc: '商品が発送された際にメールでお知らせします' },
+                  ].map(({ key, label, desc }) => (
+                    <Box key={key}>
+                      <FormControlLabel
+                        control={<Switch checked={(notifications as any)[key]} onChange={(e) => setNotifications({ ...notifications, [key]: e.target.checked })} />}
+                        label={label}
+                      />
+                      <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>{desc}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#3B82F6' }}>オークションに関する通知</Typography>
+                  {[
+                    { key: 'email_new_auction', label: '新規オークション通知', desc: '新しいオークションが開催される際にメールでお知らせします' },
+                    { key: 'email_auction_start', label: 'オークション開始通知', desc: 'オークションが開始された際にメールでお知らせします' },
+                  ].map(({ key, label, desc }) => (
+                    <Box key={key}>
+                      <FormControlLabel
+                        control={<Switch checked={(notifications as any)[key]} onChange={(e) => setNotifications({ ...notifications, [key]: e.target.checked })} />}
+                        label={label}
+                      />
+                      <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>{desc}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                  <Button variant="contained" size="large" startIcon={<SaveIcon />}
+                    onClick={() => setSnackbar({ open: true, message: '通知設定を保存しました。', severity: 'success' })}>
+                    通知設定を保存
+                  </Button>
+                </Box>
+              </CardContent>
+            </TabPanel>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>{snackbar.message}</Alert>
       </Snackbar>
     </Container>
   );
@@ -981,6 +1468,10 @@ export default function Presentation() {
   const [currentPage, setCurrentPage] = useState('home');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
+
+  // Shared state across pages
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set([2, 5, 7]));
+  const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
 
   // ─── Live demo state ───
   const [lanes, setLanes] = useState<LiveLane[]>(JSON.parse(JSON.stringify(INITIAL_LANES)));
@@ -1040,7 +1531,6 @@ export default function Presentation() {
     const item = lane.current_item;
     if (item.phase === 'freeze') { notify('フリーズ中は入札できません', 'error'); return; }
     if (item.phase === 'pre_bid') { notify('入札開始待機中です', 'error'); return; }
-
     if (currentStatus === 'active') {
       updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'inactive', active_bidders_count: Math.max(0, i.active_bidders_count - 1) }));
       notify('入札をオフにしました', 'info');
@@ -1067,6 +1557,49 @@ export default function Presentation() {
         startCountdown(laneId, 15);
       } else {
         updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+      }
+    }, 1000);
+  }, [stopTimer, updateLaneItem, startCountdown, notify]);
+
+  const simulateFreeze = useCallback((laneId: number) => {
+    stopTimer(laneId);
+    updateLaneItem(laneId, item => {
+      const inc = Math.max(100, Math.round(item.current_price * 0.1));
+      return { ...item, phase: 'freeze' as const, freeze_remaining_seconds: 3, freeze_countdown_seconds: 3, current_price: item.current_price + inc, active_bidders_count: Math.max(2, item.active_bidders_count) };
+    });
+    notify('フリーズ中！入札ボタンが一時的に無効になります', 'warning');
+    let remaining = 3;
+    const ft = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(ft);
+        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+        startCountdown(laneId, 15);
+        notify('フリーズ解除！入札可能になりました', 'success');
+      } else {
+        updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+      }
+    }, 1000);
+  }, [stopTimer, updateLaneItem, startCountdown, notify]);
+
+  const simulatePreBid = useCallback((laneId: number) => {
+    stopTimer(laneId);
+    updateLaneItem(laneId, () => makeLaneItem({
+      id: 7, species_name: '三色ラメ 新着', current_price: 4500, quantity: 3,
+      phase: 'pre_bid', pre_bid_remaining_seconds: 5, countdown_seconds: 15,
+      my_bid_status: null, active_bidders_count: 0, seller_name: 'ブリーダーD',
+    }));
+    notify('新商品がレーンに登場！入札開始まで待機中...', 'info');
+    let remaining = 5;
+    const timer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(timer);
+        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', pre_bid_remaining_seconds: 0 }));
+        startCountdown(laneId, 15);
+        notify('入札開始！入札できるようになりました', 'success');
+      } else {
+        updateLaneItem(laneId, item => ({ ...item, pre_bid_remaining_seconds: remaining }));
       }
     }, 1000);
   }, [stopTimer, updateLaneItem, startCountdown, notify]);
@@ -1115,11 +1648,17 @@ export default function Presentation() {
 
   const wonTotal = wonItems.reduce((sum, w) => sum + w.total_amount, 0);
 
-  // ─── Menu items (ParticipantLayout と同じ) ───
+  const handleNavigate = useCallback((page: string) => {
+    setCurrentPage(page);
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Menu items
   const menuItems = [
     { text: 'ホーム', icon: <HomeIcon />, page: 'home' },
     { text: 'オークション', icon: <GavelIcon />, page: 'auctions' },
-    { text: 'お気に入り', icon: <FavoriteIcon />, page: 'items' },
+    { text: '出品一覧', icon: <InventoryIcon />, page: 'items' },
+    { text: 'お気に入り', icon: <FavoriteIcon />, page: 'favorites' },
     { text: '落札管理', icon: <ReceiptIcon />, page: 'won-items' },
     { text: 'デモ', icon: <DemoIcon />, page: 'demo' },
     { text: '設定', icon: <SettingsIcon />, page: 'settings' },
@@ -1133,35 +1672,23 @@ export default function Presentation() {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 
-      {/* ヘッダー（ParticipantLayout.tsx と同じ AppBar デザイン） */}
+      {/* AppBar */}
       <AppBar position="static">
         <Toolbar>
-          <IconButton
-            edge="start" color="inherit"
-            onClick={() => setDrawerOpen(true)}
-            sx={{ mr: 2, display: { sm: 'none' } }}
-          >
+          <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)} sx={{ mr: 2, display: { sm: 'none' } }}>
             <MenuIcon />
           </IconButton>
-
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box
-              component="img" src="/img/logo.png" alt="MEDAKA AUCTION PORT"
-              onClick={() => setCurrentPage('home')}
-              sx={{ height: 48, width: '100%', maxWidth: 200, objectFit: 'contain', cursor: 'pointer' }}
-            />
+            <Box component="img" src="/img/logo.png" alt="MEDAKA AUCTION PORT"
+              onClick={() => handleNavigate('home')}
+              sx={{ height: 48, width: '100%', maxWidth: 200, objectFit: 'contain', cursor: 'pointer' }} />
             <Chip label="PRESENTATION" size="small"
               sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: '0.65rem' }} />
           </Box>
-
-          {/* デスクトップメニュー */}
           <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
             {menuItems.map((item) => (
-              <Button
-                key={item.page} color="inherit"
-                onClick={() => setCurrentPage(item.page)}
-                sx={{ borderBottom: currentPage === item.page ? 2 : 0, borderRadius: 0 }}
-              >
+              <Button key={item.page} color="inherit" onClick={() => handleNavigate(item.page)}
+                sx={{ borderBottom: currentPage === item.page ? 2 : 0, borderRadius: 0 }}>
                 {item.text}
               </Button>
             ))}
@@ -1169,20 +1696,16 @@ export default function Presentation() {
         </Toolbar>
       </AppBar>
 
-      {/* サイドメニュー（モバイル）（ParticipantLayout.tsx と同じ） */}
+      {/* Mobile Drawer */}
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 250 }} role="presentation">
-          <Box sx={{ p: 2 }}>
-            <Typography variant="h6">メニュー</Typography>
-          </Box>
+          <Box sx={{ p: 2 }}><Typography variant="h6">メニュー</Typography></Box>
           <Divider />
           <List>
             {menuItems.map((item) => (
               <ListItem key={item.page} disablePadding>
-                <ListItemButton
-                  selected={currentPage === item.page}
-                  onClick={() => { setCurrentPage(item.page); setDrawerOpen(false); }}
-                >
+                <ListItemButton selected={currentPage === item.page}
+                  onClick={() => { handleNavigate(item.page); setDrawerOpen(false); }}>
                   <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
                 </ListItemButton>
@@ -1192,14 +1715,9 @@ export default function Presentation() {
         </Box>
       </Drawer>
 
-      {/* LIVEバナー（ParticipantLayout.tsx と同じ、ホーム以外で表示） */}
+      {/* LIVE banner (shown on non-home, non-demo pages) */}
       {currentPage !== 'home' && currentPage !== 'demo' && (
-        <Box
-          sx={{
-            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
-            color: 'white', py: { xs: 3, md: 4 }, px: 2,
-          }}
-        >
+        <Box sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)', color: 'white', py: { xs: 3, md: 4 }, px: 2 }}>
           <Container maxWidth="lg">
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
@@ -1217,32 +1735,33 @@ export default function Presentation() {
             <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' } }}>
               2026年春季メダカオークション
             </Typography>
-            <Button
-              variant="contained" size="large" endIcon={<ArrowForwardIcon />}
-              onClick={() => setCurrentPage('demo')}
-              sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 700, px: 4, py: 1.5, fontSize: '1rem', '&:hover': { bgcolor: 'grey.100' } }}
-            >
+            <Button variant="contained" size="large" endIcon={<ArrowForwardIcon />} onClick={() => handleNavigate('demo')}
+              sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 700, px: 4, py: 1.5, fontSize: '1rem', '&:hover': { bgcolor: 'grey.100' } }}>
               今すぐ参加する
             </Button>
           </Container>
         </Box>
       )}
 
-      {/* メインコンテンツ */}
+      {/* Main content */}
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
-        {/* ホーム */}
-        {currentPage === 'home' && <HomeTab />}
+        {currentPage === 'home' && <HomeTab onNavigate={handleNavigate} />}
+        {currentPage === 'auctions' && <AuctionListTab onNavigate={handleNavigate} />}
+        {currentPage === 'items' && (
+          <ItemListTab favoriteIds={favoriteIds} setFavoriteIds={setFavoriteIds}
+            limitSettings={limitSettings} setLimitSettings={setLimitSettings} onNavigate={handleNavigate} />
+        )}
+        {currentPage === 'favorites' && (
+          <FavoritesTab favoriteIds={favoriteIds} setFavoriteIds={setFavoriteIds}
+            limitSettings={limitSettings} setLimitSettings={setLimitSettings} onNavigate={handleNavigate} />
+        )}
+        {currentPage === 'won-items' && <WonItemsTab />}
+        {currentPage === 'settings' && <SettingsTab />}
 
-        {/* オークション一覧 */}
-        {currentPage === 'auctions' && <AuctionListTab />}
-
-        {/* 出品一覧 (お気に入り も同じ画面) */}
-        {(currentPage === 'items' || currentPage === 'settings') && <ItemListTab />}
-
-        {/* ライブデモ（Demo.tsx と同じデザイン） */}
+        {/* DEMO PAGE */}
         {currentPage === 'demo' && (
           <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)' }}>
-            {/* ヘッダー（Demo.tsx と同じ） */}
+            {/* Demo header */}
             <Box sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)', color: 'white', py: 3, px: 2 }}>
               <Container maxWidth="xl">
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
@@ -1258,13 +1777,12 @@ export default function Presentation() {
             </Box>
 
             <Container maxWidth="xl" sx={{ py: 3 }}>
-              {/* レーングリッド（Demo.tsx と同じ） */}
+              {/* Lane grid */}
               <Grid container spacing={2}>
                 {lanes.map(lane => (
                   <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
                     <LaneCard
-                      lane={lane}
-                      isLoading={false}
+                      lane={lane} isLoading={false}
                       onBidToggle={handleBidToggle}
                       onDetailOpen={() => {}}
                       onLimitEdit={(itemId) => {
@@ -1283,7 +1801,7 @@ export default function Presentation() {
                 ))}
               </Grid>
 
-              {/* 次の商品（Demo.tsx と同じ） */}
+              {/* Upcoming items */}
               <Paper sx={{ mt: 3, p: 2 }}>
                 <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
                 <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
@@ -1307,9 +1825,7 @@ export default function Presentation() {
                             <InfoIcon sx={{ fontSize: 16, color: 'primary.main' }} />
                           </IconButton>
                           <IconButton size="small" onClick={() => toggleUpcomingFav(item.id)} sx={{ p: 0.25 }}>
-                            {item.is_favorited
-                              ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} />
-                              : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
+                            {item.is_favorited ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} /> : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
                           </IconButton>
                         </Box>
                         <Box sx={{ mt: 0.5 }}>
@@ -1322,7 +1838,7 @@ export default function Presentation() {
                 </Box>
               </Paper>
 
-              {/* 落札結果テーブル（Demo.tsx と同じ） */}
+              {/* Won items table */}
               {wonItems.length > 0 && (
                 <Paper sx={{ mt: 3, p: 2 }}>
                   <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1349,9 +1865,7 @@ export default function Presentation() {
                         ))}
                         <TableRow>
                           <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>合計</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
-                            ¥{wonTotal.toLocaleString()}
-                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>¥{wonTotal.toLocaleString()}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -1360,51 +1874,34 @@ export default function Presentation() {
               )}
               {wonItems.length === 0 && (
                 <Paper sx={{ mt: 3, p: 2, bgcolor: 'grey.50' }}>
-                  <Typography variant="body2" color="text.secondary" align="center">
-                    落札した商品がここに表示されます
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary" align="center">落札した商品がここに表示されます</Typography>
                 </Paper>
               )}
 
-              {/* フリーモード操作パネル（Demo.tsx と同じ） */}
+              {/* Free mode controls */}
               <Paper sx={{ mt: 3, p: 2 }}>
-                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
-                  フリーモード — 自由に操作できます
-                </Typography>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>フリーモード — 自由に操作できます</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   入札ボタンや操作パネルで自由にお試しください。
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Button size="small" variant="outlined" onClick={() => simulateOpponentBid(1)}>
-                    レーン1に他者入札
-                  </Button>
-                  <Button size="small" variant="outlined" onClick={() => simulateOpponentBid(2)}>
-                    レーン2に他者入札
-                  </Button>
+                  <Button size="small" variant="outlined" onClick={() => simulateOpponentBid(1)}>他者入札</Button>
+                  <Button size="small" variant="outlined" onClick={() => simulateFreeze(1)}>フリーズ体験</Button>
+                  <Button size="small" variant="outlined" onClick={() => simulatePreBid(3)}>新商品登場</Button>
                   <Button size="small" variant="outlined" onClick={() => {
                     updateLaneItem(2, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 }));
                     setTimeout(() => handleWin(), 500);
-                  }}>
-                    落札体験
-                  </Button>
-                  <Button size="small" variant="outlined" color="secondary" onClick={handleLiveReset}>
-                    リセット
-                  </Button>
+                  }}>落札体験</Button>
+                  <Button size="small" variant="outlined" color="secondary" onClick={handleLiveReset}>リセット</Button>
                 </Box>
               </Paper>
             </Container>
           </Box>
         )}
-
-        {/* 落札管理 */}
-        {currentPage === 'won-items' && <WonItemsTab />}
       </Box>
 
-      {/* フッター（ParticipantLayout.tsx と同じ） */}
-      <Box
-        component="footer"
-        sx={{ py: 3, px: 2, mt: 'auto', bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}
-      >
+      {/* Footer */}
+      <Box component="footer" sx={{ py: 3, px: 2, mt: 'auto', bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
         <Container maxWidth="lg">
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 1 }}>
             <Typography variant="caption" component="a" href="/legal/privacy" target="_blank" rel="noopener noreferrer"
@@ -1423,12 +1920,12 @@ export default function Presentation() {
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" align="center">
-            © 2025 メダカオークション運営事務局
+            &copy; 2025 メダカオークション運営事務局
           </Typography>
         </Container>
       </Box>
 
-      {/* 指値モーダル */}
+      {/* BidLimitModal for demo lanes */}
       {limitModalLaneId && limitModalItemData && (
         <BidLimitModal
           open={!!limitModalLaneId}
@@ -1446,13 +1943,10 @@ export default function Presentation() {
         />
       )}
 
-      {/* スナックバー */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
+      {/* Global snackbar */}
+      <Snackbar open={snackbar.open} autoHideDuration={3000}
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
           {snackbar.message}
         </Alert>
