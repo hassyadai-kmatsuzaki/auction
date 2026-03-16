@@ -26,7 +26,8 @@ class LaneController extends Controller
         
         $lanes = $auction->lanes()
             ->with(['items' => function ($query) {
-                $query->select('items.id', 'item_number', 'species_name', 'quantity', 'start_price', 'is_premium', 'status', 'thumbnail_path')
+                $query->select('items.id', 'item_number', 'species_name', 'quantity', 'start_price', 'is_premium', 'status', 'thumbnail_path', 'seller_profile_id')
+                    ->with(['sellerProfile.user'])
                     ->orderBy('lane_items.sequence_order');
             }])
             ->orderBy('lane_number')
@@ -57,6 +58,13 @@ class LaneController extends Controller
                         'lane_name' => $lane->lane_name,
                         'status' => $lane->status,
                         'items' => $lane->items->map(function ($item) {
+                            $sellerName = null;
+                            if ($item->sellerProfile) {
+                                $sellerName = $item->sellerProfile->seller_name
+                                    ?? $item->sellerProfile->corporate_name
+                                    ?? $item->sellerProfile->user?->name
+                                    ?? '不明';
+                            }
                             return [
                                 'id' => $item->id,
                                 'item_number' => $item->item_number,
@@ -67,6 +75,8 @@ class LaneController extends Controller
                                 'status' => $item->status,
                                 'thumbnail_path' => $item->thumbnail_path,
                                 'sequence_order' => $item->pivot->sequence_order,
+                                'seller_profile_id' => $item->seller_profile_id,
+                                'seller_name' => $sellerName,
                             ];
                         }),
                     ];

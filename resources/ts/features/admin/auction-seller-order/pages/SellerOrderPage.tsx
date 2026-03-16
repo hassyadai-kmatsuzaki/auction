@@ -117,9 +117,9 @@ export default function SellerOrderPage() {
           </Alert>
         )}
 
-        {sellers.length === 0 && (
+        {sellers.length === 0 && isEditable && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            出品者順序が設定されていません。「ランダム化」ボタンをクリックして順序を設定してください。
+            出品者順序が設定されていません。下の「ランダム化して順序を生成」ボタンをクリックしてください。
           </Alert>
         )}
       </Box>
@@ -144,8 +144,15 @@ export default function SellerOrderPage() {
               出品者順序が未設定です
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              「ランダム化」ボタンをクリックして、出品者の表示順序を設定してください。
+              まず出品者の順序を生成してください。生成後、ドラッグ&ドロップで並び替えができます。
             </Typography>
+            {isEditable && (
+              <RandomizeButton
+                auctionId={Number(auctionId)}
+                disabled={false}
+                onSuccess={handleRandomizeSuccess}
+              />
+            )}
           </Box>
         )}
       </Paper>

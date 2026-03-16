@@ -609,7 +609,7 @@ export default function LaneAssignment() {
             onClick={() => navigate(`/admin/auctions/${auctionId}/seller-order`)}
             variant="outlined"
             size="small"
-            disabled={auction?.status === 'live'}
+            disabled={!['preparing', 'scheduled'].includes(auction?.status ?? '')}
           >
             出品者順序設定
           </Button>
@@ -854,6 +854,11 @@ export default function LaneAssignment() {
                             <Typography variant="caption" color="text.secondary">
                               ¥{item.start_price.toLocaleString()} / {item.quantity}匹
                             </Typography>
+                            {item.seller_name && (
+                              <Typography variant="caption" sx={{ display: 'block', color: 'info.main', fontSize: '0.65rem', lineHeight: 1.2 }}>
+                                {item.seller_name}
+                              </Typography>
+                            )}
                           </Box>
                           {item.is_premium && (
                             <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />
@@ -994,6 +999,11 @@ export default function LaneAssignment() {
                                   <Typography variant="caption" color="text.secondary">
                                     ¥{item.start_price.toLocaleString()} / {item.quantity}匹
                                   </Typography>
+                                  {item.seller_name && (
+                                    <Typography variant="caption" sx={{ display: 'block', color: 'info.main', fontSize: '0.65rem', lineHeight: 1.2 }}>
+                                      {item.seller_name}
+                                    </Typography>
+                                  )}
                                 </Box>
                                 {item.is_premium && (
                                   <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />

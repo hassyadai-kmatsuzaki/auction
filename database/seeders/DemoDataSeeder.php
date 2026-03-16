@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Announcement;
 use App\Models\Auction;
+use App\Models\AuctionSellerOrder;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\Role;
@@ -43,6 +44,7 @@ class DemoDataSeeder extends Seeder
         
         WonItem::truncate();
         DB::table('lane_items')->truncate();
+        DB::table('auction_seller_orders')->truncate();
         Item::truncate();
         Lane::truncate();
         Auction::truncate();
@@ -76,6 +78,9 @@ class DemoDataSeeder extends Seeder
 
         // 生体（アイテム）作成
         $this->seedItems($auctions, $sellers);
+
+        // 出品者順序作成
+        $this->seedSellerOrders($auctions);
 
         // 落札データ作成（終了済みオークションのみ）
         $this->seedWonItems($participants);
@@ -613,5 +618,49 @@ class DemoDataSeeder extends Seeder
         }
 
         $this->command->info('✓ 落札データ作成完了: ' . $wonCount . '件');
+    }
+
+    /**
+     * 出品者順序作成
+     */
+    private function seedSellerOrders(array $auctions): void
+    {
+        $orderCount = 0;
+
+        foreach ($auctions as $auctionData) {
+            $auction = $auctionData['model'];
+
+            // 各オークションの出品者をアイテムから取得
+            $sellerProfileIds = Item::where('auction_id', $auction->id)
+                ->whereNotNull('seller_profile_id')
+                ->distinct()
+                ->pluck('seller_profile_id')
+                ->shuffle()
+                ->toArray();
+
+            foreach ($sellerProfileIds as $index => $sellerProfileId) {
+                AuctionSellerOrder::create([
+                    'auction_id' => $auction->id,
+                    'seller_profile_id' => $sellerProfileId,
+                    'display_order' => $index + 1,
+                ]);
+                $orderCount++;
+            }
+
+            // 各出品者内の生体に seller_display_order を設定
+            foreach ($sellerProfileIds as $sellerProfileId) {
+                $items = Item::where('auction_id', $auction->id)
+                    ->where('seller_profile_id', $sellerProfileId)
+                    ->orderBy('item_number')
+                    ->get();
+
+                foreach ($items as $itemIndex => $item) {
+                    $item->seller_display_order = $itemIndex + 1;
+                    $item->save();
+                }
+            }
+        }
+
+        $this->command->info('✓ 出品者順序作成完了: ' . $orderCount . '件');
     }
 }
