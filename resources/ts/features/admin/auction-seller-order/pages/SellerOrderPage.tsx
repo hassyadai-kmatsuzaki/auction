@@ -55,8 +55,8 @@ export default function SellerOrderPage() {
     );
   }
 
-  const sellers = data?.data.seller_orders || [];
-  const isEditable = data?.data.is_editable ?? false;
+  const sellers = data?.data?.seller_orders || [];
+  const isEditable = data?.data?.is_editable ?? false;
 
   return (
     <Box sx={{ p: 3 }}>

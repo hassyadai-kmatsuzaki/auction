@@ -33,6 +33,7 @@ import {
   Edit as EditIcon,
   Close as CloseIcon,
   Reorder as ReorderIcon,
+  Store as StoreIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -46,6 +47,8 @@ interface LaneItem {
   status: string;
   thumbnail_path: string | null;
   sequence_order?: number;
+  seller_profile_id?: number;
+  seller_name?: string;
 }
 
 interface Lane {
@@ -73,6 +76,14 @@ interface DragSource {
   type: 'lane' | 'unassigned';
   laneId?: number;
   index?: number;
+}
+
+interface SellerGroup {
+  seller_profile_id: number;
+  seller_name: string;
+  seller_code: string | null;
+  display_order: number;
+  items: LaneItem[];
 }
 
 export default function LaneAssignment() {
@@ -108,15 +119,84 @@ export default function LaneAssignment() {
   // 操作中フラグ（二重送信防止）
   const [operating, setOperating] = useState(false);
 
+  // 出品者グループ
+  const [hasSellerOrders, setHasSellerOrders] = useState(false);
+  const [sellerGroups, setSellerGroups] = useState<SellerGroup[]>([]);
+
+  // 出品者グループのドラッグ
+  const [draggedSellerGroup, setDraggedSellerGroup] = useState<SellerGroup | null>(null);
+  const [dragOverSellerIdx, setDragOverSellerIdx] = useState<number | null>(null);
+
+  // 未割当アイテムから出品者グループを構築（既存のsellerGroupsの順序を維持）
+  const buildSellerGroups = (items: LaneItem[], existingGroups: SellerGroup[]): SellerGroup[] => {
+    const groupMap = new Map<number, SellerGroup>();
+
+    // 既存の順序を維持しつつグループを初期化
+    existingGroups.forEach(g => {
+      groupMap.set(g.seller_profile_id, { ...g, items: [] });
+    });
+
+    // 新アイテムを各グループに振り分け（または新グループ作成）
+    items.forEach(item => {
+      const sid = item.seller_profile_id ?? 0;
+      if (!groupMap.has(sid)) {
+        groupMap.set(sid, {
+          seller_profile_id: sid,
+          seller_name: item.seller_name ?? 'その他',
+          seller_code: null,
+          display_order: groupMap.size + 1,
+          items: [],
+        });
+      }
+      groupMap.get(sid)!.items.push(item);
+    });
+
+    // 既存の順序でグループを返す（新グループは末尾）
+    const existingOrder = existingGroups.map(g => g.seller_profile_id);
+    const newSids = [...groupMap.keys()].filter(sid => !existingOrder.includes(sid));
+    return [...existingOrder, ...newSids]
+      .map(sid => groupMap.get(sid)!)
+      .filter(Boolean);
+  };
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/admin/auctions/${auctionId}/lanes`);
-      if (response.data.success) {
-        setAuction(response.data.data.auction);
-        setLanes(response.data.data.lanes);
-        setUnassignedItems(response.data.data.unassigned_items);
-        setStatistics(response.data.data.statistics);
+      const [lanesResponse, sellerOrderResponse] = await Promise.all([
+        axios.get(`/api/admin/auctions/${auctionId}/lanes`),
+        axios.get(`/api/admin/auctions/${auctionId}/seller-order`).catch(() => null),
+      ]);
+
+      if (!lanesResponse.data.success) {
+        setError('データの取得に失敗しました');
+        return;
+      }
+
+      const lanesData = lanesResponse.data.data;
+      setAuction(lanesData.auction);
+      setLanes(lanesData.lanes);
+      const unassigned: LaneItem[] = lanesData.unassigned_items;
+      setUnassignedItems(unassigned);
+      setStatistics(lanesData.statistics);
+
+      // seller_profile_id が含まれていれば出品者グループ化
+      const hasSellers = unassigned.some(item => item.seller_profile_id != null);
+      if (hasSellers) {
+        // seller-order API の保存済み順序をシードとして使用（リロード後も順序を維持）
+        const apiSellerOrders: Array<{ seller_profile_id: number; seller_name: string; seller_code: string | null; display_order: number }> =
+          sellerOrderResponse?.data?.data?.seller_orders ?? [];
+        const seededGroups: SellerGroup[] = apiSellerOrders.map(so => ({
+          seller_profile_id: so.seller_profile_id,
+          seller_name: so.seller_name,
+          seller_code: so.seller_code,
+          display_order: so.display_order,
+          items: [],
+        }));
+        setSellerGroups(buildSellerGroups(unassigned, seededGroups));
+        setHasSellerOrders(true);
+      } else {
+        setHasSellerOrders(false);
+        setSellerGroups([]);
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'データの取得に失敗しました');
@@ -146,6 +226,8 @@ export default function LaneAssignment() {
     setDraggedItem(null);
     setDragSource(null);
     setDropTarget(null);
+    setDraggedSellerGroup(null);
+    setDragOverSellerIdx(null);
   };
 
   // アイテム間のドロップ位置を計算
@@ -197,6 +279,12 @@ export default function LaneAssignment() {
       ));
     } else if (source?.type === 'unassigned') {
       setUnassignedItems(prev => prev.filter(i => i.id !== item.id));
+      if (hasSellerOrders) {
+        setSellerGroups(prev => prev.map(group => ({
+          ...group,
+          items: group.items.filter(i => i.id !== item.id),
+        })));
+      }
       setStatistics(prev => prev ? {
         ...prev,
         assigned_items: prev.assigned_items + 1,
@@ -234,6 +322,27 @@ export default function LaneAssignment() {
         : lane
     ));
     setUnassignedItems(prev => [...prev, item].sort((a, b) => a.item_number - b.item_number));
+    if (hasSellerOrders) {
+      const sid = item.seller_profile_id ?? 0;
+      setSellerGroups(prev => {
+        const exists = prev.find(g => g.seller_profile_id === sid);
+        if (exists) {
+          return prev.map(g =>
+            g.seller_profile_id === sid
+              ? { ...g, items: [...g.items, item].sort((a, b) => a.item_number - b.item_number) }
+              : g
+          );
+        }
+        // 新しい出品者グループを末尾に追加
+        return [...prev, {
+          seller_profile_id: sid,
+          seller_name: item.seller_name ?? 'その他',
+          seller_code: null,
+          display_order: prev.length + 1,
+          items: [item],
+        }];
+      });
+    }
     setStatistics(prev => prev ? {
       ...prev,
       assigned_items: prev.assigned_items - 1,
@@ -281,13 +390,11 @@ export default function LaneAssignment() {
     }
   };
 
-  // 自動割り当て
-  const handleAutoAssign = async (clearExisting: boolean) => {
+  // 自動割り当て（未割当のみ対象・Greedy Bin Packing）
+  const handleAutoAssign = async () => {
     try {
       setAutoAssignLoading(true);
-      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/auto-assign`, {
-        clear_existing: clearExisting,
-      });
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/auto-assign`);
       setSnackbar({ open: true, message: response.data.message, severity: 'success' });
       setAutoAssignDialogOpen(false);
       fetchData();
@@ -361,6 +468,61 @@ export default function LaneAssignment() {
       setSnackbar({ open: true, message: err.response?.data?.message || 'レーン名の更新に失敗しました', severity: 'error' });
     } finally {
       setOperating(false);
+    }
+  };
+
+  // =============================================
+  // 出品者グループのドラッグ&ドロップ（並び替え）
+  // =============================================
+
+  const handleSellerGroupDragStart = (e: React.DragEvent, group: SellerGroup) => {
+    if (operating) return;
+    setDraggedSellerGroup(group);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+  };
+
+  const handleSellerGroupDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedSellerGroup) return;
+    setDragOverSellerIdx(idx);
+  };
+
+  const handleSellerGroupDrop = async (toIdx: number) => {
+    if (!draggedSellerGroup) return;
+
+    const fromIdx = sellerGroups.findIndex(
+      (g) => g.seller_profile_id === draggedSellerGroup.seller_profile_id
+    );
+    if (fromIdx < 0 || fromIdx === toIdx) {
+      handleDragEnd();
+      return;
+    }
+
+    const newGroups = [...sellerGroups];
+    const [moved] = newGroups.splice(fromIdx, 1);
+    newGroups.splice(toIdx, 0, moved);
+    setSellerGroups(newGroups);
+    handleDragEnd();
+
+    // APIに保存（seller_profile_id > 0 の実在する出品者のみ）
+    const realSellers = newGroups.filter((g) => g.seller_profile_id > 0);
+    try {
+      await axios.put(`/api/admin/auctions/${auctionId}/seller-order/reorder`, {
+        seller_orders: realSellers.map((g, idx) => ({
+          seller_profile_id: g.seller_profile_id,
+          display_order: idx + 1,
+        })),
+      });
+      setSnackbar({ open: true, message: '出品者順序を更新しました', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || '順序の保存に失敗しました',
+        severity: 'error',
+      });
+      fetchData();
     }
   };
 
@@ -539,7 +701,7 @@ export default function LaneAssignment() {
               borderColor: 'primary.main',
               transition: 'all 0.2s',
             }}
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => { if (draggedItem && dragSource?.type === 'lane') e.preventDefault(); }}
             onDrop={handleDropOnUnassigned}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -547,50 +709,161 @@ export default function LaneAssignment() {
               未割当 ({unassignedItems.length})
             </Typography>
 
-            {unassignedItems.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                すべての生体が割当済みです
-              </Typography>
-            ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {unassignedItems.map((item) => (
-                  <Card
-                    key={item.id}
-                    draggable={!operating}
-                    onDragStart={(e) => handleDragStart(e, item, { type: 'unassigned' })}
-                    onDragEnd={handleDragEnd}
-                    sx={{
-                      cursor: operating ? 'default' : 'grab',
-                      opacity: draggedItem?.id === item.id ? 0.4 : 1,
-                      '&:hover': { boxShadow: 3 },
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 20, flexShrink: 0 }} />
-                        <Avatar
-                          src={item.thumbnail_path || undefined}
-                          sx={{ width: 32, height: 32, bgcolor: 'grey.200', flexShrink: 0 }}
+            {hasSellerOrders ? (
+              // 出品者グループ表示
+              sellerGroups.every((g) => g.items.length === 0) ? (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                  すべての生体が割当済みです
+                </Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {sellerGroups.map((group, groupIdx) =>
+                    group.items.length === 0 ? null : (
+                      <Box
+                        key={group.seller_profile_id}
+                        onDragOver={(e) => {
+                          if (draggedSellerGroup && draggedSellerGroup.seller_profile_id !== group.seller_profile_id) {
+                            handleSellerGroupDragOver(e, groupIdx);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          if (draggedSellerGroup) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSellerGroupDrop(groupIdx);
+                          }
+                        }}
+                        sx={{
+                          border: '1px solid',
+                          borderColor: dragOverSellerIdx === groupIdx ? 'primary.main' : 'grey.300',
+                          borderRadius: 1,
+                          opacity: draggedSellerGroup?.seller_profile_id === group.seller_profile_id ? 0.5 : 1,
+                          transition: 'border-color 0.15s, opacity 0.15s',
+                          bgcolor: dragOverSellerIdx === groupIdx ? 'primary.50' : 'background.paper',
+                        }}
+                      >
+                        {/* 出品者ヘッダー（ドラッグで並び替え） */}
+                        <Box
+                          draggable={group.seller_profile_id > 0 && auction?.status !== 'live'}
+                          onDragStart={(e) => handleSellerGroupDragStart(e, group)}
+                          onDragEnd={handleDragEnd}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            px: 1.5,
+                            py: 0.75,
+                            bgcolor: 'grey.100',
+                            borderRadius: '4px 4px 0 0',
+                            cursor: group.seller_profile_id > 0 && auction?.status !== 'live' ? 'grab' : 'default',
+                            '&:active': { cursor: 'grabbing' },
+                          }}
                         >
-                          <PetsIcon sx={{ fontSize: 16 }} />
-                        </Avatar>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            #{item.item_number} {item.species_name}
+                          {group.seller_profile_id > 0 && auction?.status !== 'live' && (
+                            <DragIndicatorIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+                          )}
+                          <StoreIcon sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {group.seller_name}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            ¥{item.start_price.toLocaleString()} / {item.quantity}匹
-                          </Typography>
+                          <Chip label={`${group.items.length}点`} size="small" />
                         </Box>
-                        {item.is_premium && (
-                          <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />
-                        )}
+
+                        {/* 生体一覧 */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, p: 0.5 }}>
+                          {group.items.map((item) => (
+                            <Card
+                              key={item.id}
+                              draggable={!operating}
+                              onDragStart={(e) => {
+                                e.stopPropagation();
+                                handleDragStart(e, item, { type: 'unassigned' });
+                              }}
+                              onDragEnd={handleDragEnd}
+                              sx={{
+                                cursor: operating ? 'default' : 'grab',
+                                opacity: draggedItem?.id === item.id ? 0.4 : 1,
+                                '&:hover': { boxShadow: 2 },
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 18, flexShrink: 0 }} />
+                                  <Avatar
+                                    src={item.thumbnail_path || undefined}
+                                    sx={{ width: 28, height: 28, bgcolor: 'grey.200', flexShrink: 0 }}
+                                  >
+                                    <PetsIcon sx={{ fontSize: 14 }} />
+                                  </Avatar>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      #{item.item_number} {item.species_name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ¥{item.start_price.toLocaleString()} / {item.quantity}匹
+                                    </Typography>
+                                  </Box>
+                                  {item.is_premium && (
+                                    <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />
+                                  )}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </Box>
                       </Box>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Box>
+                    )
+                  )}
+                </Box>
+              )
+            ) : (
+              // フラット表示（出品者順序未設定時）
+              unassignedItems.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                  すべての生体が割当済みです
+                </Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {unassignedItems.map((item) => (
+                    <Card
+                      key={item.id}
+                      draggable={!operating}
+                      onDragStart={(e) => handleDragStart(e, item, { type: 'unassigned' })}
+                      onDragEnd={handleDragEnd}
+                      sx={{
+                        cursor: operating ? 'default' : 'grab',
+                        opacity: draggedItem?.id === item.id ? 0.4 : 1,
+                        '&:hover': { boxShadow: 3 },
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <DragIndicatorIcon sx={{ color: 'text.secondary', fontSize: 20, flexShrink: 0 }} />
+                          <Avatar
+                            src={item.thumbnail_path || undefined}
+                            sx={{ width: 32, height: 32, bgcolor: 'grey.200', flexShrink: 0 }}
+                          >
+                            <PetsIcon sx={{ fontSize: 16 }} />
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              #{item.item_number} {item.species_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              ¥{item.start_price.toLocaleString()} / {item.quantity}匹
+                            </Typography>
+                          </Box>
+                          {item.is_premium && (
+                            <StarIcon sx={{ color: '#F59E0B', fontSize: 18, flexShrink: 0 }} />
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              )
             )}
           </Paper>
         </Grid>
@@ -767,20 +1040,15 @@ export default function LaneAssignment() {
         <DialogTitle>自動割当</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            登録済みの生体をレーンに自動で割り当てます。
+            未割当の生体を、出品者グループ単位でレーンに自動割り当てします。
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            <strong>出品者順序が設定されている場合:</strong>
-            <br />
-            出品者順序に基づいて生体を割り当てます。各出品者内でプレミアム生体が優先されます。
-            <br />
-            <br />
-            <strong>出品者順序が未設定の場合:</strong>
-            <br />
-            生体番号順で割り当てます。プレミアム生体が優先的に上位に配置されます。
+            出品者ごとに生体をグループ化し、各レーンの生体数が均等になるよう分配します。
+            レーン内の出品者グループ順はランダムになります。
           </Alert>
-          <Alert severity="warning">
-            既存の割り当てをクリアするか、追加で割り当てるかを選択してください。
+          <Alert severity="success">
+            既に割り当て済みの生体はそのまま維持され、未割当の生体のみが各レーン末尾に追加されます。
+            全てリセットして割り当て直す場合は「一括解除」後に実行してください。
           </Alert>
         </DialogContent>
         <DialogActions>
@@ -788,19 +1056,12 @@ export default function LaneAssignment() {
             キャンセル
           </Button>
           <Button
-            onClick={() => handleAutoAssign(false)}
-            disabled={autoAssignLoading}
-            variant="outlined"
-          >
-            {autoAssignLoading ? <CircularProgress size={20} /> : '追加割当'}
-          </Button>
-          <Button
-            onClick={() => handleAutoAssign(true)}
+            onClick={handleAutoAssign}
             disabled={autoAssignLoading}
             variant="contained"
             color="primary"
           >
-            {autoAssignLoading ? <CircularProgress size={20} /> : 'クリアして再割当'}
+            {autoAssignLoading ? <CircularProgress size={20} /> : '自動割当を実行'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -27,7 +27,7 @@ const makeLaneItem = (overrides: Partial<LaneItem> & { id: number; species_name:
   current_price: 3000,
   quantity: 2,
   quantity_unit: 'fish',
-  active_bidders_count: 1,
+  active_bidders_count: 0,
   countdown_seconds: 15,
   my_bid_status: null,
   is_premium: false,
@@ -191,37 +191,61 @@ export default function Demo() {
 
   const simulateOpponentBid = useCallback((laneId: number): Promise<void> => {
     return new Promise(resolve => {
+      stopTimer(laneId);
       updateLaneItem(laneId, item => {
         const increment = Math.max(100, Math.round(item.current_price * 0.1));
         notify(`他の参加者が入札！ +¥${increment.toLocaleString()}`, 'warning');
         return {
           ...item,
+          phase: 'freeze',
+          freeze_remaining_seconds: 3,
+          freeze_countdown_seconds: 3,
           current_price: item.current_price + increment,
           active_bidders_count: Math.max(2, item.active_bidders_count),
         };
       });
-      startCountdown(laneId, 15);
-      setTimeout(resolve, 800);
+      let remaining = 3;
+      const freezeTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(freezeTimer);
+          updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+          startCountdown(laneId, 15);
+          resolve();
+        } else {
+          updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+        }
+      }, 1000);
     });
-  }, [notify, updateLaneItem, startCountdown]);
+  }, [stopTimer, notify, updateLaneItem, startCountdown]);
 
   const simulateMultipleOpponentBids = useCallback(async (laneId: number, count: number) => {
+    notify('他の参加者が入札！価格が上昇しています...', 'warning');
     for (let i = 0; i < count; i++) {
-      await new Promise(r => setTimeout(r, 600));
-      updateLaneItem(laneId, item => {
-        const increment = Math.max(100, Math.round(item.current_price * 0.1));
-        return {
-          ...item,
-          current_price: item.current_price + increment,
-          active_bidders_count: Math.max(2, item.active_bidders_count),
-        };
+      await new Promise<void>(resolve => {
+        stopTimer(laneId);
+        updateLaneItem(laneId, item => {
+          const increment = Math.max(100, Math.round(item.current_price * 0.1));
+          return {
+            ...item,
+            phase: 'freeze',
+            freeze_remaining_seconds: 1,
+            freeze_countdown_seconds: 1,
+            current_price: item.current_price + increment,
+            active_bidders_count: Math.max(2, item.active_bidders_count),
+          };
+        });
+        setTimeout(() => {
+          updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+          startCountdown(laneId, 15);
+          resolve();
+        }, 1000);
       });
-      startCountdown(laneId, 15);
-      if (i === 0) {
-        notify('他の参加者が入札！価格が上昇しています...', 'warning');
+      if (i < count - 1) {
+        await new Promise(r => setTimeout(r, 300));
       }
     }
-  }, [updateLaneItem, startCountdown, notify]);
+  }, [stopTimer, updateLaneItem, startCountdown, notify]);
 
   const simulateFreeze = useCallback((laneId: number): Promise<void> => {
     return new Promise(resolve => {
@@ -399,18 +423,18 @@ export default function Demo() {
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '他の参加者が入札してきた！',
-      description: '他の参加者がレーン1に入札してきます。価格が上がりカウントダウンがリセットされる様子を確認してください。',
+      description: '他の参加者がレーン1に入札してきます。フリーズ（誤タップ防止）が3秒入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。',
       placement: 'right',
       autoAction: () => { simulateOpponentBid(1); },
-      autoActionDelay: 1000,
+      autoActionDelay: 4500,
     },
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '入札合戦！連続入札が発生',
-      description: '複数の参加者が連続で入札してきます。実際のオークションでもこのように価格が競り上がっていきます。',
+      description: '複数の参加者が連続で入札してきます。入札のたびに短いフリーズが発生し、価格が競り上がっていきます。',
       placement: 'right',
       autoAction: () => { simulateMultipleOpponentBids(1, 3); },
-      autoActionDelay: 2500,
+      autoActionDelay: 5000,
     },
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
