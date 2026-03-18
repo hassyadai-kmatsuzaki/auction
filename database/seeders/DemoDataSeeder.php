@@ -170,12 +170,21 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
+        // admin, seller, participant 全ロールを付与（ロール切り替え可能にするため）
         $adminRole = Role::where('name', 'admin')->first();
+        $sellerRole = Role::where('name', 'seller')->first();
+        $participantRole = Role::where('name', 'participant')->first();
         if ($adminRole && !$admin->roles()->where('role_id', $adminRole->id)->exists()) {
             $admin->roles()->attach($adminRole->id);
         }
+        if ($sellerRole && !$admin->roles()->where('role_id', $sellerRole->id)->exists()) {
+            $admin->roles()->attach($sellerRole->id);
+        }
+        if ($participantRole && !$admin->roles()->where('role_id', $participantRole->id)->exists()) {
+            $admin->roles()->attach($participantRole->id);
+        }
 
-        $this->command->info('✓ 管理者ユーザー作成完了: admin@example.com');
+        $this->command->info('✓ 管理者ユーザー作成完了（全ロール付与）: admin@example.com');
         return $admin;
     }
 

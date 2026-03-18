@@ -97,9 +97,9 @@ const makeLane = (id: number, num: number, name: string, item: LaneItem): LiveLa
 });
 
 const INITIAL_ITEMS: LaneItem[] = [
-  makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 3000, quantity: 2, seller_name: 'ブリーダーA' }),
-  makeLaneItem({ id: 2, species_name: '幹之フルボディ 5匹セット', current_price: 5000, quantity: 5, is_premium: true, seller_name: 'ブリーダーB' }),
-  makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 2000, quantity: 1, seller_name: 'ブリーダーC' }),
+  makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'ブリーダーA', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
+  makeLaneItem({ id: 2, species_name: '幹之フルボディ 5匹セット', current_price: 500, quantity: 5, is_premium: true, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
+  makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 200, quantity: 1, seller_name: 'ブリーダーC', thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' }),
 ];
 
 const INITIAL_LANES: LiveLane[] = [
@@ -109,9 +109,9 @@ const INITIAL_LANES: LiveLane[] = [
 ];
 
 const MOCK_UPCOMING: (UpcomingItem & { laneNumber: number })[] = [
-  { id: 10, item_number: 4, species_name: '三色ラメ', start_price: 4000, thumbnail_path: '/img/noimage.png', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
-  { id: 11, item_number: 5, species_name: 'オロチ ペア', start_price: 6000, thumbnail_path: '/img/noimage.png', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
-  { id: 12, item_number: 6, species_name: '夜桜ゴールド', start_price: 3500, thumbnail_path: '/img/noimage.png', is_premium: false, is_favorited: false, quantity: 1, laneNumber: 3 },
+  { id: 10, item_number: 4, species_name: '三色ラメ', start_price: 400, thumbnail_path: '/img/medaka/三色ラメ.jpeg', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
+  { id: 11, item_number: 5, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
+  { id: 12, item_number: 6, species_name: '夜桜ゴールド', start_price: 350, thumbnail_path: '/img/medaka/夜桜ゴールド.jpg', is_premium: false, is_favorited: false, quantity: 1, laneNumber: 3 },
 ];
 
 interface MockAuction {
@@ -173,29 +173,29 @@ interface MockWonItem {
 const MOCK_WON_ITEMS: MockWonItem[] = [
   {
     id: 1,
-    item: { id: 1, item_number: 12, species_name: '紅白ラメ ペア', quantity: 2, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 8500, quantity: 2, total_amount: 18700, commission_amount: 1700,
+    item: { id: 1, item_number: 12, species_name: '紅白ラメ ペア', quantity: 2, thumbnail_path: '/img/medaka/紅白ラメ.jpg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 850, quantity: 2, total_amount: 1870, commission_amount: 170,
     payment_status: 'confirmed', delivery_status: 'shipped',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', tracking_number: '1234-5678-9012', shipping_company: 'ヤマト運輸', shipped_at: '2026-03-10',
   },
   {
     id: 2,
-    item: { id: 2, item_number: 28, species_name: '幹之フルボディ 5匹セット', quantity: 5, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 12000, quantity: 5, total_amount: 66000, commission_amount: 6000,
+    item: { id: 2, item_number: 28, species_name: '幹之フルボディ 5匹セット', quantity: 5, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 1200, quantity: 5, total_amount: 6600, commission_amount: 600,
     payment_status: 'confirmed', delivery_status: 'completed',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', shipped_at: '2026-03-08',
   },
   {
     id: 3,
-    item: { id: 3, item_number: 55, species_name: '楊貴妃ダルマ', quantity: 1, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 4200, quantity: 1, total_amount: 4620, commission_amount: 420,
+    item: { id: 3, item_number: 55, species_name: '楊貴妃ダルマ', quantity: 1, thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 420, quantity: 1, total_amount: 462, commission_amount: 42,
     payment_status: 'pending', payment_deadline: '2026-03-19', delivery_status: 'pending',
     shipping_address: '未設定',
   },
   {
     id: 4,
-    item: { id: 4, item_number: 71, species_name: 'サファイア ペア', quantity: 2, thumbnail_path: '/img/noimage.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 15000, quantity: 2, total_amount: 33000, commission_amount: 3000,
+    item: { id: 4, item_number: 71, species_name: 'サファイア ペア', quantity: 2, thumbnail_path: '/img/medaka/01.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 1500, quantity: 2, total_amount: 3300, commission_amount: 300,
     payment_status: 'paid', delivery_status: 'preparing',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101',
   },
@@ -203,20 +203,20 @@ const MOCK_WON_ITEMS: MockWonItem[] = [
 
 // 3 lanes x 4+ items each = 14 items
 const MOCK_ITEMS: ItemData[] = [
-  { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 2000, current_price: 3500, status: 'live', is_premium: false, thumbnail_path: '/img/noimage.png', inspection_info: '体長3cm前後、発色良好' },
-  { id: 2, item_number: 2, species_name: '幹之フルボディ 5匹セット', quantity: 5, start_price: 3000, current_price: 3000, status: 'registered', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: 'フルボディ確認済み' },
-  { id: 3, item_number: 3, species_name: '楊貴妃ダルマ', quantity: 1, start_price: 1500, current_price: 1500, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 4, item_number: 4, species_name: '三色ラメ 3匹セット', quantity: 3, start_price: 4000, current_price: 4000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png', inspection_info: '三色バランス良好' },
-  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 6000, current_price: 8000, status: 'live', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: '漆黒度S級' },
-  { id: 6, item_number: 6, species_name: '夜桜ゴールド', quantity: 1, start_price: 3500, current_price: 3500, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 7, item_number: 7, species_name: '煌 (きらめき) 3匹セット', quantity: 3, start_price: 5000, current_price: 8500, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: 'ラメ数100以上' },
-  { id: 8, item_number: 8, species_name: 'サファイア ペア', quantity: 2, start_price: 8000, current_price: 12000, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png' },
-  { id: 9, item_number: 9, species_name: 'ブラックダイヤ', quantity: 1, start_price: 4500, current_price: 4500, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png', inspection_info: '体外光あり' },
-  { id: 10, item_number: 10, species_name: '松井ヒレ長 ペア', quantity: 2, start_price: 3000, current_price: 3000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 11, item_number: 11, species_name: '女雛 3匹セット', quantity: 3, start_price: 2500, current_price: 2500, status: 'unsold', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 12, item_number: 12, species_name: 'ユリシス ペア', quantity: 2, start_price: 7000, current_price: 10500, status: 'sold', is_premium: true, thumbnail_path: '/img/noimage.png', inspection_info: '青体外光確認済み' },
-  { id: 13, item_number: 13, species_name: '琥珀透明鱗', quantity: 1, start_price: 2000, current_price: 2000, status: 'registered', is_premium: false, thumbnail_path: '/img/noimage.png' },
-  { id: 14, item_number: 14, species_name: '白ラメ幹之 5匹セット', quantity: 5, start_price: 4000, current_price: 4000, status: 'unsold', is_premium: false, thumbnail_path: '/img/noimage.png' },
+  { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 200, current_price: 350, status: 'live', is_premium: false, thumbnail_path: '/img/medaka/紅白ラメ.jpg', inspection_info: '体長3cm前後、発色良好' },
+  { id: 2, item_number: 2, species_name: '幹之フルボディ 5匹セット', quantity: 5, start_price: 300, current_price: 300, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', inspection_info: 'フルボディ確認済み' },
+  { id: 3, item_number: 3, species_name: '楊貴妃ダルマ', quantity: 1, start_price: 150, current_price: 150, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' },
+  { id: 4, item_number: 4, species_name: '三色ラメ 3匹セット', quantity: 3, start_price: 400, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/三色ラメ.jpeg', inspection_info: '三色バランス良好' },
+  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 600, current_price: 800, status: 'live', is_premium: true, thumbnail_path: '/img/medaka/オロチ.jpg', inspection_info: '漆黒度S級' },
+  { id: 6, item_number: 6, species_name: '夜桜ゴールド', quantity: 1, start_price: 350, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/夜桜ゴールド.jpg' },
+  { id: 7, item_number: 7, species_name: '煌 (きらめき) 3匹セット', quantity: 3, start_price: 500, current_price: 850, status: 'sold', is_premium: true, thumbnail_path: '/img/medaka/01.png', inspection_info: 'ラメ数100以上' },
+  { id: 8, item_number: 8, species_name: 'サファイア ペア', quantity: 2, start_price: 800, current_price: 1200, status: 'sold', is_premium: true, thumbnail_path: '/img/medaka/02.png' },
+  { id: 9, item_number: 9, species_name: 'ブラックダイヤ', quantity: 1, start_price: 450, current_price: 450, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/03.png', inspection_info: '体外光あり' },
+  { id: 10, item_number: 10, species_name: '松井ヒレ長 ペア', quantity: 2, start_price: 300, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/04.png' },
+  { id: 11, item_number: 11, species_name: '女雛 3匹セット', quantity: 3, start_price: 250, current_price: 250, status: 'unsold', is_premium: false, thumbnail_path: '/img/medaka/05.png' },
+  { id: 12, item_number: 12, species_name: 'ユリシス ペア', quantity: 2, start_price: 700, current_price: 1050, status: 'sold', is_premium: true, thumbnail_path: '/img/medaka/06.png', inspection_info: '青体外光確認済み' },
+  { id: 13, item_number: 13, species_name: '琥珀透明鱗', quantity: 1, start_price: 200, current_price: 200, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/01.png' },
+  { id: 14, item_number: 14, species_name: '白ラメ幹之 5匹セット', quantity: 5, start_price: 400, current_price: 400, status: 'unsold', is_premium: false, thumbnail_path: '/img/medaka/幹之フルボディ.jpg' },
 ];
 
 // Lane assignment: items 1-5 = lane1, items 6-10 = lane2, items 11-14 = lane3
@@ -1927,32 +1927,40 @@ export default function Presentation() {
 
         {/* LIVE AUCTION PAGE (realistic simulation) */}
         {currentPage === 'live' && (
-          <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)' }}>
-            {/* Live header */}
-            <Box sx={{ background: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)', color: 'white', py: 2, px: 2 }}>
+          <Box sx={{ bgcolor: 'grey.100', minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
+            {/* Live header — matches real AuctionHeader component */}
+            <Paper sx={{ p: 2, mb: 2 }}>
               <Container maxWidth="xl">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                  <Box sx={{
-                    display: 'inline-flex', alignItems: 'center', gap: 0.75,
-                    bgcolor: 'rgba(255,255,255,0.2)', px: 1.5, py: 0.5, borderRadius: 1,
-                    fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.05em',
-                    animation: 'livePulse2 2s infinite',
-                    '@keyframes livePulse2': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.6 } },
-                  }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'white' }} />
-                    LIVE
+                <Box sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: { xs: 1.5, sm: 0 },
+                }}>
+                  <Box sx={{ textAlign: { xs: 'center', sm: 'left' }, width: { xs: '100%', sm: 'auto' } }}>
+                    <Typography variant="h5" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
+                      2026年春季メダカオークション
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {lanes.filter(l => l.status === 'active').length}/{lanes.length}レーン進行中
+                    </Typography>
                   </Box>
-                  <Typography variant="h5" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    2026年春季メダカオークション
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'center', sm: 'flex-end' } }}>
+                    <Button size="small" variant="outlined" onClick={() => handleNavigate('items')}
+                      sx={{ fontSize: '0.75rem' }}>
+                      出品一覧
+                    </Button>
+                    <Chip
+                      label="リアルタイム接続中"
+                      color="success"
+                      size="small"
+                    />
+                    <Chip label="開催中" color="success" icon={<PlayArrowIcon />} size="small" />
+                  </Box>
                 </Box>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                  {wonItems.length > 0 ? `落札: ${wonItems.length}件 | 合計: ¥${wonTotal.toLocaleString()}` : 'リアルタイムで入札が進行中です'}
-                </Typography>
               </Container>
-            </Box>
+            </Paper>
 
-            <Container maxWidth="xl" sx={{ py: 3 }}>
+            <Container maxWidth="xl" sx={{ py: 2 }}>
               {/* Lane grid */}
               <Grid container spacing={2}>
                 {lanes.map(lane => (

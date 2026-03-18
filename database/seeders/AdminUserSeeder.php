@@ -25,13 +25,25 @@ class AdminUserSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        // admin ロールを付与
+        // admin, seller, participant 全ロールを付与（ロール切り替え可能にするため）
         $adminRole = Role::where('name', 'admin')->first();
+        $sellerRoleForAdmin = Role::where('name', 'seller')->first();
+        $participantRoleForAdmin = Role::where('name', 'participant')->first();
         $admin->roles()->attach($adminRole->id, [
             'assigned_at' => now(),
         ]);
+        if ($sellerRoleForAdmin) {
+            $admin->roles()->attach($sellerRoleForAdmin->id, [
+                'assigned_at' => now(),
+            ]);
+        }
+        if ($participantRoleForAdmin) {
+            $admin->roles()->attach($participantRoleForAdmin->id, [
+                'assigned_at' => now(),
+            ]);
+        }
 
-        $this->command->info('管理者アカウントを作成しました。');
+        $this->command->info('管理者アカウントを作成しました（全ロール付与）。');
         $this->command->info('メール: admin@example.com');
         $this->command->info('パスワード: password');
 

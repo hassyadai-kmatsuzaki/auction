@@ -52,9 +52,9 @@ const makeLane = (id: number, num: number, name: string, item: LaneItem): LiveLa
 });
 
 const INITIAL_ITEMS: LaneItem[] = [
-  makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 3000, quantity: 2, seller_name: 'デモ出品者A' }),
-  makeLaneItem({ id: 2, species_name: '幹之フルボディ 5匹セット', current_price: 5000, quantity: 5, is_premium: true, seller_name: 'デモ出品者B' }),
-  makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 2000, quantity: 1, seller_name: 'デモ出品者C' }),
+  makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'デモ出品者A', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
+  makeLaneItem({ id: 2, species_name: '幹之フルボディ 5匹セット', current_price: 500, quantity: 5, is_premium: true, seller_name: 'デモ出品者B', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
+  makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 200, quantity: 1, seller_name: 'デモ出品者C', thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' }),
 ];
 
 const INITIAL_LANES: LiveLane[] = [
@@ -64,9 +64,9 @@ const INITIAL_LANES: LiveLane[] = [
 ];
 
 const INITIAL_UPCOMING: (UpcomingItem & { laneNumber: number })[] = [
-  { id: 10, item_number: 4, species_name: '三色ラメ', start_price: 4000, thumbnail_path: '/img/noimage.png', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
-  { id: 11, item_number: 5, species_name: 'オロチ ペア', start_price: 6000, thumbnail_path: '/img/noimage.png', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
-  { id: 12, item_number: 6, species_name: '夜桜ゴールド', start_price: 3500, thumbnail_path: '/img/noimage.png', is_premium: false, is_favorited: false, quantity: 1, laneNumber: 3 },
+  { id: 10, item_number: 4, species_name: '三色ラメ', start_price: 400, thumbnail_path: '/img/medaka/三色ラメ.jpeg', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
+  { id: 11, item_number: 5, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
+  { id: 12, item_number: 6, species_name: '夜桜ゴールド', start_price: 350, thumbnail_path: '/img/medaka/夜桜ゴールド.jpg', is_premium: false, is_favorited: false, quantity: 1, laneNumber: 3 },
 ];
 
 interface WonEntry {
@@ -285,7 +285,7 @@ export default function Demo() {
       updateLaneItem(laneId, () => makeLaneItem({
         id: 7,
         species_name: '三色ラメ 新着',
-        current_price: 4500,
+        current_price: 450,
         quantity: 3,
         phase: 'pre_bid',
         pre_bid_remaining_seconds: 5,
