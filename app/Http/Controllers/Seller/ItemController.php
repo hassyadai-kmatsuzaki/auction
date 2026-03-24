@@ -112,7 +112,7 @@ class ItemController extends Controller
      */
     public function getAvailableAuctions()
     {
-        $auctions = Auction::whereIn('status', ['preparing', 'scheduled'])
+        $auctions = Auction::where('status', 'scheduled')
             ->where(function ($query) {
                 $query->whereNull('upload_deadline')
                       ->orWhere('upload_deadline', '>', now());
@@ -170,7 +170,7 @@ class ItemController extends Controller
         // オークションの確認
         $auction = Auction::find($request->auction_id);
         
-        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+        if ($auction->status !== 'scheduled') {
             return response()->json([
                 'success' => false,
                 'message' => 'このオークションは出品受付を終了しています。',

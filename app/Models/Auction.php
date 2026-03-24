@@ -417,10 +417,10 @@ class Auction extends BaseModel
             $query->whereDate('event_date', '<=', $filters['date_to']);
         }
 
-        // ソート
+        // ソート（同一値でのページネーション不安定を防ぐため id で二次ソート）
         $sortBy = $filters['sort_by'] ?? 'event_date';
         $sortOrder = $filters['sort_order'] ?? 'desc';
-        $query->orderBy($sortBy, $sortOrder);
+        $query->orderBy($sortBy, $sortOrder)->orderBy('id', 'desc');
 
         return $query;
     }

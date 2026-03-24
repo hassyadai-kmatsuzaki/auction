@@ -98,7 +98,7 @@ const makeLane = (id: number, num: number, name: string, item: LaneItem): LiveLa
 
 const INITIAL_ITEMS: LaneItem[] = [
   makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'ブリーダーA', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
-  makeLaneItem({ id: 2, species_name: '幹之フルボディ 5匹セット', current_price: 500, quantity: 5, is_premium: true, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
+  makeLaneItem({ id: 2, species_name: '幹之フルボディ', current_price: 500, quantity: 5, is_premium: true, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
   makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 200, quantity: 1, seller_name: 'ブリーダーC', thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' }),
 ];
 
@@ -180,7 +180,7 @@ const MOCK_WON_ITEMS: MockWonItem[] = [
   },
   {
     id: 2,
-    item: { id: 2, item_number: 28, species_name: '幹之フルボディ 5匹セット', quantity: 5, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    item: { id: 2, item_number: 28, species_name: '幹之フルボディ', quantity: 5, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
     winning_price: 1200, quantity: 5, total_amount: 6600, commission_amount: 600,
     payment_status: 'confirmed', delivery_status: 'completed',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', shipped_at: '2026-03-08',
@@ -204,7 +204,7 @@ const MOCK_WON_ITEMS: MockWonItem[] = [
 // 3 lanes x 4+ items each = 14 items
 const MOCK_ITEMS: ItemData[] = [
   { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 200, current_price: 350, status: 'live', is_premium: false, thumbnail_path: '/img/medaka/紅白ラメ.jpg', inspection_info: '体長3cm前後、発色良好' },
-  { id: 2, item_number: 2, species_name: '幹之フルボディ 5匹セット', quantity: 5, start_price: 300, current_price: 300, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', inspection_info: 'フルボディ確認済み' },
+  { id: 2, item_number: 2, species_name: '幹之フルボディ', quantity: 5, start_price: 300, current_price: 300, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', inspection_info: 'フルボディ確認済み' },
   { id: 3, item_number: 3, species_name: '楊貴妃ダルマ', quantity: 1, start_price: 150, current_price: 150, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' },
   { id: 4, item_number: 4, species_name: '三色ラメ 3匹セット', quantity: 3, start_price: 400, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/三色ラメ.jpeg', inspection_info: '三色バランス良好' },
   { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 600, current_price: 800, status: 'live', is_premium: true, thumbnail_path: '/img/medaka/オロチ.jpg', inspection_info: '漆黒度S級' },

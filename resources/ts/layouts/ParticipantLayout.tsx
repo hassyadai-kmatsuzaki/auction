@@ -43,6 +43,11 @@ export default function ParticipantLayout() {
   const [liveAuction, setLiveAuction] = useState<Auction | null>(null);
   const [scheduledAuction, setScheduledAuction] = useState<Auction | null>(null);
 
+  // ページ遷移時にサイドバーを閉じる
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
   useEffect(() => {
     const fetchAuctions = async () => {
       try {
@@ -93,7 +98,7 @@ export default function ParticipantLayout() {
               component="img"
               src="/img/logo.png"
               alt="MEDAKA AUCTION PORT"
-              onClick={() => navigate('/participant/home')}
+              onClick={() => { setDrawerOpen(false); navigate('/participant/home'); }}
               sx={{
                 height: 48,
                 width: '100%',

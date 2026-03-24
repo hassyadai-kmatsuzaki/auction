@@ -13,6 +13,7 @@ use App\Mail\SellerAuctionStartMail;
 use App\Mail\SellerPaymentReceivedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
+use App\Jobs\SendLineNotificationJob;
 use App\Models\Auction;
 use App\Models\SellerProfile;
 use App\Models\User;
@@ -29,11 +30,9 @@ class NotificationService
     private function sendLine(int $userId, string $type, string $text): void
     {
         try {
-            $lineService = app(LineService::class);
-            $sent = $lineService->notify($userId, $type, $text);
-            Log::info("LINE notification: type={$type}, user={$userId}, sent=" . ($sent ? 'true' : 'false'));
+            SendLineNotificationJob::dispatch($userId, $type, $text);
         } catch (\Exception $e) {
-            Log::warning("LINE notification failed: {$type} user={$userId} - " . $e->getMessage());
+            Log::warning("LINE notification dispatch failed: {$type} user={$userId} - " . $e->getMessage());
         }
     }
 
@@ -130,7 +129,7 @@ class NotificationService
     {
         try {
             $user = User::find($userId);
-            if ($user && $user->email) {
+            if ($user && $user->email && $this->shouldSendParticipantNotification($user, 'email_bid_limit_reached')) {
                 Mail::to($user->email)->queue(new BidLimitReachedMail(
                     $speciesName, $limitPrice, $currentPrice, $user->name ?? ''
                 ));
@@ -214,7 +213,28 @@ class NotificationService
         return $sentCount;
     }
 
-    /** ⑦ 入金催促通知（参加者向け） — 呼び出し元で期限前に実行する */
+    /** ⑦ お気に入り順番接近通知（参加者向け） */
+    public function sendFavoriteApproachingNotification(int $userId, string $speciesName, int $aheadCount, string $laneName, string $auctionTitle): void
+    {
+        try {
+            $user = User::find($userId);
+            if ($user && $user->email && $this->shouldSendParticipantNotification($user, 'email_auction_start')) {
+                Mail::to($user->email)->queue(new FavoriteApproachingMail(
+                    $speciesName, $aheadCount, $laneName, $auctionTitle, $user->name ?? ''
+                ));
+            }
+        } catch (\Exception $e) {
+            Log::warning("Favorite approaching mail error: user={$userId} - " . $e->getMessage());
+        }
+
+        $this->sendLine($userId, 'favorite_approaching',
+            "⏰ お気に入りの{$speciesName}の出番まであと{$aheadCount}つです！\n"
+            . "{$laneName} / {$auctionTitle}\n"
+            . "準備してください！"
+        );
+    }
+
+    /** ⑧ 入金催促通知（参加者向け） — 呼び出し元で期限前に実行する */
     public function sendPaymentReminderNotification(WonItem $wonItem, string $urgency = '24時間前'): void
     {
         try {

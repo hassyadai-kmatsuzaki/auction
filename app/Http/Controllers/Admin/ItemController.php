@@ -12,6 +12,7 @@ use App\Services\ItemImportService;
 use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -292,6 +293,8 @@ class ItemController extends Controller
             ], 422);
         }
         
+        $oldStatus = $item->status;
+
         $item->update($request->only([
             'species_name',
             'quantity',
@@ -307,11 +310,16 @@ class ItemController extends Controller
             'unsold_action',
             'status',
         ]));
-        
+
         // 開始価格が変更された場合は現在価格も更新
         if ($request->has('start_price')) {
             $item->current_price = $request->start_price;
             $item->save();
+        }
+
+        // ステータスが registered 以外に変更された場合はレーンから除外
+        if ($request->has('status') && $item->status !== 'registered') {
+            $item->lanes()->detach();
         }
         
         return response()->json([
@@ -522,6 +530,11 @@ class ItemController extends Controller
 
         $item->update(['status' => $request->input('status')]);
 
+        // ステータスが registered 以外に変更された場合はレーンから除外
+        if ($item->status !== 'registered') {
+            $item->lanes()->detach();
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'ステータスを更新しました。',
@@ -554,11 +567,18 @@ class ItemController extends Controller
         $itemIds = $request->input('item_ids');
         $status = $request->input('status');
         
+        // ステータスが registered 以外の場合、対象アイテムをレーンから除外
+        if ($status !== 'registered') {
+            DB::table('lane_items')
+                ->whereIn('item_id', $itemIds)
+                ->delete();
+        }
+
         $updated = Item::where('auction_id', $auctionId)
             ->whereIn('id', $itemIds)
             ->whereNotIn('status', ['live', 'sold'])
             ->update(['status' => $status]);
-        
+
         return response()->json([
             'success' => true,
             'message' => "{$updated}件の生体のステータスを更新しました。",

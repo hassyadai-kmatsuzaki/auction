@@ -2,15 +2,12 @@
 
 namespace App\Actions\Line;
 
-use App\Mail\FavoriteApproachingMail;
 use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
-use App\Models\User;
-use App\Services\LineService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * お気に入り順番接近通知
@@ -52,6 +49,8 @@ class NotifyFavoriteApproachingAction
                 ->with('item')
                 ->get();
 
+            $notificationService = app(NotificationService::class);
+
             foreach ($favorites as $favorite) {
                 $item = $favorite->item;
                 if (!$item) continue;
@@ -67,32 +66,18 @@ class NotifyFavoriteApproachingAction
                     ->where('items.status', 'registered')
                     ->count();
 
-                $ahead = $remainingCount + 1; // 現在からの距離
+                $ahead = $remainingCount + 1;
 
-                $text = "⏰ お気に入りの{$item->species_name}の出番まであと{$ahead}つです！\n"
-                    . "レーン{$lane->lane_number} / {$lane->auction->title}\n"
-                    . "準備してください！";
-
-                // メール通知
                 try {
-                    $user = User::find($favorite->user_id);
-                    if ($user && $user->email) {
-                        Mail::to($user->email)->queue(new FavoriteApproachingMail(
-                            $item->species_name, $ahead,
-                            "レーン{$lane->lane_number}",
-                            $lane->auction->title,
-                            $user->name ?? ''
-                        ));
-                    }
-                } catch (\Exception $mailErr) {
-                    Log::warning("Favorite mail error: " . $mailErr->getMessage());
-                }
-
-                // LINE通知
-                try {
-                    app(LineService::class)->notify($favorite->user_id, 'favorite_approaching', $text);
-                } catch (\Exception $lineErr) {
-                    Log::warning("Favorite LINE error: " . $lineErr->getMessage());
+                    $notificationService->sendFavoriteApproachingNotification(
+                        $favorite->user_id,
+                        $item->species_name,
+                        $ahead,
+                        "レーン{$lane->lane_number}",
+                        $lane->auction->title
+                    );
+                } catch (\Exception $e) {
+                    Log::warning("Favorite notification error: user={$favorite->user_id} - " . $e->getMessage());
                 }
             }
 

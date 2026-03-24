@@ -53,7 +53,7 @@ const makeLane = (id: number, num: number, name: string, item: LaneItem): LiveLa
 
 const INITIAL_ITEMS: LaneItem[] = [
   makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'デモ出品者A', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
-  makeLaneItem({ id: 2, species_name: '幹之フルボディ 5匹セット', current_price: 500, quantity: 5, is_premium: true, seller_name: 'デモ出品者B', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
+  makeLaneItem({ id: 2, species_name: '幹之フルボディ', current_price: 500, quantity: 5, is_premium: true, seller_name: 'デモ出品者B', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
   makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 200, quantity: 1, seller_name: 'デモ出品者C', thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' }),
 ];
 
@@ -648,12 +648,14 @@ export default function Demo() {
                 flexShrink: 0, width: 150, borderRadius: 1.5,
                 border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'background.paper',
               }}>
-                <Box sx={{
-                  width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
-                </Box>
+                <Box
+                  component="img"
+                  src={item.thumbnail_path}
+                  alt={item.species_name}
+                  sx={{
+                    width: '100%', aspectRatio: '3/2', objectFit: 'cover', bgcolor: 'grey.100',
+                  }}
+                />
                 <Box sx={{ p: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
                     <Chip label={`L${item.laneNumber}`} size="small"

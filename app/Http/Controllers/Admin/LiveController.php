@@ -373,46 +373,34 @@ class LiveController extends Controller
      */
     private function assignItemsToLanes(Auction $auction): void
     {
-        // プレミアム生体を先に、その後に通常生体を取得
-        $premiumItems = $auction->items()
-            ->where('status', 'registered')
-            ->where('is_premium', true)
-            ->orderBy('item_number')
-            ->get();
-
-        $normalItems = $auction->items()
-            ->where('status', 'registered')
-            ->where(function ($q) {
-                $q->where('is_premium', false)
-                  ->orWhereNull('is_premium');
-            })
-            ->orderBy('item_number')
-            ->get();
-
-        // プレミアム生体を先に、通常生体を後ろに結合
-        $items = $premiumItems->concat($normalItems);
-
         $lanes = $auction->lanes()->orderBy('lane_number')->get();
         $laneCount = $lanes->count();
+        if ($laneCount === 0) return;
 
-        if ($laneCount === 0) {
-            return;
-        }
+        // 既にいずれかのレーンに割り当て済みのアイテムを除外
+        $unassigned = $auction->items()
+            ->where('status', 'registered')
+            ->whereNotIn('id', function ($q) use ($auction) {
+                $q->select('item_id')->from('lane_items')
+                  ->join('lanes', 'lane_items.lane_id', '=', 'lanes.id')
+                  ->where('lanes.auction_id', $auction->id);
+            })
+            ->orderByDesc('is_premium')  // プレミアム生体を優先
+            ->orderBy('item_number')
+            ->get();
 
-        $itemIndex = 0;
-        foreach ($items as $item) {
-            $laneIndex = $itemIndex % $laneCount;
-            $lane = $lanes[$laneIndex];
-            $sequence = floor($itemIndex / $laneCount) + 1;
+        if ($unassigned->isEmpty()) return;
 
-            // すでに割り当てられていない場合のみ
-            if (!$lane->items()->where('item_id', $item->id)->exists()) {
-                $lane->items()->attach($item->id, [
-                    'sequence_order' => $sequence,
-                ]);
-            }
-
-            $itemIndex++;
+        foreach ($unassigned as $index => $item) {
+            $lane = $lanes[$index % $laneCount];
+            $maxOrder = \DB::table('lane_items')->where('lane_id', $lane->id)->max('sequence_order') ?? 0;
+            \DB::table('lane_items')->insert([
+                'lane_id'        => $lane->id,
+                'item_id'        => $item->id,
+                'sequence_order' => $maxOrder + 1,
+                'created_at'     => now(),
+                'updated_at'     => now(),
+            ]);
         }
     }
 
