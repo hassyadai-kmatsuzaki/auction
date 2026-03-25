@@ -124,24 +124,25 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         </Box>
       )}
 
-      {/* レーン番号バッジ */}
+      {/* レーン番号バッジ + プレミアムバッジ */}
       <Box
         sx={{
           position: 'absolute', top: 8, left: 8,
-          bgcolor: 'primary.main', color: 'white',
-          px: 2, py: 0.5, borderRadius: 1, fontWeight: 'bold', zIndex: 1, fontSize: '0.85rem',
+          display: 'flex', alignItems: 'center', gap: 0.5, zIndex: 1,
         }}
       >
-        {lane.lane_name ?? `レーン ${lane.lane_number}`}
+        <Box
+          sx={{
+            bgcolor: 'primary.main', color: 'white',
+            px: 2, py: 0.5, borderRadius: 1, fontWeight: 'bold', fontSize: '0.85rem',
+          }}
+        >
+          {lane.lane_name ?? `レーン ${lane.lane_number}`}
+        </Box>
+        {item.is_premium && (
+          <Chip label="プレミアム" color="warning" size="small" />
+        )}
       </Box>
-
-      {/* プレミアムバッジ */}
-      {item.is_premium && (
-        <Chip
-          label="プレミアム" color="warning" size="small"
-          sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
-        />
-      )}
 
       <CardMedia
         component="img"

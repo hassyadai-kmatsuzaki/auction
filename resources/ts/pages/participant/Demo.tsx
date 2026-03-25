@@ -149,6 +149,64 @@ export default function Demo() {
 
   useEffect(() => () => stopAllTimers(), [stopAllTimers]);
 
+  // ─── Simulation helpers (handleBidToggle より前に定義が必要) ───
+
+  /** STEP5用: 相手が入札 → フリーズ3秒 → 入札解除 のサイクル */
+  const simulateBattleCycle = useCallback((laneId: number): Promise<void> => {
+    return new Promise(resolve => {
+      stopTimer(laneId);
+      updateLaneItem(laneId, item => {
+        const increment = Math.max(100, Math.round(item.current_price * 0.1));
+        return {
+          ...item,
+          phase: 'freeze',
+          freeze_remaining_seconds: 3,
+          freeze_countdown_seconds: 3,
+          current_price: item.current_price + increment,
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+        };
+      });
+      notify('他の参加者が入札！フリーズ中...', 'warning');
+
+      let remaining = 3;
+      const freezeTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(freezeTimer);
+          updateLaneItem(laneId, item => ({
+            ...item,
+            phase: 'bidding',
+            freeze_remaining_seconds: 0,
+            my_bid_status: 'inactive',
+            active_bidders_count: Math.max(1, item.active_bidders_count),
+          }));
+          startCountdown(laneId, 15);
+          notify('入札が解除されました。再度入札してください！', 'info');
+          resolve();
+        } else {
+          updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+        }
+      }, 1000);
+    });
+  }, [stopTimer, updateLaneItem, startCountdown, notify]);
+
+  /** STEP6用: フリーズ状態にして解除しない（説明用） */
+  const simulateFreezeHold = useCallback((laneId: number) => {
+    stopTimer(laneId);
+    updateLaneItem(laneId, item => {
+      const increment = Math.max(100, Math.round(item.current_price * 0.1));
+      return {
+        ...item,
+        phase: 'freeze',
+        freeze_remaining_seconds: 3,
+        freeze_countdown_seconds: 3,
+        current_price: item.current_price + increment,
+        active_bidders_count: Math.max(2, item.active_bidders_count),
+      };
+    });
+    notify('フリーズ中！この状態では入札ボタンが無効です', 'warning');
+  }, [stopTimer, updateLaneItem, notify]);
+
   // ─── Lane Actions ───
 
   const handleBidToggle = useCallback((itemId: number, currentStatus: 'active' | 'inactive' | null) => {
@@ -184,8 +242,13 @@ export default function Demo() {
       if (tourActive && activeStep === 2) {
         setTimeout(() => setActiveStep(3), 1200);
       }
+
+      // STEP5: 入札合戦 — ユーザーが入札したら相手も入札し返す
+      if (tourActive && activeStep === 4) {
+        setTimeout(() => simulateBattleCycle(lane.lane_id), 2000);
+      }
     }
-  }, [lanes, notify, updateLaneItem, startCountdown, tourActive, activeStep]);
+  }, [lanes, notify, updateLaneItem, startCountdown, tourActive, activeStep, simulateBattleCycle]);
 
   // ─── Simulation helpers ───
 
@@ -401,78 +464,97 @@ export default function Demo() {
   // ─── Tour step definitions ───
 
   const tourSteps: TourStep[] = [
+    // STEP1: ようこそ
     {
       targetRef: headerRef,
       title: 'オークション体験デモへようこそ！',
       description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。',
       placement: 'bottom',
     },
+    // STEP2: レーンカードの見方
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: 'レーンカードの見方',
-      description: '各レーンには品種名、現在価格、カウントダウンが表示されています。3つのレーンが同時に進行するのがこのオークションの特徴です。',
-      placement: 'right',
+      description: '各レーンには品種名、現在価格、カウントダウンが表示されています。最大3つのレーンが同時に進行するのがこのオークションの特徴です。',
+      placement: 'bottom',
     },
+    // STEP3: 入札してみよう
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '入札してみよう！',
       description: 'レーン1の「入札する」ボタンをタップしてみてください！カードが金色に光り「最高入札者」バッジが表示されます。',
-      placement: 'right',
+      placement: 'bottom',
       waitForAction: 'レーン1の「入札する」をタップ',
     },
+    // STEP4: 他の参加者が入札
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '他の参加者が入札してきた！',
-      description: '他の参加者がレーン1に入札してきます。フリーズ（誤タップ防止）が3秒入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。',
-      placement: 'right',
+      description: '他の参加者がレーン1に入札してきます。フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。',
+      placement: 'bottom',
       autoAction: () => { simulateOpponentBid(1); },
       autoActionDelay: 4500,
     },
+    // STEP5: 入札合戦（インタラクティブ）
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
-      title: '入札合戦！連続入札が発生',
-      description: '複数の参加者が連続で入札してきます。入札のたびに短いフリーズが発生し、価格が競り上がっていきます。',
-      placement: 'right',
-      autoAction: () => { simulateMultipleOpponentBids(1, 3); },
-      autoActionDelay: 5000,
+      title: '入札合戦！',
+      description: '相手が入札してきました！フリーズ後に入札が解除されます。再度「入札する」ボタンを押すと、相手も入札し返してきます。何度でも繰り返せます。準備ができたら「次へ」で先に進みましょう。',
+      placement: 'bottom',
+      autoAction: () => { simulateBattleCycle(1); },
+      autoActionDelay: 4500,
     },
+    // STEP6: フリーズ説明（フリーズ状態で固定）
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: 'フリーズ（誤タップ防止）',
-      description: '価格上昇直後、数秒間入札ボタンが無効になる「フリーズ」状態になります。誤タップを防ぐ安全機能です。',
-      placement: 'right',
-      autoAction: () => { simulateFreeze(1); },
-      autoActionDelay: 4000,
+      description: '価格上昇直後、数秒間入札ボタンが無効になる「フリーズ」状態です。誤タップを防ぐ安全機能で、フリーズ中は入札できません。',
+      placement: 'bottom',
+      autoAction: () => { simulateFreezeHold(1); },
+      autoActionDelay: 500,
     },
+    // STEP7: 待機時間
     {
       targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
       title: '新商品の入札開始待機',
-      description: 'レーン3に新しい商品が来ました。入札開始まで数秒間の待機（プレビッド）フェーズがあります。',
+      description: 'レーン3に新しい商品が来ました。入札開始まで数秒間の待機時間があります。',
       placement: 'left',
       autoAction: () => { simulatePreBid(3); },
       autoActionDelay: 6000,
     },
+    // STEP8: 指値設定
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '指値（上限価格）を設定しよう',
       description: '指値を設定すると、価格がその金額に達したとき自動で入札がオフになります。レーン1の「上限設定」ボタンを押してみてください。',
-      placement: 'right',
+      placement: 'bottom',
       waitForAction: 'レーン1の「上限設定」をタップ',
     },
+    // STEP9: 指値発動
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '指値が発動！自動入札オフ',
       description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。',
-      placement: 'right',
+      placement: 'bottom',
       autoAction: () => { simulateLimitTrigger(); },
-      autoActionDelay: 3000,
+      autoActionDelay: 6000,
     },
+    // STEP10: 次の商品確認 + 指値・お気に入り説明
     {
       targetRef: upcomingRef,
       title: '次の商品を確認',
-      description: '下にスクロールすると「次の商品」を確認できます。お気に入り登録もできるので、気になる商品を事前にチェックしておきましょう。',
+      description: '下にスクロールすると「次の商品」を確認できます。気になる商品にお気に入り登録ができ、指値（上限価格）も商品がレーンに来た際にすぐ設定できます。まずはお気に入り登録を体験しましょう。',
       placement: 'top',
     },
+    // STEP11: お気に入り登録
+    {
+      targetRef: upcomingRef,
+      title: 'お気に入りを登録してみよう',
+      description: '次の商品一覧からハートアイコンをタップして、お気に入りに登録してみてください。お気に入りの商品がレーンに登場した際に通知を受け取れます。',
+      placement: 'top',
+      waitForAction: 'ハートアイコンをタップ',
+    },
+    // STEP12: 落札
     {
       targetRef: lane2Ref as React.RefObject<HTMLDivElement | null>,
       title: '落札の瞬間！',
@@ -484,6 +566,7 @@ export default function Demo() {
       },
       autoActionDelay: 4500,
     },
+    // STEP13: 完了
     {
       targetRef: wonTableRef,
       title: 'デモ完了！お疲れさまでした',
@@ -498,6 +581,12 @@ export default function Demo() {
     const nextStep = activeStep + 1;
     if (nextStep >= tourSteps.length) return;
 
+    // STEP6（フリーズ保持）から離れる際にフリーズ解除
+    if (activeStep === 5) {
+      updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+      startCountdown(1, 15);
+    }
+
     const step = tourSteps[nextStep];
     if (step.autoAction) {
       setIsAutoPlaying(true);
@@ -509,13 +598,18 @@ export default function Demo() {
     } else {
       setActiveStep(nextStep);
     }
-  }, [activeStep, tourSteps]);
+  }, [activeStep, tourSteps, updateLaneItem, startCountdown]);
 
   const handleTourPrev = useCallback(() => {
     if (activeStep > 0) {
+      // STEP6（フリーズ保持）から離れる際にフリーズ解除
+      if (activeStep === 5) {
+        updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+        startCountdown(1, 15);
+      }
       setActiveStep(activeStep - 1);
     }
-  }, [activeStep]);
+  }, [activeStep, updateLaneItem, startCountdown]);
 
   const handleTourClose = useCallback(() => {
     setTourActive(false);
@@ -545,6 +639,10 @@ export default function Demo() {
 
   const toggleFavorite = (itemId: number) => {
     setUpcoming(prev => prev.map(u => u.id === itemId ? { ...u, is_favorited: !u.is_favorited } : u));
+    // STEP11: お気に入り登録ステップ
+    if (tourActive && activeStep === 10) {
+      setTimeout(() => setActiveStep(11), 800);
+    }
   };
 
   const wonTotal = wonItems.reduce((sum, w) => sum + w.total_amount, 0);

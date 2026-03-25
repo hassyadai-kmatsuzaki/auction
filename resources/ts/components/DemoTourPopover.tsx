@@ -573,11 +573,14 @@ export const DemoTourPopover: React.FC<Props> = ({
           }}
         />
 
+        {/* Content wrapper with overflow hidden for progress bar clipping */}
+        <Box sx={{ overflow: 'hidden', borderRadius: 'inherit' }}>
+
         {/* Progress bar */}
         <LinearProgress
           variant="determinate"
           value={progressValue}
-          sx={{ borderRadius: '12px 12px 0 0', height: 4, bgcolor: 'grey.100' }}
+          sx={{ height: 4, bgcolor: 'grey.100' }}
         />
 
         <Box sx={{ p: 2.5, position: 'relative' }}>
@@ -624,6 +627,7 @@ export const DemoTourPopover: React.FC<Props> = ({
 
           {navButtons}
         </Box>
+        </Box>{/* /Content wrapper */}
       </Paper>
     </>
   );
