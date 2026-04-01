@@ -23,6 +23,9 @@ class WonItem extends BaseModel
         'commission_rate',
         'commission_amount',
         'seller_amount',
+        // 配送料金
+        'shipping_fee',
+        'shipping_breakdown',
         // 支払い情報
         'payment_status',
         'payment_method',
@@ -58,6 +61,8 @@ class WonItem extends BaseModel
      * @var array<string, string>
      */
     protected $casts = [
+        'shipping_fee' => 'integer',
+        'shipping_breakdown' => 'array',
         'winning_price' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'commission_rate' => 'decimal:2',

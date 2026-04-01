@@ -28,6 +28,9 @@ use App\Http\Controllers\Participant\SettingsController as ParticipantSettingsCo
 use App\Http\Controllers\Participant\FavoriteController as ParticipantFavoriteController;
 use App\Http\Controllers\NotificationTestController;
 use App\Http\Controllers\ManualController;
+use App\Http\Controllers\Api\ShippingCalculateController;
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Admin\ShippingRateController;
 
 /*
 |--------------------------------------------------------------------------
@@ -64,11 +67,16 @@ Route::prefix('auth')->group(function () {
     Route::post('/set-password', [SetPasswordController::class, 'setPassword']);
 });
 
+// 配送料金計算API（認証必須）
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/shipping/calculate', [ShippingCalculateController::class, 'calculate']);
+});
+
 // 認証API（認証必須）
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [LoginController::class, 'logout']);
     Route::get('/auth/me', [LoginController::class, 'me']);
-    
+
     // マニュアルAPI（全ロール共通）
     Route::get('/manuals', [ManualController::class, 'index']);
     Route::get('/manuals/{id}', [ManualController::class, 'show']);
@@ -167,6 +175,12 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('won-items/{id}/ship', [AdminWonItemController::class, 'ship']);
     Route::post('won-items/{id}/complete', [AdminWonItemController::class, 'complete']);
     Route::patch('won-items/{id}/notes', [AdminWonItemController::class, 'updateNotes']);
+    Route::get('won-items/{id}/invoice', [InvoiceController::class, 'adminDownloadInvoice']);
+
+    // 配送マスタ管理
+    Route::get('shipping-master', [ShippingRateController::class, 'index']);
+    Route::put('shipping-master/rates', [ShippingRateController::class, 'updateRates']);
+    Route::put('shipping-master/packing-materials', [ShippingRateController::class, 'updatePackingMaterials']);
 });
 
 // ユーザーAPI（参加者・出品者共通）
@@ -230,6 +244,8 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
     Route::put('/won-items/{id}/address', [ParticipantWonItemController::class, 'updateAddress']);
+    Route::get('/won-items/{id}/invoice', [InvoiceController::class, 'downloadInvoice']);
+    Route::get('/won-items/{id}/receipt', [InvoiceController::class, 'downloadReceipt']);
     
     // お気に入り
     Route::get('/favorites', [ParticipantFavoriteController::class, 'index']);

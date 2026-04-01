@@ -20,7 +20,15 @@
 
 **手数料**: ¥{{ number_format($wonItem->commission_amount ?? 0) }}
 
+@if(($wonItem->shipping_fee ?? 0) > 0)
+**配送料金**: ¥{{ number_format($wonItem->shipping_fee) }}
+
+**合計金額**: ¥{{ number_format($wonItem->total_amount + $wonItem->shipping_fee) }}
+@else
 **合計金額**: ¥{{ number_format($wonItem->total_amount) }}
+
+※ 配送料金は配送先地域により異なります。配送先住所をご登録いただくと自動計算されます。
+@endif
 
 ---
 

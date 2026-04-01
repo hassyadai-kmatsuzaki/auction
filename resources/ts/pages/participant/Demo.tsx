@@ -100,6 +100,7 @@ export default function Demo() {
   const wonTableRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const allLanesRef = useRef<HTMLDivElement>(null);
+  const goToStepRef = useRef<(step: number) => void>(() => {});
 
   const notify = useCallback((message: string, severity: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -240,7 +241,7 @@ export default function Demo() {
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
 
       if (tourActive && activeStep === 2) {
-        setTimeout(() => setActiveStep(3), 1200);
+        setTimeout(() => goToStepRef.current(3), 1200);
       }
 
       // STEP5: 入札合戦 — ユーザーが入札したら相手も入札し返す
@@ -443,7 +444,10 @@ export default function Demo() {
     setLimitModalLaneId(null);
     notify(`上限価格を ¥${price.toLocaleString()} に設定しました`, 'success');
     if (tourActive && activeStep === 7) {
-      setTimeout(() => setActiveStep(8), 800);
+      setTimeout(() => goToStepRef.current(8), 800);
+    }
+    if (tourActive && activeStep === 12) {
+      setTimeout(() => goToStepRef.current(13), 800);
     }
   }, [limitModalLaneId, updateLaneItem, notify, tourActive, activeStep]);
 
@@ -462,6 +466,10 @@ export default function Demo() {
   });
 
   // ─── Tour step definitions ───
+  // ステップインデックス: 0=Welcome, 1=Lane説明, 2=入札(wait), 3=相手入札(auto),
+  // 4=入札合戦(auto), 5=フリーズ(auto/hold), 6=待機時間(auto), 7=指値設定(wait),
+  // 8=指値発動(auto), 9=次の商品説明, 10=お気に入り(wait), 11=新商品到着(auto),
+  // 12=次レーン指値(wait), 13=落札(auto), 14=完了
 
   const tourSteps: TourStep[] = [
     // STEP1: ようこそ
@@ -478,7 +486,7 @@ export default function Demo() {
       description: '各レーンには品種名、現在価格、カウントダウンが表示されています。最大3つのレーンが同時に進行するのがこのオークションの特徴です。',
       placement: 'bottom',
     },
-    // STEP3: 入札してみよう
+    // STEP3: 入札してみよう (index 2)
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '入札してみよう！',
@@ -486,7 +494,7 @@ export default function Demo() {
       placement: 'bottom',
       waitForAction: 'レーン1の「入札する」をタップ',
     },
-    // STEP4: 他の参加者が入札
+    // STEP4: 他の参加者が入札 (index 3)
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '他の参加者が入札してきた！',
@@ -495,7 +503,7 @@ export default function Demo() {
       autoAction: () => { simulateOpponentBid(1); },
       autoActionDelay: 4500,
     },
-    // STEP5: 入札合戦（インタラクティブ）
+    // STEP5: 入札合戦（インタラクティブ） (index 4)
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '入札合戦！',
@@ -504,7 +512,7 @@ export default function Demo() {
       autoAction: () => { simulateBattleCycle(1); },
       autoActionDelay: 4500,
     },
-    // STEP6: フリーズ説明（フリーズ状態で固定）
+    // STEP6: フリーズ説明（フリーズ状態で固定） (index 5)
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: 'フリーズ（誤タップ防止）',
@@ -513,7 +521,7 @@ export default function Demo() {
       autoAction: () => { simulateFreezeHold(1); },
       autoActionDelay: 500,
     },
-    // STEP7: 待機時間
+    // STEP7: 待機時間 (index 6)
     {
       targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
       title: '新商品の入札開始待機',
@@ -522,7 +530,7 @@ export default function Demo() {
       autoAction: () => { simulatePreBid(3); },
       autoActionDelay: 6000,
     },
-    // STEP8: 指値設定
+    // STEP8: 指値設定 (index 7)
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '指値（上限価格）を設定しよう',
@@ -530,7 +538,7 @@ export default function Demo() {
       placement: 'bottom',
       waitForAction: 'レーン1の「上限設定」をタップ',
     },
-    // STEP9: 指値発動
+    // STEP9: 指値発動 (index 8)
     {
       targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>,
       title: '指値が発動！自動入札オフ',
@@ -539,14 +547,14 @@ export default function Demo() {
       autoAction: () => { simulateLimitTrigger(); },
       autoActionDelay: 6000,
     },
-    // STEP10: 次の商品確認 + 指値・お気に入り説明
+    // STEP10: 次の商品確認 (index 9)
     {
       targetRef: upcomingRef,
       title: '次の商品を確認',
       description: '下にスクロールすると「次の商品」を確認できます。気になる商品にお気に入り登録ができ、指値（上限価格）も商品がレーンに来た際にすぐ設定できます。まずはお気に入り登録を体験しましょう。',
       placement: 'top',
     },
-    // STEP11: お気に入り登録
+    // STEP11: お気に入り登録 (index 10)
     {
       targetRef: upcomingRef,
       title: 'お気に入りを登録してみよう',
@@ -554,7 +562,42 @@ export default function Demo() {
       placement: 'top',
       waitForAction: 'ハートアイコンをタップ',
     },
-    // STEP12: 落札
+    // STEP12: 新商品到着 (index 11)
+    {
+      targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
+      title: '新商品に指値を設定しよう',
+      description: 'レーン3に新商品「夜桜ゴールド」が到着しました！商品がレーンに来たら、すぐに指値を設定できます。レーン3の「上限設定」ボタンを押してみてください。',
+      placement: 'left',
+      autoAction: () => {
+        // 次の商品リストから夜桜ゴールドをレーン3に移す
+        stopTimer(3);
+        updateLaneItem(3, () => makeLaneItem({
+          id: 12,
+          species_name: '夜桜ゴールド',
+          current_price: 350,
+          quantity: 1,
+          thumbnail_path: '/img/medaka/夜桜ゴールド.jpg',
+          phase: 'bidding',
+          countdown_seconds: 15,
+          my_bid_status: null,
+          active_bidders_count: 0,
+          seller_name: 'デモ出品者C',
+        }));
+        startCountdown(3, 15);
+        setUpcoming(prev => prev.filter(u => u.id !== 12));
+        notify('新商品「夜桜ゴールド」がレーン3に登場！', 'info');
+      },
+      autoActionDelay: 1500,
+    },
+    // STEP13: 次レーン指値設定 (index 12)
+    {
+      targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
+      title: '指値を設定してみよう',
+      description: 'レーン3の「上限設定」ボタンをタップして、指値を設定してみましょう。新しい商品が来たらすぐに予算管理できるのがポイントです。',
+      placement: 'left',
+      waitForAction: 'レーン3の「上限設定」をタップ',
+    },
+    // STEP14: 落札 (index 13)
     {
       targetRef: lane2Ref as React.RefObject<HTMLDivElement | null>,
       title: '落札の瞬間！',
@@ -566,7 +609,7 @@ export default function Demo() {
       },
       autoActionDelay: 4500,
     },
-    // STEP13: 完了
+    // STEP15: 完了 (index 14)
     {
       targetRef: wonTableRef,
       title: 'デモ完了！お疲れさまでした',
@@ -577,39 +620,39 @@ export default function Demo() {
 
   // ─── Tour navigation ───
 
-  const handleTourNext = useCallback(() => {
-    const nextStep = activeStep + 1;
-    if (nextStep >= tourSteps.length) return;
+  /** 指定ステップへ遷移（autoAction付きステップも正しく実行） */
+  const goToStep = useCallback((targetStep: number) => {
+    if (targetStep < 0 || targetStep >= tourSteps.length) return;
 
     // STEP6（フリーズ保持）から離れる際にフリーズ解除
-    if (activeStep === 5) {
+    if (activeStep === 5 && targetStep !== 5) {
       updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
       startCountdown(1, 15);
     }
 
-    const step = tourSteps[nextStep];
+    const step = tourSteps[targetStep];
     if (step.autoAction) {
       setIsAutoPlaying(true);
-      setActiveStep(nextStep);
+      setActiveStep(targetStep);
       step.autoAction();
-      setTimeout(() => {
-        setIsAutoPlaying(false);
-      }, step.autoActionDelay || 1500);
+      setTimeout(() => setIsAutoPlaying(false), step.autoActionDelay || 1500);
     } else {
-      setActiveStep(nextStep);
+      setActiveStep(targetStep);
     }
   }, [activeStep, tourSteps, updateLaneItem, startCountdown]);
 
+  // Keep ref in sync so earlier-defined callbacks can reach goToStep
+  goToStepRef.current = goToStep;
+
+  const handleTourNext = useCallback(() => {
+    goToStep(activeStep + 1);
+  }, [activeStep, goToStep]);
+
   const handleTourPrev = useCallback(() => {
     if (activeStep > 0) {
-      // STEP6（フリーズ保持）から離れる際にフリーズ解除
-      if (activeStep === 5) {
-        updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
-        startCountdown(1, 15);
-      }
-      setActiveStep(activeStep - 1);
+      goToStep(activeStep - 1);
     }
-  }, [activeStep, updateLaneItem, startCountdown]);
+  }, [activeStep, goToStep]);
 
   const handleTourClose = useCallback(() => {
     setTourActive(false);
@@ -641,7 +684,7 @@ export default function Demo() {
     setUpcoming(prev => prev.map(u => u.id === itemId ? { ...u, is_favorited: !u.is_favorited } : u));
     // STEP11: お気に入り登録ステップ
     if (tourActive && activeStep === 10) {
-      setTimeout(() => setActiveStep(11), 800);
+      setTimeout(() => goToStepRef.current(11), 800);
     }
   };
 

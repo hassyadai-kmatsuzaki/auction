@@ -34,6 +34,7 @@ import {
   OpenInNew as OpenInNewIcon,
   ContentCopy as CopyIcon,
   Edit as EditIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -57,6 +58,7 @@ interface WonItemData {
   quantity: number;
   total_amount: number;
   commission_amount: number;
+  shipping_fee: number;
   payment_status: 'pending' | 'paid' | 'confirmed' | 'refunded';
   payment_deadline?: string;
   delivery_status: 'pending' | 'preparing' | 'shipped' | 'completed' | 'cancelled';
@@ -263,9 +265,10 @@ export default function WonItems() {
     try {
       const response = await axios.put(`/api/participant/won-items/${editingItem.id}/address`, addressForm);
       if (response.data.success) {
+        const fee = response.data.data?.shipping_fee;
         setSnackbar({
           open: true,
-          message: '配送先を更新しました',
+          message: fee ? `配送先を更新しました（配送料金: ¥${Number(fee).toLocaleString()}）` : '配送先を更新しました',
           severity: 'success',
         });
         setEditAddressOpen(false);
@@ -477,8 +480,13 @@ export default function WonItems() {
                       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         手数料: ¥{Number(wonItem.commission_amount).toLocaleString()}
                       </Typography>
+                      {wonItem.shipping_fee > 0 && (
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          配送料金: ¥{Number(wonItem.shipping_fee).toLocaleString()}
+                        </Typography>
+                      )}
                       <Typography variant="h6" sx={{ color: '#059669', fontWeight: 700, mt: 0.5 }}>
-                        合計: ¥{Number(wonItem.total_amount).toLocaleString()}
+                        合計: ¥{(Number(wonItem.total_amount) + Number(wonItem.shipping_fee)).toLocaleString()}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -562,13 +570,51 @@ export default function WonItems() {
 
                   {/* アクションボタン */}
                   <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {wonItem.payment_status === 'pending' && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<DownloadIcon />}
+                      onClick={async () => {
+                        try {
+                          const res = await axios.get(`/api/participant/won-items/${wonItem.id}/invoice`, { responseType: 'blob' });
+                          const url = window.URL.createObjectURL(new Blob([res.data]));
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.setAttribute('download', `invoice_${wonItem.id}.pdf`);
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                          window.URL.revokeObjectURL(url);
+                        } catch {
+                          setSnackbar({ open: true, message: '請求書のダウンロードに失敗しました', severity: 'error' });
+                        }
+                      }}
+                    >
+                      請求書
+                    </Button>
+                    {['paid', 'confirmed'].includes(wonItem.payment_status) && (
                       <Button
-                        variant="contained"
-                        color="warning"
-                        startIcon={<ReceiptIcon />}
+                        variant="outlined"
+                        size="small"
+                        color="success"
+                        startIcon={<DownloadIcon />}
+                        onClick={async () => {
+                          try {
+                            const res = await axios.get(`/api/participant/won-items/${wonItem.id}/receipt`, { responseType: 'blob' });
+                            const url = window.URL.createObjectURL(new Blob([res.data]));
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.setAttribute('download', `receipt_${wonItem.id}.pdf`);
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                            window.URL.revokeObjectURL(url);
+                          } catch {
+                            setSnackbar({ open: true, message: '領収書のダウンロードに失敗しました', severity: 'error' });
+                          }
+                        }}
                       >
-                        請求書を確認・支払い
+                        領収書
                       </Button>
                     )}
                   </Box>

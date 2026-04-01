@@ -20,6 +20,10 @@
 
 **落札価格**: ¥{{ number_format($wonItem->winning_price) }}
 
+@if(($wonItem->shipping_fee ?? 0) > 0)
+**配送料金（買受者負担）**: ¥{{ number_format($wonItem->shipping_fee) }}
+@endif
+
 ---
 
 ## 買受者情報

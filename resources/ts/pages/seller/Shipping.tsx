@@ -58,6 +58,7 @@ interface ShippingItem {
   } | null;
   price: number;
   total_amount: number;
+  shipping_fee: number;
   payment_status: string;
   delivery_status: string;
   tracking_number?: string;
@@ -326,6 +327,11 @@ export default function SellerShipping() {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         ¥{Number(item.price).toLocaleString()}
                       </Typography>
+                      {(item.shipping_fee ?? 0) > 0 && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          配送料 ¥{Number(item.shipping_fee).toLocaleString()}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell align="center">
                       {getStatusChip(item.delivery_status)}

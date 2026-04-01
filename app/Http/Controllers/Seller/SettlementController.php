@@ -52,6 +52,12 @@ class SettlementController extends Controller
             $auction = Auction::find($row->auction_id);
             if (!$auction) continue;
 
+            // 配送料金を集計
+            $shippingFees = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+                ->where('items.seller_profile_id', $sellerProfileId)
+                ->where('items.auction_id', $row->auction_id)
+                ->sum('won_items.shipping_fee');
+
             // 精算ステータスを判定（オークション終了後1週間で精算完了と仮定）
             $auctionEndDate = $auction->event_date;
             $paymentDate = $auctionEndDate->copy()->addDays(7);
@@ -63,8 +69,7 @@ class SettlementController extends Controller
                 'auction_date' => $auction->event_date->format('Y-m-d'),
                 'total_sales' => (float) $row->total_sales,
                 'commission' => (float) $row->total_commission,
-                'shipping_fee' => 0, // 将来的に配送料を追加
-                'packing_fee' => 0, // 将来的に梱包料を追加
+                'shipping_fee' => (int) $shippingFees,
                 'net_amount' => (float) $row->total_net,
                 'status' => $status,
                 'paid_at' => $status === 'completed' ? $paymentDate->format('Y-m-d') : null,
@@ -143,6 +148,7 @@ class SettlementController extends Controller
         $totalSales = $wonItems->sum('total_amount');
         $totalCommission = $wonItems->sum('commission_amount');
         $totalNet = $wonItems->sum('seller_amount');
+        $totalShippingFee = $wonItems->sum('shipping_fee');
 
         // 精算ステータス
         $paymentDate = $auction->event_date->copy()->addDays(7);
@@ -157,8 +163,7 @@ class SettlementController extends Controller
                     'auction_date' => $auction->event_date->format('Y-m-d'),
                     'total_sales' => $totalSales,
                     'commission' => $totalCommission,
-                    'shipping_fee' => 0,
-                    'packing_fee' => 0,
+                    'shipping_fee' => (int) $totalShippingFee,
                     'net_amount' => $totalNet,
                     'status' => $status,
                     'paid_at' => $status === 'completed' ? $paymentDate->format('Y-m-d') : null,
@@ -175,6 +180,7 @@ class SettlementController extends Controller
                         ],
                         'buyer' => $wonItem->winner ? $wonItem->winner->name : '不明',
                         'winning_price' => $wonItem->winning_price,
+                        'shipping_fee' => $wonItem->shipping_fee,
                         'commission' => $wonItem->commission_amount,
                         'seller_amount' => $wonItem->seller_amount,
                     ];

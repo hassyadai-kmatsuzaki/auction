@@ -58,7 +58,6 @@ interface Settlement {
   total_sales: number;
   commission: number;
   shipping_fee: number;
-  packing_fee: number;
   net_amount: number;
   status: string;
   paid_at: string | null;
@@ -103,6 +102,7 @@ interface SettlementItem {
   };
   buyer: string;
   winning_price: number;
+  shipping_fee: number;
   commission: number;
   seller_amount: number;
 }
@@ -580,6 +580,7 @@ export default function SalesSettlement() {
                           <TableCell>品種名</TableCell>
                           <TableCell>落札者</TableCell>
                           <TableCell align="right">落札価格</TableCell>
+                          <TableCell align="right">配送料</TableCell>
                           <TableCell align="right">手数料</TableCell>
                           <TableCell align="right">受取金額</TableCell>
                         </TableRow>
@@ -591,6 +592,9 @@ export default function SalesSettlement() {
                             <TableCell>{item.item.species_name}</TableCell>
                             <TableCell>{item.buyer}</TableCell>
                             <TableCell align="right">¥{Number(item.winning_price).toLocaleString()}</TableCell>
+                            <TableCell align="right" sx={{ color: 'text.secondary' }}>
+                              {item.shipping_fee > 0 ? `¥${Number(item.shipping_fee).toLocaleString()}` : '-'}
+                            </TableCell>
                             <TableCell align="right" sx={{ color: 'error.main' }}>
                               -¥{Number(item.commission).toLocaleString()}
                             </TableCell>
@@ -627,14 +631,6 @@ export default function SalesSettlement() {
                     <ListItemText primary="配送料" />
                     <Typography variant="body1" sx={{ color: 'error.main' }}>
                       -¥{Number(selectedSettlement.shipping_fee).toLocaleString()}
-                    </Typography>
-                  </ListItem>
-                )}
-                {selectedSettlement.packing_fee > 0 && (
-                  <ListItem sx={{ px: 0, py: 1 }}>
-                    <ListItemText primary="梱包料" />
-                    <Typography variant="body1" sx={{ color: 'error.main' }}>
-                      -¥{Number(selectedSettlement.packing_fee).toLocaleString()}
                     </Typography>
                   </ListItem>
                 )}

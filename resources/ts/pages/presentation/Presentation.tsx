@@ -1524,6 +1524,7 @@ export default function Presentation() {
   const lane3Ref = useRef<HTMLDivElement | null>(null);
   const upcomingRef = useRef<HTMLDivElement>(null);
   const wonTableRef = useRef<HTMLDivElement>(null);
+  const goToStepRef = useRef<(step: number) => void>(() => {});
 
   const notify = useCallback((message: string, severity: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -1633,7 +1634,7 @@ export default function Presentation() {
       startCountdown(lane.lane_id, 15);
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
       if (tourActive && tourStep === 2) {
-        setTimeout(() => setTourStep(3), 1200);
+        setTimeout(() => goToStepRef.current(3), 1200);
       }
       // STEP5: 入札合戦 — ユーザーが入札したら相手も入札し返す
       if (tourActive && tourStep === 4) {
@@ -1781,6 +1782,10 @@ export default function Presentation() {
   });
 
   // ─── Tour steps ───
+  // ステップインデックス: 0=Welcome, 1=Lane説明, 2=入札(wait), 3=相手入札(auto),
+  // 4=入札合戦(auto), 5=フリーズ(auto/hold), 6=待機時間(auto), 7=指値設定(wait),
+  // 8=指値発動(auto), 9=次の商品説明, 10=お気に入り(wait), 11=新商品到着(auto),
+  // 12=次レーン指値(wait), 13=落札(auto), 14=完了
   const tourSteps: TourStep[] = [
     // STEP1: ようこそ
     { targetRef: demoHeaderRef, title: 'オークション体験デモへようこそ！', description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。', placement: 'bottom' },
@@ -1804,43 +1809,82 @@ export default function Presentation() {
     { targetRef: upcomingRef, title: '次の商品を確認', description: '下にスクロールすると「次の商品」を確認できます。気になる商品にお気に入り登録ができ、指値（上限価格）も商品がレーンに来た際にすぐ設定できます。まずはお気に入り登録を体験しましょう。', placement: 'top' },
     // STEP11: お気に入り登録
     { targetRef: upcomingRef, title: 'お気に入りを登録してみよう', description: '次の商品一覧からハートアイコンをタップして、お気に入りに登録してみてください。お気に入りの商品がレーンに登場した際に通知を受け取れます。', placement: 'top', waitForAction: 'ハートアイコンをタップ' },
-    // STEP12: 落札
+    // STEP12: 新商品到着（レーン3に次の商品がセット）
+    {
+      targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
+      title: '次の商品がレーンに到着！',
+      description: 'お気に入り登録した商品がレーン3に登場しました。次のステップで指値（上限価格）を設定してみましょう。',
+      placement: 'left',
+      autoAction: () => {
+        const nextItem = upcoming.find(u => u.laneNumber === 3);
+        if (nextItem) {
+          updateLaneItem(3, () => makeLaneItem({
+            id: nextItem.id,
+            species_name: nextItem.species_name,
+            current_price: nextItem.start_price,
+            quantity: nextItem.quantity ?? 1,
+            is_premium: nextItem.is_premium,
+            thumbnail_path: nextItem.thumbnail_path ?? '/img/noimage.png',
+            phase: 'bidding',
+            countdown_seconds: 15,
+            my_bid_status: null,
+            active_bidders_count: 1,
+            seller_name: 'ブリーダーD',
+          }));
+          startCountdown(3, 15);
+          setUpcoming(prev => prev.filter(u => u.id !== nextItem.id));
+          notify('新しい商品がレーン3に到着しました！', 'info');
+        }
+      },
+      autoActionDelay: 2000,
+    },
+    // STEP13: 次レーン指値設定（waitForAction）
+    {
+      targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>,
+      title: 'レーン3に指値を設定しよう',
+      description: 'レーン3の新商品に指値（上限価格）を設定してみましょう。カード下部の「上限設定」ボタンを押してください。',
+      placement: 'left',
+      waitForAction: 'レーン3の「上限設定」をタップ',
+    },
+    // STEP14: 落札
     { targetRef: lane2Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン2を落札します。紙吹雪の落札演出と結果テーブルが表示されます。おめでとうございます！', placement: 'left', autoAction: () => { updateLaneItem(2, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(), 500); }, autoActionDelay: 4500 },
-    // STEP13: 完了
+    // STEP15: 完了
     { targetRef: wonTableRef, title: 'デモ完了！お疲れさまでした', description: '落札結果がここに表示されます。実際のオークションでも同様の流れで進みます。「最初から」ボタンで何度でも練習できます。', placement: 'top' },
   ];
 
-  const handleTourNext = useCallback(() => {
-    const nextStep = tourStep + 1;
-    if (nextStep >= tourSteps.length) return;
+  /** 指定ステップへ遷移（autoAction付きステップも正しく実行） */
+  const goToStep = useCallback((targetStep: number) => {
+    if (targetStep < 0 || targetStep >= tourSteps.length) return;
 
     // STEP6（フリーズ保持）から離れる際にフリーズ解除
-    if (tourStep === 5) {
+    if (tourStep === 5 && targetStep !== 5) {
       updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
       startCountdown(1, 15);
     }
 
-    const step = tourSteps[nextStep];
+    const step = tourSteps[targetStep];
     if (step.autoAction) {
       setIsAutoPlaying(true);
-      setTourStep(nextStep);
+      setTourStep(targetStep);
       step.autoAction();
       setTimeout(() => setIsAutoPlaying(false), step.autoActionDelay || 1500);
     } else {
-      setTourStep(nextStep);
+      setTourStep(targetStep);
     }
   }, [tourStep, tourSteps, updateLaneItem, startCountdown]);
 
+  // Keep ref in sync so earlier-defined callbacks can reach goToStep
+  goToStepRef.current = goToStep;
+
+  const handleTourNext = useCallback(() => {
+    goToStep(tourStep + 1);
+  }, [tourStep, goToStep]);
+
   const handleTourPrev = useCallback(() => {
     if (tourStep > 0) {
-      // STEP6（フリーズ保持）から離れる際にフリーズ解除
-      if (tourStep === 5) {
-        updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
-        startCountdown(1, 15);
-      }
-      setTourStep(tourStep - 1);
+      goToStep(tourStep - 1);
     }
-  }, [tourStep, updateLaneItem, startCountdown]);
+  }, [tourStep, goToStep]);
 
   const handleTourClose = useCallback(() => {
     setTourActive(false);
@@ -1861,7 +1905,10 @@ export default function Presentation() {
     setLimitModalLaneId(null);
     notify(`上限価格を ¥${price.toLocaleString()} に設定しました`, 'success');
     if (tourActive && tourStep === 7) {
-      setTimeout(() => setTourStep(8), 800);
+      setTimeout(() => goToStepRef.current(8), 800);
+    }
+    if (tourActive && tourStep === 12) {
+      setTimeout(() => goToStepRef.current(13), 800);
     }
   }, [limitModalLaneId, updateLaneItem, notify, tourActive, tourStep]);
 
@@ -1876,7 +1923,7 @@ export default function Presentation() {
     setUpcoming(prev => prev.map(u => u.id === itemId ? { ...u, is_favorited: !u.is_favorited } : u));
     // STEP11: お気に入り登録ステップ
     if (tourActive && tourStep === 10) {
-      setTimeout(() => setTourStep(11), 800);
+      setTimeout(() => goToStepRef.current(11), 800);
     }
   };
 

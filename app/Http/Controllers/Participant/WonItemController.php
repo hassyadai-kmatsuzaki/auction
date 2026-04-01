@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
 use App\Models\WonItem;
+use App\Services\ShippingCalculatorService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -67,11 +68,13 @@ class WonItemController extends Controller
                         'quantity' => $wonItem->quantity,
                         'total_amount' => $wonItem->total_amount,
                         'commission_amount' => $wonItem->commission_amount,
+                        'shipping_fee' => $wonItem->shipping_fee ?? 0,
                         'payment_status' => $wonItem->payment_status,
                         'payment_deadline' => $wonItem->payment_deadline ? $wonItem->payment_deadline->toIso8601String() : null,
                         'delivery_status' => $wonItem->delivery_status,
                         'delivery_method' => $wonItem->delivery_method,
                         'shipping_address' => $this->formatShippingAddress($wonItem),
+                        'shipping_company' => $wonItem->shipping_company,
                         'tracking_number' => $wonItem->tracking_number,
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                         'created_at' => $wonItem->created_at->toIso8601String(),
@@ -130,6 +133,8 @@ class WonItemController extends Controller
                     'total_amount' => $wonItem->total_amount,
                     'commission_rate' => $wonItem->commission_rate,
                     'commission_amount' => $wonItem->commission_amount,
+                    'shipping_fee' => $wonItem->shipping_fee ?? 0,
+                    'shipping_breakdown' => $wonItem->shipping_breakdown,
                     'payment_status' => $wonItem->payment_status,
                     'payment_method' => $wonItem->payment_method,
                     'payment_deadline' => $wonItem->payment_deadline ? $wonItem->payment_deadline->toIso8601String() : null,
@@ -200,7 +205,7 @@ class WonItemController extends Controller
             ], 422);
         }
         
-        $wonItem->update([
+        $updateData = [
             'shipping_postal_code' => $request->shipping_postal_code,
             'shipping_prefecture' => $request->shipping_prefecture,
             'shipping_city' => $request->shipping_city,
@@ -208,13 +213,33 @@ class WonItemController extends Controller
             'shipping_address_line2' => $request->shipping_address_line2,
             'shipping_name' => $request->shipping_name,
             'shipping_phone' => $request->shipping_phone,
-        ]);
-        
+        ];
+
+        // 配送料金を自動計算
+        try {
+            $calculator = app(ShippingCalculatorService::class);
+            $region = $calculator->getRegionByPrefecture($request->shipping_prefecture);
+            if ($region) {
+                $item = $wonItem->item;
+                $result = $calculator->calculate(
+                    [['quantity' => $item->quantity]],
+                    $region
+                );
+                $updateData['shipping_fee'] = $result['total_shipping_fee'];
+                $updateData['shipping_breakdown'] = $result;
+            }
+        } catch (\Exception $e) {
+            \Log::warning('配送料金の自動計算に失敗', ['error' => $e->getMessage()]);
+        }
+
+        $wonItem->update($updateData);
+
         return response()->json([
             'success' => true,
             'message' => '配送先を更新しました。',
             'data' => [
                 'shipping_address' => $this->formatShippingAddress($wonItem),
+                'shipping_fee' => $wonItem->shipping_fee ?? 0,
             ],
         ]);
     }

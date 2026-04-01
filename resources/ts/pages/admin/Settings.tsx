@@ -11,6 +11,7 @@ import {
   LocalShipping as ShippingIcon, Receipt as ReceiptIcon, Gavel as GavelIcon,
   Edit as EditIcon,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 import { useSettings } from '../../features/settings/hooks/useSettings';
 import { useNotificationStore } from '../../stores/notificationStore';
 
@@ -95,6 +96,11 @@ export default function AdminSettings() {
   const [s, setS]               = useState<SettingsState>(DEFAULT_SETTINGS);
   const [shippingRates, setShippingRates]             = useState<any[]>([]);
   const [editShippingDialog, setEditShippingDialog]   = useState(false);
+  const [shippingMaster, setShippingMaster]           = useState<Record<string, Record<number, number>>>({});
+  const [editingRates, setEditingRates]               = useState<Record<string, Record<number, number>>>({});
+  const [packingMaterials, setPackingMaterials]        = useState<any[]>([]);
+  const [shippingMasterLoading, setShippingMasterLoading] = useState(false);
+  const [savingRates, setSavingRates]                 = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
   const [incrementTiers, setIncrementTiers]           = useState<PriceIncrementTier[]>(DEFAULT_PRICE_INCREMENT_TIERS);
   const [countdownTiers, setCountdownTiers]           = useState<CountdownTier[]>(DEFAULT_COUNTDOWN_TIERS);
@@ -163,6 +169,44 @@ export default function AdminSettings() {
       default_countdown_tiers: countdownTiers,
     });
   };
+
+  const fetchShippingMaster = async () => {
+    setShippingMasterLoading(true);
+    try {
+      const res = await axios.get('/api/admin/shipping-master');
+      if (res.data.success) {
+        setShippingMaster(res.data.data.shipping_rates);
+        setPackingMaterials(res.data.data.packing_materials);
+      }
+    } catch { /* silent */ }
+    setShippingMasterLoading(false);
+  };
+
+  const handleOpenEditShipping = () => {
+    setEditingRates(JSON.parse(JSON.stringify(shippingMaster)));
+    fetchShippingMaster().then(() => setEditShippingDialog(true));
+  };
+
+  const handleSaveShippingRates = async () => {
+    setSavingRates(true);
+    try {
+      const rates: { region: string; box_size: number; rate: number }[] = [];
+      for (const [region, sizes] of Object.entries(editingRates)) {
+        for (const [size, rate] of Object.entries(sizes)) {
+          rates.push({ region, box_size: Number(size), rate: Number(rate) });
+        }
+      }
+      await axios.put('/api/admin/shipping-master/rates', { rates });
+      setSnackbar({ open: true, message: '配送料金を更新しました', severity: 'success' });
+      setEditShippingDialog(false);
+      fetchShippingMaster();
+    } catch {
+      setSnackbar({ open: true, message: '更新に失敗しました', severity: 'error' as any });
+    }
+    setSavingRates(false);
+  };
+
+  useEffect(() => { fetchShippingMaster(); }, []);
 
   const str = (k: keyof SettingsState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setS((p) => ({ ...p, [k]: e.target.value }));
@@ -488,31 +532,61 @@ export default function AdminSettings() {
             <Card>
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>地域別配送料金</Typography>
-                  <Button size="small" startIcon={<EditIcon />} onClick={() => setEditShippingDialog(true)}>編集</Button>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>ヤマト法人送料（地域×箱サイズ）</Typography>
+                  <Button size="small" startIcon={<EditIcon />} onClick={handleOpenEditShipping}>編集</Button>
                 </Box>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>地域</TableCell>
-                        <TableCell align="right">60サイズ</TableCell>
-                        <TableCell align="right">80サイズ</TableCell>
-                        <TableCell align="right">100サイズ</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {shippingRates.map((r, i) => (
-                        <TableRow key={i}>
-                          <TableCell>{r.region}</TableCell>
-                          <TableCell align="right">¥{r.size_60?.toLocaleString()}</TableCell>
-                          <TableCell align="right">¥{r.size_80?.toLocaleString()}</TableCell>
-                          <TableCell align="right">¥{r.size_100?.toLocaleString()}</TableCell>
+                {shippingMasterLoading ? <CircularProgress size={24} /> : (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>地域</TableCell>
+                          <TableCell align="right">80</TableCell>
+                          <TableCell align="right">100</TableCell>
+                          <TableCell align="right">120</TableCell>
+                          <TableCell align="right">140</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                      </TableHead>
+                      <TableBody>
+                        {Object.entries(shippingMaster).map(([region, sizes]) => (
+                          <TableRow key={region}>
+                            <TableCell>{region}</TableCell>
+                            {[80, 100, 120, 140].map((sz) => (
+                              <TableCell key={sz} align="right">¥{(sizes[sz] ?? 0).toLocaleString()}</TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+                {packingMaterials.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>梱包資材費</Typography>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>箱サイズ</TableCell>
+                          <TableCell align="right">発泡スチロール</TableCell>
+                          <TableCell align="right">袋資材</TableCell>
+                          <TableCell align="right">保冷剤</TableCell>
+                          <TableCell align="right">合計</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {packingMaterials.map((m: any) => (
+                          <TableRow key={m.box_size}>
+                            <TableCell>{m.box_size}サイズ</TableCell>
+                            <TableCell align="right">¥{m.styrofoam_cost?.toLocaleString()}</TableCell>
+                            <TableCell align="right">¥{m.bag_material_cost?.toLocaleString()}</TableCell>
+                            <TableCell align="right">¥{m.coolant_cost?.toLocaleString()}</TableCell>
+                            <TableCell align="right">¥{m.total_cost?.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -584,12 +658,53 @@ export default function AdminSettings() {
       </Snackbar>
 
       {/* 配送料金編集ダイアログ */}
-      <Dialog open={editShippingDialog} onClose={() => setEditShippingDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>地域別配送料金の編集</DialogTitle>
+      <Dialog open={editShippingDialog} onClose={() => setEditShippingDialog(false)} maxWidth="lg" fullWidth>
+        <DialogTitle>ヤマト法人送料の編集</DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>配送料金テーブルは現在のバージョンでは編集できません。今後のアップデートで対応予定です。</Alert>
+          <Alert severity="warning" sx={{ mb: 2 }}>変更は全注文に即座に反映されます。慎重に入力してください。</Alert>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>地域</TableCell>
+                  {[80, 100, 120, 140].map((sz) => (
+                    <TableCell key={sz} align="center">{sz}サイズ</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {Object.entries(editingRates).map(([region, sizes]) => (
+                  <TableRow key={region}>
+                    <TableCell sx={{ fontWeight: 600 }}>{region}</TableCell>
+                    {[80, 100, 120, 140].map((sz) => (
+                      <TableCell key={sz}>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={sizes[sz] ?? 0}
+                          onChange={(e) => {
+                            setEditingRates((prev) => ({
+                              ...prev,
+                              [region]: { ...prev[region], [sz]: Number(e.target.value) },
+                            }));
+                          }}
+                          InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                          sx={{ width: 130 }}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </DialogContent>
-        <DialogActions><Button onClick={() => setEditShippingDialog(false)}>閉じる</Button></DialogActions>
+        <DialogActions>
+          <Button onClick={() => setEditShippingDialog(false)} disabled={savingRates}>キャンセル</Button>
+          <Button variant="contained" onClick={handleSaveShippingRates} disabled={savingRates}>
+            {savingRates ? <CircularProgress size={20} /> : '保存'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

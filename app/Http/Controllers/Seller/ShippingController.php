@@ -95,6 +95,7 @@ class ShippingController extends Controller
                         ] : null,
                         'price' => $wonItem->winning_price,
                         'total_amount' => $wonItem->total_amount,
+                        'shipping_fee' => $wonItem->shipping_fee ?? 0,
                         'payment_status' => $wonItem->payment_status,
                         'delivery_status' => $this->mapDeliveryStatus($wonItem->delivery_status),
                         'tracking_number' => $wonItem->tracking_number,

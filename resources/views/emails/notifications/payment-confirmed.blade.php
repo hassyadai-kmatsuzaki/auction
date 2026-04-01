@@ -14,7 +14,11 @@
 
 **品番**: No.{{ $wonItem->item->item_number ?? '-' }}
 
-**お支払い金額**: ¥{{ number_format($wonItem->total_amount) }}
+**お支払い金額**: ¥{{ number_format($wonItem->total_amount + ($wonItem->shipping_fee ?? 0)) }}
+
+@if(($wonItem->shipping_fee ?? 0) > 0)
+（内訳: 商品代金 ¥{{ number_format($wonItem->total_amount) }} ＋ 配送料金 ¥{{ number_format($wonItem->shipping_fee) }}）
+@endif
 
 ---
 
