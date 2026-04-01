@@ -2,21 +2,23 @@
 
 namespace App\Services;
 
+use App\Models\Auction;
+use App\Models\User;
 use App\Models\WonItem;
 use App\Models\SystemSetting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class InvoiceService
 {
     /**
-     * 落札者向け請求書PDFを生成
+     * オークション×落札者 単位で請求書PDFを生成
      */
-    public function generateInvoice(WonItem $wonItem): \Barryvdh\DomPDF\PDF
+    public function generateInvoice(Auction $auction, User $winner): \Barryvdh\DomPDF\PDF
     {
-        $wonItem->load(['item.auction', 'winner']);
-
-        $data = $this->buildInvoiceData($wonItem, 'invoice');
+        $wonItems = $this->getWonItems($auction, $winner);
+        $data = $this->buildInvoiceData($auction, $winner, $wonItems, 'invoice');
 
         return Pdf::loadView('pdf.invoice', $data)
             ->setPaper('a4')
@@ -25,13 +27,18 @@ class InvoiceService
     }
 
     /**
-     * 落札者向け領収書PDFを生成
+     * オークション×落札者 単位で領収書PDFを生成
      */
-    public function generateReceipt(WonItem $wonItem): \Barryvdh\DomPDF\PDF
+    public function generateReceipt(Auction $auction, User $winner): \Barryvdh\DomPDF\PDF
     {
-        $wonItem->load(['item.auction', 'winner']);
+        $wonItems = $this->getWonItems($auction, $winner)
+            ->filter(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));
 
-        $data = $this->buildInvoiceData($wonItem, 'receipt');
+        if ($wonItems->isEmpty()) {
+            throw new \RuntimeException('入金確認済みの落札品がありません');
+        }
+
+        $data = $this->buildInvoiceData($auction, $winner, $wonItems, 'receipt');
 
         return Pdf::loadView('pdf.receipt', $data)
             ->setPaper('a4')
@@ -39,17 +46,27 @@ class InvoiceService
             ->setOption('isRemoteEnabled', true);
     }
 
-    private function buildInvoiceData(WonItem $wonItem, string $type): array
+    private function getWonItems(Auction $auction, User $winner): Collection
+    {
+        $wonItems = WonItem::where('winner_id', $winner->id)
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auction->id))
+            ->with(['item'])
+            ->get();
+
+        if ($wonItems->isEmpty()) {
+            throw new \RuntimeException('該当する落札品がありません');
+        }
+
+        return $wonItems;
+    }
+
+    private function buildInvoiceData(Auction $auction, User $winner, Collection $wonItems, string $type): array
     {
         $prefix = $type === 'invoice' ? 'INV' : 'RCP';
-        $documentNumber = sprintf('%s-%s-%05d', $prefix, Carbon::now()->format('Ymd'), $wonItem->id);
+        $documentNumber = sprintf('%s-%s-A%05d', $prefix, Carbon::now()->format('Ymd'), $auction->id);
 
-        $item = $wonItem->item;
-        if (!$item) {
-            throw new \RuntimeException("落札品ID {$wonItem->id} に紐づく商品が見つかりません");
-        }
-        $auction = $item->auction ?? null;
-        $winner = $wonItem->winner;
+        // 代表の配送先情報（最初の落札品から取得）
+        $firstItem = $wonItems->first();
 
         // 会社情報をシステム設定から取得
         $companyName = SystemSetting::get('company_name', 'メダカオークション運営事務局');
@@ -58,33 +75,67 @@ class InvoiceService
         $companyEmail = SystemSetting::get('company_email', '');
         $bankInfo = SystemSetting::get('bank_info', '');
 
+        // 明細行を構築
+        $items = $wonItems->map(function ($wonItem) {
+            $item = $wonItem->item;
+            return [
+                'item_number' => $item->item_number ?? '',
+                'species_name' => $item->species_name ?? '',
+                'quantity' => $wonItem->quantity,
+                'winning_price' => (int) $wonItem->winning_price,
+                'total_amount' => (int) $wonItem->total_amount,
+                'shipping_fee' => $wonItem->shipping_fee ?? 0,
+            ];
+        })->values()->toArray();
+
+        // 合計計算
+        $subtotal = $wonItems->sum(fn ($w) => (int) $w->total_amount);
+        $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
+        $grandTotal = $subtotal + $totalShippingFee;
+
+        // 支払い期限（最も早いもの）
+        $paymentDeadline = $wonItems
+            ->filter(fn ($w) => $w->payment_deadline)
+            ->sortBy('payment_deadline')
+            ->first()?->payment_deadline;
+
+        // 入金日（最も遅いもの＝全品入金完了日）
+        $paidAt = $wonItems
+            ->filter(fn ($w) => $w->paid_at)
+            ->sortByDesc('paid_at')
+            ->first()?->paid_at;
+
+        // 支払い方法（全品同じ前提、異なる場合は「複数」）
+        $methods = $wonItems->pluck('payment_method')->unique()->filter()->values();
+        $paymentMethod = $methods->count() === 1
+            ? $this->formatPaymentMethod($methods->first())
+            : ($methods->count() > 1 ? '複数方法' : '未定');
+
         return [
             'type' => $type,
             'document_number' => $documentNumber,
             'issue_date' => Carbon::now()->format('Y年m月d日'),
             // 宛先
-            'buyer_name' => $wonItem->shipping_name ?? $winner->name ?? '',
-            'buyer_postal_code' => $wonItem->shipping_postal_code ?? '',
+            'buyer_name' => $firstItem->shipping_name ?? $winner->name ?? '',
+            'buyer_postal_code' => $firstItem->shipping_postal_code ?? '',
             'buyer_address' => trim(
-                ($wonItem->shipping_prefecture ?? '') .
-                ($wonItem->shipping_city ?? '') .
-                ($wonItem->shipping_address_line1 ?? '') .
-                ' ' . ($wonItem->shipping_address_line2 ?? '')
+                ($firstItem->shipping_prefecture ?? '') .
+                ($firstItem->shipping_city ?? '') .
+                ($firstItem->shipping_address_line1 ?? '') .
+                ' ' . ($firstItem->shipping_address_line2 ?? '')
             ),
-            // 明細
-            'auction_title' => $auction?->title ?? '',
-            'auction_date' => $auction?->event_date?->format('Y年m月d日') ?? '',
-            'item_number' => $item->item_number ?? '',
-            'species_name' => $item->species_name ?? '',
-            'quantity' => $wonItem->quantity,
-            'winning_price' => (int) $wonItem->winning_price,
-            'total_amount' => (int) $wonItem->total_amount,
-            'shipping_fee' => $wonItem->shipping_fee ?? 0,
-            'grand_total' => (int) $wonItem->total_amount + ($wonItem->shipping_fee ?? 0),
+            // オークション情報
+            'auction_title' => $auction->title ?? '',
+            'auction_date' => $auction->event_date?->format('Y年m月d日') ?? '',
+            // 明細（複数品）
+            'items' => $items,
+            'subtotal' => $subtotal,
+            'total_shipping_fee' => $totalShippingFee,
+            'grand_total' => $grandTotal,
             // 支払い情報
-            'payment_method' => $this->formatPaymentMethod($wonItem->payment_method),
-            'payment_deadline' => $wonItem->payment_deadline?->format('Y年m月d日'),
-            'paid_at' => $wonItem->paid_at?->format('Y年m月d日'),
+            'payment_method' => $paymentMethod,
+            'payment_deadline' => $paymentDeadline?->format('Y年m月d日'),
+            'paid_at' => $paidAt?->format('Y年m月d日'),
             // 発行者
             'company_name' => $companyName,
             'company_address' => $companyAddress,

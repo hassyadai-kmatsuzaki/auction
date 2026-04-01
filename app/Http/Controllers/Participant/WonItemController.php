@@ -23,30 +23,44 @@ class WonItemController extends Controller
     public function index(Request $request)
     {
         $userId = Auth::id();
-        $auctionId = $request->input('auction_id');
-        
-        $query = WonItem::forWinner($userId)
-            ->with(['item.auction', 'item.media']);
-        
-        if ($auctionId) {
-            $query->whereHas('item', function ($q) use ($auctionId) {
-                $q->where('auction_id', $auctionId);
-            });
-        }
-        
-        $wonItems = $query->orderBy('created_at', 'desc')->get();
-        
+
+        $wonItems = WonItem::forWinner($userId)
+            ->with(['item.auction', 'item.media'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         // 合計金額を計算
         $totalAmount = $wonItems->sum('total_amount');
         $pendingAmount = $wonItems->where('payment_status', 'pending')->sum('total_amount');
         $paidAmount = $wonItems->whereIn('payment_status', ['paid', 'confirmed'])->sum('total_amount');
-        
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'won_items' => $wonItems->map(function ($wonItem) {
+        $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
+
+        // オークション別にグルーピング
+        $grouped = $wonItems->groupBy(fn ($wonItem) => $wonItem->item?->auction?->id ?? 0);
+
+        $auctions = $grouped->map(function ($items, $auctionId) {
+            $auction = $items->first()->item?->auction;
+            $auctionTotalAmount = $items->sum('total_amount');
+            $auctionShippingFee = $items->sum(fn ($w) => $w->shipping_fee ?? 0);
+            $allPaid = $items->every(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));
+            $anyPending = $items->contains(fn ($w) => $w->payment_status === 'pending');
+
+            return [
+                'auction' => $auction ? [
+                    'id' => $auction->id,
+                    'title' => $auction->title,
+                    'event_date' => $auction->event_date->format('Y-m-d'),
+                ] : null,
+                'summary' => [
+                    'item_count' => $items->count(),
+                    'total_amount' => $auctionTotalAmount,
+                    'shipping_fee' => $auctionShippingFee,
+                    'grand_total' => $auctionTotalAmount + $auctionShippingFee,
+                    'all_paid' => $allPaid,
+                    'any_pending' => $anyPending,
+                ],
+                'won_items' => $items->map(function ($wonItem) {
                     $item = $wonItem->item;
-                    $auction = $item?->auction;
 
                     return [
                         'id' => $wonItem->id,
@@ -56,13 +70,6 @@ class WonItemController extends Controller
                             'species_name' => $item->species_name,
                             'quantity' => $item->quantity,
                             'thumbnail_path' => $item->thumbnail_path,
-                            'inspection_info' => $item->inspection_info,
-                            'individual_info' => $item->individual_info,
-                            'auction' => $auction ? [
-                                'id' => $auction->id,
-                                'title' => $auction->title,
-                                'event_date' => $auction->event_date->format('Y-m-d'),
-                            ] : null,
                         ] : null,
                         'winning_price' => $wonItem->winning_price,
                         'quantity' => $wonItem->quantity,
@@ -79,12 +86,21 @@ class WonItemController extends Controller
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                         'created_at' => $wonItem->created_at->toIso8601String(),
                     ];
-                }),
+                })->values(),
+            ];
+        })->sortByDesc(fn ($g) => $g['auction']['event_date'] ?? '')->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'auctions' => $auctions,
                 'summary' => [
                     'total_amount' => $totalAmount,
                     'pending_amount' => $pendingAmount,
                     'paid_amount' => $paidAmount,
+                    'shipping_fee' => $totalShippingFee,
                     'item_count' => $wonItems->count(),
+                    'auction_count' => $auctions->count(),
                 ],
             ],
         ]);

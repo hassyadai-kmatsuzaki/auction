@@ -175,7 +175,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('won-items/{id}/ship', [AdminWonItemController::class, 'ship']);
     Route::post('won-items/{id}/complete', [AdminWonItemController::class, 'complete']);
     Route::patch('won-items/{id}/notes', [AdminWonItemController::class, 'updateNotes']);
-    Route::get('won-items/{id}/invoice', [InvoiceController::class, 'adminDownloadInvoice']);
+    Route::get('auctions/{auctionId}/winners/{winnerId}/invoice', [InvoiceController::class, 'adminDownloadInvoice']);
 
     // 配送マスタ管理
     Route::get('shipping-master', [ShippingRateController::class, 'index']);
@@ -244,8 +244,8 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
     Route::put('/won-items/{id}/address', [ParticipantWonItemController::class, 'updateAddress']);
-    Route::get('/won-items/{id}/invoice', [InvoiceController::class, 'downloadInvoice']);
-    Route::get('/won-items/{id}/receipt', [InvoiceController::class, 'downloadReceipt']);
+    Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
+    Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     
     // お気に入り
     Route::get('/favorites', [ParticipantFavoriteController::class, 'index']);

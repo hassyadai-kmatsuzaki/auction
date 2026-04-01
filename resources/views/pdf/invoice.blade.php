@@ -42,6 +42,11 @@
             padding-bottom: 4px;
             margin-bottom: 6px;
         }
+        .auction-info {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 10px;
+        }
         .total-box {
             background-color: #2c3e50;
             color: #fff;
@@ -73,7 +78,16 @@
             text-align: right;
         }
         table.detail .subtotal-row td {
+            border-top: 2px solid #333;
+            border-bottom: none;
+            padding-top: 10px;
+        }
+        table.detail .shipping-row td {
+            border-bottom: 1px solid #ddd;
+        }
+        table.detail .total-row td {
             font-weight: bold;
+            font-size: 12px;
             border-top: 2px solid #333;
             border-bottom: none;
             padding-top: 10px;
@@ -131,6 +145,13 @@
         @endif
     </div>
 
+    <div class="auction-info">
+        対象オークション: {{ $auction_title }}
+        @if($auction_date)
+            （{{ $auction_date }}）
+        @endif
+    </div>
+
     <p>下記の通りご請求申し上げます。</p>
 
     <div class="total-box">
@@ -140,35 +161,46 @@
     <table class="detail">
         <thead>
             <tr>
-                <th style="width: 30%">品目</th>
-                <th style="width: 25%">品種</th>
+                <th style="width: 8%">No.</th>
+                <th style="width: 32%">品種</th>
                 <th style="width: 10%; text-align: center">数量</th>
-                <th style="width: 15%; text-align: right">単価</th>
-                <th style="width: 20%; text-align: right">金額</th>
+                <th style="width: 20%; text-align: right">単価</th>
+                <th style="width: 15%; text-align: right">小計</th>
+                <th style="width: 15%; text-align: right">配送料</th>
             </tr>
         </thead>
         <tbody>
+            @foreach($items as $item)
             <tr>
-                <td>
-                    {{ $auction_title }}
-                    @if($item_number)
-                        <br><span class="small-text">No.{{ $item_number }}</span>
+                <td>{{ $item['item_number'] }}</td>
+                <td>{{ $item['species_name'] }}</td>
+                <td style="text-align: center">{{ $item['quantity'] }}匹</td>
+                <td class="right">¥{{ number_format($item['winning_price']) }}</td>
+                <td class="right">¥{{ number_format($item['total_amount']) }}</td>
+                <td class="right">
+                    @if($item['shipping_fee'] > 0)
+                        ¥{{ number_format($item['shipping_fee']) }}
+                    @else
+                        -
                     @endif
                 </td>
-                <td>{{ $species_name }}</td>
-                <td style="text-align: center">{{ $quantity }}匹</td>
-                <td class="right">¥{{ number_format($winning_price) }}</td>
-                <td class="right">¥{{ number_format($total_amount) }}</td>
             </tr>
-            @if($shipping_fee > 0)
-            <tr>
-                <td colspan="4">配送料金（送料・梱包資材費込）</td>
-                <td class="right">¥{{ number_format($shipping_fee) }}</td>
+            @endforeach
+            <tr class="subtotal-row">
+                <td colspan="4" style="text-align: right;"><strong>商品小計</strong></td>
+                <td class="right"><strong>¥{{ number_format($subtotal) }}</strong></td>
+                <td></td>
+            </tr>
+            @if($total_shipping_fee > 0)
+            <tr class="shipping-row">
+                <td colspan="4" style="text-align: right;">配送料金合計</td>
+                <td></td>
+                <td class="right">¥{{ number_format($total_shipping_fee) }}</td>
             </tr>
             @endif
-            <tr class="subtotal-row">
-                <td colspan="4"><strong>合計（税込）</strong></td>
-                <td class="right"><strong>¥{{ number_format($grand_total) }}</strong></td>
+            <tr class="total-row">
+                <td colspan="4" style="text-align: right;"><strong>合計（税込）</strong></td>
+                <td colspan="2" class="right"><strong>¥{{ number_format($grand_total) }}</strong></td>
             </tr>
         </tbody>
     </table>

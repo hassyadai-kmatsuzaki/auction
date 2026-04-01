@@ -27,6 +27,9 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Receipt as ReceiptIcon,
@@ -35,6 +38,8 @@ import {
   ContentCopy as CopyIcon,
   Edit as EditIcon,
   Download as DownloadIcon,
+  ExpandMore as ExpandMoreIcon,
+  Event as EventIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -46,13 +51,6 @@ interface WonItemData {
     species_name: string;
     quantity: number;
     thumbnail_path?: string;
-    inspection_info?: string;
-    individual_info?: string;
-    auction?: {
-      id: number;
-      title: string;
-      event_date: string;
-    } | null;
   } | null;
   winning_price: number;
   quantity: number;
@@ -70,11 +68,30 @@ interface WonItemData {
   created_at: string;
 }
 
+interface AuctionGroup {
+  auction: {
+    id: number;
+    title: string;
+    event_date: string;
+  } | null;
+  summary: {
+    item_count: number;
+    total_amount: number;
+    shipping_fee: number;
+    grand_total: number;
+    all_paid: boolean;
+    any_pending: boolean;
+  };
+  won_items: WonItemData[];
+}
+
 interface Summary {
   total_amount: number;
   pending_amount: number;
   paid_amount: number;
+  shipping_fee: number;
   item_count: number;
+  auction_count: number;
 }
 
 // 配送業者の追跡URLを生成
@@ -105,14 +122,34 @@ interface DefaultAddress {
   phone: string;
 }
 
+// PDFダウンロードヘルパー
+const downloadPdf = async (url: string, filename: string): Promise<string | null> => {
+  const res = await axios.get(url, { responseType: 'blob' });
+  const contentType = res.headers['content-type'] || '';
+  if (!contentType.includes('application/pdf')) {
+    const text = await (res.data as Blob).text();
+    try { return JSON.parse(text).message; } catch { return null; }
+  }
+  const blob = new Blob([res.data], { type: 'application/pdf' });
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(blobUrl);
+  return null;
+};
+
 export default function WonItems() {
-  const [wonItems, setWonItems] = useState<WonItemData[]>([]);
+  const [auctionGroups, setAuctionGroups] = useState<AuctionGroup[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [defaultAddress, setDefaultAddress] = useState<DefaultAddress | null>(null);
-  
+
   const [editAddressOpen, setEditAddressOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WonItemData | null>(null);
   const [addressForm, setAddressForm] = useState({
@@ -126,10 +163,10 @@ export default function WonItems() {
   });
   const [addressErrors, setAddressErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
-  
+
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WonItemData | null>(null);
-  
+
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -146,7 +183,7 @@ export default function WonItems() {
       setLoading(true);
       const response = await axios.get('/api/participant/won-items');
       if (response.data.success) {
-        setWonItems(response.data.data.won_items);
+        setAuctionGroups(response.data.data.auctions);
         setSummary(response.data.data.summary);
       }
     } catch (err: any) {
@@ -178,40 +215,50 @@ export default function WonItems() {
     }
   };
 
-  // タブフィルタ
-  const getFilteredItems = () => {
-    switch (activeTab) {
-      case 'payment_pending':
-        return wonItems.filter(i => i.payment_status === 'pending');
-      case 'shipping_pending':
-        return wonItems.filter(i => ['paid', 'confirmed'].includes(i.payment_status) && ['pending', 'preparing'].includes(i.delivery_status));
-      case 'shipped':
-        return wonItems.filter(i => i.delivery_status === 'shipped');
-      case 'completed':
-        return wonItems.filter(i => i.delivery_status === 'completed');
-      default:
-        return wonItems;
-    }
+  // 全WonItemをフラット化してフィルタリング
+  const allItems = auctionGroups.flatMap(g => g.won_items);
+
+  const getFilteredAuctionGroups = (): AuctionGroup[] => {
+    if (activeTab === 'all') return auctionGroups;
+
+    return auctionGroups.map(group => {
+      let filtered: WonItemData[];
+      switch (activeTab) {
+        case 'payment_pending':
+          filtered = group.won_items.filter(i => i.payment_status === 'pending');
+          break;
+        case 'shipping_pending':
+          filtered = group.won_items.filter(i => ['paid', 'confirmed'].includes(i.payment_status) && ['pending', 'preparing'].includes(i.delivery_status));
+          break;
+        case 'shipped':
+          filtered = group.won_items.filter(i => i.delivery_status === 'shipped');
+          break;
+        case 'completed':
+          filtered = group.won_items.filter(i => i.delivery_status === 'completed');
+          break;
+        default:
+          filtered = group.won_items;
+      }
+      return { ...group, won_items: filtered };
+    }).filter(g => g.won_items.length > 0);
   };
 
   const getTabCounts = () => ({
-    all: wonItems.length,
-    payment_pending: wonItems.filter(i => i.payment_status === 'pending').length,
-    shipping_pending: wonItems.filter(i => ['paid', 'confirmed'].includes(i.payment_status) && ['pending', 'preparing'].includes(i.delivery_status)).length,
-    shipped: wonItems.filter(i => i.delivery_status === 'shipped').length,
-    completed: wonItems.filter(i => i.delivery_status === 'completed').length,
+    all: allItems.length,
+    payment_pending: allItems.filter(i => i.payment_status === 'pending').length,
+    shipping_pending: allItems.filter(i => ['paid', 'confirmed'].includes(i.payment_status) && ['pending', 'preparing'].includes(i.delivery_status)).length,
+    shipped: allItems.filter(i => i.delivery_status === 'shipped').length,
+    completed: allItems.filter(i => i.delivery_status === 'completed').length,
   });
 
-  const filteredItems = getFilteredItems();
+  const filteredGroups = getFilteredAuctionGroups();
   const tabCounts = getTabCounts();
 
   const handleEditAddress = async (item: WonItemData) => {
     try {
-      // 詳細を取得して住所情報を設定
       const response = await axios.get(`/api/participant/won-items/${item.id}`);
       if (response.data.success) {
         const detail = response.data.data.won_item;
-        // 既に配送先が設定されていればそれを使う、なければデフォルト配送先を使う
         const hasExisting = detail.shipping_postal_code;
         if (hasExisting) {
           setAddressForm({
@@ -248,20 +295,14 @@ export default function WonItems() {
         setEditAddressOpen(true);
       }
     } catch {
-      setSnackbar({
-        open: true,
-        message: '情報の取得に失敗しました',
-        severity: 'error',
-      });
+      setSnackbar({ open: true, message: '情報の取得に失敗しました', severity: 'error' });
     }
   };
 
   const handleSaveAddress = async () => {
     if (!editingItem) return;
-    
     setSaving(true);
     setAddressErrors({});
-    
     try {
       const response = await axios.put(`/api/participant/won-items/${editingItem.id}/address`, addressForm);
       if (response.data.success) {
@@ -276,15 +317,10 @@ export default function WonItems() {
         await fetchWonItems();
       }
     } catch (err: any) {
-      console.error('住所更新エラー:', err);
       if (err.response?.data?.errors) {
         setAddressErrors(err.response.data.errors);
       } else {
-        setSnackbar({
-          open: true,
-          message: err.response?.data?.message || '更新に失敗しました',
-          severity: 'error',
-        });
+        setSnackbar({ open: true, message: err.response?.data?.message || '更新に失敗しました', severity: 'error' });
       }
     } finally {
       setSaving(false);
@@ -298,11 +334,43 @@ export default function WonItems() {
 
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
-    setSnackbar({
-      open: true,
-      message: 'コピーしました',
-      severity: 'success',
-    });
+    setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
+  };
+
+  const handleDownloadInvoice = async (auctionId: number) => {
+    try {
+      const errMsg = await downloadPdf(
+        `/api/participant/auctions/${auctionId}/invoice`,
+        `invoice_auction_${auctionId}.pdf`
+      );
+      if (errMsg) {
+        setSnackbar({ open: true, message: errMsg || '請求書のダウンロードに失敗しました', severity: 'error' });
+      }
+    } catch (err: any) {
+      let msg = '請求書のダウンロードに失敗しました';
+      if (err?.response?.data instanceof Blob) {
+        try { msg = JSON.parse(await err.response.data.text()).message || msg; } catch {}
+      }
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    }
+  };
+
+  const handleDownloadReceipt = async (auctionId: number) => {
+    try {
+      const errMsg = await downloadPdf(
+        `/api/participant/auctions/${auctionId}/receipt`,
+        `receipt_auction_${auctionId}.pdf`
+      );
+      if (errMsg) {
+        setSnackbar({ open: true, message: errMsg || '領収書のダウンロードに失敗しました', severity: 'error' });
+      }
+    } catch (err: any) {
+      let msg = '領収書のダウンロードに失敗しました';
+      if (err?.response?.data instanceof Blob) {
+        try { msg = JSON.parse(await err.response.data.text()).message || msg; } catch {}
+      }
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    }
   };
 
   const getPaymentStatusLabel = (status: string) => {
@@ -374,17 +442,20 @@ export default function WonItems() {
       {/* サマリー */}
       {summary && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Paper sx={{ p: 2.5 }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
                 合計落札金額
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                ¥{summary.total_amount.toLocaleString()}
+                ¥{(summary.total_amount + summary.shipping_fee).toLocaleString()}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {summary.auction_count}件のオークション / {summary.item_count}品
               </Typography>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Paper sx={{ p: 2.5, bgcolor: '#ECFDF5' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
                 入金確認済み
@@ -394,13 +465,23 @@ export default function WonItems() {
               </Typography>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Paper sx={{ p: 2.5, bgcolor: '#FEF3C7' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
                 支払い待ち
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#F59E0B' }}>
                 ¥{summary.pending_amount.toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Paper sx={{ p: 2.5 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+                配送料金合計
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: '#64748B' }}>
+                ¥{summary.shipping_fee.toLocaleString()}
               </Typography>
             </Paper>
           </Grid>
@@ -424,241 +505,191 @@ export default function WonItems() {
         </Tabs>
       </Paper>
 
-      {/* 落札商品一覧 */}
-      {filteredItems.length === 0 ? (
+      {/* オークション別落札商品一覧 */}
+      {filteredGroups.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
             {activeTab === 'all' ? '落札した商品はまだありません。' : '該当する商品はありません。'}
           </Typography>
         </Paper>
       ) : (
-        filteredItems.map((wonItem) => (
-          <Card key={wonItem.id} sx={{ mb: 3 }}>
-            <CardContent sx={{ p: 3 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={3}>
-                  <CardMedia
-                    component="img"
-                    image={wonItem.item?.thumbnail_path || '/img/noimage.png'}
-                    alt={wonItem.item?.species_name || '商品'}
-                    sx={{ borderRadius: 2, aspectRatio: '3/2', objectFit: 'cover', width: '100%' }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={9}>
-                  {/* ヘッダー */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+        filteredGroups.map((group) => {
+          const auctionId = group.auction?.id;
+          return (
+            <Accordion key={auctionId ?? 'unknown'} defaultExpanded sx={{ mb: 2 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', pr: 2, flexWrap: 'wrap' }}>
+                  <EventIcon sx={{ color: 'text.secondary' }} />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                      {group.auction?.title || '不明なオークション'}
+                    </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      No.{wonItem.item?.item_number ?? '-'}
+                      {group.auction?.event_date || ''} / {group.summary.item_count}品落札
                     </Typography>
-                    <Chip
-                      label={getPaymentStatusLabel(wonItem.payment_status)}
-                      size="small"
-                      sx={{ ...getPaymentStatusColor(wonItem.payment_status), fontWeight: 600, fontSize: '0.7rem' }}
-                    />
-                    <Chip
-                      label={getDeliveryStatusLabel(wonItem.delivery_status)}
-                      size="small"
-                      sx={{ bgcolor: '#DBEAFE', color: '#3B82F6', fontWeight: 600, fontSize: '0.7rem' }}
-                    />
                   </Box>
-
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                    {wonItem.item?.species_name || '（削除された商品）'}
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#059669' }}>
+                    ¥{group.summary.grand_total.toLocaleString()}
                   </Typography>
-
-                  {/* オークション情報 */}
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                    {wonItem.item?.auction ? `${wonItem.item.auction.title} (${wonItem.item.auction.event_date})` : ''}
-                  </Typography>
-
-                  {/* 金額情報 */}
-                  <Grid container spacing={2} sx={{ mb: 2 }}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        落札単価: ¥{Number(wonItem.winning_price).toLocaleString()} × {wonItem.quantity}匹
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        手数料: ¥{Number(wonItem.commission_amount).toLocaleString()}
-                      </Typography>
-                      {wonItem.shipping_fee > 0 && (
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          配送料金: ¥{Number(wonItem.shipping_fee).toLocaleString()}
-                        </Typography>
-                      )}
-                      <Typography variant="h6" sx={{ color: '#059669', fontWeight: 700, mt: 0.5 }}>
-                        合計: ¥{(Number(wonItem.total_amount) + Number(wonItem.shipping_fee)).toLocaleString()}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      {wonItem.payment_deadline && wonItem.payment_status === 'pending' && (
-                        <Typography variant="body2" sx={{ color: 'error.main' }}>
-                          支払期限: {new Date(wonItem.payment_deadline).toLocaleDateString('ja-JP')}
-                        </Typography>
-                      )}
-                      {wonItem.shipped_at && (
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          発送日: {new Date(wonItem.shipped_at).toLocaleDateString('ja-JP')}
-                        </Typography>
-                      )}
-                    </Grid>
-                  </Grid>
-
-                  {/* 配送情報 */}
-                  {wonItem.tracking_number && (
-                    <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, mb: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                          配送情報
-                        </Typography>
-                        <Button
-                          size="small"
-                          endIcon={<OpenInNewIcon />}
-                          onClick={() => handleOpenTrackingDetail(wonItem)}
-                        >
-                          詳細を見る
-                        </Button>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
-                        <Typography variant="body2">
-                          {wonItem.shipping_company}: 
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                          {wonItem.tracking_number}
-                        </Typography>
-                        <Tooltip title="コピー">
-                          <IconButton size="small" onClick={() => handleCopyTrackingNumber(wonItem.tracking_number!)}>
-                            <CopyIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Tooltip>
-                        {wonItem.shipping_company && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            endIcon={<OpenInNewIcon />}
-                            component={Link}
-                            href={getTrackingUrl(wonItem.tracking_number, wonItem.shipping_company)}
-                            target="_blank"
-                          >
-                            配送状況を確認
-                          </Button>
-                        )}
-                      </Box>
-                    </Box>
-                  )}
-
-                  {/* 配送先 */}
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                      配送先
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2">
-                        {wonItem.shipping_address || '未設定'}
-                      </Typography>
-                      {wonItem.payment_status === 'pending' && (
-                        <Button
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditAddress(wonItem)}
-                        >
-                          {wonItem.shipping_address ? '変更' : '設定'}
-                        </Button>
-                      )}
-                    </Box>
-                  </Box>
-
-                  {/* アクションボタン */}
-                  <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {group.summary.all_paid ? (
+                    <Chip label="入金済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
+                  ) : group.summary.any_pending ? (
+                    <Chip label="支払い待ち" size="small" sx={{ bgcolor: '#FEF3C7', color: '#F59E0B', fontWeight: 600 }} />
+                  ) : null}
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
+                {/* オークション単位のアクションボタン */}
+                {auctionId && (
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                     <Button
                       variant="outlined"
                       size="small"
                       startIcon={<DownloadIcon />}
-                      onClick={async () => {
-                        try {
-                          const res = await axios.get(`/api/participant/won-items/${wonItem.id}/invoice`, {
-                            responseType: 'blob',
-                          });
-                          const contentType = res.headers['content-type'] || '';
-                          if (!contentType.includes('application/pdf')) {
-                            const text = await (res.data as Blob).text();
-                            let msg = '請求書のダウンロードに失敗しました';
-                            try { msg = JSON.parse(text).message || msg; } catch {}
-                            setSnackbar({ open: true, message: msg, severity: 'error' });
-                            return;
-                          }
-                          const blob = new Blob([res.data], { type: 'application/pdf' });
-                          const url = window.URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.setAttribute('download', `invoice_${wonItem.id}.pdf`);
-                          document.body.appendChild(link);
-                          link.click();
-                          link.remove();
-                          window.URL.revokeObjectURL(url);
-                        } catch (err: any) {
-                          let msg = '請求書のダウンロードに失敗しました';
-                          if (err?.response?.data instanceof Blob) {
-                            try {
-                              const text = await err.response.data.text();
-                              msg = JSON.parse(text).message || msg;
-                            } catch {}
-                          }
-                          setSnackbar({ open: true, message: msg, severity: 'error' });
-                        }
-                      }}
+                      onClick={() => handleDownloadInvoice(auctionId)}
                     >
-                      請求書
+                      請求書ダウンロード
                     </Button>
-                    {['paid', 'confirmed'].includes(wonItem.payment_status) && (
+                    {group.summary.all_paid && (
                       <Button
                         variant="outlined"
                         size="small"
                         color="success"
                         startIcon={<DownloadIcon />}
-                        onClick={async () => {
-                          try {
-                            const res = await axios.get(`/api/participant/won-items/${wonItem.id}/receipt`, {
-                              responseType: 'blob',
-                            });
-                            const contentType = res.headers['content-type'] || '';
-                            if (!contentType.includes('application/pdf')) {
-                              const text = await (res.data as Blob).text();
-                              let msg = '領収書のダウンロードに失敗しました';
-                              try { msg = JSON.parse(text).message || msg; } catch {}
-                              setSnackbar({ open: true, message: msg, severity: 'error' });
-                              return;
-                            }
-                            const blob = new Blob([res.data], { type: 'application/pdf' });
-                            const url = window.URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.setAttribute('download', `receipt_${wonItem.id}.pdf`);
-                            document.body.appendChild(link);
-                            link.click();
-                            link.remove();
-                            window.URL.revokeObjectURL(url);
-                          } catch (err: any) {
-                            let msg = '領収書のダウンロードに失敗しました';
-                            if (err?.response?.data instanceof Blob) {
-                              try {
-                                const text = await err.response.data.text();
-                                msg = JSON.parse(text).message || msg;
-                              } catch {}
-                            }
-                            setSnackbar({ open: true, message: msg, severity: 'error' });
-                          }
-                        }}
+                        onClick={() => handleDownloadReceipt(auctionId)}
                       >
-                        領収書
+                        領収書ダウンロード
                       </Button>
                     )}
                   </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        ))
+                )}
+
+                <Divider sx={{ mb: 2 }} />
+
+                {/* 落札商品リスト */}
+                {group.won_items.map((wonItem) => (
+                  <Card key={wonItem.id} variant="outlined" sx={{ mb: 2 }}>
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={2}>
+                          <CardMedia
+                            component="img"
+                            image={wonItem.item?.thumbnail_path || '/img/noimage.png'}
+                            alt={wonItem.item?.species_name || '商品'}
+                            sx={{ borderRadius: 1, aspectRatio: '3/2', objectFit: 'cover', width: '100%' }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={10}>
+                          {/* ヘッダー */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              No.{wonItem.item?.item_number ?? '-'}
+                            </Typography>
+                            <Chip
+                              label={getPaymentStatusLabel(wonItem.payment_status)}
+                              size="small"
+                              sx={{ ...getPaymentStatusColor(wonItem.payment_status), fontWeight: 600, fontSize: '0.7rem' }}
+                            />
+                            <Chip
+                              label={getDeliveryStatusLabel(wonItem.delivery_status)}
+                              size="small"
+                              sx={{ bgcolor: '#DBEAFE', color: '#3B82F6', fontWeight: 600, fontSize: '0.7rem' }}
+                            />
+                          </Box>
+
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            {wonItem.item?.species_name || '（削除された商品）'}
+                          </Typography>
+
+                          {/* 金額情報 */}
+                          <Box sx={{ display: 'flex', gap: 3, mb: 1, flexWrap: 'wrap' }}>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                              ¥{Number(wonItem.winning_price).toLocaleString()} × {wonItem.quantity}匹
+                              = <strong>¥{Number(wonItem.total_amount).toLocaleString()}</strong>
+                            </Typography>
+                            {wonItem.shipping_fee > 0 && (
+                              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                配送料: ¥{Number(wonItem.shipping_fee).toLocaleString()}
+                              </Typography>
+                            )}
+                            {wonItem.payment_deadline && wonItem.payment_status === 'pending' && (
+                              <Typography variant="body2" sx={{ color: 'error.main' }}>
+                                支払期限: {new Date(wonItem.payment_deadline).toLocaleDateString('ja-JP')}
+                              </Typography>
+                            )}
+                          </Box>
+
+                          {/* 配送情報 */}
+                          {wonItem.tracking_number && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                              <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 16 }} />
+                              <Typography variant="body2">
+                                {wonItem.shipping_company}:
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                                {wonItem.tracking_number}
+                              </Typography>
+                              <Tooltip title="コピー">
+                                <IconButton size="small" onClick={() => handleCopyTrackingNumber(wonItem.tracking_number!)}>
+                                  <CopyIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                              {wonItem.shipping_company && (
+                                <Button
+                                  size="small"
+                                  variant="text"
+                                  endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                                  component={Link}
+                                  href={getTrackingUrl(wonItem.tracking_number, wonItem.shipping_company)}
+                                  target="_blank"
+                                  sx={{ fontSize: '0.75rem' }}
+                                >
+                                  追跡
+                                </Button>
+                              )}
+                            </Box>
+                          )}
+
+                          {/* 配送先 */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                              配送先: {wonItem.shipping_address || '未設定'}
+                            </Typography>
+                            {wonItem.payment_status === 'pending' && (
+                              <Button
+                                size="small"
+                                startIcon={<EditIcon />}
+                                onClick={() => handleEditAddress(wonItem)}
+                                sx={{ fontSize: '0.75rem' }}
+                              >
+                                {wonItem.shipping_address ? '変更' : '設定'}
+                              </Button>
+                            )}
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {/* オークション合計 */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 3, pt: 1 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    商品小計: ¥{group.summary.total_amount.toLocaleString()}
+                  </Typography>
+                  {group.summary.shipping_fee > 0 && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      配送料合計: ¥{group.summary.shipping_fee.toLocaleString()}
+                    </Typography>
+                  )}
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#059669' }}>
+                    合計: ¥{group.summary.grand_total.toLocaleString()}
+                  </Typography>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          );
+        })
       )}
 
       {/* 配送先編集ダイアログ */}
@@ -760,24 +791,14 @@ export default function WonItems() {
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   {selectedItem.item?.species_name || '（削除された商品）'}
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {selectedItem.item?.auction?.title || ''}
-                </Typography>
               </Box>
 
               <Divider sx={{ my: 2 }} />
 
-              {/* 配送ステップ */}
               <Stepper activeStep={getDeliveryStepIndex(selectedItem.delivery_status)} sx={{ mb: 3 }}>
-                <Step>
-                  <StepLabel>発送準備中</StepLabel>
-                </Step>
-                <Step>
-                  <StepLabel>配送中</StepLabel>
-                </Step>
-                <Step>
-                  <StepLabel>配達完了</StepLabel>
-                </Step>
+                <Step><StepLabel>発送準備中</StepLabel></Step>
+                <Step><StepLabel>配送中</StepLabel></Step>
+                <Step><StepLabel>配達完了</StepLabel></Step>
               </Stepper>
 
               {selectedItem.tracking_number && (
