@@ -134,7 +134,7 @@
     <p>下記の通りご請求申し上げます。</p>
 
     <div class="total-box">
-        ご請求金額: &yen;{{ number_format($grand_total) }}
+        ご請求金額: ¥{{ number_format($grand_total) }}
     </div>
 
     <table class="detail">
@@ -157,18 +157,18 @@
                 </td>
                 <td>{{ $species_name }}</td>
                 <td style="text-align: center">{{ $quantity }}匹</td>
-                <td class="right">&yen;{{ number_format($winning_price) }}</td>
-                <td class="right">&yen;{{ number_format($total_amount) }}</td>
+                <td class="right">¥{{ number_format($winning_price) }}</td>
+                <td class="right">¥{{ number_format($total_amount) }}</td>
             </tr>
             @if($shipping_fee > 0)
             <tr>
                 <td colspan="4">配送料金（送料・梱包資材費込）</td>
-                <td class="right">&yen;{{ number_format($shipping_fee) }}</td>
+                <td class="right">¥{{ number_format($shipping_fee) }}</td>
             </tr>
             @endif
             <tr class="subtotal-row">
                 <td colspan="4"><strong>合計（税込）</strong></td>
-                <td class="right"><strong>&yen;{{ number_format($grand_total) }}</strong></td>
+                <td class="right"><strong>¥{{ number_format($grand_total) }}</strong></td>
             </tr>
         </tbody>
     </table>

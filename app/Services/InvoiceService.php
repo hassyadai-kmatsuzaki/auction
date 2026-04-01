@@ -45,6 +45,9 @@ class InvoiceService
         $documentNumber = sprintf('%s-%s-%05d', $prefix, Carbon::now()->format('Ymd'), $wonItem->id);
 
         $item = $wonItem->item;
+        if (!$item) {
+            throw new \RuntimeException("落札品ID {$wonItem->id} に紐づく商品が見つかりません");
+        }
         $auction = $item->auction ?? null;
         $winner = $wonItem->winner;
 
@@ -76,8 +79,8 @@ class InvoiceService
             'quantity' => $wonItem->quantity,
             'winning_price' => (int) $wonItem->winning_price,
             'total_amount' => (int) $wonItem->total_amount,
-            'shipping_fee' => $wonItem->shipping_fee,
-            'grand_total' => (int) $wonItem->total_amount + $wonItem->shipping_fee,
+            'shipping_fee' => $wonItem->shipping_fee ?? 0,
+            'grand_total' => (int) $wonItem->total_amount + ($wonItem->shipping_fee ?? 0),
             // 支払い情報
             'payment_method' => $this->formatPaymentMethod($wonItem->payment_method),
             'payment_deadline' => $wonItem->payment_deadline?->format('Y年m月d日'),

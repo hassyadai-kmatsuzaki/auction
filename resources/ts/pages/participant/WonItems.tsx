@@ -576,8 +576,20 @@ export default function WonItems() {
                       startIcon={<DownloadIcon />}
                       onClick={async () => {
                         try {
-                          const res = await axios.get(`/api/participant/won-items/${wonItem.id}/invoice`, { responseType: 'blob' });
-                          const url = window.URL.createObjectURL(new Blob([res.data]));
+                          const res = await axios.get(`/api/participant/won-items/${wonItem.id}/invoice`, {
+                            responseType: 'blob',
+                            headers: { Accept: 'application/pdf' },
+                          });
+                          const contentType = res.headers['content-type'] || '';
+                          if (!contentType.includes('application/pdf')) {
+                            const text = await (res.data as Blob).text();
+                            let msg = '請求書のダウンロードに失敗しました';
+                            try { msg = JSON.parse(text).message || msg; } catch {}
+                            setSnackbar({ open: true, message: msg, severity: 'error' });
+                            return;
+                          }
+                          const blob = new Blob([res.data], { type: 'application/pdf' });
+                          const url = window.URL.createObjectURL(blob);
                           const link = document.createElement('a');
                           link.href = url;
                           link.setAttribute('download', `invoice_${wonItem.id}.pdf`);
@@ -585,8 +597,15 @@ export default function WonItems() {
                           link.click();
                           link.remove();
                           window.URL.revokeObjectURL(url);
-                        } catch {
-                          setSnackbar({ open: true, message: '請求書のダウンロードに失敗しました', severity: 'error' });
+                        } catch (err: any) {
+                          let msg = '請求書のダウンロードに失敗しました';
+                          if (err?.response?.data instanceof Blob) {
+                            try {
+                              const text = await err.response.data.text();
+                              msg = JSON.parse(text).message || msg;
+                            } catch {}
+                          }
+                          setSnackbar({ open: true, message: msg, severity: 'error' });
                         }
                       }}
                     >
@@ -600,8 +619,20 @@ export default function WonItems() {
                         startIcon={<DownloadIcon />}
                         onClick={async () => {
                           try {
-                            const res = await axios.get(`/api/participant/won-items/${wonItem.id}/receipt`, { responseType: 'blob' });
-                            const url = window.URL.createObjectURL(new Blob([res.data]));
+                            const res = await axios.get(`/api/participant/won-items/${wonItem.id}/receipt`, {
+                              responseType: 'blob',
+                              headers: { Accept: 'application/pdf' },
+                            });
+                            const contentType = res.headers['content-type'] || '';
+                            if (!contentType.includes('application/pdf')) {
+                              const text = await (res.data as Blob).text();
+                              let msg = '領収書のダウンロードに失敗しました';
+                              try { msg = JSON.parse(text).message || msg; } catch {}
+                              setSnackbar({ open: true, message: msg, severity: 'error' });
+                              return;
+                            }
+                            const blob = new Blob([res.data], { type: 'application/pdf' });
+                            const url = window.URL.createObjectURL(blob);
                             const link = document.createElement('a');
                             link.href = url;
                             link.setAttribute('download', `receipt_${wonItem.id}.pdf`);
@@ -609,8 +640,15 @@ export default function WonItems() {
                             link.click();
                             link.remove();
                             window.URL.revokeObjectURL(url);
-                          } catch {
-                            setSnackbar({ open: true, message: '領収書のダウンロードに失敗しました', severity: 'error' });
+                          } catch (err: any) {
+                            let msg = '領収書のダウンロードに失敗しました';
+                            if (err?.response?.data instanceof Blob) {
+                              try {
+                                const text = await err.response.data.text();
+                                msg = JSON.parse(text).message || msg;
+                              } catch {}
+                            }
+                            setSnackbar({ open: true, message: msg, severity: 'error' });
                           }
                         }}
                       >

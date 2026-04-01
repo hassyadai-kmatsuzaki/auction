@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WonItem;
 use App\Services\InvoiceService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class InvoiceController extends Controller
 {
@@ -21,9 +22,23 @@ class InvoiceController extends Controller
     {
         $wonItem = WonItem::where('winner_id', Auth::id())->findOrFail($id);
 
-        $pdf = $this->invoiceService->generateInvoice($wonItem);
+        try {
+            $pdf = $this->invoiceService->generateInvoice($wonItem);
+            $content = $pdf->output();
 
-        return $pdf->download("invoice_{$wonItem->id}.pdf");
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"invoice_{$wonItem->id}.pdf\"",
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('請求書PDF生成エラー', [
+                'won_item_id' => $wonItem->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => '請求書の生成に失敗しました'], 500);
+        }
     }
 
     /**
@@ -36,9 +51,23 @@ class InvoiceController extends Controller
             ->whereIn('payment_status', ['paid', 'confirmed'])
             ->findOrFail($id);
 
-        $pdf = $this->invoiceService->generateReceipt($wonItem);
+        try {
+            $pdf = $this->invoiceService->generateReceipt($wonItem);
+            $content = $pdf->output();
 
-        return $pdf->download("receipt_{$wonItem->id}.pdf");
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"receipt_{$wonItem->id}.pdf\"",
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('領収書PDF生成エラー', [
+                'won_item_id' => $wonItem->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => '領収書の生成に失敗しました'], 500);
+        }
     }
 
     /**
@@ -49,8 +78,22 @@ class InvoiceController extends Controller
     {
         $wonItem = WonItem::findOrFail($id);
 
-        $pdf = $this->invoiceService->generateInvoice($wonItem);
+        try {
+            $pdf = $this->invoiceService->generateInvoice($wonItem);
+            $content = $pdf->output();
 
-        return $pdf->download("invoice_{$wonItem->id}.pdf");
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"invoice_{$wonItem->id}.pdf\"",
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('請求書PDF生成エラー（管理者）', [
+                'won_item_id' => $wonItem->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => '請求書の生成に失敗しました'], 500);
+        }
     }
 }

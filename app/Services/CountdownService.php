@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Actions\Auction\FinishAuctionAction;
 use App\Actions\Bid\FinalizeBidAction;
 use App\Actions\Bid\LeaveBidAction;
 use App\Actions\Bid\SetBidLimitAction;
@@ -867,6 +868,14 @@ class CountdownService
                 'status' => 'finished',
                 'end_time' => now()->format('H:i:s'),
             ]);
+
+            // 落札者ごとに配送料を一括計算
+            try {
+                $finishAction = app(FinishAuctionAction::class);
+                $finishAction->calculateShippingForAuction($auction);
+            } catch (\Exception $e) {
+                Log::warning("配送料一括計算エラー: " . $e->getMessage());
+            }
 
             // ステータス変更イベントをブロードキャスト
             try {

@@ -9,6 +9,7 @@ use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\PriceEvent;
+use App\Models\User;
 use App\Models\WonItem;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
@@ -57,7 +58,22 @@ class FinalizeBidAction
 
             $item->update(['status' => 'sold']);
 
-            $wonItem = WonItem::create([
+            // 落札者の登録住所をデフォルト配送先としてコピー（配送料はオークション終了時に一括計算）
+            $winner = User::find($winnerId);
+            $shippingData = [];
+            if ($winner && $winner->prefecture) {
+                $shippingData = [
+                    'shipping_postal_code'  => $winner->postal_code,
+                    'shipping_prefecture'   => $winner->prefecture,
+                    'shipping_city'         => $winner->city,
+                    'shipping_address_line1' => $winner->address_line1,
+                    'shipping_address_line2' => $winner->address_line2,
+                    'shipping_name'         => $winner->name,
+                    'shipping_phone'        => $winner->phone,
+                ];
+            }
+
+            $wonItem = WonItem::create(array_merge([
                 'item_id'          => $item->id,
                 'winner_id'        => $winnerId,
                 'winning_price'    => $finalPrice,
@@ -69,7 +85,7 @@ class FinalizeBidAction
                 'payment_status'   => 'pending',
                 'delivery_status'  => 'pending',
                 'payment_deadline' => now()->addHours($auction->payment_deadline_hours),
-            ]);
+            ], $shippingData));
 
             BidEvent::recordWin($item->id, $winnerId, $finalPrice);
             PriceEvent::recordItemSold($item->id, $finalPrice, $winnerId);
