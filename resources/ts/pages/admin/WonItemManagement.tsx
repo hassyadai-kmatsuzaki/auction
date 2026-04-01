@@ -30,6 +30,7 @@ import {
   Alert,
   Snackbar,
   TablePagination,
+  Link,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -42,7 +43,7 @@ import {
   ContentCopy as CopyIcon,
   AttachMoney as MoneyIcon,
   Refresh as RefreshIcon,
-  Done as DoneIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -72,9 +73,25 @@ interface WonItem {
   delivery_method?: string;
   shipping_address?: string;
   tracking_number?: string;
+  shipping_company?: string;
   shipped_at?: string;
   created_at: string;
 }
+
+// 配送業者の追跡URLを生成
+const getTrackingUrl = (trackingNumber: string, company: string) => {
+  const cleanNumber = trackingNumber.replace(/-/g, '');
+  switch (company) {
+    case 'ヤマト運輸':
+      return `https://jizen.kuronekoyamato.co.jp/jizen/servlet/crjz.b.NQ0010?id=${cleanNumber}`;
+    case '佐川急便':
+      return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${cleanNumber}`;
+    case '日本郵便':
+      return `https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S003&locale=ja&SVID=023&reqCodeNo1=${cleanNumber}`;
+    default:
+      return '';
+  }
+};
 
 interface Statistics {
   total_items: number;
@@ -220,22 +237,6 @@ export default function WonItemManagement() {
       }
     } catch (err: any) {
       setSnackbar({ open: true, message: err.response?.data?.message || '発送登録に失敗しました', severity: 'error' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // 配達完了
-  const handleComplete = async (id: number) => {
-    setActionLoading(true);
-    try {
-      const response = await axios.post(`/api/admin/won-items/${id}/complete`);
-      if (response.data.success) {
-        setSnackbar({ open: true, message: '配達完了を登録しました', severity: 'success' });
-        fetchWonItems();
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '配達完了登録に失敗しました', severity: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -489,6 +490,18 @@ export default function WonItemManagement() {
                               <CopyIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Tooltip>
+                          {item.shipping_company && getTrackingUrl(item.tracking_number, item.shipping_company) && (
+                            <Tooltip title="配送状況を確認">
+                              <IconButton
+                                size="small"
+                                component={Link}
+                                href={getTrackingUrl(item.tracking_number, item.shipping_company)}
+                                target="_blank"
+                              >
+                                <OpenInNewIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       ) : (
                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
@@ -519,15 +532,16 @@ export default function WonItemManagement() {
                             </IconButton>
                           </Tooltip>
                         )}
-                        {item.delivery_status === 'shipped' && (
-                          <Tooltip title="配達完了">
+                        {item.delivery_status === 'shipped' && item.tracking_number && item.shipping_company && (
+                          <Tooltip title="配送状況を確認">
                             <IconButton
                               size="small"
-                              sx={{ color: 'success.main' }}
-                              onClick={() => handleComplete(item.id)}
-                              disabled={actionLoading}
+                              sx={{ color: 'primary.main' }}
+                              component={Link}
+                              href={getTrackingUrl(item.tracking_number, item.shipping_company)}
+                              target="_blank"
                             >
-                              <DoneIcon sx={{ fontSize: 18 }} />
+                              <OpenInNewIcon sx={{ fontSize: 18 }} />
                             </IconButton>
                           </Tooltip>
                         )}

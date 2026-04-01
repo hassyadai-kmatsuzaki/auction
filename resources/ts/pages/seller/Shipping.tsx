@@ -17,11 +17,6 @@ import {
   TableRow,
   Chip,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Grid,
   Tooltip,
   Link,
   CircularProgress,
@@ -30,8 +25,6 @@ import {
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  LocalShipping as ShippingIcon,
-  Edit as EditIcon,
   OpenInNew as OpenInNewIcon,
   ContentCopy as CopyIcon,
   Refresh as RefreshIcon,
@@ -74,9 +67,19 @@ interface Statistics {
   delivered: number;
 }
 
-// ヤマト運輸の追跡URLを生成
-const getYamatoTrackingUrl = (trackingNumber: string) => {
-  return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${trackingNumber.replace(/-/g, '')}`;
+// 配送業者の追跡URLを生成
+const getTrackingUrl = (trackingNumber: string, company: string) => {
+  const cleanNumber = trackingNumber.replace(/-/g, '');
+  switch (company) {
+    case 'ヤマト運輸':
+      return `https://jizen.kuronekoyamato.co.jp/jizen/servlet/crjz.b.NQ0010?id=${cleanNumber}`;
+    case '佐川急便':
+      return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${cleanNumber}`;
+    case '日本郵便':
+      return `https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S003&locale=ja&SVID=023&reqCodeNo1=${cleanNumber}`;
+    default:
+      return '';
+  }
 };
 
 export default function SellerShipping() {
@@ -86,10 +89,6 @@ export default function SellerShipping() {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<ShippingItem | null>(null);
-  const [trackingForm, setTrackingForm] = useState({ tracking_number: '', shipping_company: 'ヤマト運輸' });
-  const [actionLoading, setActionLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -121,57 +120,6 @@ export default function SellerShipping() {
   useEffect(() => {
     fetchShippingItems();
   }, [fetchShippingItems]);
-
-  // 発送登録
-  const handleShip = async () => {
-    if (!selectedItem || !trackingForm.tracking_number) return;
-    setActionLoading(true);
-    try {
-      const response = await axios.post(`/api/seller/shipping/${selectedItem.id}/ship`, {
-        shipping_company: trackingForm.shipping_company,
-        tracking_number: trackingForm.tracking_number,
-      });
-      if (response.data.success) {
-        setSnackbar({ open: true, message: '発送情報を登録しました', severity: 'success' });
-        setTrackingDialogOpen(false);
-        fetchShippingItems();
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '発送登録に失敗しました', severity: 'error' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // 伝票番号更新
-  const handleUpdateTracking = async () => {
-    if (!selectedItem || !trackingForm.tracking_number) return;
-    setActionLoading(true);
-    try {
-      const response = await axios.put(`/api/seller/shipping/${selectedItem.id}/tracking`, {
-        shipping_company: trackingForm.shipping_company,
-        tracking_number: trackingForm.tracking_number,
-      });
-      if (response.data.success) {
-        setSnackbar({ open: true, message: '伝票番号を更新しました', severity: 'success' });
-        setTrackingDialogOpen(false);
-        fetchShippingItems();
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '更新に失敗しました', severity: 'error' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleOpenTrackingDialog = (item: ShippingItem) => {
-    setSelectedItem(item);
-    setTrackingForm({
-      tracking_number: item.tracking_number || '',
-      shipping_company: item.shipping_company || 'ヤマト運輸',
-    });
-    setTrackingDialogOpen(true);
-  };
 
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -352,16 +300,18 @@ export default function SellerShipping() {
                               <CopyIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="配送状況を確認">
-                            <IconButton
-                              size="small"
-                              component={Link}
-                              href={getYamatoTrackingUrl(item.tracking_number)}
-                              target="_blank"
-                            >
-                              <OpenInNewIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
+                          {item.shipping_company && getTrackingUrl(item.tracking_number, item.shipping_company) && (
+                            <Tooltip title="配送状況を確認">
+                              <IconButton
+                                size="small"
+                                component={Link}
+                                href={getTrackingUrl(item.tracking_number, item.shipping_company)}
+                                target="_blank"
+                              >
+                                <OpenInNewIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       ) : (
                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -370,25 +320,19 @@ export default function SellerShipping() {
                       )}
                     </TableCell>
                     <TableCell align="center">
-                      {item.delivery_status === 'pending' && item.payment_status !== 'pending' && (
+                      {item.tracking_number && item.shipping_company && getTrackingUrl(item.tracking_number, item.shipping_company) ? (
                         <Button
                           size="small"
-                          variant="contained"
-                          startIcon={<ShippingIcon />}
-                          onClick={() => handleOpenTrackingDialog(item)}
+                          variant="outlined"
+                          endIcon={<OpenInNewIcon />}
+                          component={Link}
+                          href={getTrackingUrl(item.tracking_number, item.shipping_company)}
+                          target="_blank"
                         >
-                          発送登録
+                          配送状況
                         </Button>
-                      )}
-                      {item.delivery_status === 'pending' && item.payment_status === 'pending' && (
-                        <Chip label="入金待ち" size="small" sx={{ bgcolor: '#FEF3C7', color: '#D97706' }} />
-                      )}
-                      {item.delivery_status !== 'pending' && item.tracking_number && (
-                        <Tooltip title="伝票番号を編集">
-                          <IconButton size="small" onClick={() => handleOpenTrackingDialog(item)}>
-                            <EditIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
+                      ) : (
+                        <Chip label={item.payment_status === 'pending' ? '入金待ち' : '発送待ち'} size="small" sx={{ bgcolor: '#FEF3C7', color: '#D97706' }} />
                       )}
                     </TableCell>
                   </TableRow>
@@ -399,67 +343,6 @@ export default function SellerShipping() {
         </TableContainer>
       </Card>
 
-      {/* 伝票番号登録ダイアログ */}
-      <Dialog open={trackingDialogOpen} onClose={() => setTrackingDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedItem?.delivery_status === 'pending' ? '発送情報を登録' : '伝票番号を編集'}
-        </DialogTitle>
-        <DialogContent>
-          {selectedItem && (
-            <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                {selectedItem.item.species_name}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                買受者: {selectedItem.buyer?.name || '不明'}
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                配送先: {selectedItem.buyer?.address || '住所未登録'}
-              </Typography>
-            </Box>
-          )}
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="配送業者"
-                value={trackingForm.shipping_company}
-                onChange={(e) => setTrackingForm({ ...trackingForm, shipping_company: e.target.value })}
-                select
-                SelectProps={{ native: true }}
-              >
-                <option value="ヤマト運輸">ヤマト運輸</option>
-                <option value="佐川急便">佐川急便</option>
-                <option value="日本郵便">日本郵便</option>
-                <option value="その他">その他</option>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="伝票番号"
-                value={trackingForm.tracking_number}
-                onChange={(e) => setTrackingForm({ ...trackingForm, tracking_number: e.target.value })}
-                placeholder="1234-5678-9012"
-                required
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTrackingDialogOpen(false)} disabled={actionLoading}>
-            キャンセル
-          </Button>
-          <Button
-            variant="contained"
-            onClick={selectedItem?.delivery_status === 'pending' ? handleShip : handleUpdateTracking}
-            startIcon={actionLoading ? <CircularProgress size={20} /> : <ShippingIcon />}
-            disabled={actionLoading || !trackingForm.tracking_number}
-          >
-            {selectedItem?.delivery_status === 'pending' ? '発送登録' : '更新'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* スナックバー */}
       <Snackbar

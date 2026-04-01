@@ -20,7 +20,7 @@ class InvoiceService
 
         return Pdf::loadView('pdf.invoice', $data)
             ->setPaper('a4')
-            ->setOption('defaultFont', 'sans-serif')
+            ->setOption('defaultFont', 'ipagothic')
             ->setOption('isRemoteEnabled', true);
     }
 
@@ -35,7 +35,7 @@ class InvoiceService
 
         return Pdf::loadView('pdf.receipt', $data)
             ->setPaper('a4')
-            ->setOption('defaultFont', 'sans-serif')
+            ->setOption('defaultFont', 'ipagothic')
             ->setOption('isRemoteEnabled', true);
     }
 

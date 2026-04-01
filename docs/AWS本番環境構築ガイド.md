@@ -96,7 +96,7 @@ EC2 インスタンス
 
 | サービス | 用途 | 選定理由 |
 |---------|------|---------|
-| **EC2** (t3.medium) | App/Nginx/Reverb/Queue | WebSocket常駐プロセスがあるためECS/Fargateより制御しやすい |
+| **EC2** (t3.large) | App/Nginx/Reverb/Queue | WebSocket常駐プロセスがあるためECS/Fargateより制御しやすい。500人同時接続にはPHP-FPM 100ワーカー+Reverb+Queue Workerで8GB RAM必要 |
 | **ALB** | ロードバランサー | WebSocket対応、パスベースルーティング、SSL終端 |
 | **RDS MySQL** | 永続データ | マネージドDB、自動バックアップ、Multi-AZ |
 | **ElastiCache Redis** | Cache/Queue/Session/Pub-Sub | インメモリ高速処理、Reverb Pub/Sub |
@@ -229,9 +229,12 @@ CIDR: 10.0.0.0/16
 
 | 項目 | 選択値 | 説明 |
 |------|--------|------|
-| インスタンスタイプ | **t3.medium** | 2 vCPU / 4GB RAM（同時接続500人規模に対応） |
+| インスタンスタイプ | **t3.large** | 2 vCPU / 8GB RAM（同時接続500人規模に対応） |
 
-> **コストの目安**: 約$30〜35/月（東京リージョン）
+> **コストの目安**: 約$60〜70/月（東京リージョン）
+>
+> **なぜ t3.large か**: 500人同時接続では PHP-FPM 100ワーカー + Reverb + Queue Worker を同時実行する必要があり、
+> t3.medium (4GB) ではメモリ不足になります。t3.large (8GB) なら余裕を持って運用できます。
 
 #### 手順5: キーペアの設定
 
@@ -568,7 +571,7 @@ Route::get('/health', function () {
 | 設定項目 | 推奨値 | 説明 |
 |---------|--------|------|
 | エンジン | MySQL 8.0 | 現行と同じ |
-| インスタンスクラス | **db.t3.small** | 2 vCPU / 2GB RAM |
+| インスタンスクラス | **db.t3.medium** | 2 vCPU / 4GB RAM（max_connections=150、500人対応に必須） |
 | ストレージ | gp3 20GB（自動拡張有効） | 初期は小さく |
 | Multi-AZ | **有効** | 自動フェイルオーバー |
 | サブネットグループ | private-a, private-c | プライベートサブネット |
@@ -586,10 +589,11 @@ character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 
 # 接続数（500人同時接続対応）
-max_connections = 200
+# db.t3.medium のデフォルトは約150。PHP-FPM 100ワーカー + Queue Worker + Reverb を考慮
+max_connections = 150
 
-# バッファ
-innodb_buffer_pool_size = 1073741824  # 1GB（メモリの50-75%）
+# バッファ（db.t3.medium: 4GB RAMの50-75%）
+innodb_buffer_pool_size = 2147483648  # 2GB
 innodb_log_file_size = 268435456      # 256MB
 
 # スロークエリログ
@@ -609,7 +613,7 @@ time_zone = Asia/Tokyo
 | 設定項目 | 推奨値 |
 |---------|--------|
 | エンジン | Redis 7.x |
-| ノードタイプ | **cache.t3.small**（1.5GB RAM） |
+| ノードタイプ | **cache.t3.medium**（3GB RAM）。500人同時接続ではセッション+キャッシュ+キューで3,000+ops/secが発生するため、cache.t3.smallでは不足 |
 | レプリカ | 1（Multi-AZ） |
 | サブネットグループ | private-a, private-c |
 | セキュリティグループ | sg-redis |
@@ -783,12 +787,13 @@ listen.mode = 0660
 ; dynamic: 負荷に応じてワーカー数を自動調整
 pm = dynamic
 
-; t3.medium (4GB RAM) の場合:
-; 1プロセス ≈ 40-60MB → 最大50プロセスで約2.5GB
-pm.max_children = 50
-pm.start_servers = 10
-pm.min_spare_servers = 5
-pm.max_spare_servers = 20
+; t3.large (8GB RAM) の場合:
+; 1プロセス ≈ 40-60MB → 最大100プロセスで約5GB
+; Reverb(500MB) + Queue Worker(500MB) + OS(1GB) を差し引いた残りで計算
+pm.max_children = 100
+pm.start_servers = 20
+pm.min_spare_servers = 10
+pm.max_spare_servers = 40
 pm.max_requests = 1000
 
 ; タイムアウト
@@ -1146,19 +1151,22 @@ Git リポジトリ（GitHub/CodeCommit）が正のソース。EC2上のコー�
 
 ### 16.1 推奨構成（500人同時接続）— 月額詳細
 
+> **2026-04-01 更新**: 実コード精査により、500人同時接続に必要な最小スペックを再算定。
+> 旧構成（t3.medium / db.t3.small / cache.t3.small）では DB接続数不足・Redis負荷超過が発生するため、以下に引き上げ。
+
 #### コンピューティング
 
 | サービス | スペック | 単価 | 時間/月 | 月額 (USD) | 月額 (JPY) |
 |---------|---------|------|---------|-----------|-----------|
-| EC2 | t3.medium (2vCPU/4GB) × 1 | $0.0544/時 | 730h | **$39.71** | ¥5,957 |
+| EC2 | t3.large (2vCPU/8GB) × 1 | $0.1088/時 | 730h | **$79.42** | ¥11,913 |
 | EBS (gp3) | 30GB | $0.096/GB | — | **$2.88** | ¥432 |
 
 #### データベース
 
 | サービス | スペック | 単価 | 月額 (USD) | 月額 (JPY) | 備考 |
 |---------|---------|------|-----------|-----------|------|
-| RDS MySQL | db.t3.small (2vCPU/2GB) | $0.044/時 | **$32.12** | ¥4,818 | シングルAZ |
-| RDS MySQL | db.t3.small **Multi-AZ** | $0.088/時 | **$64.24** | ¥9,636 | 推奨 |
+| RDS MySQL | db.t3.medium (2vCPU/4GB) | $0.088/時 | **$64.24** | ¥9,636 | シングルAZ |
+| RDS MySQL | db.t3.medium **Multi-AZ** | $0.176/時 | **$128.48** | ¥19,272 | 推奨（max_connections=150） |
 | RDS ストレージ | gp3 20GB | $0.138/GB | **$2.76** | ¥414 | |
 | RDS バックアップ | 20GB（自動） | 無料 | **$0** | ¥0 | DB容量まで無料 |
 
@@ -1166,8 +1174,8 @@ Git リポジトリ（GitHub/CodeCommit）が正のソース。EC2上のコー�
 
 | サービス | スペック | 単価 | 月額 (USD) | 月額 (JPY) | 備考 |
 |---------|---------|------|-----------|-----------|------|
-| ElastiCache | cache.t3.small (1.5GB) | $0.034/時 | **$24.82** | ¥3,723 | シングルノード |
-| ElastiCache | cache.t3.small **+ レプリカ** | — | **$49.64** | ¥7,446 | Multi-AZ推奨 |
+| ElastiCache | cache.t3.medium (3GB) | $0.068/時 | **$49.64** | ¥7,446 | シングルノード |
+| ElastiCache | cache.t3.medium **+ レプリカ** | — | **$99.28** | ¥14,892 | Multi-AZ推奨 |
 
 #### ネットワーク
 
@@ -1195,7 +1203,7 @@ Git リポジトリ（GitHub/CodeCommit）が正のソース。EC2上のコー�
 
 ### 16.2 合計コスト（3パターン）
 
-#### パターンA: 最小構成（コスト優先）
+#### パターンA: 最小構成（100人以下・テスト用）
 
 シングルAZ、レプリカなし。開発・テスト・小規模運用向け。
 
@@ -1207,47 +1215,53 @@ Git リポジトリ（GitHub/CodeCommit）が正のソース。EC2上のコー�
 | RDS ストレージ 20GB | $2.76 |
 | ElastiCache cache.t3.small (シングル) | $24.82 |
 | ALB | $25.74 |
-| NAT Gateway | $35.10 |
 | Route 53 | $0.90 |
 | データ転送 100GB | $11.40 |
 | CloudWatch | $6.35 |
-| **合計** | **約 $182/月（¥27,300）** |
+| **合計** | **約 $147/月（¥22,050）** |
 
-#### パターンB: 推奨構成（可用性重視）★おすすめ
+> 注: NAT Gateway は EC2 がパブリックサブネットにあるため不要
 
-Multi-AZ有効、レプリカあり。本番運用向け。
+#### パターンB: 500人対応構成（可用性重視）★おすすめ
+
+Multi-AZ有効、レプリカあり。500人同時接続の本番運用向け。
 
 | 項目 | 月額 (USD) |
 |------|-----------|
-| EC2 t3.medium × 1 | $39.71 |
+| EC2 t3.large × 1 | $79.42 |
 | EBS 30GB | $2.88 |
-| RDS db.t3.small (**Multi-AZ**) | $64.24 |
+| RDS db.t3.medium (**Multi-AZ**) | $128.48 |
 | RDS ストレージ 20GB | $2.76 |
-| ElastiCache cache.t3.small (**+ レプリカ**) | $49.64 |
+| ElastiCache cache.t3.medium (**+ レプリカ**) | $99.28 |
 | ALB | $25.74 |
-| NAT Gateway | $35.10 |
-| Route 53 | $0.90 |
-| データ転送 100GB | $11.40 |
-| CloudWatch | $6.35 |
-| **合計** | **約 $239/月（¥35,850）** |
-
-#### パターンC: 高可用性構成（1000人対応）
-
-EC2 2台、大きめインスタンス。
-
-| 項目 | 月額 (USD) |
-|------|-----------|
-| EC2 t3.large × 2 | $122.64 |
-| EBS 30GB × 2 | $5.76 |
-| RDS db.t3.medium (Multi-AZ) | $128.48 |
-| RDS ストレージ 50GB | $6.90 |
-| ElastiCache cache.t3.medium (+ レプリカ) | $99.28 |
-| ALB | $30.00 |
-| NAT Gateway | $40.00 |
 | Route 53 | $0.90 |
 | データ転送 200GB | $22.80 |
 | CloudWatch | $10.00 |
-| **合計** | **約 $467/月（¥70,050）** |
+| **合計** | **約 $372/月（¥55,800）** |
+
+> **なぜ旧構成（t3.medium / db.t3.small）では不足か**:
+> - db.t3.small の max_connections=45 → 500人 × 2接続 = 1,000接続必要で大幅に不足
+> - cache.t3.small 1台で セッション+キャッシュ+キュー の 3,000+ops/sec を処理不能
+> - t3.medium (4GB) では PHP-FPM 100ワーカー + Reverb + Queue Worker のメモリが不足
+
+#### パターンC: 高可用性構成（1000人対応）
+
+EC2 2台 + Reverb Redis Scaling、大きめインスタンス。
+
+| 項目 | 月額 (USD) |
+|------|-----------|
+| EC2 t3.large × 2 | $158.84 |
+| EBS 30GB × 2 | $5.76 |
+| RDS db.t3.large (Multi-AZ) | $256.96 |
+| RDS ストレージ 50GB | $6.90 |
+| ElastiCache cache.m6g.large (+ レプリカ) | $198.56 |
+| ALB | $30.00 |
+| Route 53 | $0.90 |
+| データ転送 200GB | $22.80 |
+| CloudWatch | $10.00 |
+| **合計** | **約 $691/月（¥103,650）** |
+
+> EC2 複数台時は `REVERB_SCALING_ENABLED=true` が必須
 
 ---
 
@@ -1256,10 +1270,11 @@ EC2 2台、大きめインスタンス。
 | 項目 | 旧構成（Pusher + DB） | 新構成（Reverb + Redis） | 差額 |
 |------|---------------------|------------------------|------|
 | Pusher Business | $299/月 (¥44,850) | $0 | **-$299** |
-| ElastiCache Redis | $0 | $50/月 | +$50 |
-| EC2/RDS/ALB等 | 同等 | 同等 | $0 |
-| **インフラ合計** | **$482/月** | **$239/月** | **-$243/月** |
-| **年間** | **$5,784** | **$2,868** | **-$2,916/年（¥437,400節約）** |
+| ElastiCache Redis | $0 | $99/月 | +$99 |
+| EC2 (t3.medium→t3.large) | $40/月 | $79/月 | +$39 |
+| RDS (db.t3.small→db.t3.medium Multi-AZ) | $64/月 | $128/月 | +$64 |
+| **インフラ合計** | **$482/月** | **$372/月** | **-$110/月** |
+| **年間** | **$5,784** | **$4,464** | **-$1,320/年（¥198,000節約）** |
 
 ---
 
@@ -1274,15 +1289,15 @@ EC2 2台、大きめインスタンス。
 | **NAT Gateway → VPCエンドポイント** | $35→$10/月 | S3/CloudWatch等はVPCエンドポイントで無料化 |
 | **Savings Plans（1年）** | 約30%OFF | EC2 + Fargate 横断で適用 |
 
-#### リザーブド適用時の最安構成
+#### リザーブド適用時の最安構成（パターンB: 500人対応）
 
 | 項目 | オンデマンド | RI 1年適用後 |
 |------|-----------|-------------|
-| EC2 t3.medium | $39.71 | **$25.00** |
-| RDS db.t3.small Multi-AZ | $64.24 | **$45.00** |
-| ElastiCache cache.t3.small + レプリカ | $49.64 | **$35.00** |
-| その他（ALB/NAT/Route53等） | $82.37 | $82.37 |
-| **合計** | **$239/月** | **約 $187/月（¥28,050）** |
+| EC2 t3.large | $79.42 | **$50.00** |
+| RDS db.t3.medium Multi-AZ | $128.48 | **$90.00** |
+| ElastiCache cache.t3.medium + レプリカ | $99.28 | **$70.00** |
+| その他（ALB/Route53/データ転送等） | $62.08 | $62.08 |
+| **合計** | **$372/月** | **約 $272/月（¥40,800）** |
 
 ---
 
@@ -1292,10 +1307,14 @@ EC2 2台、大きめインスタンス。
 
 | 同時接続数 | EC2 | RDS | Redis | 月額概算 |
 |-----------|-----|-----|-------|---------|
-| ~500人 | t3.medium × 1 | db.t3.small | cache.t3.small | $223 |
-| ~1,000人 | t3.large × 1 | db.t3.medium | cache.t3.medium | $350 |
-| ~2,000人 | t3.large × 2 (ALB) | db.t3.large | cache.m6g.large | $600 |
-| ~5,000人 | c6i.xlarge × 3 (ALB) | db.r6g.large | cache.m6g.xlarge | $1,200 |
+| ~100人 | t3.medium × 1 | db.t3.small (Multi-AZ) | cache.t3.small (レプリカ付) | $220 |
+| ~500人 | **t3.large × 1** | **db.t3.medium (Multi-AZ)** | **cache.t3.medium (レプリカ付)** | **$372** |
+| ~1,000人 | t3.large × 2 (ALB) | db.t3.large (Multi-AZ) | cache.m6g.large (レプリカ付) | $691 |
+| ~2,000人 | c6i.xlarge × 2 (ALB) | db.r6g.large (Multi-AZ) | cache.m6g.xlarge (レプリカ付) | $1,000 |
+| ~5,000人 | c6i.xlarge × 3 (ALB) | db.r6g.xlarge (Multi-AZ) | cache.m6g.2xlarge (レプリカ付) | $1,800 |
+
+> **注意**: 500人以上ではコード修正（競合状態の解消、N+1解消、ブロードキャスト最適化）も必須。
+> インフラ増強だけでは入札の正確性を保証できません。詳細は `同時接続500人_負荷耐性レポート.md` を参照。
 
 ### 17.2 スケールアウト時の注意点
 

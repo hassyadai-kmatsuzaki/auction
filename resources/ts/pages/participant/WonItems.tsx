@@ -77,16 +77,16 @@ interface Summary {
   item_count: number;
 }
 
-// ヤマト運輸の追跡URLを生成
+// 配送業者の追跡URLを生成
 const getTrackingUrl = (trackingNumber: string, company: string) => {
   const cleanNumber = trackingNumber.replace(/-/g, '');
   switch (company) {
     case 'ヤマト運輸':
-      return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${cleanNumber}`;
+      return `https://jizen.kuronekoyamato.co.jp/jizen/servlet/crjz.b.NQ0010?id=${cleanNumber}`;
     case '佐川急便':
       return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${cleanNumber}`;
     case '日本郵便':
-      return `https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=${cleanNumber}`;
+      return `https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S003&locale=ja&SVID=023&reqCodeNo1=${cleanNumber}`;
     default:
       return '';
   }

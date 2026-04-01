@@ -3,10 +3,8 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
-
         body {
-            font-family: 'Noto Sans JP', 'DejaVu Sans', sans-serif;
+            font-family: 'ipagothic', 'DejaVu Sans', sans-serif;
             font-size: 11px;
             color: #333;
             line-height: 1.7;
