@@ -578,7 +578,6 @@ export default function WonItems() {
                         try {
                           const res = await axios.get(`/api/participant/won-items/${wonItem.id}/invoice`, {
                             responseType: 'blob',
-                            headers: { Accept: 'application/pdf' },
                           });
                           const contentType = res.headers['content-type'] || '';
                           if (!contentType.includes('application/pdf')) {
@@ -621,7 +620,6 @@ export default function WonItems() {
                           try {
                             const res = await axios.get(`/api/participant/won-items/${wonItem.id}/receipt`, {
                               responseType: 'blob',
-                              headers: { Accept: 'application/pdf' },
                             });
                             const contentType = res.headers['content-type'] || '';
                             if (!contentType.includes('application/pdf')) {
