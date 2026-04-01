@@ -73,7 +73,23 @@ class InvoiceService
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
-        $bankInfo = SystemSetting::get('bank_info', '');
+
+        // 振込先情報を個別設定から組み立て
+        $bankName = SystemSetting::get('bank_name', '');
+        $bankBranch = SystemSetting::get('bank_branch', '');
+        $bankAccountType = SystemSetting::get('bank_account_type', '');
+        $bankAccountNumber = SystemSetting::get('bank_account_number', '');
+        $bankAccountHolder = SystemSetting::get('bank_account_holder', '');
+        $bankInfo = '';
+        if ($bankName) {
+            $parts = array_filter([
+                $bankName . ($bankBranch ? " {$bankBranch}" : ''),
+                $bankAccountType ? "口座種別: {$bankAccountType}" : '',
+                $bankAccountNumber ? "口座番号: {$bankAccountNumber}" : '',
+                $bankAccountHolder ? "口座名義: {$bankAccountHolder}" : '',
+            ]);
+            $bankInfo = implode("\n", $parts);
+        }
 
         // 明細行を構築
         $items = $wonItems->map(function ($wonItem) {

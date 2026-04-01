@@ -82,6 +82,10 @@ interface AuctionGroup {
     all_paid: boolean;
     any_pending: boolean;
   };
+  shipping: {
+    address: string | null;
+    can_update: boolean;
+  };
   won_items: WonItemData[];
 }
 
@@ -151,7 +155,7 @@ export default function WonItems() {
   const [defaultAddress, setDefaultAddress] = useState<DefaultAddress | null>(null);
 
   const [editAddressOpen, setEditAddressOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<WonItemData | null>(null);
+  const [editingAuctionId, setEditingAuctionId] = useState<number | null>(null);
   const [addressForm, setAddressForm] = useState({
     shipping_postal_code: '',
     shipping_prefecture: '',
@@ -254,66 +258,80 @@ export default function WonItems() {
   const filteredGroups = getFilteredAuctionGroups();
   const tabCounts = getTabCounts();
 
-  const handleEditAddress = async (item: WonItemData) => {
+  const handleEditAddress = async (auctionId: number) => {
+    // オークション内の最初の落札品から既存住所を取得
+    const group = auctionGroups.find(g => g.auction?.id === auctionId);
+    const firstItemId = group?.won_items[0]?.id;
+
     try {
-      const response = await axios.get(`/api/participant/won-items/${item.id}`);
-      if (response.data.success) {
-        const detail = response.data.data.won_item;
-        const hasExisting = detail.shipping_postal_code;
-        if (hasExisting) {
-          setAddressForm({
-            shipping_postal_code: detail.shipping_postal_code || '',
-            shipping_prefecture: detail.shipping_prefecture || '',
-            shipping_city: detail.shipping_city || '',
-            shipping_address_line1: detail.shipping_address_line1 || '',
-            shipping_address_line2: detail.shipping_address_line2 || '',
-            shipping_name: detail.shipping_name || '',
-            shipping_phone: detail.shipping_phone || '',
-          });
-        } else if (defaultAddress) {
-          setAddressForm({
-            shipping_postal_code: defaultAddress.postal_code,
-            shipping_prefecture: defaultAddress.prefecture,
-            shipping_city: defaultAddress.city,
-            shipping_address_line1: defaultAddress.address_line1,
-            shipping_address_line2: defaultAddress.address_line2,
-            shipping_name: defaultAddress.name,
-            shipping_phone: defaultAddress.phone,
-          });
-        } else {
-          setAddressForm({
-            shipping_postal_code: '',
-            shipping_prefecture: '',
-            shipping_city: '',
-            shipping_address_line1: '',
-            shipping_address_line2: '',
-            shipping_name: '',
-            shipping_phone: '',
-          });
+      if (firstItemId) {
+        const response = await axios.get(`/api/participant/won-items/${firstItemId}`);
+        if (response.data.success) {
+          const detail = response.data.data.won_item;
+          if (detail.shipping_postal_code) {
+            setAddressForm({
+              shipping_postal_code: detail.shipping_postal_code || '',
+              shipping_prefecture: detail.shipping_prefecture || '',
+              shipping_city: detail.shipping_city || '',
+              shipping_address_line1: detail.shipping_address_line1 || '',
+              shipping_address_line2: detail.shipping_address_line2 || '',
+              shipping_name: detail.shipping_name || '',
+              shipping_phone: detail.shipping_phone || '',
+            });
+            setEditingAuctionId(auctionId);
+            setEditAddressOpen(true);
+            return;
+          }
         }
-        setEditingItem(item);
-        setEditAddressOpen(true);
       }
     } catch {
-      setSnackbar({ open: true, message: '情報の取得に失敗しました', severity: 'error' });
+      // フォールバック
     }
+
+    // 既存住所がない場合はデフォルトを使用
+    if (defaultAddress) {
+      setAddressForm({
+        shipping_postal_code: defaultAddress.postal_code,
+        shipping_prefecture: defaultAddress.prefecture,
+        shipping_city: defaultAddress.city,
+        shipping_address_line1: defaultAddress.address_line1,
+        shipping_address_line2: defaultAddress.address_line2,
+        shipping_name: defaultAddress.name,
+        shipping_phone: defaultAddress.phone,
+      });
+    } else {
+      setAddressForm({
+        shipping_postal_code: '',
+        shipping_prefecture: '',
+        shipping_city: '',
+        shipping_address_line1: '',
+        shipping_address_line2: '',
+        shipping_name: '',
+        shipping_phone: '',
+      });
+    }
+    setEditingAuctionId(auctionId);
+    setEditAddressOpen(true);
   };
 
   const handleSaveAddress = async () => {
-    if (!editingItem) return;
+    if (!editingAuctionId) return;
     setSaving(true);
     setAddressErrors({});
     try {
-      const response = await axios.put(`/api/participant/won-items/${editingItem.id}/address`, addressForm);
+      const response = await axios.put(`/api/participant/auctions/${editingAuctionId}/address`, addressForm);
       if (response.data.success) {
-        const fee = response.data.data?.shipping_fee;
+        const fee = response.data.data?.total_shipping_fee;
+        const count = response.data.data?.updated_count;
         setSnackbar({
           open: true,
-          message: fee ? `配送先を更新しました（配送料金: ¥${Number(fee).toLocaleString()}）` : '配送先を更新しました',
+          message: fee
+            ? `配送先を更新しました（${count}品、配送料合計: ¥${Number(fee).toLocaleString()}）`
+            : `配送先を更新しました（${count}品）`,
           severity: 'success',
         });
         setEditAddressOpen(false);
-        setEditingItem(null);
+        setEditingAuctionId(null);
         await fetchWonItems();
       }
     } catch (err: any) {
@@ -539,6 +557,25 @@ export default function WonItems() {
                 </Box>
               </AccordionSummary>
               <AccordionDetails sx={{ pt: 0 }}>
+                {/* 配送先（オークション単位） */}
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>配送先:</Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {group.shipping.address || '未設定'}
+                  </Typography>
+                  {group.shipping.can_update && auctionId && (
+                    <Button
+                      size="small"
+                      startIcon={<EditIcon />}
+                      onClick={() => handleEditAddress(auctionId)}
+                      sx={{ fontSize: '0.75rem', ml: 'auto' }}
+                    >
+                      {group.shipping.address ? '変更' : '設定'}
+                    </Button>
+                  )}
+                </Box>
+
                 {/* オークション単位のアクションボタン */}
                 {auctionId && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
@@ -650,22 +687,7 @@ export default function WonItems() {
                             </Box>
                           )}
 
-                          {/* 配送先 */}
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                              配送先: {wonItem.shipping_address || '未設定'}
-                            </Typography>
-                            {wonItem.payment_status === 'pending' && (
-                              <Button
-                                size="small"
-                                startIcon={<EditIcon />}
-                                onClick={() => handleEditAddress(wonItem)}
-                                sx={{ fontSize: '0.75rem' }}
-                              >
-                                {wonItem.shipping_address ? '変更' : '設定'}
-                              </Button>
-                            )}
-                          </Box>
+                          {/* 配送先は個別ではなくオークション単位で表示 */}
                         </Grid>
                       </Grid>
                     </CardContent>

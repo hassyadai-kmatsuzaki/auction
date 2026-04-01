@@ -243,7 +243,7 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     // 落札商品
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
-    Route::put('/won-items/{id}/address', [ParticipantWonItemController::class, 'updateAddress']);
+    Route::put('/auctions/{auctionId}/address', [ParticipantWonItemController::class, 'updateAddress']);
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     
