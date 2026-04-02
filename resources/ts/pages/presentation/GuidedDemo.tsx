@@ -21,6 +21,7 @@ import { CelebrationOverlay } from '../../features/auction-live/components/Celeb
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { DemoTourPopover, type TourStep } from '../../components/DemoTourPopover';
+import { DemoLayout } from './DemoLayout';
 import { DemoHome } from './DemoHome';
 import { DemoItemList } from './DemoItemList';
 import { DemoWaitingRoom } from './DemoWaitingRoom';
@@ -397,199 +398,223 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   // Render
   // ====================================================================
 
+  // Navigation handler for DemoLayout
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
+  const handleNavigate = (page: string) => {
+    if (page === 'home') { setPhase('home'); setSettingsTab(undefined); }
+    else if (page === 'items') { setPhase('items'); setSettingsTab(undefined); }
+    else if (page === 'post-auction') { setPhase('post-auction'); setSettingsTab(undefined); }
+    else if (page === 'settings') { setPhase('post-auction'); setSettingsTab('settings'); }
+  };
+
   if (phase === 'home') {
-    return <DemoHome onGoToItems={() => setPhase('items')} isGuided />;
+    return (
+      <DemoLayout currentPage="home" onNavigate={handleNavigate}>
+        <DemoHome onGoToItems={() => setPhase('items')} onGoToWaitingRoom={() => setPhase('waiting')} isGuided />
+      </DemoLayout>
+    );
   }
 
   if (phase === 'items') {
-    return <DemoItemList onGoToWaitingRoom={() => setPhase('waiting')} isGuided />;
+    return (
+      <DemoLayout currentPage="items" onNavigate={handleNavigate}>
+        <DemoItemList onGoToWaitingRoom={() => setPhase('waiting')} isGuided />
+      </DemoLayout>
+    );
   }
 
   if (phase === 'waiting') {
     return (
-      <DemoWaitingRoom
-        auctionTitle={MOCK_AUCTIONS[0].title}
-        onAuctionStart={handleAuctionStart}
-      />
+      <DemoLayout currentPage="home" onNavigate={handleNavigate}>
+        <DemoWaitingRoom
+          auctionTitle={MOCK_AUCTIONS[0].title}
+          onAuctionStart={handleAuctionStart}
+        />
+      </DemoLayout>
     );
   }
 
   if (phase === 'post-auction') {
     return (
-      <PostAuctionGuide
-        wonItems={wonItems}
-        isGuided={true}
-        onBackToTop={onBackToTop}
-      />
+      <DemoLayout currentPage={settingsTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate}>
+        <PostAuctionGuide
+          wonItems={wonItems}
+          isGuided={true}
+          onBackToTop={onBackToTop}
+          initialTab={settingsTab}
+        />
+      </DemoLayout>
     );
   }
 
   // phase === 'auction'
   return (
-    <Box sx={{ bgcolor: 'grey.100', minHeight: '100vh', position: 'relative' }}>
-      {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
+    <DemoLayout currentPage="items" onNavigate={handleNavigate}>
+      <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative' }}>
+        {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 
-      {/* Auction header */}
-      <Box ref={demoHeaderRef} sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)', color: 'white', py: 3, px: 2 }}>
-        <Container maxWidth="xl">
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-            <GavelIcon sx={{ fontSize: 32 }} />
-            <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.3rem', md: '2rem' } }}>
-              {MOCK_AUCTIONS[0].title}
-            </Typography>
-          </Box>
-          <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-            ガイドに沿って操作してみましょう
-          </Typography>
-          {tourActive && (
-            <Chip label={`ガイド進行中 (${tourStep + 1}/${tourSteps.length})`}
-              sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: '0.85rem' }} />
-          )}
-        </Container>
-      </Box>
-
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        {/* Lane grid */}
-        <Grid container spacing={2}>
-          {lanes.map((lane, idx) => (
-            <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
-              <Box ref={(el: HTMLDivElement | null) => { laneCardRefs.current[idx] = el; }}>
-                <LaneCard
-                  lane={lane} isLoading={false}
-                  onBidToggle={handleBidToggle}
-                  onDetailOpen={() => {}}
-                  onLimitEdit={(itemId) => {
-                    const targetLane = lanes.find(la => la.current_item?.id === itemId);
-                    if (targetLane) setLimitModalLaneId(targetLane.lane_id);
-                  }}
-                  onLimitRemove={(itemId) => {
-                    const targetLane = lanes.find(la => la.current_item?.id === itemId);
-                    if (targetLane) {
-                      updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
-                      notify('上限設定を解除しました', 'info');
-                    }
-                  }}
-                />
-              </Box>
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Upcoming items */}
-        <Paper ref={upcomingRef} sx={{ mt: 3, p: 2 }}>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
-          <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
-            {upcoming.map(item => (
-              <Box key={item.id} sx={{
-                flexShrink: 0, width: 150, borderRadius: 1.5,
-                border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'background.paper',
-              }}>
-                <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
-                </Box>
-                <Box sx={{ p: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
-                    <Chip label={`L${item.laneNumber}`} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} color="primary" variant="outlined" />
-                    {item.is_premium && <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />}
-                  </Box>
-                  <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.species_name}</Typography>
-                  <Typography variant="caption" color="primary.main" fontWeight="bold">¥{item.start_price.toLocaleString()}〜</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.5 }}>
-                    <IconButton size="small" onClick={() => toggleUpcomingFav(item.id)} sx={{ p: 0.25 }}>
-                      {item.is_favorited ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} /> : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
-                    </IconButton>
-                  </Box>
-                  <Box sx={{ mt: 0.5 }}>
-                    <BidLimitBadge limitPrice={null} isTriggered={false}
-                      onEdit={() => notify('次の商品への指値は、商品がレーンに来てから設定できます', 'info')} />
-                  </Box>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        </Paper>
-
-        {/* Won items table */}
-        <Box ref={wonTableRef}>
-          {wonItems.length > 0 && (
-            <Paper sx={{ mt: 3, p: 2 }}>
-              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TrophyIcon color="warning" /> あなたの落札結果
+        {/* Auction header */}
+        <Box ref={demoHeaderRef} sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)', color: 'white', py: 3, px: 2 }}>
+          <Container maxWidth="xl">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <GavelIcon sx={{ fontSize: 32 }} />
+              <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.3rem', md: '2rem' } }}>
+                {MOCK_AUCTIONS[0].title}
               </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>品種</TableCell>
-                      <TableCell align="right">単価</TableCell>
-                      <TableCell align="right">数量</TableCell>
-                      <TableCell align="right">合計(税込)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {wonItems.map((w, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{w.species_name}</TableCell>
-                        <TableCell align="right">¥{w.winning_price.toLocaleString()}/匹</TableCell>
-                        <TableCell align="right">{w.quantity}匹</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{w.total_amount.toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>合計</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>¥{wonTotal.toLocaleString()}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          )}
-          {wonItems.length === 0 && (
-            <Paper sx={{ mt: 3, p: 2, bgcolor: 'grey.50' }}>
-              <Typography variant="body2" color="text.secondary" align="center">落札した商品がここに表示されます</Typography>
-            </Paper>
-          )}
+            </Box>
+            <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+              ガイドに沿って操作してみましょう
+            </Typography>
+            {tourActive && (
+              <Chip label={`ガイド進行中 (${tourStep + 1}/${tourSteps.length})`}
+                sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700, fontSize: '0.85rem' }} />
+            )}
+          </Container>
         </Box>
-      </Container>
 
-      {/* Tour popover */}
-      {tourActive && (
-        <DemoTourPopover
-          steps={tourSteps}
-          activeStep={tourStep}
-          onNext={handleTourNext}
-          onPrev={handleTourPrev}
-          onClose={handleTourClose}
-          onReset={handleStartTour}
-          isAutoPlaying={isAutoPlaying}
-        />
-      )}
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          {/* Lane grid */}
+          <Grid container spacing={2}>
+            {lanes.map((lane, idx) => (
+              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+                <Box ref={(el: HTMLDivElement | null) => { laneCardRefs.current[idx] = el; }}>
+                  <LaneCard
+                    lane={lane} isLoading={false}
+                    onBidToggle={handleBidToggle}
+                    onDetailOpen={() => {}}
+                    onLimitEdit={(itemId) => {
+                      const targetLane = lanes.find(la => la.current_item?.id === itemId);
+                      if (targetLane) setLimitModalLaneId(targetLane.lane_id);
+                    }}
+                    onLimitRemove={(itemId) => {
+                      const targetLane = lanes.find(la => la.current_item?.id === itemId);
+                      if (targetLane) {
+                        updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
+                        notify('上限設定を解除しました', 'info');
+                      }
+                    }}
+                  />
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
 
-      {/* BidLimitModal */}
-      {limitModalLaneId && limitModalItemData && (
-        <BidLimitModal
-          open={!!limitModalLaneId}
-          onClose={() => setLimitModalLaneId(null)}
-          itemId={limitModalItemData.id}
-          speciesName={limitModalItemData.species_name}
-          currentLimitPrice={limitModalItemData.my_limit_price ?? null}
-          currentPrice={limitModalItemData.current_price}
-          quickOptions={null}
-          isLive={true}
-          isSetting={false}
-          isRemoving={false}
-          onSet={handleSetLimit}
-          onRemove={handleRemoveLimit}
-        />
-      )}
+          {/* Upcoming items */}
+          <Paper ref={upcomingRef} sx={{ mt: 3, p: 2 }}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
+              {upcoming.map(item => (
+                <Box key={item.id} sx={{
+                  flexShrink: 0, width: 150, borderRadius: 1.5,
+                  border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'background.paper',
+                }}>
+                  <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
+                  </Box>
+                  <Box sx={{ p: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+                      <Chip label={`L${item.laneNumber}`} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} color="primary" variant="outlined" />
+                      {item.is_premium && <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />}
+                    </Box>
+                    <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.species_name}</Typography>
+                    <Typography variant="caption" color="primary.main" fontWeight="bold">¥{item.start_price.toLocaleString()}〜</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.5 }}>
+                      <IconButton size="small" onClick={() => toggleUpcomingFav(item.id)} sx={{ p: 0.25 }}>
+                        {item.is_favorited ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 16 }} /> : <FavoriteBorderIcon sx={{ color: 'grey.400', fontSize: 16 }} />}
+                      </IconButton>
+                    </Box>
+                    <Box sx={{ mt: 0.5 }}>
+                      <BidLimitBadge limitPrice={null} isTriggered={false}
+                        onEdit={() => notify('次の商品への指値は、商品がレーンに来てから設定できます', 'info')} />
+                    </Box>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Paper>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+          {/* Won items table */}
+          <Box ref={wonTableRef}>
+            {wonItems.length > 0 && (
+              <Paper sx={{ mt: 3, p: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TrophyIcon color="warning" /> あなたの落札結果
+                </Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>品種</TableCell>
+                        <TableCell align="right">単価</TableCell>
+                        <TableCell align="right">数量</TableCell>
+                        <TableCell align="right">合計(税込)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {wonItems.map((w, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{w.species_name}</TableCell>
+                          <TableCell align="right">¥{w.winning_price.toLocaleString()}/匹</TableCell>
+                          <TableCell align="right">{w.quantity}匹</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{w.total_amount.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>合計</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>¥{wonTotal.toLocaleString()}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            )}
+            {wonItems.length === 0 && (
+              <Paper sx={{ mt: 3, p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="body2" color="text.secondary" align="center">落札した商品がここに表示されます</Typography>
+              </Paper>
+            )}
+          </Box>
+        </Container>
+
+        {/* Tour popover */}
+        {tourActive && (
+          <DemoTourPopover
+            steps={tourSteps}
+            activeStep={tourStep}
+            onNext={handleTourNext}
+            onPrev={handleTourPrev}
+            onClose={handleTourClose}
+            onReset={handleStartTour}
+            isAutoPlaying={isAutoPlaying}
+          />
+        )}
+
+        {/* BidLimitModal */}
+        {limitModalLaneId && limitModalItemData && (
+          <BidLimitModal
+            open={!!limitModalLaneId}
+            onClose={() => setLimitModalLaneId(null)}
+            itemId={limitModalItemData.id}
+            speciesName={limitModalItemData.species_name}
+            currentLimitPrice={limitModalItemData.my_limit_price ?? null}
+            currentPrice={limitModalItemData.current_price}
+            quickOptions={null}
+            isLive={true}
+            isSetting={false}
+            isRemoving={false}
+            onSet={handleSetLimit}
+            onRemove={handleRemoveLimit}
+          />
+        )}
+
+        <Snackbar open={snackbar.open} autoHideDuration={3000}
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+          <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </DemoLayout>
   );
 }
