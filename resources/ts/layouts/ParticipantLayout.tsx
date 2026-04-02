@@ -69,7 +69,7 @@ export default function ParticipantLayout() {
     { text: 'オークション', icon: <GavelIcon />, path: '/participant/auctions' },
     { text: 'お気に入り', icon: <FavoriteIcon />, path: '/participant/favorites' },
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
-    { text: 'デモ', icon: <DemoIcon />, path: '/participant/demo' },
+    { text: 'デモ', icon: <DemoIcon />, path: '/presentation' },
     { text: '設定', icon: <SettingsIcon />, path: '/participant/settings' },
   ];
 
