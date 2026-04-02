@@ -55,6 +55,10 @@ interface PostAuctionGuideProps {
   onBackToTop: () => void;
   /** 初期表示タブ */
   initialTab?: string;
+  /** 外部制御のタブ値（設定されている場合、内部状態より優先） */
+  controlledTab?: string;
+  /** タブが変更された際のコールバック */
+  onTabChange?: (tab: string) => void;
 }
 
 /**
@@ -62,8 +66,13 @@ interface PostAuctionGuideProps {
  * ガイド付きもガイドなしも同じ画面構成。
  * ガイド付きの場合はステッパーとナビゲーションボタンが追加される。
  */
-export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab }: PostAuctionGuideProps) {
-  const [currentTab, setCurrentTab] = useState(initialTab || 'won-items');
+export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, controlledTab, onTabChange }: PostAuctionGuideProps) {
+  const [internalTab, setInternalTab] = useState(initialTab || 'won-items');
+  const currentTab = controlledTab ?? internalTab;
+  const setCurrentTab = (tab: string) => {
+    setInternalTab(tab);
+    onTabChange?.(tab);
+  };
 
   // ガイド付きの場合のステップ番号（タブ値から算出）
   const currentStepIndex = TAB_ITEMS.findIndex(t => t.value === currentTab);
@@ -144,7 +153,8 @@ export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab }
         <Paper sx={{ mb: 3 }}>
           <Tabs value={currentTab} onChange={(_, v) => setCurrentTab(v)}>
             {TAB_ITEMS.map(tab => (
-              <Tab key={tab.value} value={tab.value} label={tab.label} icon={tab.icon} iconPosition="start" />
+              <Tab key={tab.value} value={tab.value} label={tab.label} icon={tab.icon} iconPosition="start"
+                data-tour-target={tab.value === 'settings' ? 'settings-tab' : undefined} />
             ))}
           </Tabs>
         </Paper>
@@ -253,7 +263,7 @@ function StepWonItemManagement() {
   return (
     <Box>
       {/* ヘッダー — 実際の WonItems.tsx と同じ */}
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+      <Typography data-tour-target="won-items-header" variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
         落札管理
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
@@ -359,8 +369,8 @@ function StepWonItemManagement() {
             <Divider sx={{ mb: 2 }} />
 
             {/* 落札商品リスト — 実際の WonItems.tsx と同一レイアウト */}
-            {filteredItems.map((wonItem) => (
-              <Card key={wonItem.id} variant="outlined" sx={{ mb: 2 }}>
+            {filteredItems.map((wonItem, idx) => (
+              <Card key={wonItem.id} variant="outlined" data-tour-target={idx === 0 ? 'won-first-item' : undefined} sx={{ mb: 2 }}>
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={2}>
@@ -666,7 +676,7 @@ function StepAccountSettings() {
             {/* 通知設定タブ — 実際の Settings.tsx と同一 */}
             {tabValue === 1 && (
               <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <Box data-tour-target="notification-section" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <NotificationsIcon sx={{ color: '#F59E0B' }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>メール通知設定</Typography>
                 </Box>

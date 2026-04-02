@@ -19,6 +19,7 @@ import {
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
+import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { MOCK_AUCTIONS, MOCK_ITEMS, MOCK_LANES_LIST, STATUS_CONFIG } from './mockData';
 
 interface DemoItemListProps {
@@ -31,6 +32,8 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
+  const [limitModalItem, setLimitModalItem] = useState<{ id: number; species_name: string; start_price: number } | null>(null);
 
   const totalItems = MOCK_ITEMS.length;
 
@@ -55,6 +58,35 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
     ? allLaneItems.filter((item) => statusFilter.includes(item.status))
     : allLaneItems;
 
+  const getLimitForItem = (itemId: number) => limitSettings[itemId] ?? { limit_price: null, is_triggered: false };
+
+  const handleLimitEdit = (item: typeof MOCK_ITEMS[0]) => {
+    setLimitModalItem({ id: item.id, species_name: item.species_name, start_price: item.start_price });
+  };
+
+  const handleLimitRemove = (itemId: number) => {
+    setLimitSettings(prev => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
+  const handleSetLimit = (price: number) => {
+    if (!limitModalItem) return;
+    setLimitSettings(prev => ({
+      ...prev,
+      [limitModalItem.id]: { limit_price: price, is_triggered: false },
+    }));
+    setLimitModalItem(null);
+  };
+
+  const handleRemoveLimitModal = () => {
+    if (!limitModalItem) return;
+    handleLimitRemove(limitModalItem.id);
+    setLimitModalItem(null);
+  };
+
   const handleFavoriteToggle = (e: React.MouseEvent, itemId: number) => {
     e.stopPropagation();
     setFavoriteIds(prev => {
@@ -78,7 +110,7 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
       )}
 
       {/* ヘッダー — 実際の AuctionItems.tsx と同じ */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper data-tour-target="items-header" sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Typography variant="h5" fontWeight="bold">{MOCK_AUCTIONS[0].title}</Typography>
@@ -87,7 +119,7 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button size="small" variant="outlined" color="primary"
+            <Button data-tour-target="items-waiting-button" size="small" variant="outlined" color="primary"
               startIcon={<MeetingRoomIcon />}
               onClick={onGoToWaitingRoom}
               sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
@@ -116,7 +148,7 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
           { key: 'all',        label: 'すべて',   color: 'default' as const },
           { key: 'registered', label: '出品中',   color: 'primary' as const },
           { key: 'live',       label: '入札中',   color: 'error'   as const },
-          { key: 'sold',       label: '落札済み', color: 'success' as const },
+          { key: 'sold',       label: '落札済',   color: 'success' as const },
           { key: 'unsold',     label: '不成立',   color: 'default' as const },
         ].map(({ key, label, color }) => {
           const isAll = key === 'all';
@@ -142,9 +174,9 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
         </Paper>
       ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
-          {currentItems.map((item) => (
+          {currentItems.map((item, idx) => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Box data-tour-target={idx === 0 ? 'items-first-card' : undefined} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
@@ -162,9 +194,10 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
                   borderBottomRightRadius: 2,
                 }}>
                   <BidLimitBadge
-                    limitPrice={null}
-                    isTriggered={false}
-                    onEdit={() => {}}
+                    limitPrice={getLimitForItem(item.id).limit_price}
+                    isTriggered={getLimitForItem(item.id).is_triggered}
+                    onEdit={() => handleLimitEdit(item)}
+                    onRemove={() => handleLimitRemove(item.id)}
                   />
                 </Box>
               </Box>
@@ -202,7 +235,12 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{Number(item.start_price).toLocaleString()}</TableCell>
                     <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-                      <BidLimitBadge limitPrice={null} isTriggered={false} onEdit={() => {}} />
+                      <BidLimitBadge
+                        limitPrice={getLimitForItem(item.id).limit_price}
+                        isTriggered={getLimitForItem(item.id).is_triggered}
+                        onEdit={() => handleLimitEdit(item)}
+                        onRemove={() => handleLimitRemove(item.id)}
+                      />
                     </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -220,6 +258,23 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+      {/* BidLimitModal */}
+      {limitModalItem && (
+        <BidLimitModal
+          open={!!limitModalItem}
+          onClose={() => setLimitModalItem(null)}
+          itemId={limitModalItem.id}
+          speciesName={limitModalItem.species_name}
+          currentLimitPrice={getLimitForItem(limitModalItem.id).limit_price}
+          currentPrice={limitModalItem.start_price}
+          quickOptions={null}
+          isLive={false}
+          isSetting={false}
+          isRemoving={false}
+          onSet={handleSetLimit}
+          onRemove={handleRemoveLimitModal}
+        />
       )}
     </Container>
   );

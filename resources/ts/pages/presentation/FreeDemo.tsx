@@ -22,6 +22,7 @@ import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal
 import { DemoLayout } from './DemoLayout';
 import { DemoHome } from './DemoHome';
 import { DemoItemList } from './DemoItemList';
+import { DemoFavorites } from './DemoFavorites';
 import { DemoWaitingRoom } from './DemoWaitingRoom';
 import { PostAuctionGuide } from './PostAuctionGuide';
 import {
@@ -32,7 +33,7 @@ import {
 } from './mockData';
 import { initCpuState, decideCpuAction, calculatePriceIncrement, type CpuBidState } from './cpuBidder';
 
-type FreeDemoPhase = 'home' | 'items' | 'waiting' | 'auction' | 'post-auction';
+type FreeDemoPhase = 'home' | 'items' | 'favorites' | 'waiting' | 'auction' | 'post-auction';
 
 interface FreeDemoProps {
   onBackToTop: () => void;
@@ -393,8 +394,10 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   const handleNavigate = (page: string) => {
     if (page === 'home') { setPhase('home'); setSettingsTab(undefined); }
     else if (page === 'items') { setPhase('items'); setSettingsTab(undefined); }
+    else if (page === 'favorites') { setPhase('favorites'); setSettingsTab(undefined); }
     else if (page === 'post-auction') { setPhase('post-auction'); setSettingsTab(undefined); }
     else if (page === 'settings') { setPhase('post-auction'); setSettingsTab('settings'); }
+    else if (page === 'demo-top') { onBackToTop(); }
   };
 
   if (phase === 'home') {
@@ -409,6 +412,14 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate}>
         <DemoItemList onGoToWaitingRoom={() => setPhase('waiting')} />
+      </DemoLayout>
+    );
+  }
+
+  if (phase === 'favorites') {
+    return (
+      <DemoLayout currentPage="favorites" onNavigate={handleNavigate}>
+        <DemoFavorites onNavigateToAuctions={() => setPhase('items')} />
       </DemoLayout>
     );
   }

@@ -2,8 +2,10 @@
  * デモ共通ホーム画面
  * 実際の Home.tsx と同じデザインを再現
  */
+import { useState } from 'react';
 import {
-  Box, Container, Typography, Button, Card, CardContent, Grid, Chip, Alert,
+  Box, Container, Typography, Button, Card, CardContent, CardActionArea, Grid, Chip, Alert, Stack,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   Event as EventIcon,
@@ -11,6 +13,7 @@ import {
   ArrowForward as ArrowForwardIcon,
   ListAlt as ListAltIcon,
   OpenInNew as OpenInNewIcon,
+  Announcement as AnnouncementIcon,
 } from '@mui/icons-material';
 import {
   MOCK_AUCTIONS, MOCK_ANNOUNCEMENTS,
@@ -38,11 +41,12 @@ const sponsoredAds = [
 
 export function DemoHome({ onGoToItems, onGoToWaitingRoom, isGuided = false }: DemoHomeProps) {
   const auction = MOCK_AUCTIONS[0];
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<typeof MOCK_ANNOUNCEMENTS[0] | null>(null);
 
   return (
     <Box>
       {/* 次回開催予定 - 実際のHome.tsxと同じスタイル */}
-      <Box sx={{ bgcolor: '#f0f7ff', py: { xs: 3, md: 4 }, px: 2 }}>
+      <Box data-tour-target="home-banner" sx={{ bgcolor: '#f0f7ff', py: { xs: 3, md: 4 }, px: 2 }}>
         <Container maxWidth="lg">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <EventIcon sx={{ color: 'primary.main' }} />
@@ -99,6 +103,7 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom, isGuided = false }: D
               待機室へ入室
             </Button>
             <Button
+              data-tour-target="home-items-button"
               variant="outlined"
               size="large"
               startIcon={<ListAltIcon />}
@@ -127,23 +132,70 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom, isGuided = false }: D
           </Alert>
         )}
 
-        {/* お知らせ - 実際のHome.tsxと同じAnnouncementListスタイル */}
+        {/* お知らせ — 実際の AnnouncementList コンポーネントと同一デザイン */}
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
+          <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AnnouncementIcon />
             お知らせ
           </Typography>
-          {MOCK_ANNOUNCEMENTS.slice(0, 3).map((a) => (
-            <Card key={a.id} sx={{ mb: 1.5, border: a.is_important ? 2 : 0, borderColor: 'error.main' }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  {a.is_important && <Chip label="重要" size="small" color="error" />}
-                  <Typography variant="caption" color="text.secondary">{formatDateTime(a.published_at)}</Typography>
-                </Box>
-                <Typography variant="subtitle2" fontWeight="bold">{a.title}</Typography>
-              </CardContent>
-            </Card>
-          ))}
+          <Stack spacing={2}>
+            {MOCK_ANNOUNCEMENTS.map((a) => (
+              <Card key={a.id} sx={{
+                border: a.is_important ? 2 : 0,
+                borderColor: 'error.main',
+                bgcolor: a.is_important ? 'error.50' : 'background.paper',
+              }}>
+                <CardActionArea onClick={() => setSelectedAnnouncement(a)}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                      {a.is_important && <Chip label="重要" size="small" color="error" />}
+                      <Typography variant="h6" component="div" sx={{ flex: 1, fontWeight: a.is_important ? 600 : 500 }}>
+                        {a.title}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{
+                      overflow: 'hidden', textOverflow: 'ellipsis',
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', mb: 1,
+                    }}>
+                      {a.content}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      公開日時: {formatDateTime(a.published_at)}
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            ))}
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+              全{MOCK_ANNOUNCEMENTS.length}件
+            </Typography>
+          </Stack>
         </Box>
+
+        {/* お知らせ詳細ダイアログ */}
+        <Dialog open={!!selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)} maxWidth="md" fullWidth>
+          {selectedAnnouncement && (
+            <>
+              <DialogTitle>
+                {selectedAnnouncement.is_important && (
+                  <Alert severity="error" sx={{ mb: 2 }}>重要なお知らせ</Alert>
+                )}
+                <Typography variant="h6">{selectedAnnouncement.title}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  公開日時: {formatDateTime(selectedAnnouncement.published_at)}
+                </Typography>
+              </DialogTitle>
+              <DialogContent dividers>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {selectedAnnouncement.content}
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setSelectedAnnouncement(null)}>閉じる</Button>
+              </DialogActions>
+            </>
+          )}
+        </Dialog>
 
         {/* 広告 - 実際のHome.tsxと同じスタイル */}
         {sponsoredAds.length > 0 && (

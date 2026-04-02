@@ -26,6 +26,8 @@ import {
   Gavel as GavelIcon,
   Receipt as ReceiptIcon,
   Settings as SettingsIcon,
+  Favorite as FavoriteIcon,
+  SportsEsports as DemoIcon,
 } from '@mui/icons-material';
 
 interface DemoLayoutProps {
@@ -37,7 +39,9 @@ interface DemoLayoutProps {
 const menuItems = [
   { text: 'ホーム', icon: <HomeIcon />, page: 'home' },
   { text: 'オークション', icon: <GavelIcon />, page: 'items' },
+  { text: 'お気に入り', icon: <FavoriteIcon />, page: 'favorites' },
   { text: '落札管理', icon: <ReceiptIcon />, page: 'post-auction' },
+  { text: 'デモ', icon: <DemoIcon />, page: 'demo-top' },
   { text: '設定', icon: <SettingsIcon />, page: 'settings' },
 ];
 

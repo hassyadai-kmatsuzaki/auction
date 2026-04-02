@@ -24,6 +24,7 @@ import { DemoTourPopover, type TourStep } from '../../components/DemoTourPopover
 import { DemoLayout } from './DemoLayout';
 import { DemoHome } from './DemoHome';
 import { DemoItemList } from './DemoItemList';
+import { DemoFavorites } from './DemoFavorites';
 import { DemoWaitingRoom } from './DemoWaitingRoom';
 import { PostAuctionGuide } from './PostAuctionGuide';
 import {
@@ -33,7 +34,7 @@ import {
   type WonEntry,
 } from './mockData';
 
-type GuidedPhase = 'home' | 'items' | 'waiting' | 'auction' | 'post-auction';
+type GuidedPhase = 'home' | 'items' | 'favorites' | 'waiting' | 'auction' | 'post-auction';
 
 interface GuidedDemoProps {
   onBackToTop: () => void;
@@ -58,7 +59,10 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
 
-  // Tour refs
+  // Post-auction controlled tab
+  const [postAuctionTab, setPostAuctionTab] = useState<string>('won-items');
+
+  // Tour refs - auction phase (static)
   const demoHeaderRef = useRef<HTMLDivElement>(null);
   const laneCardRefs = useRef<(HTMLDivElement | null)[]>([null, null, null]);
   const lane1Ref = useRef<HTMLDivElement | null>(null);
@@ -67,6 +71,37 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const upcomingRef = useRef<HTMLDivElement>(null);
   const wonTableRef = useRef<HTMLDivElement>(null);
   const goToStepRef = useRef<(step: number) => void>(() => {});
+
+  // Tour refs - dynamic (resolved via data-tour-target attributes)
+  const homeBannerRef = useRef<HTMLElement | null>(null);
+  const itemsButtonRef = useRef<HTMLElement | null>(null);
+  const itemsHeaderRef = useRef<HTMLElement | null>(null);
+  const firstItemRef = useRef<HTMLElement | null>(null);
+  const waitingRoomButtonRef = useRef<HTMLElement | null>(null);
+  const wonItemsHeaderRef = useRef<HTMLElement | null>(null);
+  const firstWonItemRef = useRef<HTMLElement | null>(null);
+  const settingsTabRef = useRef<HTMLElement | null>(null);
+  const notificationSectionRef = useRef<HTMLElement | null>(null);
+
+  // Resolve dynamic refs after phase/tab changes
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const resolve = () => {
+      homeBannerRef.current = document.querySelector('[data-tour-target="home-banner"]');
+      itemsButtonRef.current = document.querySelector('[data-tour-target="home-items-button"]');
+      itemsHeaderRef.current = document.querySelector('[data-tour-target="items-header"]');
+      firstItemRef.current = document.querySelector('[data-tour-target="items-first-card"]');
+      waitingRoomButtonRef.current = document.querySelector('[data-tour-target="items-waiting-button"]');
+      wonItemsHeaderRef.current = document.querySelector('[data-tour-target="won-items-header"]');
+      firstWonItemRef.current = document.querySelector('[data-tour-target="won-first-item"]');
+      settingsTabRef.current = document.querySelector('[data-tour-target="settings-tab"]');
+      notificationSectionRef.current = document.querySelector('[data-tour-target="notification-section"]');
+    };
+    // Resolve immediately and after a short delay (for DOM to settle)
+    resolve();
+    const t = setTimeout(() => { resolve(); forceUpdate(n => n + 1); }, 100);
+    return () => clearTimeout(t);
+  }, [phase, postAuctionTab, tourStep]);
 
   const notify = useCallback((message: string, severity: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -245,10 +280,10 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'active', active_bidders_count: i.active_bidders_count + 1 }));
       startCountdown(lane.lane_id, 15);
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
-      if (tourActive && tourStep === 2) {
-        setTimeout(() => goToStepRef.current(3), 1200);
+      if (tourActive && tourStep === 7) {
+        setTimeout(() => goToStepRef.current(8), 1200);
       }
-      if (tourActive && tourStep === 4) {
+      if (tourActive && tourStep === 9) {
         setTimeout(() => simulateBattleCycle(lane.lane_id), 2000);
       }
     }
@@ -264,8 +299,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     updateLaneItem(limitModalLaneId, item => ({ ...item, my_limit_price: price, my_limit_triggered: false }));
     setLimitModalLaneId(null);
     notify(`上限価格を ¥${price.toLocaleString()} に設定しました`, 'success');
-    if (tourActive && tourStep === 7) setTimeout(() => goToStepRef.current(8), 800);
     if (tourActive && tourStep === 12) setTimeout(() => goToStepRef.current(13), 800);
+    if (tourActive && tourStep === 17) setTimeout(() => goToStepRef.current(18), 800);
   }, [limitModalLaneId, updateLaneItem, notify, tourActive, tourStep]);
 
   const handleRemoveLimit = useCallback(() => {
@@ -277,8 +312,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   const toggleUpcomingFav = (itemId: number) => {
     setUpcoming(prev => prev.map(u => u.id === itemId ? { ...u, is_favorited: !u.is_favorited } : u));
-    if (tourActive && tourStep === 10) {
-      setTimeout(() => goToStepRef.current(11), 800);
+    if (tourActive && tourStep === 15) {
+      setTimeout(() => goToStepRef.current(16), 800);
     }
   };
 
@@ -303,15 +338,43 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     setTimeout(() => { setTourActive(true); setTourStep(0); }, 100);
   }, [handleAuctionReset]);
 
-  // Auto-start tour when entering auction phase
+  // Auto-start tour when entering auction phase (from waiting room)
   const handleAuctionStart = useCallback(() => {
     setPhase('auction');
-    setTimeout(() => handleStartTour(), 300);
-  }, [handleStartTour]);
+    // Tour continues: jump to auction steps (step 5)
+    setTimeout(() => {
+      setTourActive(true);
+      setTourStep(5);
+    }, 300);
+  }, []);
 
-  // ─── Tour steps (same as existing) ───
+  // Start the full-flow tour from home phase
+  useEffect(() => {
+    // Auto-start tour on mount (guided demo always starts with tour)
+    const t = setTimeout(() => {
+      setTourActive(true);
+      setTourStep(0);
+    }, 500);
+    return () => clearTimeout(t);
+  }, []);
+
+  // ─── Tour steps (full flow: Home → Items → Auction → Post-Auction) ───
+  // Steps 0-1: Home phase
+  // Steps 2-4: Items phase
+  // Steps 5-19: Auction phase (existing 15 steps, renumbered)
+  // Steps 20-24: Post-Auction phase
 
   const tourSteps: TourStep[] = [
+    // ── HOME phase (steps 0-1) ──
+    { targetRef: homeBannerRef as React.RefObject<HTMLElement | null>, title: 'ガイド付きデモへようこそ！', description: 'ホーム画面です。次回開催予定のオークションの情報が表示されます。', placement: 'bottom' },
+    { targetRef: itemsButtonRef as React.RefObject<HTMLElement | null>, title: '出品一覧を確認しよう', description: '「出品一覧」ボタンを押して出品されている商品を確認しましょう。', placement: 'bottom', waitForAction: '「出品一覧」をタップ' },
+
+    // ── ITEMS phase (steps 2-4) ──
+    { targetRef: itemsHeaderRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。', placement: 'bottom' },
+    { targetRef: firstItemRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）の設定', description: '各商品に指値（上限価格）を設定できます。気になる商品があれば「上限設定」をタップしてみましょう。', placement: 'bottom' },
+    { targetRef: waitingRoomButtonRef as React.RefObject<HTMLElement | null>, title: '待機室へ入室', description: '商品を確認したら「待機室へ」ボタンで入室しましょう。', placement: 'bottom', waitForAction: '「待機室へ」をタップ' },
+
+    // ── AUCTION phase (steps 5-19) ──
     { targetRef: demoHeaderRef, title: 'オークション体験デモへようこそ！', description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。最大3つのレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ' },
@@ -346,19 +409,44 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     },
     { targetRef: lane3Ref as React.RefObject<HTMLDivElement | null>, title: 'レーン3に指値を設定しよう', description: 'カード下部の「上限設定」ボタンを押してください。', placement: 'left', waitForAction: 'レーン3の「上限設定」をタップ' },
     { targetRef: lane2Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン2を落札します。紙吹雪の落札演出をお楽しみください！', placement: 'left', autoAction: () => { updateLaneItem(2, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(), 500); }, autoActionDelay: 4500 },
-    { targetRef: wonTableRef, title: 'オークション体験完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
+    { targetRef: wonTableRef, title: 'オークション完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
+
+    // ── POST-AUCTION phase (steps 20-24) ──
+    { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
+    { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡、配送先の変更ができます。', placement: 'bottom' },
+    { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブでプロフィールや通知設定を管理できます。', placement: 'bottom',
+      autoAction: () => { setPostAuctionTab('settings'); },
+      autoActionDelay: 500,
+    },
+    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。テスト送信も可能です。', placement: 'bottom' },
+    { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！実際のオークションでも同じ画面で操作できます。お疲れ様でした。', placement: 'bottom' },
   ];
+
+  // Helper: determine which phase a step belongs to
+  const getPhaseForStep = (step: number): GuidedPhase => {
+    if (step <= 1) return 'home';
+    if (step <= 4) return 'items';
+    if (step <= 19) return 'auction';
+    return 'post-auction';
+  };
 
   const goToStep = useCallback((targetStep: number) => {
     if (targetStep < 0 || targetStep >= tourSteps.length) {
-      // ツアー完了 → 落札管理へ
+      // Tour complete
       if (targetStep >= tourSteps.length) {
         setTourActive(false);
-        setPhase('post-auction');
       }
       return;
     }
-    if (tourStep === 5 && targetStep !== 5) {
+    // Handle phase transitions
+    const targetPhase = getPhaseForStep(targetStep);
+    if (targetPhase !== phase) {
+      setPhase(targetPhase);
+      // For waiting phase transition (items->waiting->auction), handled separately
+    }
+
+    // Cleanup from freeze step (auction step 10, which is absolute step 10)
+    if (tourStep === 10 && targetStep !== 10) {
       updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
       startCountdown(1, 15);
     }
@@ -371,15 +459,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     } else {
       setTourStep(targetStep);
     }
-  }, [tourStep, tourSteps, updateLaneItem, startCountdown]);
+  }, [tourStep, tourSteps, updateLaneItem, startCountdown, phase]);
 
   goToStepRef.current = goToStep;
 
   const handleTourNext = useCallback(() => {
     if (tourStep === tourSteps.length - 1) {
-      // Last step → go to post-auction
+      // Last step → tour complete
       setTourActive(false);
-      setPhase('post-auction');
     } else {
       goToStep(tourStep + 1);
     }
@@ -399,18 +486,50 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   // ====================================================================
 
   // Navigation handler for DemoLayout
-  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const handleNavigate = (page: string) => {
-    if (page === 'home') { setPhase('home'); setSettingsTab(undefined); }
-    else if (page === 'items') { setPhase('items'); setSettingsTab(undefined); }
-    else if (page === 'post-auction') { setPhase('post-auction'); setSettingsTab(undefined); }
-    else if (page === 'settings') { setPhase('post-auction'); setSettingsTab('settings'); }
+    if (page === 'home') { setPhase('home'); }
+    else if (page === 'items') { setPhase('items'); }
+    else if (page === 'favorites') { setPhase('favorites'); }
+    else if (page === 'post-auction') { setPhase('post-auction'); setPostAuctionTab('won-items'); }
+    else if (page === 'settings') { setPhase('post-auction'); setPostAuctionTab('settings'); }
+    else if (page === 'demo-top') { onBackToTop(); }
   };
+
+  // Tour-aware phase transition handlers
+  const handleHomeGoToItems = useCallback(() => {
+    setPhase('items');
+    if (tourActive && tourStep === 1) {
+      // After step 1 action (tap items button), advance to step 2
+      setTimeout(() => goToStepRef.current(2), 300);
+    }
+  }, [tourActive, tourStep]);
+
+  const handleItemsGoToWaitingRoom = useCallback(() => {
+    setPhase('waiting');
+    if (tourActive && tourStep === 4) {
+      // Tour pauses during waiting room, resumes at auction via handleAuctionStart
+      setTourActive(false);
+    }
+  }, [tourActive, tourStep]);
+
+  // Shared tour popover element (rendered in non-auction phases)
+  const tourPopoverElement = tourActive ? (
+    <DemoTourPopover
+      steps={tourSteps}
+      activeStep={tourStep}
+      onNext={handleTourNext}
+      onPrev={handleTourPrev}
+      onClose={handleTourClose}
+      onReset={handleStartTour}
+      isAutoPlaying={isAutoPlaying}
+    />
+  ) : null;
 
   if (phase === 'home') {
     return (
       <DemoLayout currentPage="home" onNavigate={handleNavigate}>
-        <DemoHome onGoToItems={() => setPhase('items')} onGoToWaitingRoom={() => setPhase('waiting')} isGuided />
+        <DemoHome onGoToItems={handleHomeGoToItems} onGoToWaitingRoom={() => setPhase('waiting')} isGuided />
+        {tourPopoverElement}
       </DemoLayout>
     );
   }
@@ -418,7 +537,16 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate}>
-        <DemoItemList onGoToWaitingRoom={() => setPhase('waiting')} isGuided />
+        <DemoItemList onGoToWaitingRoom={handleItemsGoToWaitingRoom} isGuided />
+        {tourPopoverElement}
+      </DemoLayout>
+    );
+  }
+
+  if (phase === 'favorites') {
+    return (
+      <DemoLayout currentPage="favorites" onNavigate={handleNavigate}>
+        <DemoFavorites onNavigateToAuctions={() => setPhase('items')} />
       </DemoLayout>
     );
   }
@@ -436,13 +564,15 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   if (phase === 'post-auction') {
     return (
-      <DemoLayout currentPage={settingsTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate}>
+      <DemoLayout currentPage={postAuctionTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate}>
         <PostAuctionGuide
           wonItems={wonItems}
-          isGuided={true}
+          isGuided={!tourActive}
           onBackToTop={onBackToTop}
-          initialTab={settingsTab}
+          controlledTab={tourActive ? postAuctionTab : undefined}
+          onTabChange={setPostAuctionTab}
         />
+        {tourPopoverElement}
       </DemoLayout>
     );
   }
