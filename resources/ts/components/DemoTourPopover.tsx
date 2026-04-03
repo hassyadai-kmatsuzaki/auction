@@ -226,7 +226,7 @@ export const DemoTourPopover: React.FC<Props> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          zIndex: 1300,
+          zIndex: 1400,
           pointerEvents: 'none',
         }}
       >
@@ -309,7 +309,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             left: spotlightRect.left + spotlightRect.width / 2 - 20,
             width: 40,
             height: 40,
-            zIndex: 1300,
+            zIndex: 1400,
             pointerEvents: 'none',
           }}
         >
@@ -343,33 +343,34 @@ export const DemoTourPopover: React.FC<Props> = ({
         </Box>
       )}
 
-      {/* Click-blocking overlay: blocks all interactions outside spotlight */}
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1300,
-          pointerEvents: 'all',
-        }}
-      />
-
-      {/* Click-through window over spotlight (only for waitForAction steps) */}
-      {spotlightRect && step.waitForAction && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: spotlightRect.top - SPOTLIGHT_PADDING,
-            left: spotlightRect.left - SPOTLIGHT_PADDING,
-            width: spotlightRect.width + SPOTLIGHT_PADDING * 2,
-            height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
-            zIndex: 1300,
-            pointerEvents: 'auto',
-          }}
-        />
-      )}
+      {/* Click-blocking overlay: 4枚のBoxでスポットライト領域を囲み、外側だけブロック */}
+      {/* waitForAction時はスポットライト内をクリック可能にする */}
+      {(() => {
+        // スポットライト穴がない or waitForActionでない場合: 全面ブロック
+        if (!spotlightRect || !step.waitForAction) {
+          return (
+            <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1400, pointerEvents: 'all' }} />
+          );
+        }
+        // waitForAction時: スポットライト領域に穴を開けた4枚のBoxでブロック
+        const sx = spotlightRect.left - SPOTLIGHT_PADDING;
+        const sy = spotlightRect.top - SPOTLIGHT_PADDING;
+        const sw = spotlightRect.width + SPOTLIGHT_PADDING * 2;
+        const sh = spotlightRect.height + SPOTLIGHT_PADDING * 2;
+        const common = { position: 'fixed' as const, zIndex: 1400, pointerEvents: 'all' as const };
+        return (
+          <>
+            {/* 上 */}
+            <Box sx={{ ...common, top: 0, left: 0, right: 0, height: sy }} />
+            {/* 下 */}
+            <Box sx={{ ...common, top: sy + sh, left: 0, right: 0, bottom: 0 }} />
+            {/* 左 */}
+            <Box sx={{ ...common, top: sy, left: 0, width: sx, height: sh }} />
+            {/* 右 */}
+            <Box sx={{ ...common, top: sy, left: sx + sw, right: 0, height: sh }} />
+          </>
+        );
+      })()}
     </>
   );
 
@@ -493,7 +494,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 1301,
+            zIndex: 1401,
             borderRadius: '16px 16px 0 0',
             overflow: 'hidden',
             animation: 'footerSlideUp 0.3s ease-out',
@@ -659,7 +660,7 @@ export const DemoTourPopover: React.FC<Props> = ({
           top: position.top,
           left: position.left,
           width: POPOVER_WIDTH,
-          zIndex: 1301,
+          zIndex: 1401,
           borderRadius: 3,
           overflow: 'visible',
           animation: 'popoverEnter 0.3s ease-out',
