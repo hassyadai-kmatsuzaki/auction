@@ -23,8 +23,6 @@ import {
 interface DemoHomeProps {
   onGoToItems: () => void;
   onGoToWaitingRoom?: () => void;
-  /** ガイドモードの場合にステップ案内を表示 */
-  isGuided?: boolean;
 }
 
 // 広告データ（実際のHome.tsxと同じ構造）
@@ -39,7 +37,7 @@ const sponsoredAds = [
   },
 ];
 
-export function DemoHome({ onGoToItems, onGoToWaitingRoom, isGuided = false }: DemoHomeProps) {
+export function DemoHome({ onGoToItems, onGoToWaitingRoom }: DemoHomeProps) {
   const auction = MOCK_AUCTIONS[0];
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<typeof MOCK_ANNOUNCEMENTS[0] | null>(null);
 
@@ -122,16 +120,6 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom, isGuided = false }: D
       </Box>
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Guide tooltip (only for guided mode) */}
-        {isGuided && (
-          <Alert severity="info" icon={<ArrowForwardIcon />} sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" fontWeight="bold">ガイド付きデモ: ステップ 1/5</Typography>
-            <Typography variant="body2">
-              まずはオークションのホーム画面です。「出品一覧」ボタンを押して、出品されている商品を確認しましょう。
-            </Typography>
-          </Alert>
-        )}
-
         {/* お知らせ — 実際の AnnouncementList コンポーネントと同一デザイン */}
         <Box sx={{ mb: 5 }}>
           <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

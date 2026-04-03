@@ -4,17 +4,18 @@
  */
 import { useState } from 'react';
 import {
-  Box, Container, Typography, Grid, Paper, Tabs, Tab, Chip, IconButton, Alert,
+  Box, Container, Typography, Grid, Paper, Tabs, Tab, Chip, IconButton,
   Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Dialog, DialogTitle, DialogContent,
 } from '@mui/material';
 import {
   ViewModule as ViewModuleIcon,
   ViewList as ViewListIcon,
-  ArrowForward as ArrowForwardIcon,
   MeetingRoom as MeetingRoomIcon,
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   Info as InfoIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
@@ -24,16 +25,18 @@ import { MOCK_AUCTIONS, MOCK_ITEMS, MOCK_LANES_LIST, STATUS_CONFIG } from './moc
 
 interface DemoItemListProps {
   onGoToWaitingRoom: () => void;
-  isGuided?: boolean;
+  onFavoriteAdded?: () => void;
+  onLimitSet?: () => void;
 }
 
-export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemListProps) {
+export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
   const [limitModalItem, setLimitModalItem] = useState<{ id: number; species_name: string; start_price: number } | null>(null);
+  const [selectedItem, setSelectedItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
 
   const totalItems = MOCK_ITEMS.length;
 
@@ -79,6 +82,7 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
       [limitModalItem.id]: { limit_price: price, is_triggered: false },
     }));
     setLimitModalItem(null);
+    onLimitSet?.();
   };
 
   const handleRemoveLimitModal = () => {
@@ -91,24 +95,18 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
     e.stopPropagation();
     setFavoriteIds(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+        onFavoriteAdded?.();
+      }
       return next;
     });
   };
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
-      {/* Guide tooltip */}
-      {isGuided && (
-        <Alert severity="info" icon={<ArrowForwardIcon />} sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight="bold">ガイド付きデモ: ステップ 2/5</Typography>
-          <Typography variant="body2">
-            出品されている商品を確認できます。確認したら「待機室へ」ボタンでオークション会場へ進みます。
-          </Typography>
-        </Alert>
-      )}
-
       {/* ヘッダー — 実際の AuctionItems.tsx と同じ */}
       <Paper data-tour-target="items-header" sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
@@ -180,7 +178,7 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
-                  onClick={() => {}}
+                  onClick={() => setSelectedItem(item)}
                   onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)}
                 />
                 {/* 指値バッジ（カード下部に独立して配置）— 実際と同じ */}
@@ -223,7 +221,7 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
               {currentItems.map((item) => {
                 const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
                 return (
-                  <TableRow key={item.id} hover sx={{ cursor: 'pointer' }}>
+                  <TableRow key={item.id} hover sx={{ cursor: 'pointer' }} onClick={() => setSelectedItem(item)}>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.item_number}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -259,6 +257,43 @@ export function DemoItemList({ onGoToWaitingRoom, isGuided = false }: DemoItemLi
           </Table>
         </TableContainer>
       )}
+      {/* Item Detail Dialog */}
+      {selectedItem && (
+        <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              {selectedItem.species_name}
+              <Typography variant="body2" color="text.secondary">No.{selectedItem.item_number}</Typography>
+            </Box>
+            <IconButton onClick={() => setSelectedItem(null)} size="small"><CloseIcon /></IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <Box
+              component="img"
+              src={selectedItem.thumbnail_path || '/img/noimage.png'}
+              alt={selectedItem.species_name}
+              sx={{ width: '100%', maxHeight: 400, objectFit: 'contain', mb: 2 }}
+            />
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              {selectedItem.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
+              <Chip label={(STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }).label}
+                color={(STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }).color} size="small" />
+            </Box>
+            <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 1 }}>
+              ¥{Number(selectedItem.start_price).toLocaleString()}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {selectedItem.quantity}匹セット
+            </Typography>
+            {selectedItem.inspection_info && (
+              <Typography variant="body2" color="text.secondary">
+                検査情報: {selectedItem.inspection_info}
+              </Typography>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* BidLimitModal */}
       {limitModalItem && (
         <BidLimitModal

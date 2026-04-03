@@ -6,13 +6,17 @@ import { useState } from 'react';
 import {
   Container, Box, Typography, Grid, Card, CardMedia, CardContent,
   Chip, Paper, Button, IconButton,
+  Dialog, DialogTitle, DialogContent,
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { MOCK_ITEMS, STATUS_CONFIG } from './mockData';
+
+type MockItem = typeof MOCK_ITEMS[0];
 
 interface DemoFavoritesProps {
   onNavigateToAuctions: () => void;
@@ -22,7 +26,8 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
   // デモ用: 最初から数件お気に入り登録済み
   const [favoriteItemIds, setFavoriteItemIds] = useState<Set<number>>(new Set([1, 2, 5, 7]));
   const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
-  const [limitModalItem, setLimitModalItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
+  const [limitModalItem, setLimitModalItem] = useState<MockItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MockItem | null>(null);
 
   const favorites = MOCK_ITEMS.filter(item => favoriteItemIds.has(item.id));
 
@@ -58,7 +63,7 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper data-tour-target="favorites-header" sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box>
             <Typography variant="h5" fontWeight="bold">お気に入り</Typography>
@@ -84,7 +89,7 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
             const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
             return (
               <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
-                <Card sx={{
+                <Card onClick={() => setSelectedItem(item)} sx={{
                   cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s',
                   position: 'relative', borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
                   '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
@@ -137,6 +142,43 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
             );
           })}
         </Grid>
+      )}
+
+      {/* Item Detail Dialog */}
+      {selectedItem && (
+        <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              {selectedItem.species_name}
+              <Typography variant="body2" color="text.secondary">No.{selectedItem.item_number}</Typography>
+            </Box>
+            <IconButton onClick={() => setSelectedItem(null)} size="small"><CloseIcon /></IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <Box
+              component="img"
+              src={selectedItem.thumbnail_path || '/img/noimage.png'}
+              alt={selectedItem.species_name}
+              sx={{ width: '100%', maxHeight: 400, objectFit: 'contain', mb: 2 }}
+            />
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              {selectedItem.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
+              <Chip label={(STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }).label}
+                color={(STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }).color} size="small" />
+            </Box>
+            <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 1 }}>
+              ¥{Number(selectedItem.start_price).toLocaleString()}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {selectedItem.quantity}匹セット
+            </Typography>
+            {selectedItem.inspection_info && (
+              <Typography variant="body2" color="text.secondary">
+                検査情報: {selectedItem.inspection_info}
+              </Typography>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* BidLimitModal */}

@@ -5,15 +5,17 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Box, Container, Typography, Button, Paper, Grid,
+  Box, Container, Typography, Button, Paper, Grid, IconButton,
   Chip, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  LinearProgress,
 } from '@mui/material';
 import {
-  Gavel as GavelIcon,
   EmojiEvents as TrophyIcon,
   Pets as PetsIcon,
+  Wifi as WifiIcon,
+  PlayArrow as PlayArrowIcon,
+  ViewList as ViewListIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem, UpcomingItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
@@ -31,7 +33,7 @@ import {
   CPU_CHARACTERS,
   type WonEntry,
 } from './mockData';
-import { initCpuState, decideCpuAction, calculatePriceIncrement, type CpuBidState } from './cpuBidder';
+import { initCpuState, calculatePriceIncrement, type CpuBidState } from './cpuBidder';
 
 type FreeDemoPhase = 'home' | 'items' | 'favorites' | 'waiting' | 'auction' | 'post-auction';
 
@@ -66,7 +68,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
   const cpuTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const [completedLanes, setCompletedLanes] = useState<Set<number>>(new Set());
-  const [totalItemsCompleted, setTotalItemsCompleted] = useState(0);
+  const [, setTotalItemsCompleted] = useState(0);
 
   // CPU state
   const cpuStatesRef = useRef<CpuBidState[]>([]);
@@ -219,30 +221,48 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   }, [resolveItem]);
 
   // ─── CPU bidding loop ───
+  // 実際のオークションと同様に、カウントダウン開始後1-2秒以内に入札が入り続けるイメージ
+  // 各レーンに独立した入札タイマーを設置し、フリーズ解除直後に素早く次の入札を入れる
   useEffect(() => {
     if (phase !== 'auction') return;
-    const cpuLoop = setInterval(() => {
-      // Each CPU independently decides whether to bid
-      CPU_CHARACTERS.forEach((cpu, cpuIdx) => {
-        if (Math.random() > 0.3) return; // Rate limit: only 30% of CPUs act each tick
 
+    // 各レーンに対して独立したCPU入札ループを設定
+    const laneTimers: ReturnType<typeof setTimeout>[] = [];
+
+    const scheduleCpuBidForLane = (laneId: number) => {
+      // フリーズ解除後 0.8〜2秒のランダム遅延で次の入札
+      const delay = 800 + Math.random() * 1200;
+      const timer = setTimeout(() => {
         setLanes(currentLanes => {
-          const state = cpuStatesRef.current[cpuIdx];
-          if (!state) return currentLanes;
-
-          const decision = decideCpuAction(cpu, state, currentLanes);
-          if (!decision) return currentLanes;
-
-          const { laneId } = decision;
           const lane = currentLanes.find(l => l.lane_id === laneId);
           if (!lane?.current_item) return currentLanes;
-          if (lane.current_item.phase !== 'bidding') return currentLanes;
+          if (lane.current_item.phase !== 'bidding') {
+            // フリーズ中/pre_bid中は少し待ってリトライ
+            scheduleCpuBidForLane(laneId);
+            return currentLanes;
+          }
+
+          // CPUの中から入札意欲のあるものを選ぶ
+          const eligibleCpus = CPU_CHARACTERS.filter(cpu => {
+            if (cpu.preferredLanes && !cpu.preferredLanes.includes(lane.lane_number)) return false;
+            const state = cpuStatesRef.current[cpu.id - 1];
+            if (!state) return false;
+            const maxPrice = state.maxPrices.get(lane.current_item!.id) ?? 0;
+            if (lane.current_item!.current_price >= maxPrice) return false;
+            return Math.random() < cpu.bidProbability;
+          });
+
+          if (eligibleCpus.length === 0) {
+            // 誰も入札しない → 少し長めに待ってリトライ
+            const retryTimer = setTimeout(() => scheduleCpuBidForLane(laneId), 2000 + Math.random() * 3000);
+            laneTimers.push(retryTimer);
+            return currentLanes;
+          }
 
           const item = lane.current_item;
           const increment = calculatePriceIncrement(item.current_price);
           const newPrice = item.current_price + increment;
 
-          // Apply freeze and price increase
           stopTimer(laneId);
 
           const updatedLanes = currentLanes.map(l => {
@@ -256,14 +276,13 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                 freeze_remaining_seconds: 3,
                 freeze_countdown_seconds: 3,
                 active_bidders_count: Math.max(2, l.current_item.active_bidders_count),
-                // If user had a limit price and it's now exceeded, trigger it
                 my_limit_triggered: (l.current_item.my_limit_price && newPrice >= l.current_item.my_limit_price) ? true : l.current_item.my_limit_triggered,
                 my_bid_status: (l.current_item.my_limit_price && newPrice >= l.current_item.my_limit_price) ? 'inactive' : l.current_item.my_bid_status,
               },
             };
           });
 
-          // Schedule freeze release
+          // フリーズ → 解除 → 次のCPU入札をスケジュール
           let remaining = 3;
           const freezeTimer = setInterval(() => {
             remaining -= 1;
@@ -271,6 +290,8 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
               clearInterval(freezeTimer);
               updateLaneItem(laneId, i => ({ ...i, phase: 'bidding', freeze_remaining_seconds: 0 }));
               startCountdown(laneId, 15);
+              // フリーズ解除直後に次の入札をスケジュール（0.8〜2秒後）
+              scheduleCpuBidForLane(laneId);
             } else {
               updateLaneItem(laneId, i => ({ ...i, freeze_remaining_seconds: remaining }));
             }
@@ -278,11 +299,19 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
           return updatedLanes;
         });
-      });
-    }, 2000); // Check every 2 seconds
+      }, delay);
+      laneTimers.push(timer);
+    };
 
-    cpuTimersRef.current.push(cpuLoop);
-    return () => clearInterval(cpuLoop);
+    // 各レーンのCPU入札を開始（初回は1〜3秒後にランダム開始）
+    [1, 2, 3].forEach(laneId => {
+      const initialDelay = 1000 + Math.random() * 2000;
+      const t = setTimeout(() => scheduleCpuBidForLane(laneId), initialDelay);
+      laneTimers.push(t);
+    });
+
+    cpuTimersRef.current.push(...laneTimers);
+    return () => laneTimers.forEach(t => clearTimeout(t));
   }, [phase, stopTimer, updateLaneItem, startCountdown]);
 
   // ─── Start initial countdowns ───
@@ -310,8 +339,8 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     const lane = lanes.find(l => l.current_item?.id === itemId);
     if (!lane?.current_item) return;
     const item = lane.current_item;
-    if (item.phase === 'freeze') { notify('フリーズ中は入札できません', 'error'); return; }
-    if (item.phase === 'pre_bid') { notify('入札開始待機中です', 'error'); return; }
+    if (item.phase === 'freeze') { notify('誤タップ防止中です。もう少々お待ちください。', 'error'); return; }
+    if (item.phase === 'pre_bid') { notify('入札開始待機中です。もう少々お待ちください。', 'error'); return; }
     if (currentStatus === 'active') {
       updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'inactive', active_bidders_count: Math.max(0, i.active_bidders_count - 1) }));
       notify('入札をオフにしました', 'info');
@@ -366,8 +395,6 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   }, [limitModalLaneId, updateLaneItem, notify]);
 
   const wonTotal = wonItems.reduce((sum, w) => sum + w.total_amount, 0);
-  const totalItems = 30;
-  const progressPercent = (totalItemsCompleted / totalItems) * 100;
 
   // ─── Upcoming items for each lane ───
   const getUpcomingForLane = (laneId: number): UpcomingItem[] => {
@@ -453,38 +480,32 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative' }}>
         {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 
-        {/* Header */}
-        <Box sx={{ background: 'linear-gradient(135deg, #424242 0%, #212121 100%)', color: 'white', py: 2, px: 2 }}>
-          <Container maxWidth="xl">
+        {/* Header — matches real AuctionHeader */}
+        <Container maxWidth="xl" sx={{ pt: 2 }}>
+          <Paper sx={{ p: 2, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <GavelIcon sx={{ fontSize: 28 }} />
-                <Box>
-                  <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1rem', md: '1.3rem' } }}>
-                    ガイドなしデモ — フリーオークション
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                    3レーン x 各10匹 | CPU参加者10人
-                  </Typography>
-                </Box>
+              <Box>
+                <Typography variant="h5" fontWeight="bold">
+                  ガイドなしデモ — フリーオークション
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {3 - completedLanes.size}/{3}レーン進行中
+                </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip label={`進行: ${totalItemsCompleted}/${totalItems}`} size="small"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 700 }} />
-                <Chip label="リアルタイム" color="success" size="small" />
-                <Button size="small" variant="outlined"
-                  sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
-                  onClick={onBackToTop}>
-                  終了
+                <Chip icon={<WifiIcon />} label="リアルタイム接続中" color="success" size="small" />
+                <Chip icon={<PlayArrowIcon />} label="開催中" color="success" size="small" />
+                <Button size="small" variant="outlined" startIcon={<ViewListIcon />}
+                  onClick={() => setPhase('items')}>
+                  出品一覧
                 </Button>
+                <IconButton size="small" onClick={() => {}}>
+                  <RefreshIcon />
+                </IconButton>
               </Box>
             </Box>
-            {/* Progress bar */}
-            <LinearProgress variant="determinate" value={progressPercent}
-              sx={{ mt: 1.5, height: 6, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.15)',
-                '& .MuiLinearProgress-bar': { borderRadius: 3 } }} />
-          </Container>
-        </Box>
+          </Paper>
+        </Container>
 
         <Container maxWidth="xl" sx={{ py: 2 }}>
           {/* Lane grid */}

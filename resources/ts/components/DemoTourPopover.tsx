@@ -31,6 +31,8 @@ export interface TourStep {
   waitForAction?: string;
   /** autoAction 実行後にポップオーバー表示するまでの遅延(ms) */
   autoActionDelay?: number;
+  /** autoActionのボタンラベル（デフォルト: "実行"） */
+  autoActionLabel?: string;
 }
 
 interface Props {
@@ -42,6 +44,8 @@ interface Props {
   onReset: () => void;
   /** 自動アクション実行中かどうか */
   isAutoPlaying?: boolean;
+  /** autoActionの実行ボタンが押された時 */
+  onExecuteAction?: () => void;
 }
 
 const POPOVER_WIDTH = 340;
@@ -58,6 +62,7 @@ export const DemoTourPopover: React.FC<Props> = ({
   onClose,
   onReset,
   isAutoPlaying = false,
+  onExecuteAction,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -212,71 +217,194 @@ export const DemoTourPopover: React.FC<Props> = ({
 
   // ── 共通: スポットライトバックドロップ ──
   const spotlightBackdrop = (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1300,
-        pointerEvents: 'none',
-      }}
-    >
-      <svg
-        width="100%"
-        height="100%"
-        style={{ position: 'absolute', top: 0, left: 0 }}
+    <>
+      {/* Visual overlay (dark mask with spotlight cutout) */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1300,
+          pointerEvents: 'none',
+        }}
       >
-        <defs>
-          <mask id="demo-spotlight-mask">
-            <rect width="100%" height="100%" fill="white" />
-            {spotlightRect && (
-              <rect
-                x={spotlightRect.left - SPOTLIGHT_PADDING}
-                y={spotlightRect.top - SPOTLIGHT_PADDING}
-                width={spotlightRect.width + SPOTLIGHT_PADDING * 2}
-                height={spotlightRect.height + SPOTLIGHT_PADDING * 2}
-                rx={12}
-                fill="black"
-              />
-            )}
-          </mask>
-        </defs>
-        <rect
+        <svg
           width="100%"
           height="100%"
-          fill="rgba(0,0,0,0.55)"
-          mask="url(#demo-spotlight-mask)"
-        />
-      </svg>
+          style={{ position: 'absolute', top: 0, left: 0 }}
+        >
+          <defs>
+            <mask id="demo-spotlight-mask">
+              <rect width="100%" height="100%" fill="white" />
+              {spotlightRect && (
+                <rect
+                  x={spotlightRect.left - SPOTLIGHT_PADDING}
+                  y={spotlightRect.top - SPOTLIGHT_PADDING}
+                  width={spotlightRect.width + SPOTLIGHT_PADDING * 2}
+                  height={spotlightRect.height + SPOTLIGHT_PADDING * 2}
+                  rx={12}
+                  fill="black"
+                />
+              )}
+            </mask>
+          </defs>
+          <rect
+            width="100%"
+            height="100%"
+            fill="rgba(0,0,0,0.55)"
+            mask="url(#demo-spotlight-mask)"
+          />
+        </svg>
 
-      {spotlightRect && (
+        {spotlightRect && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: spotlightRect.top - SPOTLIGHT_PADDING,
+              left: spotlightRect.left - SPOTLIGHT_PADDING,
+              width: spotlightRect.width + SPOTLIGHT_PADDING * 2,
+              height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
+              borderRadius: '12px',
+              pointerEvents: 'none',
+              // waitForAction時: ゴールドの強いパルスで「ここをタップ」を示す
+              // それ以外: 青の穏やかなパルス
+              ...(step.waitForAction ? {
+                border: '2px solid rgba(255, 165, 0, 0.8)',
+                boxShadow: '0 0 0 4px rgba(255, 165, 0, 0.3), 0 0 24px rgba(255, 165, 0, 0.4)',
+                animation: 'spotlightTapPulse 1.2s ease-in-out infinite',
+                '@keyframes spotlightTapPulse': {
+                  '0%, 100%': {
+                    boxShadow: '0 0 0 4px rgba(255, 165, 0, 0.3), 0 0 24px rgba(255, 165, 0, 0.4)',
+                  },
+                  '50%': {
+                    boxShadow: '0 0 0 8px rgba(255, 165, 0, 0.5), 0 0 40px rgba(255, 165, 0, 0.6)',
+                  },
+                },
+              } : {
+                border: '2px solid rgba(25, 118, 210, 0.6)',
+                boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
+                animation: 'spotlightPulse 2s ease-in-out infinite',
+                '@keyframes spotlightPulse': {
+                  '0%, 100%': {
+                    boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
+                  },
+                  '50%': {
+                    boxShadow: '0 0 0 6px rgba(25, 118, 210, 0.25), 0 0 30px rgba(25, 118, 210, 0.4)',
+                  },
+                },
+              }),
+            }}
+          />
+        )}
+      </Box>
+
+      {/* Tap-here ripple indicator (only for waitForAction steps) */}
+      {spotlightRect && step.waitForAction && (
         <Box
           sx={{
-            position: 'absolute',
+            position: 'fixed',
+            top: spotlightRect.top + spotlightRect.height / 2 - 20,
+            left: spotlightRect.left + spotlightRect.width / 2 - 20,
+            width: 40,
+            height: 40,
+            zIndex: 1300,
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Expanding ring */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              borderRadius: '50%',
+              border: '2px solid rgba(255, 165, 0, 0.6)',
+              animation: 'tapRipple 1.5s ease-out infinite',
+              '@keyframes tapRipple': {
+                '0%': { transform: 'scale(0.8)', opacity: 1 },
+                '100%': { transform: 'scale(2.5)', opacity: 0 },
+              },
+            }}
+          />
+          {/* Center dot */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              bgcolor: 'rgba(255, 165, 0, 0.8)',
+              boxShadow: '0 0 8px rgba(255, 165, 0, 0.6)',
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Click-blocking overlay: blocks all interactions outside spotlight */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1300,
+          pointerEvents: 'all',
+        }}
+      />
+
+      {/* Click-through window over spotlight (only for waitForAction steps) */}
+      {spotlightRect && step.waitForAction && (
+        <Box
+          sx={{
+            position: 'fixed',
             top: spotlightRect.top - SPOTLIGHT_PADDING,
             left: spotlightRect.left - SPOTLIGHT_PADDING,
             width: spotlightRect.width + SPOTLIGHT_PADDING * 2,
             height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
-            borderRadius: '12px',
-            border: '2px solid rgba(25, 118, 210, 0.6)',
-            boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
-            pointerEvents: 'none',
-            animation: 'spotlightPulse 2s ease-in-out infinite',
-            '@keyframes spotlightPulse': {
-              '0%, 100%': {
-                boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
-              },
-              '50%': {
-                boxShadow: '0 0 0 6px rgba(25, 118, 210, 0.25), 0 0 30px rgba(25, 118, 210, 0.4)',
-              },
-            },
+            zIndex: 1300,
+            pointerEvents: 'auto',
           }}
         />
       )}
-    </Box>
+    </>
   );
+
+  // ── 共通: 自動再生インジケーター ──
+  const autoPlayingIndicator = isAutoPlaying ? (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.75,
+        px: 1,
+        py: 0.5,
+        bgcolor: 'rgba(25, 118, 210, 0.08)',
+        borderRadius: 1,
+      }}
+    >
+      <Box
+        sx={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          bgcolor: 'primary.main',
+          flexShrink: 0,
+          animation: 'autoPulse 1s infinite',
+          '@keyframes autoPulse': {
+            '0%, 100%': { opacity: 1 },
+            '50%': { opacity: 0.3 },
+          },
+        }}
+      />
+      <Typography variant="caption" color="primary.main" fontWeight={600}>
+        シミュレーション実行中...
+      </Typography>
+    </Box>
+  ) : null;
 
   // ── 共通: ナビゲーションボタン群 ──
   const navButtons = (
@@ -321,6 +449,19 @@ export const DemoTourPopover: React.FC<Props> = ({
             {step.waitForAction}
           </Typography>
         </Box>
+      ) : step.autoAction ? (
+        isAutoPlaying ? (
+          autoPlayingIndicator
+        ) : (
+          <Button
+            size="small"
+            variant="contained"
+            color="warning"
+            onClick={onExecuteAction}
+          >
+            {step.autoActionLabel || '実行'}
+          </Button>
+        )
       ) : (
         <Button
           size="small"
@@ -334,39 +475,6 @@ export const DemoTourPopover: React.FC<Props> = ({
       )}
     </Box>
   );
-
-  // ── 共通: 自動再生インジケーター ──
-  const autoPlayingIndicator = isAutoPlaying ? (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0.75,
-        px: 1,
-        py: 0.5,
-        bgcolor: 'rgba(25, 118, 210, 0.08)',
-        borderRadius: 1,
-      }}
-    >
-      <Box
-        sx={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          bgcolor: 'primary.main',
-          flexShrink: 0,
-          animation: 'autoPulse 1s infinite',
-          '@keyframes autoPulse': {
-            '0%, 100%': { opacity: 1 },
-            '50%': { opacity: 0.3 },
-          },
-        }}
-      />
-      <Typography variant="caption" color="primary.main" fontWeight={600}>
-        シミュレーション実行中...
-      </Typography>
-    </Box>
-  ) : null;
 
   // ════════════════════════════════════════════
   // モバイル: フッター固定パネル

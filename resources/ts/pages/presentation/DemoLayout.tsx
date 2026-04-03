@@ -91,6 +91,7 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
                 key={item.page}
                 color="inherit"
                 onClick={() => onNavigate(item.page)}
+                {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : {})}
                 sx={{
                   borderBottom: currentPage === item.page ? 2 : 0,
                   borderRadius: 0,
@@ -119,6 +120,7 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
                     onNavigate(item.page);
                     setDrawerOpen(false);
                   }}
+                  {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : {})}
                 >
                   <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
@@ -203,7 +205,7 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" align="center">
-            &copy; 2025 メダカオークション運営事務局
+            © 2025 メダカオークション運営事務局
           </Typography>
         </Container>
       </Box>

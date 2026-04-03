@@ -33,7 +33,7 @@ import {
 } from '@mui/icons-material';
 import type { WonEntry, MockWonItem } from './mockData';
 import {
-  MOCK_WON_ITEMS, getPaymentStatusLabel, getPaymentStatusColor,
+  getPaymentStatusLabel, getPaymentStatusColor,
   getDeliveryStatusLabel, getDeliveryStepIndex,
 } from './mockData';
 
@@ -159,7 +159,7 @@ export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, 
           </Tabs>
         </Paper>
 
-        {currentTab === 'won-items' && <StepWonItemManagement />}
+        {currentTab === 'won-items' && <StepWonItemManagement wonItems={wonItems} />}
         {currentTab === 'settings' && <StepAccountSettings />}
 
         {/* ガイド付きナビゲーション */}
@@ -192,7 +192,7 @@ export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, 
 // 落札管理画面（実際の WonItems.tsx と同一デザイン）
 // ====================================================================
 
-function StepWonItemManagement() {
+function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
   const [activeTab, setActiveTab] = useState('all');
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MockWonItem | null>(null);
@@ -204,10 +204,32 @@ function StepWonItemManagement() {
   const [shippingAddress, setShippingAddress] = useState('〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // オークショングループ化（実際のWonItems.tsxと同じ構造）
-  const auctionTitle = '2026年早春オークション';
-  const auctionDate = '2026-03-01';
-  const allItems = MOCK_WON_ITEMS;
+  // Generate mock data from actual won items
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const paymentDeadline = tomorrow.toISOString().split('T')[0];
+
+  const auctionTitle = '2026年春季メダカオークション';
+  const auctionDate = new Date().toISOString().split('T')[0];
+  const allItems: MockWonItem[] = wonItems.map((w, i) => ({
+    id: i + 1,
+    item: {
+      id: i + 1,
+      item_number: i + 1,
+      species_name: w.species_name,
+      quantity: w.quantity,
+      thumbnail_path: '/img/noimage.png',
+      auction: { id: 1, title: '2026年春季メダカオークション', event_date: new Date().toISOString().split('T')[0] },
+    },
+    winning_price: w.winning_price,
+    quantity: w.quantity,
+    total_amount: w.total_amount,
+    commission_amount: Math.floor(w.winning_price * w.quantity * 0.1),
+    payment_status: 'pending' as const,
+    payment_deadline: paymentDeadline,
+    delivery_status: 'pending' as const,
+    shipping_address: '未設定',
+  }));
 
   const summary = {
     total_amount: allItems.reduce((s, w) => s + w.total_amount, 0),
@@ -259,6 +281,25 @@ function StepWonItemManagement() {
     navigator.clipboard?.writeText(text);
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
   };
+
+  if (wonItems.length === 0) {
+    return (
+      <Box>
+        <Typography data-tour-target="won-items-header" variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          落札管理
+        </Typography>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <TrophyIcon sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">
+            落札した商品はまだありません
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            オークションで商品を落札すると、ここに表示されます。
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -666,7 +707,7 @@ function StepAccountSettings() {
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
                   <Button variant="contained" size="large" startIcon={<SaveIcon />}
-                    onClick={() => setSnackbar({ open: true, message: '変更を保存しました（デモ）' })}>
+                    onClick={() => setSnackbar({ open: true, message: 'プロフィールを保存しました。' })}>
                     変更を保存
                   </Button>
                 </Box>
@@ -706,7 +747,7 @@ function StepAccountSettings() {
                           label={item.label}
                         />
                         <Button size="small" variant="outlined" startIcon={<SendIcon />}
-                          onClick={() => setSnackbar({ open: true, message: 'テストメールを送信しました（デモ）' })}>
+                          onClick={() => setSnackbar({ open: true, message: 'テストメールを送信しました。受信をご確認ください。' })}>
                           テスト送信
                         </Button>
                       </Box>
@@ -739,7 +780,7 @@ function StepAccountSettings() {
                           label={item.label}
                         />
                         <Button size="small" variant="outlined" startIcon={<SendIcon />}
-                          onClick={() => setSnackbar({ open: true, message: 'テストメールを送信しました（デモ）' })}>
+                          onClick={() => setSnackbar({ open: true, message: 'テストメールを送信しました。受信をご確認ください。' })}>
                           テスト送信
                         </Button>
                       </Box>
@@ -752,7 +793,7 @@ function StepAccountSettings() {
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
                   <Button variant="contained" size="large" startIcon={<SaveIcon />}
-                    onClick={() => setSnackbar({ open: true, message: '通知設定を保存しました（デモ）' })}>
+                    onClick={() => setSnackbar({ open: true, message: '通知設定を保存しました。' })}>
                     通知設定を保存
                   </Button>
                 </Box>
