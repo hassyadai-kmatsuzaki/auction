@@ -9,6 +9,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/lp.css">
+  <script>
+    (function(d) {
+      var config = {
+        kitId: 'png6ego',
+        scriptTimeout: 3000,
+        async: true
+      },
+      h=d.documentElement,t=setTimeout(function(){h.className=h.className.replace(/\bwf-loading\b/g,"")+" wf-inactive";},config.scriptTimeout),tk=d.createElement("script"),f=false,s=d.getElementsByTagName("script")[0],a;h.className+=" wf-loading";tk.src='https://use.typekit.net/'+config.kitId+'.js';tk.async=true;tk.onload=tk.onreadystatechange=function(){a=this.readyState;if(f||a&&a!="complete"&&a!="loaded")return;f=true;clearTimeout(t);try{Typekit.load(config)}catch(e){}};s.parentNode.insertBefore(tk,s)
+    })(document);
+  </script>
 </head>
 <body>
 
@@ -35,7 +45,6 @@
   <div class="hero__deco-text" aria-hidden="true">MEDAICHI</div>
   <div class="hero__inner">
     <div class="hero__left">
-      <p class="hero__badge hero-anim" data-hero-delay="0">2025年4月25日、第1回オークション開催</p>
       <h1 class="hero__title hero-anim" data-hero-delay="1">
         <span class="hero__title-line">信頼できる</span>
         <span class="hero__title-line">出品者からあなたへ</span>
@@ -56,15 +65,8 @@
     </div>
     <div class="hero__right hero-anim" data-hero-delay="2">
       <div class="hero__visual">
-        <div class="hero__img-main">
+        <div class="hero__img-full">
           <img src="/img/lp/AdobeStock_194803795.jpeg" alt="めだか" loading="eager">
-        </div>
-        <div class="hero__img-sub">
-          <img src="/img/lp/AdobeStock_501966175.jpeg" alt="めだか" loading="eager">
-        </div>
-        <div class="hero__float-badge">
-          <strong>第1回</strong>
-          <span>オークション<br>開催決定</span>
         </div>
       </div>
     </div>
