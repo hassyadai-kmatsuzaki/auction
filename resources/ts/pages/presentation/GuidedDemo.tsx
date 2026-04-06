@@ -178,47 +178,125 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // ─── Simulation helpers ───
 
-  const simulateBattleCycle = useCallback((laneId: number) => {
-    stopTimer(laneId);
-    updateLaneItem(laneId, item => {
-      const inc = Math.max(100, Math.round(item.current_price * 0.1));
-      return { ...item, phase: 'freeze' as const, freeze_remaining_seconds: 3, freeze_countdown_seconds: 3, current_price: item.current_price + inc, active_bidders_count: Math.max(2, item.active_bidders_count), my_bid_status: item.my_bid_status === 'active' ? 'inactive' : item.my_bid_status };
-    });
-    notify('他の参加者が入札！フリーズ中...', 'warning');
-    let remaining = 3;
-    const ft = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(ft);
-        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0, my_bid_status: 'inactive', active_bidders_count: Math.max(1, item.active_bidders_count) }));
-        startCountdown(laneId, 15);
-        notify('入札が解除されました。再度入札してください！', 'info');
-      } else {
-        updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
-      }
-    }, 1000);
-  }, [stopTimer, updateLaneItem, startCountdown, notify]);
-
-
-  const simulateOpponentBid = useCallback((laneId: number) => {
-    stopTimer(laneId);
-    updateLaneItem(laneId, item => {
-      const inc = Math.max(100, Math.round(item.current_price * 0.1));
-      return { ...item, phase: 'freeze' as const, freeze_remaining_seconds: 3, freeze_countdown_seconds: 3, current_price: item.current_price + inc, active_bidders_count: Math.max(2, item.active_bidders_count), my_bid_status: item.my_bid_status === 'active' ? 'inactive' : item.my_bid_status };
-    });
-    notify('他の参加者が入札！価格が上昇しました', 'warning');
-    let remaining = 3;
+  // 共通: フリーズ演出（指定秒後にonCompleteを呼ぶ）
+  const runFreeze = useCallback((laneId: number, seconds: number, onComplete: () => void) => {
+    let remaining = seconds;
     const ft = setInterval(() => {
       remaining -= 1;
       if (remaining <= 0) {
         clearInterval(ft);
         updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
-        startCountdown(laneId, 15);
+        onComplete();
       } else {
         updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
       }
     }, 1000);
-  }, [stopTimer, updateLaneItem, startCountdown, notify]);
+  }, [updateLaneItem]);
+
+  // 相手が1回入札（フリーズ後にカウントダウン再開）
+  const simulateOpponentBid = useCallback((laneId: number) => {
+    stopTimer(laneId);
+    updateLaneItem(laneId, item => {
+      const inc = Math.max(100, Math.round(item.current_price * 0.1));
+      return {
+        ...item,
+        phase: 'freeze' as const,
+        freeze_remaining_seconds: 3,
+        freeze_countdown_seconds: 3,
+        current_price: item.current_price + inc,
+        active_bidders_count: Math.max(2, item.active_bidders_count),
+        // 本番と同じ: 相手が入札 → 自分はinactiveになる
+        my_bid_status: item.my_bid_status === 'active' ? 'inactive' as const : item.my_bid_status,
+      };
+    });
+    notify('他の参加者が入札！価格が上昇しました', 'warning');
+    runFreeze(laneId, 3, () => {
+      startCountdown(laneId, 15);
+    });
+  }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
+
+  // 入札合戦: 自動で複数ラウンドの攻防を再現
+  // ラウンド: 相手入札→フリーズ→自分入札→フリーズ→（繰り返し）
+  const simulateMultiRoundBattle = useCallback((laneId: number) => {
+    const totalRounds = 3;
+    let round = 0;
+
+    const doOpponentBid = () => {
+      stopTimer(laneId);
+      updateLaneItem(laneId, item => {
+        const inc = Math.max(100, Math.round(item.current_price * 0.1));
+        return {
+          ...item,
+          phase: 'freeze' as const,
+          freeze_remaining_seconds: 2,
+          freeze_countdown_seconds: 2,
+          current_price: item.current_price + inc,
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+          my_bid_status: 'inactive' as const,
+        };
+      });
+      notify(`相手が入札！（${round + 1}/${totalRounds}ラウンド）`, 'warning');
+      runFreeze(laneId, 2, () => {
+        // フリーズ解除後、自分が自動入札
+        setTimeout(() => doUserBid(), 800);
+      });
+    };
+
+    const doUserBid = () => {
+      stopTimer(laneId);
+      updateLaneItem(laneId, item => {
+        const inc = Math.max(100, Math.round(item.current_price * 0.1));
+        return {
+          ...item,
+          phase: 'freeze' as const,
+          freeze_remaining_seconds: 2,
+          freeze_countdown_seconds: 2,
+          current_price: item.current_price + inc,
+          active_bidders_count: Math.max(2, item.active_bidders_count),
+          my_bid_status: 'active' as const,
+        };
+      });
+      notify('あなたが入札しました！', 'success');
+      runFreeze(laneId, 2, () => {
+        round++;
+        if (round < totalRounds) {
+          startCountdown(laneId, 15);
+          // 次ラウンドの相手入札（1秒後）
+          setTimeout(() => doOpponentBid(), 1000);
+        } else {
+          // 最終ラウンド完了 → ユーザーがactive状態でカウントダウン再開
+          startCountdown(laneId, 15);
+          notify('入札合戦が終了しました！あなたが最高入札者です', 'success');
+        }
+      });
+    };
+
+    // 最初の相手入札で合戦開始
+    doOpponentBid();
+  }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
+
+  // 旧simulateBattleCycle（handleBidToggle内のstep 13から呼ばれる場合のフォールバック）
+  const simulateBattleCycle = useCallback((laneId: number) => {
+    stopTimer(laneId);
+    updateLaneItem(laneId, item => {
+      const inc = Math.max(100, Math.round(item.current_price * 0.1));
+      return {
+        ...item,
+        phase: 'freeze' as const,
+        freeze_remaining_seconds: 3,
+        freeze_countdown_seconds: 3,
+        current_price: item.current_price + inc,
+        active_bidders_count: Math.max(2, item.active_bidders_count),
+        my_bid_status: 'inactive' as const,
+      };
+    });
+    notify('他の参加者が入札！フリーズ中...', 'warning');
+    runFreeze(laneId, 3, () => {
+      updateLaneItem(laneId, item => ({ ...item, my_bid_status: 'inactive' }));
+      startCountdown(laneId, 15);
+      notify('入札が解除されました。再度入札してください！', 'info');
+    });
+  }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
 
   const handleWin = useCallback((laneId: number = 1) => {
     const targetLane = lanes.find(l => l.lane_id === laneId);
@@ -365,7 +443,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。最大3つのレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきた！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦とフリーズ', description: '相手が入札してきました！価格上昇直後は数秒間「フリーズ」状態になり、誤タップを防ぎます。フリーズ解除後に、再度入札できるようになります。', placement: 'bottom', autoAction: () => { simulateBattleCycle(1); }, autoActionDelay: 4500, autoActionLabel: '入札合戦を開始' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦とフリーズ', description: '3ラウンドの入札合戦を自動再現します。価格上昇直後は「フリーズ」で誤タップを防ぎ、解除後に入札できるようになります。', placement: 'bottom', autoAction: () => { simulateMultiRoundBattle(1); }, autoActionDelay: 20000, autoActionLabel: '入札合戦を開始（3ラウンド）' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値が発動！自動入札オフ', description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateLimitTrigger(); }, autoActionDelay: 6000, autoActionLabel: '指値発動を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン1を落札します。紙吹雪の落札演出をお楽しみください！', placement: 'bottom', autoAction: () => { updateLaneItem(1, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(1), 500); }, autoActionDelay: 4500, autoActionLabel: '落札する' },

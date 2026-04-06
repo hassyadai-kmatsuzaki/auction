@@ -2,6 +2,14 @@
  * ガイドなしデモ
  * 3レーン x 各10匹 = 30匹のリアルなオークション体験
  * 10人のCPU参加者がフロントエンドのみで入札ロジックを実行
+ *
+ * 本番のオークションロジック:
+ * - ユーザーが入札 → BidParticipant(active) 登録
+ * - 2人以上active → サーバーが即座にprice increment + freeze
+ * - freeze解除後 → bidding再開(countdown 15s)
+ * - countdown=0 で active=1人 → その人が落札(sold)
+ * - countdown=0 で active=0人 → 不成立(unsold)
+ * - 価格上昇時、前の入札者は自動deactivate(指値がない場合)
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -59,19 +67,25 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       makeLane(3, 3, 'レーン 3', { ...LANE_QUEUES[2][0] }),
     ];
   });
+  // lanesの最新値をrefで追跡（タイマーコールバック内で使用）
+  const lanesRef = useRef(lanes);
+  useEffect(() => { lanesRef.current = lanes; }, [lanes]);
+
   // Track which item index each lane is on
   const laneItemIndexRef = useRef<number[]>([0, 0, 0]);
   const [wonItems, setWonItems] = useState<WonEntry[]>([]);
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
-  const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
-  const cpuTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const countdownTimersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
+  const freezeTimersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
+  const cpuTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [completedLanes, setCompletedLanes] = useState<Set<number>>(new Set());
-  const [, setTotalItemsCompleted] = useState(0);
 
   // Track resolved items to prevent duplicate resolution
   const resolvedRef = useRef<Set<string>>(new Set());
+  // Track items currently transitioning to prevent double advance
+  const transitioningRef = useRef<Set<number>>(new Set());
 
   // CPU state
   const cpuStatesRef = useRef<CpuBidState[]>([]);
@@ -88,37 +102,31 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     ));
   }, []);
 
-  const stopTimer = useCallback((laneId: number) => {
-    const t = timersRef.current.get(laneId);
-    if (t) { clearInterval(t); timersRef.current.delete(laneId); }
+  // ─── Timer management（レーンごとに管理） ───
+
+  const stopCountdown = useCallback((laneId: number) => {
+    const t = countdownTimersRef.current.get(laneId);
+    if (t) { clearInterval(t); countdownTimersRef.current.delete(laneId); }
+  }, []);
+
+  const stopFreeze = useCallback((laneId: number) => {
+    const t = freezeTimersRef.current.get(laneId);
+    if (t) { clearInterval(t); freezeTimersRef.current.delete(laneId); }
+  }, []);
+
+  const stopCpuTimer = useCallback((laneId: number) => {
+    const t = cpuTimersRef.current.get(laneId);
+    if (t) { clearTimeout(t); cpuTimersRef.current.delete(laneId); }
   }, []);
 
   const stopAllTimers = useCallback(() => {
-    timersRef.current.forEach(t => clearInterval(t));
-    timersRef.current.clear();
-    cpuTimersRef.current.forEach(t => clearInterval(t));
-    cpuTimersRef.current = [];
+    countdownTimersRef.current.forEach(t => clearInterval(t));
+    countdownTimersRef.current.clear();
+    freezeTimersRef.current.forEach(t => clearInterval(t));
+    freezeTimersRef.current.clear();
+    cpuTimersRef.current.forEach(t => clearTimeout(t));
+    cpuTimersRef.current.clear();
   }, []);
-
-  const startCountdown = useCallback((laneId: number, seconds?: number) => {
-    stopTimer(laneId);
-    if (seconds !== undefined) {
-      updateLaneItem(laneId, item => ({ ...item, countdown_seconds: seconds }));
-    }
-    const timer = setInterval(() => {
-      setLanes(prev => {
-        const lane = prev.find(l => l.lane_id === laneId);
-        const cd = lane?.current_item?.countdown_seconds ?? 0;
-        if (cd <= 1) { stopTimer(laneId); }
-        return prev.map(l =>
-          l.lane_id === laneId && l.current_item
-            ? { ...l, current_item: { ...l.current_item, countdown_seconds: Math.max(0, l.current_item.countdown_seconds - 1) } }
-            : l
-        );
-      });
-    }, 1000);
-    timersRef.current.set(laneId, timer);
-  }, [stopTimer, updateLaneItem]);
 
   // Cleanup
   useEffect(() => () => stopAllTimers(), [stopAllTimers]);
@@ -131,15 +139,128 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     cpuStatesRef.current = CPU_CHARACTERS.map(cpu => initCpuState(cpu, priceMap));
   }, []);
 
-  // ─── Handle item completion (countdown reached 0 without new bids) ───
+  // ─── Freeze: 価格上昇後の誤タップ防止期間 ───
+
+  const startFreeze = useCallback((laneId: number, onComplete: () => void) => {
+    stopFreeze(laneId); // 既存のフリーズタイマーをクリア
+    let remaining = 3;
+    updateLaneItem(laneId, item => ({
+      ...item,
+      phase: 'freeze' as const,
+      freeze_remaining_seconds: 3,
+      freeze_countdown_seconds: 3,
+    }));
+    const timer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(timer);
+        freezeTimersRef.current.delete(laneId);
+        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
+        onComplete();
+      } else {
+        updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
+      }
+    }, 1000);
+    freezeTimersRef.current.set(laneId, timer);
+  }, [stopFreeze, updateLaneItem]);
+
+  // ─── Countdown: 入札カウントダウン ───
+
+  const startCountdown = useCallback((laneId: number, seconds: number = 15) => {
+    stopCountdown(laneId);
+    updateLaneItem(laneId, item => ({ ...item, countdown_seconds: seconds }));
+    const timer = setInterval(() => {
+      setLanes(prev => {
+        const lane = prev.find(l => l.lane_id === laneId);
+        const cd = lane?.current_item?.countdown_seconds ?? 0;
+        if (cd <= 1) { stopCountdown(laneId); }
+        return prev.map(l =>
+          l.lane_id === laneId && l.current_item
+            ? { ...l, current_item: { ...l.current_item, countdown_seconds: Math.max(0, l.current_item.countdown_seconds - 1) } }
+            : l
+        );
+      });
+    }, 1000);
+    countdownTimersRef.current.set(laneId, timer);
+  }, [stopCountdown, updateLaneItem]);
+
+  // ─── CPU入札をスケジュール ───
+
+  const scheduleCpuBid = useCallback((laneId: number) => {
+    stopCpuTimer(laneId);
+    const delay = 800 + Math.random() * 1200;
+    const timer = setTimeout(() => {
+      cpuTimersRef.current.delete(laneId);
+      // lanesRefから最新の状態を読む（setLanes updater内での副作用を回避）
+      const currentLanes = lanesRef.current;
+      const lane = currentLanes.find(l => l.lane_id === laneId);
+      if (!lane?.current_item) return;
+
+      // フリーズ中/pre_bid中はリトライ
+      if (lane.current_item.phase !== 'bidding') {
+        scheduleCpuBid(laneId);
+        return;
+      }
+
+      // CPUの中から入札意欲のあるものを選ぶ
+      const eligibleCpus = CPU_CHARACTERS.filter(cpu => {
+        if (cpu.preferredLanes && !cpu.preferredLanes.includes(lane.lane_number)) return false;
+        const state = cpuStatesRef.current[cpu.id - 1];
+        if (!state) return false;
+        const maxPrice = state.maxPrices.get(lane.current_item!.id) ?? 0;
+        if (lane.current_item!.current_price >= maxPrice) return false;
+        return Math.random() < cpu.bidProbability;
+      });
+
+      if (eligibleCpus.length === 0) {
+        // 誰も入札しない → 少し長めに待ってリトライ
+        const retryDelay = 2000 + Math.random() * 3000;
+        const retryTimer = setTimeout(() => {
+          cpuTimersRef.current.delete(laneId);
+          scheduleCpuBid(laneId);
+        }, retryDelay);
+        cpuTimersRef.current.set(laneId, retryTimer);
+        return;
+      }
+
+      // CPU入札実行: 価格上昇 + フリーズ
+      const item = lane.current_item;
+      const increment = calculatePriceIncrement(item.current_price);
+      const newPrice = item.current_price + increment;
+
+      stopCountdown(laneId);
+
+      // 本番同様: 相手が入札 → 自分(ユーザー)はinactiveになる
+      updateLaneItem(laneId, i => ({
+        ...i,
+        current_price: newPrice,
+        active_bidders_count: Math.max(2, i.active_bidders_count),
+        // 指値チェック: 新価格が指値以上なら発動
+        my_limit_triggered: (i.my_limit_price && newPrice >= i.my_limit_price) ? true : i.my_limit_triggered,
+        // ユーザーがactiveだったらinactiveに（本番と同じ: 価格上昇時に前の入札者はdeactivate）
+        my_bid_status: i.my_bid_status === 'active' ? 'inactive' as const : i.my_bid_status,
+      }));
+
+      // フリーズ開始 → 完了後にカウントダウン再開 + 次のCPU入札をスケジュール
+      startFreeze(laneId, () => {
+        startCountdown(laneId, 15);
+        scheduleCpuBid(laneId);
+      });
+    }, delay);
+    cpuTimersRef.current.set(laneId, timer);
+  }, [stopCpuTimer, stopCountdown, updateLaneItem, startFreeze, startCountdown]);
+
+  // ─── Next item transition ───
 
   const advanceToNextItem = useCallback((laneId: number) => {
+    // 二重遷移防止
+    if (transitioningRef.current.has(laneId)) return;
+    transitioningRef.current.add(laneId);
+
     const laneIndex = laneId - 1;
     const currentIdx = laneItemIndexRef.current[laneIndex];
     const queue = LANE_QUEUES[laneIndex];
     const nextIdx = currentIdx + 1;
-
-    setTotalItemsCompleted(prev => prev + 1);
 
     if (nextIdx >= queue.length) {
       // Lane is finished
@@ -147,6 +268,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       setLanes(prev => prev.map(l =>
         l.lane_id === laneId ? { ...l, status: 'completed', current_item: null } : l
       ));
+      transitioningRef.current.delete(laneId);
       return;
     }
 
@@ -168,172 +290,78 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
         clearInterval(preBidTimer);
         updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', pre_bid_remaining_seconds: 0 }));
         startCountdown(laneId, 15);
+        // pre_bid完了後にCPU入札を開始
+        scheduleCpuBid(laneId);
+        transitioningRef.current.delete(laneId);
       } else {
         updateLaneItem(laneId, item => ({ ...item, pre_bid_remaining_seconds: remaining }));
       }
     }, 1000);
-  }, [updateLaneItem, startCountdown]);
+  }, [updateLaneItem, startCountdown, scheduleCpuBid]);
 
   // ─── Determine winner when countdown reaches 0 ───
 
-  const resolveItem = useCallback((laneId: number) => {
-    setLanes(prev => {
-      const lane = prev.find(l => l.lane_id === laneId);
-      if (!lane?.current_item) return prev;
-      const item = lane.current_item;
+  const resolveItem = useCallback((laneId: number, item: LaneItem) => {
+    const key = `${laneId}-${item.id}`;
+    if (resolvedRef.current.has(key)) return;
+    resolvedRef.current.add(key);
 
-      // Prevent duplicate resolution
-      const key = `${laneId}-${item.id}`;
-      if (resolvedRef.current.has(key)) return prev;
-      resolvedRef.current.add(key);
+    // ユーザーが最高入札者(active)なら落札
+    if (item.my_bid_status === 'active' && item.active_bidders_count >= 1) {
+      const price = item.current_price;
+      const qty = item.quantity;
+      setWonItems(w => [...w, {
+        species_name: item.species_name,
+        winning_price: price,
+        quantity: qty,
+        total_amount: Math.floor(price * qty * 1.1),
+      }]);
+      setCelebration({ species_name: item.species_name, winning_price: price });
+      setTimeout(() => setCelebration(null), 3000);
+    }
 
-      if (item.my_bid_status === 'active' && item.active_bidders_count >= 1) {
-        // User wins!
-        const price = item.current_price;
-        const qty = item.quantity;
-        setWonItems(w => [...w, {
-          species_name: item.species_name,
-          winning_price: price,
-          quantity: qty,
-          total_amount: Math.floor(price * qty * 1.1),
-        }]);
-        setCelebration({ species_name: item.species_name, winning_price: price });
-        setTimeout(() => setCelebration(null), 3000);
-      }
-
-      // Move to next item after a brief delay
-      setTimeout(() => advanceToNextItem(laneId), 1500);
-
-      return prev;
-    });
+    // Move to next item after a brief delay
+    setTimeout(() => advanceToNextItem(laneId), 1500);
   }, [advanceToNextItem]);
 
   // ─── Monitor countdowns reaching 0 ───
   useEffect(() => {
     const checkInterval = setInterval(() => {
-      setLanes(prev => {
-        prev.forEach(lane => {
-          if (!lane.current_item) return;
-          if (lane.current_item.phase === 'bidding' && lane.current_item.countdown_seconds <= 0) {
-            // Item finished
-            if (!timersRef.current.has(lane.lane_id)) {
-              // Only resolve if timer already stopped (countdown naturally reached 0)
-              resolveItem(lane.lane_id);
-            }
+      // lanesRefを使って最新状態を読む（setLanes内で副作用を起こさない）
+      const currentLanes = lanesRef.current;
+      currentLanes.forEach(lane => {
+        if (!lane.current_item) return;
+        if (lane.current_item.phase === 'bidding' && lane.current_item.countdown_seconds <= 0) {
+          // タイマーが既に停止している場合のみ（自然にカウントダウンが0になった場合）
+          if (!countdownTimersRef.current.has(lane.lane_id)) {
+            resolveItem(lane.lane_id, lane.current_item);
           }
-        });
-        return prev;
+        }
       });
     }, 500);
     return () => clearInterval(checkInterval);
   }, [resolveItem]);
 
-  // ─── CPU bidding loop ───
-  // 実際のオークションと同様に、カウントダウン開始後1-2秒以内に入札が入り続けるイメージ
-  // 各レーンに独立した入札タイマーを設置し、フリーズ解除直後に素早く次の入札を入れる
+  // ─── Start initial countdowns + CPU bidding ───
   useEffect(() => {
     if (phase !== 'auction') return;
-
-    // 各レーンに対して独立したCPU入札ループを設定
-    const laneTimers: ReturnType<typeof setTimeout>[] = [];
-
-    const scheduleCpuBidForLane = (laneId: number) => {
-      // フリーズ解除後 0.8〜2秒のランダム遅延で次の入札
-      const delay = 800 + Math.random() * 1200;
-      const timer = setTimeout(() => {
-        setLanes(currentLanes => {
-          const lane = currentLanes.find(l => l.lane_id === laneId);
-          if (!lane?.current_item) return currentLanes;
-          if (lane.current_item.phase !== 'bidding') {
-            // フリーズ中/pre_bid中は少し待ってリトライ
-            scheduleCpuBidForLane(laneId);
-            return currentLanes;
-          }
-
-          // CPUの中から入札意欲のあるものを選ぶ
-          const eligibleCpus = CPU_CHARACTERS.filter(cpu => {
-            if (cpu.preferredLanes && !cpu.preferredLanes.includes(lane.lane_number)) return false;
-            const state = cpuStatesRef.current[cpu.id - 1];
-            if (!state) return false;
-            const maxPrice = state.maxPrices.get(lane.current_item!.id) ?? 0;
-            if (lane.current_item!.current_price >= maxPrice) return false;
-            return Math.random() < cpu.bidProbability;
-          });
-
-          if (eligibleCpus.length === 0) {
-            // 誰も入札しない → 少し長めに待ってリトライ
-            const retryTimer = setTimeout(() => scheduleCpuBidForLane(laneId), 2000 + Math.random() * 3000);
-            laneTimers.push(retryTimer);
-            return currentLanes;
-          }
-
-          const item = lane.current_item;
-          const increment = calculatePriceIncrement(item.current_price);
-          const newPrice = item.current_price + increment;
-
-          stopTimer(laneId);
-
-          const updatedLanes = currentLanes.map(l => {
-            if (l.lane_id !== laneId || !l.current_item) return l;
-            return {
-              ...l,
-              current_item: {
-                ...l.current_item,
-                current_price: newPrice,
-                phase: 'freeze' as const,
-                freeze_remaining_seconds: 3,
-                freeze_countdown_seconds: 3,
-                active_bidders_count: Math.max(2, l.current_item.active_bidders_count),
-                my_limit_triggered: (l.current_item.my_limit_price && newPrice >= l.current_item.my_limit_price) ? true : l.current_item.my_limit_triggered,
-                // 相手が入札したら自分は未入札状態になる（本番と同じ挙動）
-                my_bid_status: l.current_item.my_bid_status === 'active' ? 'inactive' : l.current_item.my_bid_status,
-              },
-            };
-          });
-
-          // フリーズ → 解除 → 次のCPU入札をスケジュール
-          let remaining = 3;
-          const freezeTimer = setInterval(() => {
-            remaining -= 1;
-            if (remaining <= 0) {
-              clearInterval(freezeTimer);
-              updateLaneItem(laneId, i => ({ ...i, phase: 'bidding', freeze_remaining_seconds: 0 }));
-              startCountdown(laneId, 15);
-              // フリーズ解除直後に次の入札をスケジュール（0.8〜2秒後）
-              scheduleCpuBidForLane(laneId);
-            } else {
-              updateLaneItem(laneId, i => ({ ...i, freeze_remaining_seconds: remaining }));
-            }
-          }, 1000);
-
-          return updatedLanes;
-        });
-      }, delay);
-      laneTimers.push(timer);
-    };
-
-    // 各レーンのCPU入札を開始（初回は1〜3秒後にランダム開始）
     [1, 2, 3].forEach(laneId => {
+      startCountdown(laneId, 15);
+      // 各レーンのCPU入札を開始（初回は1〜3秒後にランダム開始）
       const initialDelay = 1000 + Math.random() * 2000;
-      const t = setTimeout(() => scheduleCpuBidForLane(laneId), initialDelay);
-      laneTimers.push(t);
+      const t = setTimeout(() => {
+        cpuTimersRef.current.delete(laneId);
+        scheduleCpuBid(laneId);
+      }, initialDelay);
+      cpuTimersRef.current.set(laneId, t);
     });
-
-    cpuTimersRef.current.push(...laneTimers);
-    return () => laneTimers.forEach(t => clearTimeout(t));
-  }, [phase, stopTimer, updateLaneItem, startCountdown]);
-
-  // ─── Start initial countdowns ───
-  useEffect(() => {
-    if (phase !== 'auction') return;
-    [1, 2, 3].forEach(laneId => startCountdown(laneId, 15));
+    return () => stopAllTimers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   // ─── Check if auction is complete ───
   useEffect(() => {
     if (completedLanes.size >= 3 && phase === 'auction') {
-      // All lanes complete, wait a moment then transition
       const timer = setTimeout(() => {
         stopAllTimers();
         setPhase('post-auction');
@@ -343,9 +371,14 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   }, [completedLanes, phase, stopAllTimers]);
 
   // ─── Bid toggle ───
+  // 本番の動作:
+  // - ユーザーが入札 → active になる
+  // - 2人以上active → 即座にprice increment + freeze
+  // - freeze解除後 → bidding(countdown 15s)
+  // デモでは「CPUが既に入札中」と仮定し、ユーザーの入札で即座にprice increment + freeze
 
   const handleBidToggle = useCallback((itemId: number, currentStatus: 'active' | 'inactive' | null) => {
-    const lane = lanes.find(l => l.current_item?.id === itemId);
+    const lane = lanesRef.current.find(l => l.current_item?.id === itemId);
     if (!lane?.current_item) return;
     const item = lane.current_item;
     if (item.phase === 'freeze') { notify('誤タップ防止中です。もう少々お待ちください。', 'error'); return; }
@@ -354,35 +387,27 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'inactive', active_bidders_count: Math.max(0, i.active_bidders_count - 1) }));
       notify('入札をオフにしました', 'info');
     } else {
-      // User bidding = price increase + freeze
+      // ユーザーが入札 = 価格上昇 + フリーズ（本番で2人以上activeの時と同じ挙動）
       const increment = calculatePriceIncrement(item.current_price);
       const newPrice = item.current_price + increment;
-      stopTimer(lane.lane_id);
+      stopCountdown(lane.lane_id);
+      stopCpuTimer(lane.lane_id); // CPU入札スケジュールも一旦停止
+
       updateLaneItem(lane.lane_id, i => ({
         ...i,
         my_bid_status: 'active',
-        active_bidders_count: i.active_bidders_count + 1,
+        active_bidders_count: Math.max(2, i.active_bidders_count + 1),
         current_price: newPrice,
-        phase: 'freeze' as const,
-        freeze_remaining_seconds: 3,
-        freeze_countdown_seconds: 3,
       }));
       notify(`レーン${lane.lane_number}に入札しました！ ¥${newPrice.toLocaleString()}`, 'success');
 
-      // Freeze release
-      let remaining = 3;
-      const freezeTimer = setInterval(() => {
-        remaining -= 1;
-        if (remaining <= 0) {
-          clearInterval(freezeTimer);
-          updateLaneItem(lane.lane_id, i => ({ ...i, phase: 'bidding', freeze_remaining_seconds: 0 }));
-          startCountdown(lane.lane_id, 15);
-        } else {
-          updateLaneItem(lane.lane_id, i => ({ ...i, freeze_remaining_seconds: remaining }));
-        }
-      }, 1000);
+      // フリーズ開始 → 完了後にカウントダウン再開 + CPU入札再開
+      startFreeze(lane.lane_id, () => {
+        startCountdown(lane.lane_id, 15);
+        scheduleCpuBid(lane.lane_id);
+      });
     }
-  }, [lanes, notify, updateLaneItem, startCountdown, stopTimer]);
+  }, [notify, updateLaneItem, startCountdown, stopCountdown, stopCpuTimer, startFreeze, scheduleCpuBid]);
 
   // ─── Limit ───
 

@@ -196,6 +196,8 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MockWonItem | null>(null);
   const shippingAddress = '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101';
+  const shippingCalculated = false; // デモでは送料未計算
+  const MOCK_SHIPPING_FEE = 1500;
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   // Generate mock data from actual won items
