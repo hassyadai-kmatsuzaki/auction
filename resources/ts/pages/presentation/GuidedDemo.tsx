@@ -186,9 +186,9 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       remaining -= 1;
       if (remaining <= 0) {
         clearInterval(ft);
-        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0, my_bid_status: 'inactive', active_bidders_count: Math.max(1, item.active_bidders_count) }));
+        updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0, active_bidders_count: Math.max(1, item.active_bidders_count) }));
         startCountdown(laneId, 15);
-        notify('入札が解除されました。再度入札してください！', 'info');
+        notify('フリーズ解除！入札が再開されました', 'info');
       } else {
         updateLaneItem(laneId, item => ({ ...item, freeze_remaining_seconds: remaining }));
       }
