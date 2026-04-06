@@ -313,23 +313,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // ─── Tour logic ───
 
-  const handleAuctionReset = useCallback(() => {
-    stopAllTimers();
-    setLanes(JSON.parse(JSON.stringify(GUIDED_INITIAL_LANES)));
-    setUpcoming(GUIDED_UPCOMING.map(u => ({ ...u })));
-    setWonItems([]);
-    setCelebration(null);
-    setLimitModalLaneId(null);
-    setTourActive(false);
-    setTourStep(0);
-    setIsAutoPlaying(false);
-  }, [stopAllTimers]);
-
-  const handleStartTour = useCallback(() => {
-    handleAuctionReset();
-    setTimeout(() => { setTourActive(true); setTourStep(0); }, 100);
-  }, [handleAuctionReset]);
-
   // Auto-start tour when entering auction phase (from waiting room)
   const handleAuctionStart = useCallback(() => {
     setPhase('auction');
@@ -559,7 +542,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       onNext={handleTourNext}
       onPrev={handleTourPrev}
       onClose={handleTourClose}
-      onReset={handleStartTour}
+      onReset={onBackToTop}
       isAutoPlaying={isAutoPlaying}
       onExecuteAction={handleExecuteAction}
     />
@@ -767,7 +750,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             onNext={handleTourNext}
             onPrev={handleTourPrev}
             onClose={handleTourClose}
-            onReset={handleStartTour}
+            onReset={onBackToTop}
             isAutoPlaying={isAutoPlaying}
             onExecuteAction={handleExecuteAction}
           />

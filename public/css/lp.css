@@ -14,13 +14,19 @@
 
 /* --- Custom Properties --- */
 :root {
-  --navy: #042550;
-  --blue: #0762b0;
-  --blue-dark: #054d8c;
-  --gold: #C5A55A;
+  --purple: #5d40c6;
+  --blue: #05b2f8;
+  --pink: #e2229f;
+  --navy: #2d1b69;
+  --blue-dark: #0490cc;
+  --purple-dark: #4a32a0;
+  --gold: #f0c040;
   --green: #06C755;
   --green-dark: #04A846;
   --red: #CC3333;
+  --gradient-main: linear-gradient(120deg, #5d40c6 0%, #05b2f8 50%, #e2229f 85%, #e2229f 100%);
+  --gradient-reverse: linear-gradient(300deg, #5d40c6 0%, #05b2f8 50%, #e2229f 85%, #e2229f 100%);
+  --gradient-soft: linear-gradient(120deg, rgba(93,64,198,0.08) 0%, rgba(5,178,248,0.08) 50%, rgba(226,34,159,0.08) 100%);
   --bg-light: #F5F7FA;
   --bg-cream: #FAF8F5;
   --text: #1a1a1a;
@@ -103,20 +109,21 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   transition: all 0.3s ease;
 }
 .header__btn--login {
-  color: var(--navy);
-  border: 1.5px solid var(--navy);
+  color: var(--purple);
+  border: 1.5px solid var(--purple);
   background: transparent;
 }
 .header__btn--login:hover {
-  background: var(--navy); color: #fff;
+  background: var(--purple); color: #fff;
   transform: translateY(-1px);
 }
 .header__btn--register {
   color: #fff;
-  background: var(--blue);
+  background: var(--gradient-main);
+  background-size: 200% 100%;
 }
 .header__btn--register:hover {
-  background: var(--blue-dark);
+  background-position: 100% 0%;
   transform: translateY(-1px);
 }
 
@@ -142,7 +149,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   position: relative; min-height: 100vh; min-height: 100dvh;
   display: flex; align-items: center;
   overflow: hidden;
-  background: var(--navy);
+  background: var(--gradient-main);
 }
 
 .hero__noise {
@@ -190,8 +197,9 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   display: inline-block;
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
   padding: 8px 20px; border-radius: 100px;
-  background: rgba(197,165,90,0.12); border: 1px solid rgba(197,165,90,0.35);
-  color: var(--gold); margin-bottom: 2rem;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; margin-bottom: 2rem;
+  backdrop-filter: blur(8px);
 }
 .hero__title {
   color: #fff; margin-bottom: 1.5rem;
@@ -207,9 +215,8 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   font-size: clamp(2rem, 5.5vw, 3.6rem);
   line-height: 1.2; letter-spacing: -0.01em;
   font-weight: 900; margin-top: 0.25em;
-  background: linear-gradient(135deg, #fff 0%, rgba(180,210,240,0.9) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #fff;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.15);
 }
 
 .hero__sub {
@@ -250,7 +257,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   position: absolute; bottom: -20px; left: -30px;
   width: 45%; border-radius: 16px; overflow: hidden;
   box-shadow: 0 20px 60px rgba(0,0,0,0.35);
-  border: 4px solid var(--navy);
+  border: 4px solid rgba(93,64,198,0.6);
   transform: rotate(-3deg);
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -263,10 +270,10 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 .hero__float-badge {
   position: absolute; top: -10px; right: -10px;
   width: 90px; height: 90px; border-radius: 50%;
-  background: var(--gold);
+  background: linear-gradient(135deg, var(--pink), #ff6ec7);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; color: #fff;
-  box-shadow: 0 8px 30px rgba(197,165,90,0.4);
+  box-shadow: 0 8px 30px rgba(226,34,159,0.4);
   animation: badge-pulse 3s ease-in-out infinite;
 }
 .hero__float-badge strong {
@@ -358,15 +365,20 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 .section__num {
   display: block;
   font-family: 'Inter', sans-serif; font-weight: 700; font-size: clamp(3rem, 8vw, 5.5rem);
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(7,98,176,0.15);
+  background: var(--gradient-main);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.18;
   letter-spacing: -0.04em;
   line-height: 1; margin-bottom: 0.5rem;
 }
 .section__en {
   display: block;
   font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.75rem;
-  letter-spacing: 0.2em; color: var(--blue);
+  letter-spacing: 0.2em;
+  background: var(--gradient-main);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 1rem;
 }
 .section__title {
@@ -383,34 +395,37 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
    =================================== */
 .btn-primary {
   display: inline-flex; align-items: center; gap: 10px;
-  background: var(--green); color: #fff;
+  background: var(--gradient-main); color: #fff;
   font-weight: 700; font-size: 0.95rem;
   padding: 16px 36px; border-radius: 100px;
   transition: all var(--transition);
   position: relative; overflow: hidden;
+  background-size: 200% 100%;
+  background-position: 0% 0%;
 }
 .btn-primary::before {
   content: ''; position: absolute; top: 0; left: -100%;
   width: 100%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
   transition: left 0.6s ease;
 }
 .btn-primary:hover::before { left: 100%; }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(6,199,85,0.3);
+  box-shadow: 0 10px 30px rgba(93,64,198,0.35);
+  background-position: 100% 0%;
 }
 .btn-primary--lg { padding: 20px 48px; font-size: 1.05rem; }
 
 .btn-secondary {
   display: inline-flex; align-items: center; gap: 8px;
-  color: var(--blue); font-weight: 700; font-size: 0.95rem;
+  color: var(--purple); font-weight: 700; font-size: 0.95rem;
   padding: 14px 32px; border-radius: 100px;
-  border: 2px solid var(--blue);
+  border: 2px solid var(--purple);
   transition: all 0.3s ease;
 }
 .btn-secondary:hover {
-  background: var(--blue); color: #fff;
+  background: var(--purple); color: #fff;
   transform: translateY(-2px);
 }
 
@@ -443,7 +458,10 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 .problem-item__num {
   display: block;
   font-family: 'Inter', sans-serif; font-weight: 700; font-size: 3rem;
-  color: var(--blue); opacity: 0.12; line-height: 1; margin-bottom: 0.5rem;
+  background: var(--gradient-main);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.2; line-height: 1; margin-bottom: 0.5rem;
 }
 .problem-item__body h3 {
   font-size: clamp(1.1rem, 2.5vw, 1.4rem);
@@ -507,7 +525,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   color: var(--navy); margin-bottom: 1rem;
   line-height: 1.5;
   padding-left: 0.85rem;
-  border-left: 3px solid var(--blue);
+  border-left: 3px solid var(--purple);
 }
 .feature-card__body p {
   font-size: 0.85rem; color: var(--text-sub); line-height: 1.9;
@@ -535,15 +553,15 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 }
 .step:hover .step__icon { transform: scale(1.1); }
 .step__icon svg { width: 28px; height: 28px; }
-.step__icon--green { background: linear-gradient(135deg, var(--green), var(--green-dark)); }
-.step__icon--blue { background: linear-gradient(135deg, var(--blue), var(--blue-dark)); }
-.step__icon--navy { background: linear-gradient(135deg, var(--navy), #053a6e); }
-.step__icon--gold { background: linear-gradient(135deg, var(--gold), #A88B3D); }
+.step__icon--green { background: linear-gradient(135deg, #5d40c6, #7c5ce7); }
+.step__icon--blue { background: linear-gradient(135deg, #05b2f8, #0490cc); }
+.step__icon--navy { background: linear-gradient(135deg, #e2229f, #ff6ec7); }
+.step__icon--gold { background: linear-gradient(135deg, #f0c040, #f5a623); }
 
 .step__num {
   display: block; font-family: 'Inter', sans-serif;
   font-weight: 700; font-size: 0.7rem; letter-spacing: 0.1em;
-  color: var(--blue); margin-bottom: 0.5rem;
+  color: var(--purple); margin-bottom: 0.5rem;
 }
 .step h4 { font-size: 0.95rem; color: var(--navy); margin-bottom: 0.25rem; }
 .step p { font-size: 0.78rem; color: var(--text-light); }
@@ -584,7 +602,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 .demo-features li::before {
   content: ''; position: absolute; left: 0; top: 0.6em;
   width: 8px; height: 8px; border-radius: 50%;
-  background: var(--blue);
+  background: var(--purple);
 }
 
 .phone-mockup {
@@ -604,7 +622,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 .pricing-hero {
   text-align: center; padding: 3rem 2rem;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+  background: var(--gradient-main);
   color: #fff; margin-bottom: 2rem;
 }
 .pricing-hero__badge {
@@ -635,32 +653,32 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   padding: 1.25rem 1.5rem; gap: 1rem;
 }
 .pricing-row:not(:last-child) { border-bottom: 1px solid #eee; }
-.pricing-row--highlight { background: rgba(6,199,85,0.04); }
+.pricing-row--highlight { background: rgba(93,64,198,0.04); }
 .pricing-row__label {
   display: flex; align-items: center; gap: 8px;
   font-weight: 700; font-size: 0.9rem; color: var(--navy);
 }
 .pricing-row__badge {
   font-size: 0.6rem; font-weight: 700; padding: 3px 8px;
-  border-radius: 6px; background: var(--green); color: #fff;
+  border-radius: 6px; background: var(--purple); color: #fff;
 }
 .pricing-row__value {
   text-align: right; font-size: 0.9rem;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
 }
 .pricing-row__old { color: var(--red); text-decoration: line-through; font-size: 0.85rem; }
-.pricing-row__new { font-weight: 700; color: var(--green); font-size: 1.1rem; }
+.pricing-row__new { font-weight: 700; color: var(--purple); font-size: 1.1rem; }
 .pricing-row__campaign {
   font-size: 0.6rem; font-weight: 700;
   padding: 2px 8px; border-radius: 100px;
-  background: rgba(6,199,85,0.1); color: var(--green);
-  border: 1px solid var(--green);
+  background: rgba(93,64,198,0.1); color: var(--purple);
+  border: 1px solid var(--purple);
 }
 
 .pricing-note {
   margin-top: 1.5rem; padding: 1.25rem;
-  border-radius: var(--radius); background: rgba(7,98,176,0.04);
-  border-left: 3px solid var(--blue);
+  border-radius: var(--radius); background: rgba(93,64,198,0.04);
+  border-left: 3px solid var(--purple);
   font-size: 0.85rem; color: var(--text-sub);
 }
 
@@ -700,7 +718,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   font-size: 0.65rem; font-weight: 700;
   padding: 4px 12px; border-radius: 100px;
   background: rgba(255,255,255,0.9);
-  color: var(--navy); backdrop-filter: blur(4px);
+  color: var(--purple); backdrop-filter: blur(4px);
 }
 .lineup-card__coming {
   width: 100%; aspect-ratio: 1/1;
@@ -719,7 +737,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
    CTA
    =================================== */
 .section--cta {
-  background: linear-gradient(160deg, var(--navy) 0%, var(--blue-dark) 50%, var(--blue) 100%);
+  background: var(--gradient-main);
   padding: 0;
 }
 .section--cta .container { padding-top: 6rem; padding-bottom: 6rem; }
@@ -731,8 +749,9 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
 .cta-inner__badge {
   display: inline-block; font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.08em; padding: 8px 22px; border-radius: 100px;
-  background: rgba(197,165,90,0.15); border: 1px solid rgba(197,165,90,0.4);
-  color: var(--gold); margin-bottom: 2rem;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35);
+  color: #fff; margin-bottom: 2rem;
+  backdrop-filter: blur(8px);
 }
 .cta-inner h2 {
   color: #fff; font-size: clamp(1.6rem, 4.5vw, 2.6rem);
@@ -743,7 +762,16 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
   color: rgba(255,255,255,0.7); font-size: 0.95rem;
   margin-bottom: 2.5rem;
 }
-.cta-inner .btn-primary { margin-bottom: 2.5rem; }
+.cta-inner .btn-primary {
+  margin-bottom: 2.5rem;
+  background: #fff; color: var(--purple);
+  background-size: unset;
+}
+.cta-inner .btn-primary svg { stroke: var(--purple); }
+.cta-inner .btn-primary:hover {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  background: rgba(255,255,255,0.9);
+}
 .cta-inner__trust {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
 }
@@ -784,7 +812,7 @@ h1, h2, h3, h4 { font-family: 'CorporateLogo', 'Noto Sans JP', sans-serif; font-
    =================================== */
 .footer {
   padding: 3rem 0 2rem;
-  background: var(--navy);
+  background: #1e1245;
 }
 .footer .container { text-align: center; }
 .footer__logo { margin-bottom: 1rem; }

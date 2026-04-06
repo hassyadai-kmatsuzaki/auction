@@ -14,7 +14,6 @@ import {
   NavigateNext as NextIcon,
   NavigateBefore as PrevIcon,
   Close as CloseIcon,
-  Refresh as RefreshIcon,
   TouchApp as TouchAppIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
@@ -450,11 +449,10 @@ export const DemoTourPopover: React.FC<Props> = ({
         <Button
           size="small"
           variant="contained"
-          startIcon={<RefreshIcon />}
           onClick={onReset}
           disabled={isAutoPlaying}
         >
-          最初から
+          デモTOPに戻る
         </Button>
       ) : step.waitForAction ? (
         <Box
