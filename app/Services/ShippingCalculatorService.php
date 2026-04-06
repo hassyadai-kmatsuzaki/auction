@@ -8,13 +8,18 @@ use App\Models\PackingMaterial;
 use App\Models\PrefectureRegion;
 use App\Models\ShippingRate;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ShippingCalculatorService
 {
     private array $bagSpecs;
     private array $boxSpecs;
+    private array $boxCapacities;
     private array $packingMaterials;
     private array $shippingRates;
+
+    /** アクティブな箱サイズ（120不採用） */
+    private const BOX_SIZES = [80, 100, 140];
 
     private const CACHE_TTL = 3600;
 
@@ -32,13 +37,9 @@ class ShippingCalculatorService
      */
     public function calculate(array $items, string $destinationRegion): array
     {
-        // 1) 匹数から袋サイズ・袋数を決定
         $bags = $this->determineBags($items);
-
-        // 2) 袋の組み合わせから最小箱構成を決定（Greedy Bin-Packing）
         $boxes = $this->packBags($bags);
 
-        // 3) 各箱の（送料 + 梱包資材費）を合算
         $totalShippingCost = 0;
         $totalPackingCost = 0;
         $boxDetails = [];
@@ -73,7 +74,6 @@ class ShippingCalculatorService
      */
     public function getRegionByPrefecture(string $prefecture): ?string
     {
-        // 「都」「府」「県」を除去して照合
         $normalized = preg_replace('/(都|道|府|県)$/', '', $prefecture);
 
         return Cache::remember("prefecture_region_{$normalized}", self::CACHE_TTL, function () use ($normalized) {
@@ -93,7 +93,7 @@ class ShippingCalculatorService
      */
     private function determineBags(array $items): array
     {
-        $bags = ['S' => 0, 'M' => 0, 'L' => 0, 'LL' => 0];
+        $bags = ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0];
 
         foreach ($items as $item) {
             $qty = $item['quantity'];
@@ -111,12 +111,13 @@ class ShippingCalculatorService
      */
     private function determineBagsForQuantity(int $quantity): array
     {
-        $bags = ['S' => 0, 'M' => 0, 'L' => 0, 'LL' => 0];
+        $bags = ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0];
         $remaining = $quantity;
 
-        // 大きい袋から順に割り当て
-        foreach (['LL', 'L', 'M', 'S'] as $size) {
-            $spec = $this->bagSpecs[$size];
+        foreach (['KA', 'L', 'M', 'S'] as $size) {
+            $spec = $this->bagSpecs[$size] ?? null;
+            if (!$spec) continue;
+
             $minQty = $spec['min_qty'];
             $maxQty = $spec['max_qty'] ?? PHP_INT_MAX;
 
@@ -129,7 +130,6 @@ class ShippingCalculatorService
             if ($remaining <= 0) break;
         }
 
-        // 残りがあればS袋に入れる（min_qty未満でも1袋必要）
         if ($remaining > 0) {
             $bags['S']++;
         }
@@ -138,86 +138,105 @@ class ShippingCalculatorService
     }
 
     /**
-     * Greedy Bin-Packing: 袋を箱に詰める
+     * Greedy Bin-Packing: 袋を箱に詰める（120不採用・5フェーズ）
+     *
+     * Phase 0: 全袋が1箱に収まるか試行 (80→100→140)
+     * Phase 1: KA袋 → 140に1個ずつ割当（S袋との同梱を試みる）
+     * Phase 2: L袋 → 140に割当（M/S袋との同梱を試みる）
+     * Phase 3: M袋 → 最小適合箱に割当（100に1個 / 140に2-3個）
+     * Phase 4: S袋 → 残りスペースに詰め、溢れは新箱に割当
      */
     private function packBags(array $bags): array
     {
         $s  = $bags['S'] ?? 0;
         $m  = $bags['M'] ?? 0;
         $l  = $bags['L'] ?? 0;
-        $ka = $bags['LL'] ?? 0;
+        $ka = $bags['KA'] ?? 0;
 
-        // Phase 0: 全袋が1箱に収まるか試行（80→100→120→140の順）
-        foreach ([80, 100, 120, 140] as $boxSize) {
+        // Phase 0: 全袋が1箱に収まるか試行
+        foreach (self::BOX_SIZES as $boxSize) {
             if ($this->fitsInBox($s, $m, $l, $ka, $boxSize)) {
-                return [['box_size' => $boxSize, 'bags' => ['S' => $s, 'M' => $m, 'L' => $l, 'LL' => $ka]]];
+                return [['box_size' => $boxSize, 'bags' => ['S' => $s, 'M' => $m, 'L' => $l, 'KA' => $ka]]];
             }
         }
 
-        // Phase 1-4: 個別にパッキング
         $boxes = [];
 
-        // Phase 1: LL袋を140サイズに1個ずつ割当
-        for ($i = 0; $i < $ka; $i++) {
-            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 0, 'L' => 0, 'LL' => 1]];
+        // Phase 1: KA → 140 (1個/箱、S袋との同梱を試みる)
+        while ($ka > 0) {
+            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 1]];
+            $ka--;
+            // KA(15kg) + S×n → 15 + n*2.2 ≤ 20 → n ≤ 2
+            $sFit = min($s, 2);
+            $boxes[count($boxes) - 1]['bags']['S'] = $sFit;
+            $s -= $sFit;
         }
 
-        // Phase 2: L袋を最小適合箱に割当（120に1個 or 140に2個）
-        $remainingL = $l;
-        while ($remainingL >= 2) {
-            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 0, 'L' => 2, 'LL' => 0]];
-            $remainingL -= 2;
-        }
-        if ($remainingL === 1) {
-            $boxes[] = ['box_size' => 120, 'bags' => ['S' => 0, 'M' => 0, 'L' => 1, 'LL' => 0]];
-            $remainingL = 0;
-        }
-
-        // Phase 3: M袋を最小適合箱に割当（100に1個 / 120に2個 / 140に3個）
-        $remainingM = $m;
-        while ($remainingM >= 3) {
-            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 3, 'L' => 0, 'LL' => 0]];
-            $remainingM -= 3;
-        }
-        if ($remainingM === 2) {
-            $boxes[] = ['box_size' => 120, 'bags' => ['S' => 0, 'M' => 2, 'L' => 0, 'LL' => 0]];
-            $remainingM = 0;
-        } elseif ($remainingM === 1) {
-            $boxes[] = ['box_size' => 100, 'bags' => ['S' => 0, 'M' => 1, 'L' => 0, 'LL' => 0]];
-            $remainingM = 0;
-        }
-
-        // Phase 4: S袋を残りスペースに詰め、溢れは新箱に割当
-        $remainingS = $s;
-
-        // まず既存箱の空きスペースにS袋を詰める
-        foreach ($boxes as &$box) {
-            if ($remainingS <= 0) break;
-            $currentS = $box['bags']['S'];
-            $maxS = $this->getMaxSInBox($box['bags'], $box['box_size']);
-            $available = $maxS - $currentS;
-            if ($available > 0) {
-                $add = min($available, $remainingS);
-                $box['bags']['S'] += $add;
-                $remainingS -= $add;
+        // Phase 2: L → 140
+        while ($l > 0) {
+            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0]];
+            $idx = count($boxes) - 1;
+            if ($l >= 2) {
+                // L×2 = 16kg → 残り4kg → S×1(2.2kg)のみ可
+                $boxes[$idx]['bags']['L'] = 2;
+                $l -= 2;
+                $sFit = min($s, 1);
+                $boxes[$idx]['bags']['S'] = $sFit;
+                $s -= $sFit;
+            } else {
+                // L×1 = 8kg → M/Sとの同梱を試みる
+                $boxes[$idx]['bags']['L'] = 1;
+                $l--;
+                // L×1 + M×n: 8+5.5n ≤ 20 → n ≤ 2
+                $mFit = min($m, 2);
+                $boxes[$idx]['bags']['M'] = $mFit;
+                $m -= $mFit;
+                // 残り重量でSを詰める
+                $remainingWeight = 20.0 - 8.0 - ($mFit * 5.5);
+                $sFit = min($s, (int) floor($remainingWeight / 2.2));
+                $boxes[$idx]['bags']['S'] = $sFit;
+                $s -= $sFit;
             }
         }
-        unset($box);
 
-        // 溢れたS袋を新箱に
-        while ($remainingS > 0) {
-            // S袋の箱サイズ: 80に1, 100に2, 120に6, 140に9
-            foreach ([80 => 1, 100 => 2, 120 => 6, 140 => 9] as $boxSize => $maxCount) {
-                if ($remainingS <= $maxCount) {
-                    $boxes[] = ['box_size' => $boxSize, 'bags' => ['S' => $remainingS, 'M' => 0, 'L' => 0, 'LL' => 0]];
-                    $remainingS = 0;
-                    break;
-                }
+        // Phase 3: M → 100(1個) or 140(2-3個)
+        while ($m > 0) {
+            if ($m === 1 && $s === 0) {
+                // M単独 → 100
+                $boxes[] = ['box_size' => 100, 'bags' => ['S' => 0, 'M' => 1, 'L' => 0, 'KA' => 0]];
+                $m--;
+            } elseif ($m >= 2) {
+                // M×2-3 → 140
+                $mFit = min($m, 3);
+                $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => $mFit, 'L' => 0, 'KA' => 0]];
+                $m -= $mFit;
+                $remainingWeight = 20.0 - ($mFit * 5.5);
+                $sFit = min($s, 9, (int) floor($remainingWeight / 2.2));
+                $boxes[count($boxes) - 1]['bags']['S'] = $sFit;
+                $s -= $sFit;
+            } else {
+                // M×1 + S → 140 (100ではS+M混載不可)
+                $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 1, 'L' => 0, 'KA' => 0]];
+                $m--;
+                $remainingWeight = 20.0 - 5.5;
+                $sFit = min($s, 9, (int) floor($remainingWeight / 2.2));
+                $boxes[count($boxes) - 1]['bags']['S'] = $sFit;
+                $s -= $sFit;
             }
-            if ($remainingS > 0) {
-                // 140に9個詰めて残りを次のループへ
-                $boxes[] = ['box_size' => 140, 'bags' => ['S' => 9, 'M' => 0, 'L' => 0, 'LL' => 0]];
-                $remainingS -= 9;
+        }
+
+        // Phase 4: S → 80(1個) / 100(2個) / 140(3-9個)
+        while ($s > 0) {
+            if ($s === 1) {
+                $boxes[] = ['box_size' => 80, 'bags' => ['S' => 1, 'M' => 0, 'L' => 0, 'KA' => 0]];
+                $s--;
+            } elseif ($s === 2) {
+                $boxes[] = ['box_size' => 100, 'bags' => ['S' => 2, 'M' => 0, 'L' => 0, 'KA' => 0]];
+                $s -= 2;
+            } else {
+                $fit = min($s, 9);
+                $boxes[] = ['box_size' => 140, 'bags' => ['S' => $fit, 'M' => 0, 'L' => 0, 'KA' => 0]];
+                $s -= $fit;
             }
         }
 
@@ -231,68 +250,33 @@ class ShippingCalculatorService
     {
         // 重量チェック
         $totalWeight = $s * 2.2 + $m * 5.5 + $l * 8.0 + $ka * 15.0;
-        $spec = $this->boxSpecs[$boxSize];
-        if ($totalWeight > $spec['max_weight_kg']) {
+        $spec = $this->boxSpecs[$boxSize] ?? null;
+        if (!$spec || $totalWeight > $spec['max_weight_kg']) {
             return false;
         }
 
-        // 採用枠チェック
-        if ($s > $spec['max_s'] || $m > $spec['max_m'] || $l > $spec['max_l'] || $ka > $spec['max_ll']) {
+        // 容量チェック（box_capacities テーブル参照）
+        $caps = $this->boxCapacities[$boxSize] ?? [];
+        if ($s > ($caps['S'] ?? 0) || $m > ($caps['M'] ?? 0) ||
+            $l > ($caps['L'] ?? 0) || $ka > ($caps['KA'] ?? 0)) {
             return false;
         }
 
-        // 混載制約
+        // 混載制約: 100でS+M不可
         if ($boxSize === 100 && $s > 0 && $m > 0) {
-            return false; // S+M → 100に入らない
+            return false;
         }
+        // KA + M/L 混載不可
         if ($ka > 0 && ($m > 0 || $l > 0)) {
-            return false; // LL + M/L 混載不可
-        }
-        if ($boxSize === 120 && $s > 0 && $l > 0) {
-            return false; // S+L → 120に入らない
+            return false;
         }
 
         return true;
     }
 
-    /**
-     * 箱内の既存袋構成でS袋を追加できる最大数を返す
-     */
-    private function getMaxSInBox(array $bags, int $boxSize): int
-    {
-        $spec = $this->boxSpecs[$boxSize];
-        $m = $bags['M'] ?? 0;
-        $l = $bags['L'] ?? 0;
-        $ka = $bags['LL'] ?? 0;
-
-        // LL or L が入っている箱にはS袋混載制約あり
-        if ($ka > 0) {
-            return 0; // LL + S は可能だが、LL箱は140固定で余裕が限られる
-        }
-
-        // 混載制約: S+M→100不可, S+L→120不可
-        if ($m > 0 && $boxSize <= 100) {
-            return 0;
-        }
-        if ($l > 0 && $boxSize <= 120) {
-            return 0;
-        }
-
-        // 重量制約
-        $currentWeight = ($bags['S'] ?? 0) * 2.2 + $m * 5.5 + $l * 8.0 + $ka * 15.0;
-        $remainingWeight = $spec['max_weight_kg'] - $currentWeight;
-        $maxByWeight = (int) floor($remainingWeight / 2.2);
-
-        // 枠制約
-        $maxBySlot = $spec['max_s'] - ($bags['S'] ?? 0);
-
-        return max(0, min($maxByWeight, $maxBySlot));
-    }
-
     private function getShippingRate(string $region, int $boxSize): int
     {
-        $key = "{$region}_{$boxSize}";
-        return $this->shippingRates[$key] ?? 0;
+        return $this->shippingRates["{$region}_{$boxSize}"] ?? 0;
     }
 
     private function getPackingMaterialCost(int $boxSize): int
@@ -303,7 +287,7 @@ class ShippingCalculatorService
     private function formatBagsInBox(array $bags): array
     {
         $result = [];
-        foreach (['S', 'M', 'L', 'LL'] as $size) {
+        foreach (['S', 'M', 'L', 'KA'] as $size) {
             $count = $bags[$size] ?? 0;
             if ($count > 0) {
                 $result[] = "{$size}×{$count}";
@@ -321,9 +305,6 @@ class ShippingCalculatorService
         return $result;
     }
 
-    /**
-     * マスタデータをキャッシュ付きでロード
-     */
     private function loadMasterData(): void
     {
         $this->bagSpecs = Cache::remember('shipping_bag_specs', self::CACHE_TTL, function () {
@@ -343,13 +324,17 @@ class ShippingCalculatorService
             foreach (BoxSpec::all() as $box) {
                 $specs[$box->box_size] = [
                     'max_weight_kg' => $box->max_weight_kg,
-                    'max_s' => $box->max_s,
-                    'max_m' => $box->max_m,
-                    'max_l' => $box->max_l,
-                    'max_ll' => $box->max_ll,
                 ];
             }
             return $specs;
+        });
+
+        $this->boxCapacities = Cache::remember('shipping_box_capacities', self::CACHE_TTL, function () {
+            $caps = [];
+            foreach (DB::table('box_capacities')->get() as $row) {
+                $caps[$row->box_size][$row->bag_size] = $row->max_count;
+            }
+            return $caps;
         });
 
         $this->shippingRates = Cache::remember('shipping_rates_map', self::CACHE_TTL, function () {
@@ -369,13 +354,11 @@ class ShippingCalculatorService
         });
     }
 
-    /**
-     * キャッシュクリア（マスタ更新時に呼ぶ）
-     */
     public static function clearCache(): void
     {
         Cache::forget('shipping_bag_specs');
         Cache::forget('shipping_box_specs');
+        Cache::forget('shipping_box_capacities');
         Cache::forget('shipping_rates_map');
         Cache::forget('shipping_packing_materials');
     }

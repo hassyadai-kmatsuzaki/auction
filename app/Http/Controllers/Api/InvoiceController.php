@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
+use App\Models\SellerProfile;
 use App\Models\WonItem;
 use App\Services\InvoiceService;
 use Illuminate\Support\Facades\Auth;
@@ -25,12 +26,17 @@ class InvoiceController extends Controller
         $winner = Auth::user();
 
         // このオークションに落札品があるか確認
-        $hasItems = WonItem::where('winner_id', $winner->id)
+        $wonItems = WonItem::where('winner_id', $winner->id)
             ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
-            ->exists();
+            ->get();
 
-        if (!$hasItems) {
+        if ($wonItems->isEmpty()) {
             return response()->json(['message' => '該当する落札品がありません'], 404);
+        }
+
+        // 送料計算済みチェック
+        if ($wonItems->contains(fn ($w) => $w->shipping_calculated_at === null)) {
+            return response()->json(['message' => '送料計算後にダウンロードできます'], 400);
         }
 
         try {
@@ -62,14 +68,19 @@ class InvoiceController extends Controller
         $auction = Auction::findOrFail($auctionId);
         $winner = Auth::user();
 
-        // 入金確認済みの落札品があるか確認
-        $hasPaidItems = WonItem::where('winner_id', $winner->id)
+        // 落札品チェック
+        $wonItems = WonItem::where('winner_id', $winner->id)
             ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
-            ->whereIn('payment_status', ['paid', 'confirmed'])
-            ->exists();
+            ->get();
 
-        if (!$hasPaidItems) {
+        $paidItems = $wonItems->filter(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));
+        if ($paidItems->isEmpty()) {
             return response()->json(['message' => '入金確認済みの落札品がありません'], 404);
+        }
+
+        // 送料計算済みチェック
+        if ($wonItems->contains(fn ($w) => $w->shipping_calculated_at === null)) {
+            return response()->json(['message' => '送料計算後にダウンロードできます'], 400);
         }
 
         try {
@@ -118,6 +129,74 @@ class InvoiceController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => '請求書の生成に失敗しました'], 500);
+        }
+    }
+
+    /**
+     * 出品者支払通知書PDFダウンロード（管理者向け）
+     * GET /api/admin/auctions/{auctionId}/sellers/{sellerId}/payment-notice
+     */
+    public function adminDownloadPaymentNotice(int $auctionId, int $sellerId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $seller = SellerProfile::findOrFail($sellerId);
+
+        try {
+            $pdf = $this->invoiceService->generateSellerPaymentNotice($auction, $seller);
+            $content = $pdf->output();
+
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"payment_notice_auction_{$auctionId}_seller_{$sellerId}.pdf\"",
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('支払通知書PDF生成エラー', [
+                'auction_id' => $auctionId,
+                'seller_id' => $sellerId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => '支払通知書の生成に失敗しました'], 500);
+        }
+    }
+
+    /**
+     * 出品者支払通知書PDFダウンロード（出品者向け）
+     * GET /api/seller/settlements/{auctionId}/payment-notice
+     */
+    public function sellerDownloadPaymentNotice(int $auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $user = Auth::user();
+        $seller = SellerProfile::where('user_id', $user->id)->firstOrFail();
+
+        // この出品者がこのオークションで売ったアイテムがあるか確認
+        $hasItems = WonItem::whereHas('item', fn ($q) => $q
+            ->where('auction_id', $auctionId)
+            ->where('seller_profile_id', $seller->id)
+        )->exists();
+
+        if (!$hasItems) {
+            return response()->json(['message' => '該当する売上データがありません'], 404);
+        }
+
+        try {
+            $pdf = $this->invoiceService->generateSellerPaymentNotice($auction, $seller);
+            $content = $pdf->output();
+
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"payment_notice_auction_{$auctionId}.pdf\"",
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('支払通知書PDF生成エラー（出品者）', [
+                'auction_id' => $auctionId,
+                'seller_id' => $seller->id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => '支払通知書の生成に失敗しました'], 500);
         }
     }
 }

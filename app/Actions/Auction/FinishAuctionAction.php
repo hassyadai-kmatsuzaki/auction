@@ -29,8 +29,7 @@ class FinishAuctionAction
             throw $e;
         }
 
-        // 落札者ごとに配送料を一括計算
-        $this->calculateShippingForAuction($auction);
+        // 送料計算はボタン方式に移行（自動計算しない）
 
         broadcast(new AuctionStatusChanged($auction->id, 'finished', 'オークションが終了しました'));
 

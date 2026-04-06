@@ -85,6 +85,8 @@ interface AuctionGroup {
   shipping: {
     address: string | null;
     can_update: boolean;
+    calculated: boolean;
+    can_calculate: boolean;
   };
   won_items: WonItemData[];
 }
@@ -355,6 +357,32 @@ export default function WonItems() {
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
   };
 
+  const [calculatingShipping, setCalculatingShipping] = useState<number | null>(null);
+
+  const handleCalculateShipping = async (auctionId: number) => {
+    setCalculatingShipping(auctionId);
+    try {
+      const response = await axios.post(`/api/participant/auctions/${auctionId}/calculate-shipping`);
+      if (response.data.success) {
+        const fee = response.data.data?.total_shipping_fee;
+        setSnackbar({
+          open: true,
+          message: `送料を計算しました（合計: ¥${Number(fee).toLocaleString()}）`,
+          severity: 'success',
+        });
+        await fetchWonItems();
+      }
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || '送料の計算に失敗しました',
+        severity: 'error',
+      });
+    } finally {
+      setCalculatingShipping(null);
+    }
+  };
+
   const handleDownloadInvoice = async (auctionId: number) => {
     try {
       const errMsg = await downloadPdf(
@@ -578,15 +606,40 @@ export default function WonItems() {
 
                 {/* オークション単位のアクションボタン */}
                 {auctionId && (
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<DownloadIcon />}
-                      onClick={() => handleDownloadInvoice(auctionId)}
-                    >
-                      請求書ダウンロード
-                    </Button>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/* 送料計算ボタン */}
+                    {group.shipping.calculated ? (
+                      <Chip label="送料計算済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
+                    ) : (
+                      <Tooltip title={!group.shipping.address ? '配送先を先に設定してください' : ''}>
+                        <span>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={calculatingShipping === auctionId ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
+                            onClick={() => handleCalculateShipping(auctionId)}
+                            disabled={!group.shipping.can_calculate || calculatingShipping === auctionId}
+                          >
+                            送料計算
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    )}
+                    {/* 請求書（送料計算後のみ） */}
+                    <Tooltip title={!group.shipping.calculated ? '送料計算後にダウンロードできます' : ''}>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<DownloadIcon />}
+                          onClick={() => handleDownloadInvoice(auctionId)}
+                          disabled={!group.shipping.calculated}
+                        >
+                          請求書
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    {/* 領収書（送料計算済み + 全品入金済み） */}
                     {group.summary.all_paid && (
                       <Button
                         variant="outlined"
@@ -594,8 +647,9 @@ export default function WonItems() {
                         color="success"
                         startIcon={<DownloadIcon />}
                         onClick={() => handleDownloadReceipt(auctionId)}
+                        disabled={!group.shipping.calculated}
                       >
-                        領収書ダウンロード
+                        領収書
                       </Button>
                     )}
                   </Box>

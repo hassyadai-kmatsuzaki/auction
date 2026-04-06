@@ -45,6 +45,8 @@ class WonItemController extends Controller
             $allPaid = $items->every(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));
             $anyPending = $items->contains(fn ($w) => $w->payment_status === 'pending');
             $canUpdateAddress = $items->every(fn ($w) => $w->canUpdateShippingAddress());
+            $shippingCalculated = $items->every(fn ($w) => $w->shipping_calculated_at !== null);
+            $hasAddress = (bool) $items->first()->shipping_postal_code;
 
             // 代表の配送先（最初の落札品から）
             $first = $items->first();
@@ -66,6 +68,8 @@ class WonItemController extends Controller
                 'shipping' => [
                     'address' => $this->formatShippingAddress($first),
                     'can_update' => $canUpdateAddress,
+                    'calculated' => $shippingCalculated,
+                    'can_calculate' => $hasAddress && !$shippingCalculated,
                 ],
                 'won_items' => $items->map(function ($wonItem) {
                     $item = $wonItem->item;
@@ -253,41 +257,88 @@ class WonItemController extends Controller
 
         $totalShippingFee = 0;
 
-        // 各落札品の配送先を更新し、配送料を再計算
+        // 全品の住所を一括更新し、送料計算をリセット
         foreach ($wonItems as $wonItem) {
-            $updateData = $addressData;
-
-            try {
-                $calculator = app(ShippingCalculatorService::class);
-                $region = $calculator->getRegionByPrefecture($request->shipping_prefecture);
-                if ($region) {
-                    $result = $calculator->calculate(
-                        [['quantity' => $wonItem->item->quantity]],
-                        $region
-                    );
-                    $updateData['shipping_fee'] = $result['total_shipping_fee'];
-                    $updateData['shipping_breakdown'] = $result;
-                    $totalShippingFee += $result['total_shipping_fee'];
-                }
-            } catch (\Exception $e) {
-                \Log::warning('配送料金の自動計算に失敗', [
-                    'won_item_id' => $wonItem->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            $wonItem->update($updateData);
+            $wonItem->update(array_merge($addressData, [
+                'shipping_fee' => 0,
+                'shipping_breakdown' => null,
+                'shipping_calculated_at' => null,
+            ]));
         }
 
         return response()->json([
             'success' => true,
-            'message' => '配送先を更新しました。',
+            'message' => '配送先を更新しました。送料計算ボタンから配送料を計算してください。',
             'data' => [
                 'shipping_address' => $this->formatShippingAddress($wonItems->first()),
-                'total_shipping_fee' => $totalShippingFee,
                 'updated_count' => $wonItems->count(),
             ],
         ]);
+    }
+
+    /**
+     * オークション内全落札品の送料を一括計算
+     *
+     * @param int $auctionId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function calculateShipping($auctionId)
+    {
+        $userId = Auth::id();
+
+        $wonItems = WonItem::forWinner($userId)
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->with('item')
+            ->get();
+
+        if ($wonItems->isEmpty()) {
+            return response()->json(['success' => false, 'message' => '該当する落札品がありません。'], 404);
+        }
+
+        // 既に全品計算済みの場合
+        if ($wonItems->every(fn ($w) => $w->shipping_calculated_at !== null)) {
+            return response()->json(['success' => false, 'message' => '送料は既に計算済みです。'], 400);
+        }
+
+        $first = $wonItems->first();
+        if (!$first->shipping_prefecture) {
+            return response()->json(['success' => false, 'message' => '配送先住所を先に設定してください。'], 400);
+        }
+
+        try {
+            $calculator = app(ShippingCalculatorService::class);
+            $region = $calculator->getRegionByPrefecture($first->shipping_prefecture);
+            if (!$region) {
+                return response()->json(['success' => false, 'message' => '配送先地域を特定できません。'], 400);
+            }
+
+            $items = $wonItems->map(fn ($w) => ['quantity' => $w->item->quantity])->values()->toArray();
+            $result = $calculator->calculate($items, $region);
+            $totalShippingFee = $result['total_shipping_fee'];
+
+            $totalQuantity = $wonItems->sum(fn ($w) => $w->item->quantity);
+            foreach ($wonItems as $wonItem) {
+                $ratio = $wonItem->item->quantity / $totalQuantity;
+                $wonItem->update([
+                    'shipping_fee' => (int) round($totalShippingFee * $ratio),
+                    'shipping_breakdown' => $result,
+                    'shipping_calculated_at' => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => '送料を計算しました。',
+                'data' => [
+                    'total_shipping_fee' => $totalShippingFee,
+                    'box_summary' => collect($result['boxes'])->pluck('box_size')->countBy()->map(fn ($count, $size) => $count > 1 ? "{$size}×{$count}" : (string) $size)->values()->implode('+'),
+                    'region' => $region,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('送料計算エラー', ['auction_id' => $auctionId, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => '送料の計算に失敗しました。'], 500);
+        }
     }
 
     /**

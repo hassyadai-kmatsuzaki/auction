@@ -44,6 +44,8 @@ import {
   AttachMoney as MoneyIcon,
   Refresh as RefreshIcon,
   OpenInNew as OpenInNewIcon,
+  Calculate as CalculateIcon,
+  Description as DescriptionIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -75,6 +77,7 @@ interface WonItem {
   tracking_number?: string;
   shipping_company?: string;
   shipped_at?: string;
+  shipping_calculated_at?: string;
   created_at: string;
 }
 
@@ -251,6 +254,53 @@ export default function WonItemManagement() {
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
+  };
+
+  // 送料計算（落札者単位）
+  const handleCalculateShipping = async (winnerId: number) => {
+    setActionLoading(true);
+    try {
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/winners/${winnerId}/calculate-shipping`);
+      if (response.data.success) {
+        const fee = response.data.data?.total_shipping_fee;
+        setSnackbar({ open: true, message: `送料を計算しました（¥${Number(fee).toLocaleString()}）`, severity: 'success' });
+        fetchWonItems();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '送料の計算に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 支払通知書DL
+  const handleDownloadPaymentNotice = async (sellerId: number) => {
+    try {
+      const res = await axios.get(`/api/admin/auctions/${auctionId}/sellers/${sellerId}/payment-notice`, { responseType: 'blob' });
+      const contentType = res.headers['content-type'] || '';
+      if (!contentType.includes('application/pdf')) {
+        const text = await (res.data as Blob).text();
+        let msg = '支払通知書のダウンロードに失敗しました';
+        try { msg = JSON.parse(text).message || msg; } catch {}
+        setSnackbar({ open: true, message: msg, severity: 'error' });
+        return;
+      }
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `payment_notice_auction_${auctionId}_seller_${sellerId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      let msg = '支払通知書のダウンロードに失敗しました';
+      if (err?.response?.data instanceof Blob) {
+        try { msg = JSON.parse(await err.response.data.text()).message || msg; } catch {}
+      }
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    }
   };
 
   const getPaymentStatusChip = (status: string) => {
@@ -509,6 +559,18 @@ export default function WonItemManagement() {
                     </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                        {!item.shipping_calculated_at && item.winner && (
+                          <Tooltip title="送料計算">
+                            <IconButton
+                              size="small"
+                              sx={{ color: 'warning.main' }}
+                              onClick={() => handleCalculateShipping(item.winner!.id)}
+                              disabled={actionLoading}
+                            >
+                              <CalculateIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {item.payment_status === 'pending' && (
                           <Tooltip title="入金確認">
                             <IconButton

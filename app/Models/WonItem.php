@@ -73,6 +73,7 @@ class WonItem extends BaseModel
         'payment_deadline' => 'datetime',
         'pickup_datetime' => 'datetime',
         'shipping_locked_at' => 'datetime',
+        'shipping_calculated_at' => 'datetime',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
     ];

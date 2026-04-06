@@ -175,7 +175,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('won-items/{id}/ship', [AdminWonItemController::class, 'ship']);
     Route::post('won-items/{id}/complete', [AdminWonItemController::class, 'complete']);
     Route::patch('won-items/{id}/notes', [AdminWonItemController::class, 'updateNotes']);
+    Route::post('auctions/{auctionId}/winners/{winnerId}/calculate-shipping', [AdminWonItemController::class, 'calculateShipping']);
     Route::get('auctions/{auctionId}/winners/{winnerId}/invoice', [InvoiceController::class, 'adminDownloadInvoice']);
+    Route::get('auctions/{auctionId}/sellers/{sellerId}/payment-notice', [InvoiceController::class, 'adminDownloadPaymentNotice']);
 
     // 配送マスタ管理
     Route::get('shipping-master', [ShippingRateController::class, 'index']);
@@ -219,6 +221,7 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     // 売上・精算
     Route::get('/settlements', [SellerSettlementController::class, 'index']);
     Route::get('/settlements/{auctionId}', [SellerSettlementController::class, 'show']);
+    Route::get('/settlements/{auctionId}/payment-notice', [InvoiceController::class, 'sellerDownloadPaymentNotice']);
 });
 
 // 参加者API
@@ -244,6 +247,7 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
     Route::put('/auctions/{auctionId}/address', [ParticipantWonItemController::class, 'updateAddress']);
+    Route::post('/auctions/{auctionId}/calculate-shipping', [ParticipantWonItemController::class, 'calculateShipping']);
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     

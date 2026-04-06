@@ -869,13 +869,7 @@ class CountdownService
                 'end_time' => now()->format('H:i:s'),
             ]);
 
-            // 落札者ごとに配送料を一括計算
-            try {
-                $finishAction = app(FinishAuctionAction::class);
-                $finishAction->calculateShippingForAuction($auction);
-            } catch (\Exception $e) {
-                Log::warning("配送料一括計算エラー: " . $e->getMessage());
-            }
+            // 送料計算はボタン方式に移行（自動計算しない）
 
             // ステータス変更イベントをブロードキャスト
             try {
