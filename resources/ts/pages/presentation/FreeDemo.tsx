@@ -1,6 +1,6 @@
 /**
  * ガイドなしデモ
- * 3レーン x 各10匹 = 30匹のリアルなオークション体験
+ * 2レーン x 各3匹 = 6匹のリアルなオークション体験
  * 10人のCPU参加者がフロントエンドのみで入札ロジックを実行
  *
  * 本番のオークションロジック:
@@ -37,7 +37,7 @@ import { DemoWaitingRoom } from './DemoWaitingRoom';
 import { PostAuctionGuide } from './PostAuctionGuide';
 import {
   makeLane,
-  FREE_LANE1_ITEMS, FREE_LANE2_ITEMS, FREE_LANE3_ITEMS,
+  FREE_LANE1_ITEMS, FREE_LANE2_ITEMS,
   CPU_CHARACTERS,
   type WonEntry,
 } from './mockData';
@@ -53,7 +53,6 @@ interface FreeDemoProps {
 const LANE_QUEUES: LaneItem[][] = [
   FREE_LANE1_ITEMS.map(i => ({ ...i })),
   FREE_LANE2_ITEMS.map(i => ({ ...i })),
-  FREE_LANE3_ITEMS.map(i => ({ ...i })),
 ];
 
 export function FreeDemo({ onBackToTop }: FreeDemoProps) {
@@ -64,7 +63,6 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     return [
       makeLane(1, 1, 'レーン 1', { ...LANE_QUEUES[0][0] }),
       makeLane(2, 2, 'レーン 2', { ...LANE_QUEUES[1][0] }),
-      makeLane(3, 3, 'レーン 3', { ...LANE_QUEUES[2][0] }),
     ];
   });
   // lanesの最新値をrefで追跡（タイマーコールバック内で使用）
@@ -72,7 +70,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   useEffect(() => { lanesRef.current = lanes; }, [lanes]);
 
   // Track which item index each lane is on
-  const laneItemIndexRef = useRef<number[]>([0, 0, 0]);
+  const laneItemIndexRef = useRef<number[]>([0, 0]);
   const [wonItems, setWonItems] = useState<WonEntry[]>([]);
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
@@ -133,7 +131,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
   // ─── Initialize CPU states ───
   useEffect(() => {
-    const allItems = [...FREE_LANE1_ITEMS, ...FREE_LANE2_ITEMS, ...FREE_LANE3_ITEMS];
+    const allItems = [...FREE_LANE1_ITEMS, ...FREE_LANE2_ITEMS];
     const priceMap = new Map<number, number>();
     allItems.forEach(item => priceMap.set(item.id, item.current_price));
     cpuStatesRef.current = CPU_CHARACTERS.map(cpu => initCpuState(cpu, priceMap));
@@ -345,7 +343,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   // ─── Start initial countdowns + CPU bidding ───
   useEffect(() => {
     if (phase !== 'auction') return;
-    [1, 2, 3].forEach(laneId => {
+    [1, 2].forEach(laneId => {
       startCountdown(laneId, 15);
       // 各レーンのCPU入札を開始（初回は1〜3秒後にランダム開始）
       const initialDelay = 1000 + Math.random() * 2000;
@@ -361,7 +359,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
   // ─── Check if auction is complete ───
   useEffect(() => {
-    if (completedLanes.size >= 3 && phase === 'auction') {
+    if (completedLanes.size >= 2 && phase === 'auction') {
       const timer = setTimeout(() => {
         stopAllTimers();
         setPhase('post-auction');
@@ -523,7 +521,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                   ガイドなしデモ — フリーオークション
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {3 - completedLanes.size}/{3}レーン進行中
+                  {2 - completedLanes.size}/{2}レーン進行中
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -545,7 +543,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
           {/* Lane grid */}
           <Grid container spacing={2}>
             {lanes.map(lane => (
-              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+              <Grid item xs={12} sm={6} key={lane.lane_id}>
                 {lane.current_item ? (
                   <LaneCard
                     lane={lane} isLoading={false}
@@ -578,11 +576,11 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
           <Paper sx={{ mt: 3, p: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
             <Grid container spacing={2}>
-              {[1, 2, 3].map(laneId => {
+              {[1, 2].map(laneId => {
                 const upcomingItems = getUpcomingForLane(laneId);
                 if (upcomingItems.length === 0) return null;
                 return (
-                  <Grid item xs={12} md={4} key={laneId}>
+                  <Grid item xs={12} md={6} key={laneId}>
                     <Typography variant="caption" fontWeight="bold" color="primary.main" sx={{ mb: 1, display: 'block' }}>
                       レーン{laneId}
                     </Typography>

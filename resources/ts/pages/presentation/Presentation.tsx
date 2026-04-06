@@ -5,7 +5,7 @@
  * 各デモモードは専用コンポーネントに委譲する。
  *
  * - ガイド付きデモ: ホーム → 出品一覧 → 待機室 → オークション（ツアー付き） → 落札者管理ガイド
- * - ガイドなしデモ: 3レーン x 10匹、CPU10人によるリアルオークション → 落札管理
+ * - ガイドなしデモ: 2レーン x 3匹、CPU10人によるリアルオークション → 落札管理
  */
 import { useState, useCallback } from 'react';
 import { DemoModeSelector } from './DemoModeSelector';

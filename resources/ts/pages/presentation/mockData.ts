@@ -38,77 +38,45 @@ export const makeLane = (id: number, num: number, name: string, item: LaneItem):
 });
 
 // ====================================================================
-// ガイド付きデモ用データ（3アイテム + upcoming 3）
+// ガイド付きデモ用データ（2レーン x 各1アイテム + upcoming 2）
 // ====================================================================
 
 export const GUIDED_INITIAL_ITEMS: LaneItem[] = [
   makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'ブリーダーA', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
   makeLaneItem({ id: 2, species_name: '幹之フルボディ', current_price: 500, quantity: 5, is_premium: true, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
-  makeLaneItem({ id: 3, species_name: '楊貴妃ダルマ', current_price: 200, quantity: 1, seller_name: 'ブリーダーC', thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' }),
 ];
 
 export const GUIDED_INITIAL_LANES: LiveLane[] = [
   makeLane(1, 1, 'レーン 1', GUIDED_INITIAL_ITEMS[0]),
   makeLane(2, 2, 'レーン 2', GUIDED_INITIAL_ITEMS[1]),
-  makeLane(3, 3, 'レーン 3', GUIDED_INITIAL_ITEMS[2]),
 ];
 
 export const GUIDED_UPCOMING: (UpcomingItem & { laneNumber: number })[] = [
-  { id: 10, item_number: 4, species_name: '三色ラメ', start_price: 400, thumbnail_path: '/img/medaka/三色ラメ.jpeg', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
-  { id: 11, item_number: 5, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
-  { id: 12, item_number: 6, species_name: '夜桜ゴールド', start_price: 350, thumbnail_path: '/img/medaka/夜桜ゴールド.jpg', is_premium: false, is_favorited: false, quantity: 1, laneNumber: 3 },
+  { id: 10, item_number: 3, species_name: '三色ラメ', start_price: 400, thumbnail_path: '/img/medaka/三色ラメ.jpeg', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
+  { id: 11, item_number: 4, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
 ];
 
 // ====================================================================
-// ガイドなしデモ用データ（3レーン x 10アイテム = 30アイテム）
+// ガイドなしデモ用データ（2レーン x 3アイテム = 6アイテム）
 // ====================================================================
 
 const MEDAKA_SPECIES = [
-  // レーン1（10匹）
+  // レーン1（3匹）
   { id: 101, species_name: '紅白ラメ ペア', price: 300, quantity: 2, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/紅白ラメ.jpg' },
   { id: 102, species_name: '三色ラメ 3匹', price: 400, quantity: 3, premium: false, seller: 'ブリーダーB', thumbnail: '/img/medaka/三色ラメ.jpeg' },
   { id: 103, species_name: 'サファイア ペア', price: 800, quantity: 2, premium: true, seller: 'ブリーダーC', thumbnail: '/img/medaka/02.png' },
-  { id: 104, species_name: '松井ヒレ長 ペア', price: 300, quantity: 2, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/04.png' },
-  { id: 105, species_name: '琥珀透明鱗', price: 200, quantity: 1, premium: false, seller: 'ブリーダーD', thumbnail: '/img/medaka/01.png' },
-  { id: 106, species_name: '白ラメ幹之 5匹', price: 400, quantity: 5, premium: false, seller: 'ブリーダーB', thumbnail: '/img/medaka/幹之フルボディ.jpg' },
-  { id: 107, species_name: 'ユリシス ペア', price: 700, quantity: 2, premium: true, seller: 'ブリーダーE', thumbnail: '/img/medaka/06.png' },
-  { id: 108, species_name: '紅帝 3匹', price: 350, quantity: 3, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/01.png' },
-  { id: 109, species_name: '龍の瞳 ペア', price: 900, quantity: 2, premium: true, seller: 'ブリーダーF', thumbnail: '/img/medaka/03.png' },
-  { id: 110, species_name: '紅白ラメヒカリ', price: 250, quantity: 1, premium: false, seller: 'ブリーダーC', thumbnail: '/img/medaka/紅白ラメ.jpg' },
-  // レーン2（10匹）
+  // レーン2（3匹）
   { id: 201, species_name: '幹之フルボディ', price: 500, quantity: 5, premium: true, seller: 'ブリーダーB', thumbnail: '/img/medaka/幹之フルボディ.jpg' },
   { id: 202, species_name: 'オロチ ペア', price: 600, quantity: 2, premium: true, seller: 'ブリーダーD', thumbnail: '/img/medaka/オロチ.jpg' },
   { id: 203, species_name: '女雛 3匹', price: 250, quantity: 3, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/05.png' },
-  { id: 204, species_name: '煌 ペア', price: 500, quantity: 2, premium: true, seller: 'ブリーダーE', thumbnail: '/img/medaka/01.png' },
-  { id: 205, species_name: '黒ラメ幹之', price: 350, quantity: 1, premium: false, seller: 'ブリーダーB', thumbnail: '/img/medaka/03.png' },
-  { id: 206, species_name: 'マリンブルー 3匹', price: 300, quantity: 3, premium: false, seller: 'ブリーダーC', thumbnail: '/img/medaka/02.png' },
-  { id: 207, species_name: '鳳凰 ペア', price: 650, quantity: 2, premium: true, seller: 'ブリーダーF', thumbnail: '/img/medaka/04.png' },
-  { id: 208, species_name: '楊貴妃 5匹', price: 200, quantity: 5, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/楊貴妃ダルマ.jpeg' },
-  { id: 209, species_name: '深海 ペア', price: 450, quantity: 2, premium: false, seller: 'ブリーダーD', thumbnail: '/img/medaka/06.png' },
-  { id: 210, species_name: 'ブラックダイヤ', price: 750, quantity: 1, premium: true, seller: 'ブリーダーE', thumbnail: '/img/medaka/03.png' },
-  // レーン3（10匹）
-  { id: 301, species_name: '楊貴妃ダルマ', price: 200, quantity: 1, premium: false, seller: 'ブリーダーC', thumbnail: '/img/medaka/楊貴妃ダルマ.jpeg' },
-  { id: 302, species_name: '夜桜ゴールド', price: 350, quantity: 1, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/夜桜ゴールド.jpg' },
-  { id: 303, species_name: '王華 ペア', price: 550, quantity: 2, premium: true, seller: 'ブリーダーF', thumbnail: '/img/medaka/05.png' },
-  { id: 304, species_name: '月虹 3匹', price: 400, quantity: 3, premium: false, seller: 'ブリーダーB', thumbnail: '/img/medaka/06.png' },
-  { id: 305, species_name: '朱赤透明鱗', price: 180, quantity: 1, premium: false, seller: 'ブリーダーD', thumbnail: '/img/medaka/01.png' },
-  { id: 306, species_name: 'カブキ ペア', price: 480, quantity: 2, premium: false, seller: 'ブリーダーE', thumbnail: '/img/medaka/02.png' },
-  { id: 307, species_name: '紅薊 3匹', price: 320, quantity: 3, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/04.png' },
-  { id: 308, species_name: 'ラメ王 ペア', price: 850, quantity: 2, premium: true, seller: 'ブリーダーF', thumbnail: '/img/medaka/03.png' },
-  { id: 309, species_name: '銀河 5匹', price: 500, quantity: 5, premium: false, seller: 'ブリーダーC', thumbnail: '/img/medaka/幹之フルボディ.jpg' },
-  { id: 310, species_name: '紅白ダルマ', price: 280, quantity: 1, premium: false, seller: 'ブリーダーB', thumbnail: '/img/medaka/紅白ラメ.jpg' },
 ];
 
-/** レーン1のアイテムキュー（10個） */
-export const FREE_LANE1_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 101 && s.id <= 110)
+/** レーン1のアイテムキュー（3個） */
+export const FREE_LANE1_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 101 && s.id <= 103)
   .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
 
-/** レーン2のアイテムキュー（10個） */
-export const FREE_LANE2_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 201 && s.id <= 210)
-  .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
-
-/** レーン3のアイテムキュー（10個） */
-export const FREE_LANE3_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 301 && s.id <= 310)
+/** レーン2のアイテムキュー（3個） */
+export const FREE_LANE2_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 201 && s.id <= 203)
   .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
 
 // ====================================================================
@@ -233,9 +201,8 @@ export const MOCK_ITEMS: ItemData[] = [
 ];
 
 export const MOCK_LANES_LIST = [
-  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter((_, i) => i < 4) },
-  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter((_, i) => i >= 4 && i < 7) },
-  { lane_name: 'レーン 3', items: MOCK_ITEMS.filter((_, i) => i >= 7) },
+  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter((_, i) => i < 5) },
+  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter((_, i) => i >= 5) },
 ];
 
 // ====================================================================

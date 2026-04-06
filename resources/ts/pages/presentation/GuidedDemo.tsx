@@ -75,10 +75,9 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // Tour refs - auction phase (static)
   const demoHeaderRef = useRef<HTMLDivElement>(null);
-  const laneCardRefs = useRef<(HTMLDivElement | null)[]>([null, null, null]);
+  const laneCardRefs = useRef<(HTMLDivElement | null)[]>([null, null]);
   const lane1Ref = useRef<HTMLDivElement | null>(null);
   const lane2Ref = useRef<HTMLDivElement | null>(null);
-  const lane3Ref = useRef<HTMLDivElement | null>(null);
   const upcomingRef = useRef<HTMLDivElement>(null);
   const wonTableRef = useRef<HTMLDivElement>(null);
   const goToStepRef = useRef<(step: number) => void>(() => {});
@@ -182,7 +181,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   useEffect(() => {
     lane1Ref.current = laneCardRefs.current[0];
     lane2Ref.current = laneCardRefs.current[1];
-    lane3Ref.current = laneCardRefs.current[2];
   });
 
   // ─── Simulation helpers ───
@@ -354,7 +352,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       // lane refs の解決を確実にする
       lane1Ref.current = laneCardRefs.current[0];
       lane2Ref.current = laneCardRefs.current[1];
-      lane3Ref.current = laneCardRefs.current[2];
       setTourStep(9);
       setTourActive(true);
       // ref解決後にもう一度forceUpdateして位置計算を確実にする
@@ -398,7 +395,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
     // ── AUCTION phase (steps 8-17, Lane 1 only) ──
     { targetRef: demoHeaderRef, title: 'オークション体験デモへようこそ！', description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。', placement: 'bottom' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。最大3つのレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。複数のレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきます！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、3回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ' },
@@ -683,7 +680,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                   {MOCK_AUCTIONS[0].title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  3/3レーン進行中
+                  2/2レーン進行中
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -709,7 +706,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           {/* Lane grid */}
           <Grid container spacing={2}>
             {lanes.map((lane, idx) => (
-              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+              <Grid item xs={12} sm={6} key={lane.lane_id}>
                 <Box ref={(el: HTMLDivElement | null) => { laneCardRefs.current[idx] = el; }}>
                   <LaneCard
                     lane={lane} isLoading={false}

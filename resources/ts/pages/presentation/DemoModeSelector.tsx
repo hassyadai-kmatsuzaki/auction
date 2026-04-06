@@ -120,13 +120,13 @@ export function DemoModeSelector({ onSelectGuided, onSelectFree }: DemoModeSelec
                   </Box>
 
                   <Typography variant="body1" color="text.secondary" sx={{ mb: 2, lineHeight: 1.8 }}>
-                    3レーン各10匹のリアルなオークションを体験。10人のCPU参加者と競り合いながら、自由に入札できます。
+                    2レーン各3匹のリアルなオークションを体験。10人のCPU参加者と競り合いながら、自由に入札できます。
                   </Typography>
 
                   <Box sx={{ mt: 'auto' }}>
                     <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>特徴：</Typography>
                     <Box component="ul" sx={{ pl: 2, m: 0, '& li': { mb: 0.5, fontSize: '0.875rem', color: 'text.secondary' } }}>
-                      <li>3レーン x 各10匹 = 計30匹</li>
+                      <li>2レーン x 各3匹 = 計6匹</li>
                       <li>10人のCPU参加者がリアルに入札</li>
                       <li>指値（上限価格）の自由な設定</li>
                       <li>オークション終了後、落札管理を体験</li>
