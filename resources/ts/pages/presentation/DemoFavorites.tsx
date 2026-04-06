@@ -20,9 +20,10 @@ type MockItem = typeof MOCK_ITEMS[0];
 
 interface DemoFavoritesProps {
   onNavigateToAuctions: () => void;
+  onLimitSet?: () => void;
 }
 
-export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
+export function DemoFavorites({ onNavigateToAuctions, onLimitSet }: DemoFavoritesProps) {
   // デモ用: 最初から数件お気に入り登録済み
   const [favoriteItemIds, setFavoriteItemIds] = useState<Set<number>>(new Set([1, 2, 5, 7]));
   const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
@@ -46,6 +47,7 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
     if (!limitModalItem) return;
     setLimitSettings(prev => ({ ...prev, [limitModalItem.id]: { limit_price: price, is_triggered: false } }));
     setLimitModalItem(null);
+    onLimitSet?.();
   };
 
   const handleRemoveLimit = (itemId: number) => {
@@ -85,7 +87,7 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {favorites.map((item) => {
+          {favorites.map((item, idx) => {
             const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
             return (
               <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
@@ -130,7 +132,7 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
                   </CardContent>
                 </Card>
                 {/* 指値バッジ */}
-                <Box sx={{ px: 1.5, py: 1, bgcolor: 'background.paper', border: '1px solid', borderTop: 'none', borderColor: 'divider', borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }}>
+                <Box data-tour-target={idx === 0 ? 'favorites-first-limit' : undefined} sx={{ px: 1.5, py: 1, bgcolor: 'background.paper', border: '1px solid', borderTop: 'none', borderColor: 'divider', borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }}>
                   <BidLimitBadge
                     limitPrice={getLimitForItem(item.id).limit_price}
                     isTriggered={getLimitForItem(item.id).is_triggered}
@@ -196,6 +198,7 @@ export function DemoFavorites({ onNavigateToAuctions }: DemoFavoritesProps) {
           isRemoving={false}
           onSet={handleSetLimit}
           onRemove={() => { handleRemoveLimit(limitModalItem.id); setLimitModalItem(null); }}
+          zIndex={1500}
         />
       )}
     </Container>

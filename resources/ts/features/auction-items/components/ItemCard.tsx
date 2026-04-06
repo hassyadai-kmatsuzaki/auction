@@ -30,9 +30,11 @@ interface Props {
   isFavorited: boolean;
   onClick: () => void;
   onFavoriteToggle: (e: React.MouseEvent) => void;
+  /** ツアー用: ハートアイコンに data-tour-target を付与 */
+  favoriteButtonTourTarget?: string;
 }
 
-export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle }: Props) => {
+export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, favoriteButtonTourTarget }: Props) => {
   const status = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
 
   return (
@@ -46,6 +48,7 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
     >
       <IconButton
         onClick={onFavoriteToggle}
+        data-tour-target={favoriteButtonTourTarget}
         sx={{ position: 'absolute', top: 4, left: 4, zIndex: 2, bgcolor: 'rgba(255,255,255,0.85)', width: 32, height: 32 }}
         size="small"
       >
