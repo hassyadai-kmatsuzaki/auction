@@ -90,16 +90,22 @@ export const DemoTourPopover: React.FC<Props> = ({
     setExpanded(false);
   }, [activeStep]);
 
-  // waitForAction時: ターゲット要素と全ての祖先をオーバーレイ(z-index:1400)の上に持ち上げる
-  // 深いDOM階層でもスポットライト領域がクリック可能になるよう、bodyまで辿る
+  // waitForAction時: ターゲット要素からbodyまでの祖先チェーンをオーバーレイの上に持ち上げる
+  // これにより深いDOM階層でもスポットライト領域がクリック可能になる
   useEffect(() => {
     if (!step?.waitForAction || !step.targetRef.current) return;
     const el = step.targetRef.current;
 
-    const saved: { node: HTMLElement; zIndex: string; position: string }[] = [];
+    const saved: { node: HTMLElement; zIndex: string; position: string; isolation: string }[] = [];
     const raise = (node: HTMLElement) => {
-      saved.push({ node, zIndex: node.style.zIndex, position: node.style.position });
+      saved.push({
+        node,
+        zIndex: node.style.zIndex,
+        position: node.style.position,
+        isolation: node.style.isolation,
+      });
       node.style.zIndex = '1401';
+      node.style.isolation = 'auto';
       if (!node.style.position || node.style.position === 'static') {
         node.style.position = 'relative';
       }
@@ -113,9 +119,10 @@ export const DemoTourPopover: React.FC<Props> = ({
     }
 
     return () => {
-      saved.forEach(({ node, zIndex, position }) => {
+      saved.forEach(({ node, zIndex, position, isolation }) => {
         node.style.zIndex = zIndex;
         node.style.position = position;
+        node.style.isolation = isolation;
       });
     };
   }, [step, activeStep]);
@@ -286,47 +293,50 @@ export const DemoTourPopover: React.FC<Props> = ({
           />
         </svg>
 
-        {spotlightRect && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: spotlightRect.top - SPOTLIGHT_PADDING,
-              left: spotlightRect.left - SPOTLIGHT_PADDING,
-              width: spotlightRect.width + SPOTLIGHT_PADDING * 2,
-              height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
-              borderRadius: '12px',
-              pointerEvents: 'none',
-              // waitForAction時: ゴールドの強いパルスで「ここをタップ」を示す
-              // それ以外: 青の穏やかなパルス
-              ...(step.waitForAction ? {
-                border: '2px solid rgba(255, 165, 0, 0.8)',
-                boxShadow: '0 0 0 4px rgba(255, 165, 0, 0.3), 0 0 24px rgba(255, 165, 0, 0.4)',
-                animation: 'spotlightTapPulse 1.2s ease-in-out infinite',
-                '@keyframes spotlightTapPulse': {
-                  '0%, 100%': {
-                    boxShadow: '0 0 0 4px rgba(255, 165, 0, 0.3), 0 0 24px rgba(255, 165, 0, 0.4)',
-                  },
-                  '50%': {
-                    boxShadow: '0 0 0 8px rgba(255, 165, 0, 0.5), 0 0 40px rgba(255, 165, 0, 0.6)',
-                  },
-                },
-              } : {
-                border: '2px solid rgba(25, 118, 210, 0.6)',
-                boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
-                animation: 'spotlightPulse 2s ease-in-out infinite',
-                '@keyframes spotlightPulse': {
-                  '0%, 100%': {
-                    boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
-                  },
-                  '50%': {
-                    boxShadow: '0 0 0 6px rgba(25, 118, 210, 0.25), 0 0 30px rgba(25, 118, 210, 0.4)',
-                  },
-                },
-              }),
-            }}
-          />
-        )}
       </Box>
+
+      {/* Spotlight pulse border — オーバーレイBoxの外に配置し独自のz-indexで最前面に表示 */}
+      {spotlightRect && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: spotlightRect.top - SPOTLIGHT_PADDING,
+            left: spotlightRect.left - SPOTLIGHT_PADDING,
+            width: spotlightRect.width + SPOTLIGHT_PADDING * 2,
+            height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
+            borderRadius: '12px',
+            pointerEvents: 'none',
+            zIndex: 1402,
+            // waitForAction時: ゴールドの強いパルスで「ここをタップ」を示す
+            // それ以外: 青の穏やかなパルス
+            ...(step.waitForAction ? {
+              border: '2px solid rgba(255, 165, 0, 0.8)',
+              boxShadow: '0 0 0 4px rgba(255, 165, 0, 0.3), 0 0 24px rgba(255, 165, 0, 0.4)',
+              animation: 'spotlightTapPulse 1.2s ease-in-out infinite',
+              '@keyframes spotlightTapPulse': {
+                '0%, 100%': {
+                  boxShadow: '0 0 0 4px rgba(255, 165, 0, 0.3), 0 0 24px rgba(255, 165, 0, 0.4)',
+                },
+                '50%': {
+                  boxShadow: '0 0 0 8px rgba(255, 165, 0, 0.5), 0 0 40px rgba(255, 165, 0, 0.6)',
+                },
+              },
+            } : {
+              border: '2px solid rgba(25, 118, 210, 0.6)',
+              boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
+              animation: 'spotlightPulse 2s ease-in-out infinite',
+              '@keyframes spotlightPulse': {
+                '0%, 100%': {
+                  boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.15), 0 0 20px rgba(25, 118, 210, 0.3)',
+                },
+                '50%': {
+                  boxShadow: '0 0 0 6px rgba(25, 118, 210, 0.25), 0 0 30px rgba(25, 118, 210, 0.4)',
+                },
+              },
+            }),
+          }}
+        />
+      )}
 
       {/* Tap-here ripple indicator (only for waitForAction steps) */}
       {spotlightRect && step.waitForAction && (
@@ -337,7 +347,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             left: spotlightRect.left + spotlightRect.width / 2 - 20,
             width: 40,
             height: 40,
-            zIndex: 1400,
+            zIndex: 1402,
             pointerEvents: 'none',
           }}
         >
