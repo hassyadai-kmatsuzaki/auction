@@ -27,9 +27,10 @@ interface DemoItemListProps {
   onGoToWaitingRoom: () => void;
   onFavoriteAdded?: () => void;
   onLimitSet?: () => void;
+  onItemDetailOpened?: () => void;
 }
 
-export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }: DemoItemListProps) {
+export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -174,11 +175,11 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }:
         <Grid container spacing={2}>
           {currentItems.map((item, idx) => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+              <Box data-tour-target={idx === 0 ? 'items-first-card' : undefined} sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
-                  onClick={() => setSelectedItem(item)}
+                  onClick={() => { setSelectedItem(item); onItemDetailOpened?.(); }}
                   onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)}
                   favoriteButtonTourTarget={idx === 0 ? 'items-first-favorite' : undefined}
                 />
@@ -260,7 +261,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }:
       )}
       {/* Item Detail Dialog */}
       {selectedItem && (
-        <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="sm" fullWidth>
+        <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="sm" fullWidth sx={{ zIndex: 1500 }}>
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box>
               {selectedItem.species_name}

@@ -23,6 +23,8 @@ import {
 interface DemoHomeProps {
   onGoToItems: () => void;
   onGoToWaitingRoom?: () => void;
+  /** ガイド中は待機室ボタンを無効化 */
+  disableWaitingRoom?: boolean;
 }
 
 // 広告データ（実際のHome.tsxと同じ構造）
@@ -37,7 +39,7 @@ const sponsoredAds = [
   },
 ];
 
-export function DemoHome({ onGoToItems, onGoToWaitingRoom }: DemoHomeProps) {
+export function DemoHome({ onGoToItems, onGoToWaitingRoom, disableWaitingRoom }: DemoHomeProps) {
   const auction = MOCK_AUCTIONS[0];
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<typeof MOCK_ANNOUNCEMENTS[0] | null>(null);
 
@@ -91,6 +93,7 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom }: DemoHomeProps) {
               size="large"
               endIcon={<ArrowForwardIcon />}
               onClick={onGoToWaitingRoom}
+              disabled={disableWaitingRoom}
               sx={{
                 fontWeight: 700,
                 px: 4,

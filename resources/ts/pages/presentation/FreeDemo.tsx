@@ -70,6 +70,9 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   const [completedLanes, setCompletedLanes] = useState<Set<number>>(new Set());
   const [, setTotalItemsCompleted] = useState(0);
 
+  // Track resolved items to prevent duplicate resolution
+  const resolvedRef = useRef<Set<string>>(new Set());
+
   // CPU state
   const cpuStatesRef = useRef<CpuBidState[]>([]);
 
@@ -179,6 +182,11 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       if (!lane?.current_item) return prev;
       const item = lane.current_item;
 
+      // Prevent duplicate resolution
+      const key = `${laneId}-${item.id}`;
+      if (resolvedRef.current.has(key)) return prev;
+      resolvedRef.current.add(key);
+
       if (item.my_bid_status === 'active' && item.active_bidders_count >= 1) {
         // User wins!
         const price = item.current_price;
@@ -193,11 +201,11 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
         setTimeout(() => setCelebration(null), 3000);
       }
 
+      // Move to next item after a brief delay
+      setTimeout(() => advanceToNextItem(laneId), 1500);
+
       return prev;
     });
-
-    // Move to next item after a brief delay
-    setTimeout(() => advanceToNextItem(laneId), 1500);
   }, [advanceToNextItem]);
 
   // ─── Monitor countdowns reaching 0 ───
@@ -277,7 +285,8 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                 freeze_countdown_seconds: 3,
                 active_bidders_count: Math.max(2, l.current_item.active_bidders_count),
                 my_limit_triggered: (l.current_item.my_limit_price && newPrice >= l.current_item.my_limit_price) ? true : l.current_item.my_limit_triggered,
-                my_bid_status: (l.current_item.my_limit_price && newPrice >= l.current_item.my_limit_price) ? 'inactive' : l.current_item.my_bid_status,
+                // 相手が入札したら自分は未入札状態になる（本番と同じ挙動）
+                my_bid_status: l.current_item.my_bid_status === 'active' ? 'inactive' : l.current_item.my_bid_status,
               },
             };
           });

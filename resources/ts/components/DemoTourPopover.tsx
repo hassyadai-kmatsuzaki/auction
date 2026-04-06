@@ -4,7 +4,6 @@ import {
   Paper,
   Typography,
   Button,
-  IconButton,
   LinearProgress,
   useMediaQuery,
   useTheme,
@@ -13,7 +12,6 @@ import {
 import {
   NavigateNext as NextIcon,
   NavigateBefore as PrevIcon,
-  Close as CloseIcon,
   TouchApp as TouchAppIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
@@ -39,7 +37,6 @@ interface Props {
   activeStep: number;
   onNext: () => void;
   onPrev: () => void;
-  onClose: () => void;
   onReset: () => void;
   /** 自動アクション実行中かどうか */
   isAutoPlaying?: boolean;
@@ -58,7 +55,6 @@ export const DemoTourPopover: React.FC<Props> = ({
   activeStep,
   onNext,
   onPrev,
-  onClose,
   onReset,
   isAutoPlaying = false,
   onExecuteAction,
@@ -579,13 +575,6 @@ export const DemoTourPopover: React.FC<Props> = ({
                   ))}
                 </Box>
               </Box>
-              <IconButton
-                size="small"
-                onClick={onClose}
-                sx={{ color: 'grey.400', p: 0.5, '&:hover': { color: 'grey.600' } }}
-              >
-                <CloseIcon sx={{ fontSize: 18 }} />
-              </IconButton>
             </Box>
 
             {/* タイトル */}
@@ -716,21 +705,7 @@ export const DemoTourPopover: React.FC<Props> = ({
           sx={{ height: 4, bgcolor: 'grey.100' }}
         />
 
-        <Box sx={{ p: 2.5, position: 'relative' }}>
-          <IconButton
-            size="small"
-            onClick={onClose}
-            sx={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              color: 'grey.400',
-              '&:hover': { color: 'grey.600' },
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-
+        <Box sx={{ p: 2.5 }}>
           <Typography
             variant="caption"
             sx={{

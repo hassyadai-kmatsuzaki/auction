@@ -182,41 +182,67 @@
       <h2 class="section__title">ご利用の流れ</h2>
       <p class="section__lead">新規登録するだけで、すぐにオークションに参加できます。</p>
     </div>
-    <div class="steps-row anim" data-anim="fade-up">
-      <div class="step">
-        <div class="step__icon step__icon--green">
+    <div class="steps-vertical">
+      <div class="step-card anim" data-anim="fade-up">
+        <div class="step-card__num">
+          <span class="step-card__label">STEP</span>
+          <span class="step-card__number">1</span>
+        </div>
+        <div class="step-card__icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
         </div>
-        <span class="step__num">01</span>
-        <h4>新規登録</h4>
-        <p>無料で会員登録</p>
+        <div class="step-card__body">
+          <h4>マイページの新規登録</h4>
+          <p>無料で会員登録をおこなっていただきます。メールアドレスとパスワードの設定だけで完了です。</p>
+        </div>
       </div>
-      <div class="step__arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-      <div class="step">
-        <div class="step__icon step__icon--blue">
+      <div class="step-card__connector" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      </div>
+      <div class="step-card anim" data-anim="fade-up">
+        <div class="step-card__num">
+          <span class="step-card__label">STEP</span>
+          <span class="step-card__number">2</span>
+        </div>
+        <div class="step-card__icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </div>
-        <span class="step__num">02</span>
-        <h4>閲覧・入札</h4>
-        <p>画像・動画で個体を確認</p>
+        <div class="step-card__body">
+          <h4>出品個体の閲覧・入札</h4>
+          <p>画像・動画で個体の状態を確認。品種やグレードで絞り込み、気に入った個体に入札できます。</p>
+        </div>
       </div>
-      <div class="step__arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-      <div class="step">
-        <div class="step__icon step__icon--navy">
+      <div class="step-card__connector" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      </div>
+      <div class="step-card anim" data-anim="fade-up">
+        <div class="step-card__num">
+          <span class="step-card__label">STEP</span>
+          <span class="step-card__number">3</span>
+        </div>
+        <div class="step-card__icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
         </div>
-        <span class="step__num">03</span>
-        <h4>落札・決済</h4>
-        <p>オンラインで決済</p>
+        <div class="step-card__body">
+          <h4>落札・オンライン決済</h4>
+          <p>落札後、マイページからクレジットカードで安全にお支払い。面倒な手続きは一切ありません。</p>
+        </div>
       </div>
-      <div class="step__arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-      <div class="step">
-        <div class="step__icon step__icon--gold">
+      <div class="step-card__connector" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      </div>
+      <div class="step-card anim" data-anim="fade-up">
+        <div class="step-card__num">
+          <span class="step-card__label">STEP</span>
+          <span class="step-card__number">4</span>
+        </div>
+        <div class="step-card__icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         </div>
-        <span class="step__num">04</span>
-        <h4>受け取り</h4>
-        <p>プロ梱包で安心お届け</p>
+        <div class="step-card__body">
+          <h4>プロ梱包で安心お届け</h4>
+          <p>業界歴20年のプロが梱包・発送。温度管理や酸素供給など万全の状態でご自宅にお届けします。</p>
+        </div>
       </div>
     </div>
   </div>
@@ -398,29 +424,53 @@
       </div>
       <div class="voice-layout__right">
         <div class="voice-card anim" data-anim="fade-up">
-          <div class="voice-card__body">
-            <p class="voice-card__text">フリマアプリで何度も失敗した経験がありましたが、こちらでは審査制の出品者のみなので安心して入札できました。届いた個体も写真通りで、梱包も丁寧。もうここ以外では買えません。</p>
+          <div class="voice-card__avatar">TK</div>
+          <div class="voice-card__content">
+            <div class="voice-card__bubble">
+              <p>フリマアプリで何度も失敗した経験がありましたが、こちらでは審査制の出品者のみなので安心して入札できました。届いた個体も写真通りで、梱包も丁寧。もうここ以外では買えません。</p>
+            </div>
             <div class="voice-card__author">
-              <strong>T.K. 様</strong>
-              <span>めだか愛好家・個人コレクター</span>
+              <div class="voice-card__photo">
+                {{-- <img src="/img/lp/voice-tk.jpg" alt="T.K. 様"> --}}
+              </div>
+              <div class="voice-card__info">
+                <strong>T.K. 様</strong>
+                <span>めだか愛好家・個人コレクター</span>
+              </div>
             </div>
           </div>
         </div>
         <div class="voice-card anim" data-anim="fade-up" data-delay="1">
-          <div class="voice-card__body">
-            <p class="voice-card__text">即売会前の仕入れに毎回苦労していましたが、このプラットフォームのおかげでまとまった品質の個体を安定して確保できるようになりました。事業として計画が立てやすくなり、売上も安定しています。</p>
+          <div class="voice-card__avatar">SM</div>
+          <div class="voice-card__content">
+            <div class="voice-card__bubble">
+              <p>即売会前の仕入れに毎回苦労していましたが、このプラットフォームのおかげでまとまった品質の個体を安定して確保できるようになりました。事業として計画が立てやすくなり、売上も安定しています。</p>
+            </div>
             <div class="voice-card__author">
-              <strong>S.M. 様</strong>
-              <span>めだか販売店経営</span>
+              <div class="voice-card__photo">
+                {{-- <img src="/img/lp/voice-sm.jpg" alt="S.M. 様"> --}}
+              </div>
+              <div class="voice-card__info">
+                <strong>S.M. 様</strong>
+                <span>めだか販売店経営</span>
+              </div>
             </div>
           </div>
         </div>
         <div class="voice-card anim" data-anim="fade-up" data-delay="2">
-          <div class="voice-card__body">
-            <p class="voice-card__text">プロによる梱包・発送が本当にありがたいです。以前は個人発送で死着のリスクが常にありましたが、ここでは一度もトラブルがありません。生体を扱うプラットフォームとして、最も信頼できます。</p>
+          <div class="voice-card__avatar">YH</div>
+          <div class="voice-card__content">
+            <div class="voice-card__bubble">
+              <p>プロによる梱包・発送が本当にありがたいです。以前は個人発送で死着のリスクが常にありましたが、ここでは一度もトラブルがありません。生体を扱うプラットフォームとして、最も信頼できます。</p>
+            </div>
             <div class="voice-card__author">
-              <strong>Y.H. 様</strong>
-              <span>ブリーダー・即売会出展者</span>
+              <div class="voice-card__photo">
+                {{-- <img src="/img/lp/voice-yh.jpg" alt="Y.H. 様"> --}}
+              </div>
+              <div class="voice-card__info">
+                <strong>Y.H. 様</strong>
+                <span>ブリーダー・即売会出展者</span>
+              </div>
             </div>
           </div>
         </div>

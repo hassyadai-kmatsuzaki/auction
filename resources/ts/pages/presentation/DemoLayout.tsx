@@ -28,12 +28,20 @@ import {
   Settings as SettingsIcon,
   Favorite as FavoriteIcon,
   SportsEsports as DemoIcon,
+  PlayArrow as PlayArrowIcon,
+  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 
 interface DemoLayoutProps {
   currentPage: string;
   onNavigate: (page: string) => void;
   children: React.ReactNode;
+  /** 待機室バナーを表示するか（home以外のページで表示） */
+  showAuctionBanner?: boolean;
+  /** バナーの「待機室へ入室」ボタンのクリックハンドラ */
+  onGoToWaitingRoom?: () => void;
+  /** バナーの「待機室へ入室」ボタンを無効化 */
+  disableWaitingRoomBanner?: boolean;
 }
 
 const menuItems = [
@@ -45,7 +53,7 @@ const menuItems = [
   { text: '設定', icon: <SettingsIcon />, page: 'settings' },
 ];
 
-export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProps) {
+export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanner, onGoToWaitingRoom, disableWaitingRoomBanner }: DemoLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ページ遷移時にサイドバーを閉じる
@@ -91,7 +99,7 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
                 key={item.page}
                 color="inherit"
                 onClick={() => onNavigate(item.page)}
-                {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : {})}
+                {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : {})}
                 sx={{
                   borderBottom: currentPage === item.page ? 2 : 0,
                   borderRadius: 0,
@@ -120,7 +128,7 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
                     onNavigate(item.page);
                     setDrawerOpen(false);
                   }}
-                  {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : {})}
+                  {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : {})}
                 >
                   <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
@@ -130,6 +138,65 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
           </List>
         </Box>
       </Drawer>
+
+      {/* 待機室バナー（本番の ParticipantLayout と同じデザイン） */}
+      {showAuctionBanner && currentPage !== 'home' && (
+        <Box
+          sx={{
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%)',
+            color: 'white',
+            py: { xs: 3, md: 4 },
+            px: 2,
+          }}
+        >
+          <Container maxWidth="lg">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 1,
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                <PlayArrowIcon sx={{ fontSize: 16 }} />
+                待機室
+              </Box>
+              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+                まもなく開催
+              </Typography>
+            </Box>
+            <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' } }}>
+              2026年春季メダカオークション
+            </Typography>
+            <Button
+              data-tour-target="banner-waiting-room"
+              variant="contained"
+              size="large"
+              endIcon={<ArrowForwardIcon />}
+              onClick={onGoToWaitingRoom}
+              disabled={disableWaitingRoomBanner}
+              sx={{
+                bgcolor: 'white',
+                color: 'primary.main',
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                '&:hover': { bgcolor: 'grey.100' },
+              }}
+            >
+              待機室へ入室
+            </Button>
+          </Container>
+        </Box>
+      )}
 
       {/* メインコンテンツ */}
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>

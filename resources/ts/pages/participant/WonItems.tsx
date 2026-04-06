@@ -9,7 +9,6 @@ import {
   Grid,
   Chip,
   Button,
-  TextField,
   Paper,
   Tabs,
   Tab,
@@ -36,7 +35,6 @@ import {
   LocalShipping as LocalShippingIcon,
   OpenInNew as OpenInNewIcon,
   ContentCopy as CopyIcon,
-  Edit as EditIcon,
   Download as DownloadIcon,
   ExpandMore as ExpandMoreIcon,
   Event as EventIcon,
@@ -118,16 +116,6 @@ const getTrackingUrl = (trackingNumber: string, company: string) => {
 // タブ定義
 type FilterTab = 'all' | 'payment_pending' | 'shipping_pending' | 'shipped' | 'completed';
 
-interface DefaultAddress {
-  postal_code: string;
-  prefecture: string;
-  city: string;
-  address_line1: string;
-  address_line2: string;
-  name: string;
-  phone: string;
-}
-
 // PDFダウンロードヘルパー
 const downloadPdf = async (url: string, filename: string): Promise<string | null> => {
   const res = await axios.get(url, { responseType: 'blob' });
@@ -154,21 +142,7 @@ export default function WonItems() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [defaultAddress, setDefaultAddress] = useState<DefaultAddress | null>(null);
 
-  const [editAddressOpen, setEditAddressOpen] = useState(false);
-  const [editingAuctionId, setEditingAuctionId] = useState<number | null>(null);
-  const [addressForm, setAddressForm] = useState({
-    shipping_postal_code: '',
-    shipping_prefecture: '',
-    shipping_city: '',
-    shipping_address_line1: '',
-    shipping_address_line2: '',
-    shipping_name: '',
-    shipping_phone: '',
-  });
-  const [addressErrors, setAddressErrors] = useState<Record<string, string[]>>({});
-  const [saving, setSaving] = useState(false);
 
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WonItemData | null>(null);
@@ -181,7 +155,6 @@ export default function WonItems() {
 
   useEffect(() => {
     fetchWonItems();
-    fetchDefaultAddress();
   }, []);
 
   const fetchWonItems = async () => {
@@ -196,28 +169,6 @@ export default function WonItems() {
       setError('落札商品の取得に失敗しました。');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchDefaultAddress = async () => {
-    try {
-      const response = await axios.get('/api/participant/settings');
-      if (response.data.success) {
-        const p = response.data.data.profile;
-        if (p.postal_code && p.prefecture && p.city && p.address_line1) {
-          setDefaultAddress({
-            postal_code: p.postal_code || '',
-            prefecture: p.prefecture || '',
-            city: p.city || '',
-            address_line1: p.address_line1 || '',
-            address_line2: p.address_line2 || '',
-            name: p.name || '',
-            phone: p.phone || '',
-          });
-        }
-      }
-    } catch {
-      // サイレント
     }
   };
 
@@ -260,93 +211,6 @@ export default function WonItems() {
   const filteredGroups = getFilteredAuctionGroups();
   const tabCounts = getTabCounts();
 
-  const handleEditAddress = async (auctionId: number) => {
-    // オークション内の最初の落札品から既存住所を取得
-    const group = auctionGroups.find(g => g.auction?.id === auctionId);
-    const firstItemId = group?.won_items[0]?.id;
-
-    try {
-      if (firstItemId) {
-        const response = await axios.get(`/api/participant/won-items/${firstItemId}`);
-        if (response.data.success) {
-          const detail = response.data.data.won_item;
-          if (detail.shipping_postal_code) {
-            setAddressForm({
-              shipping_postal_code: detail.shipping_postal_code || '',
-              shipping_prefecture: detail.shipping_prefecture || '',
-              shipping_city: detail.shipping_city || '',
-              shipping_address_line1: detail.shipping_address_line1 || '',
-              shipping_address_line2: detail.shipping_address_line2 || '',
-              shipping_name: detail.shipping_name || '',
-              shipping_phone: detail.shipping_phone || '',
-            });
-            setEditingAuctionId(auctionId);
-            setEditAddressOpen(true);
-            return;
-          }
-        }
-      }
-    } catch {
-      // フォールバック
-    }
-
-    // 既存住所がない場合はデフォルトを使用
-    if (defaultAddress) {
-      setAddressForm({
-        shipping_postal_code: defaultAddress.postal_code,
-        shipping_prefecture: defaultAddress.prefecture,
-        shipping_city: defaultAddress.city,
-        shipping_address_line1: defaultAddress.address_line1,
-        shipping_address_line2: defaultAddress.address_line2,
-        shipping_name: defaultAddress.name,
-        shipping_phone: defaultAddress.phone,
-      });
-    } else {
-      setAddressForm({
-        shipping_postal_code: '',
-        shipping_prefecture: '',
-        shipping_city: '',
-        shipping_address_line1: '',
-        shipping_address_line2: '',
-        shipping_name: '',
-        shipping_phone: '',
-      });
-    }
-    setEditingAuctionId(auctionId);
-    setEditAddressOpen(true);
-  };
-
-  const handleSaveAddress = async () => {
-    if (!editingAuctionId) return;
-    setSaving(true);
-    setAddressErrors({});
-    try {
-      const response = await axios.put(`/api/participant/auctions/${editingAuctionId}/address`, addressForm);
-      if (response.data.success) {
-        const fee = response.data.data?.total_shipping_fee;
-        const count = response.data.data?.updated_count;
-        setSnackbar({
-          open: true,
-          message: fee
-            ? `配送先を更新しました（${count}品、配送料合計: ¥${Number(fee).toLocaleString()}）`
-            : `配送先を更新しました（${count}品）`,
-          severity: 'success',
-        });
-        setEditAddressOpen(false);
-        setEditingAuctionId(null);
-        await fetchWonItems();
-      }
-    } catch (err: any) {
-      if (err.response?.data?.errors) {
-        setAddressErrors(err.response.data.errors);
-      } else {
-        setSnackbar({ open: true, message: err.response?.data?.message || '更新に失敗しました', severity: 'error' });
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleOpenTrackingDetail = (item: WonItemData) => {
     setSelectedItem(item);
     setTrackingDetailOpen(true);
@@ -355,32 +219,6 @@ export default function WonItems() {
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
-  };
-
-  const [calculatingShipping, setCalculatingShipping] = useState<number | null>(null);
-
-  const handleCalculateShipping = async (auctionId: number) => {
-    setCalculatingShipping(auctionId);
-    try {
-      const response = await axios.post(`/api/participant/auctions/${auctionId}/calculate-shipping`);
-      if (response.data.success) {
-        const fee = response.data.data?.total_shipping_fee;
-        setSnackbar({
-          open: true,
-          message: `送料を計算しました（合計: ¥${Number(fee).toLocaleString()}）`,
-          severity: 'success',
-        });
-        await fetchWonItems();
-      }
-    } catch (err: any) {
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.message || '送料の計算に失敗しました',
-        severity: 'error',
-      });
-    } finally {
-      setCalculatingShipping(null);
-    }
   };
 
   const handleDownloadInvoice = async (auctionId: number) => {
@@ -592,38 +430,14 @@ export default function WonItems() {
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     {group.shipping.address || '未設定'}
                   </Typography>
-                  {group.shipping.can_update && auctionId && (
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => handleEditAddress(auctionId)}
-                      sx={{ fontSize: '0.75rem', ml: 'auto' }}
-                    >
-                      {group.shipping.address ? '変更' : '設定'}
-                    </Button>
-                  )}
                 </Box>
 
                 {/* オークション単位のアクションボタン */}
                 {auctionId && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {/* 送料計算ボタン */}
-                    {group.shipping.calculated ? (
+                    {/* 送料計算状態 */}
+                    {group.shipping.calculated && (
                       <Chip label="送料計算済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
-                    ) : (
-                      <Tooltip title={!group.shipping.address ? '配送先を先に設定してください' : ''}>
-                        <span>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={calculatingShipping === auctionId ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
-                            onClick={() => handleCalculateShipping(auctionId)}
-                            disabled={!group.shipping.can_calculate || calculatingShipping === auctionId}
-                          >
-                            送料計算
-                          </Button>
-                        </span>
-                      </Tooltip>
                     )}
                     {/* 請求書（送料計算後のみ） */}
                     <Tooltip title={!group.shipping.calculated ? '送料計算後にダウンロードできます' : ''}>
@@ -767,95 +581,6 @@ export default function WonItems() {
           );
         })
       )}
-
-      {/* 配送先編集ダイアログ */}
-      <Dialog open={editAddressOpen} onClose={() => setEditAddressOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>配送先住所の変更</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            ※ 入金確認前のみ変更可能です
-          </Typography>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="郵便番号"
-                value={addressForm.shipping_postal_code}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_postal_code: e.target.value })}
-                placeholder="123-4567"
-                error={!!addressErrors.shipping_postal_code}
-                helperText={addressErrors.shipping_postal_code?.[0]}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="都道府県"
-                value={addressForm.shipping_prefecture}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_prefecture: e.target.value })}
-                error={!!addressErrors.shipping_prefecture}
-                helperText={addressErrors.shipping_prefecture?.[0]}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="市区町村"
-                value={addressForm.shipping_city}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_city: e.target.value })}
-                error={!!addressErrors.shipping_city}
-                helperText={addressErrors.shipping_city?.[0]}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="番地"
-                value={addressForm.shipping_address_line1}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_address_line1: e.target.value })}
-                error={!!addressErrors.shipping_address_line1}
-                helperText={addressErrors.shipping_address_line1?.[0]}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="建物名・部屋番号（任意）"
-                value={addressForm.shipping_address_line2}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_address_line2: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="受取人氏名"
-                value={addressForm.shipping_name}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_name: e.target.value })}
-                error={!!addressErrors.shipping_name}
-                helperText={addressErrors.shipping_name?.[0]}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="電話番号"
-                value={addressForm.shipping_phone}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_phone: e.target.value })}
-                error={!!addressErrors.shipping_phone}
-                helperText={addressErrors.shipping_phone?.[0]}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditAddressOpen(false)} disabled={saving}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSaveAddress} variant="contained" disabled={saving}>
-            {saving ? <CircularProgress size={24} /> : '保存'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* 配送詳細ダイアログ */}
       <Dialog open={trackingDetailOpen} onClose={() => setTrackingDetailOpen(false)} maxWidth="sm" fullWidth>

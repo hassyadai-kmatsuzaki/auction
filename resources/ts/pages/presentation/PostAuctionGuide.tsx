@@ -23,7 +23,6 @@ import {
   LocalShipping as LocalShippingIcon,
   OpenInNew as OpenInNewIcon,
   ContentCopy as CopyIcon,
-  Edit as EditIcon,
   ArrowForward as ArrowForwardIcon,
   ArrowBack as ArrowBackIcon,
   Home as HomeIcon,
@@ -196,14 +195,7 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
   const [activeTab, setActiveTab] = useState('all');
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MockWonItem | null>(null);
-  const [editAddressOpen, setEditAddressOpen] = useState(false);
-  const [addressForm, setAddressForm] = useState({
-    shipping_postal_code: '', shipping_prefecture: '', shipping_city: '',
-    shipping_address_line1: '', shipping_address_line2: '', shipping_name: '', shipping_phone: '',
-  });
-  const [shippingAddress, setShippingAddress] = useState('〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101');
-  const [shippingCalculated, setShippingCalculated] = useState(false);
-  const [calculatingShipping, setCalculatingShipping] = useState(false);
+  const shippingAddress = '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101';
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   // Generate mock data from actual won items
@@ -263,35 +255,9 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
     completed: allItems.filter(i => i.delivery_status === 'completed').length,
   };
 
-  const handleEditAddress = () => {
-    setAddressForm({
-      shipping_postal_code: '150-0001', shipping_prefecture: '東京都',
-      shipping_city: '渋谷区', shipping_address_line1: '神宮前1-2-3',
-      shipping_address_line2: 'メダカハイツ101', shipping_name: 'デモ ユーザー', shipping_phone: '090-1234-5678',
-    });
-    setEditAddressOpen(true);
-  };
-
-  const handleSaveAddress = () => {
-    const addr = `〒${addressForm.shipping_postal_code} ${addressForm.shipping_prefecture}${addressForm.shipping_city}${addressForm.shipping_address_line1} ${addressForm.shipping_address_line2}`;
-    setShippingAddress(addr);
-    setSnackbar({ open: true, message: `配送先を更新しました（${allItems.length}品）`, severity: 'success' });
-    setEditAddressOpen(false);
-  };
-
   const handleCopy = (text: string) => {
     navigator.clipboard?.writeText(text);
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
-  };
-
-  const MOCK_SHIPPING_FEE = 1200;
-  const handleCalculateShipping = () => {
-    setCalculatingShipping(true);
-    setTimeout(() => {
-      setCalculatingShipping(false);
-      setShippingCalculated(true);
-      setSnackbar({ open: true, message: `送料を計算しました（合計: ¥${MOCK_SHIPPING_FEE.toLocaleString()}）`, severity: 'success' });
-    }, 1500);
   };
 
   if (wonItems.length === 0) {
@@ -400,25 +366,8 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
               <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
               <Typography variant="body2" sx={{ fontWeight: 600 }}>配送先:</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>{shippingAddress}</Typography>
-              <Button size="small" startIcon={<EditIcon />} onClick={handleEditAddress} sx={{ fontSize: '0.75rem', ml: 'auto' }}>
-                変更
-              </Button>
-              {shippingCalculated ? (
-                <Chip label="送料計算済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
-              ) : (
-                <Tooltip title={shippingAddress === '未設定' ? '配送先を先に設定してください' : ''}>
-                  <span>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={calculatingShipping ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
-                      onClick={handleCalculateShipping}
-                      disabled={shippingAddress === '未設定' || calculatingShipping}
-                    >
-                      送料計算
-                    </Button>
-                  </span>
-                </Tooltip>
+              {shippingCalculated && (
+                <Chip label="送料計算済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600, ml: 'auto' }} />
               )}
             </Box>
 
@@ -526,50 +475,6 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
           </AccordionDetails>
         </Accordion>
       )}
-
-      {/* 配送先編集ダイアログ — 実際と同じ */}
-      <Dialog open={editAddressOpen} onClose={() => setEditAddressOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>配送先住所の変更</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            ※ 入金確認前のみ変更可能です
-          </Typography>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="郵便番号" value={addressForm.shipping_postal_code} placeholder="123-4567"
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_postal_code: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="都道府県" value={addressForm.shipping_prefecture}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_prefecture: e.target.value })} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth label="市区町村" value={addressForm.shipping_city}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_city: e.target.value })} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth label="番地" value={addressForm.shipping_address_line1}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_address_line1: e.target.value })} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth label="建物名・部屋番号（任意）" value={addressForm.shipping_address_line2}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_address_line2: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="受取人氏名" value={addressForm.shipping_name}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_name: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth label="電話番号" value={addressForm.shipping_phone}
-                onChange={(e) => setAddressForm({ ...addressForm, shipping_phone: e.target.value })} />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditAddressOpen(false)}>キャンセル</Button>
-          <Button onClick={handleSaveAddress} variant="contained">保存</Button>
-        </DialogActions>
-      </Dialog>
 
       {/* 配送詳細ダイアログ — 実際と同じ */}
       <Dialog open={trackingDetailOpen} onClose={() => setTrackingDetailOpen(false)} maxWidth="sm" fullWidth>
