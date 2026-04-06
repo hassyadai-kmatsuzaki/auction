@@ -723,8 +723,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           </Box>
         </Container>
 
-        {/* Tour popover */}
-        {tourActive && (
+        {/* Tour popover — 指値モーダルが開いている間は非表示 */}
+        {tourActive && !limitModalLaneId && (
           <DemoTourPopover
             steps={tourSteps}
             activeStep={tourStep}
