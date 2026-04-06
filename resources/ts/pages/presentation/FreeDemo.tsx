@@ -241,7 +241,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
       // フリーズ開始 → 完了後にカウントダウン再開 + 次のCPU入札をスケジュール
       startFreeze(laneId, () => {
-        startCountdown(laneId, 15);
+        startCountdown(laneId, 8);
         scheduleCpuBid(laneId);
       });
     }, delay);
@@ -276,7 +276,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     setLanes(prev => prev.map(l =>
       l.lane_id === laneId ? {
         ...l,
-        current_item: { ...nextItem, phase: 'pre_bid' as const, pre_bid_remaining_seconds: 3, countdown_seconds: 15, my_bid_status: null, active_bidders_count: 0 }
+        current_item: { ...nextItem, phase: 'pre_bid' as const, pre_bid_remaining_seconds: 3, countdown_seconds: 8, my_bid_status: null, active_bidders_count: 0 }
       } : l
     ));
 
@@ -287,7 +287,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       if (remaining <= 0) {
         clearInterval(preBidTimer);
         updateLaneItem(laneId, item => ({ ...item, phase: 'bidding', pre_bid_remaining_seconds: 0 }));
-        startCountdown(laneId, 15);
+        startCountdown(laneId, 8);
         // pre_bid完了後にCPU入札を開始
         scheduleCpuBid(laneId);
         transitioningRef.current.delete(laneId);
@@ -344,7 +344,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   useEffect(() => {
     if (phase !== 'auction') return;
     [1, 2].forEach(laneId => {
-      startCountdown(laneId, 15);
+      startCountdown(laneId, 8);
       // 各レーンのCPU入札を開始（初回は1〜3秒後にランダム開始）
       const initialDelay = 1000 + Math.random() * 2000;
       const t = setTimeout(() => {
@@ -401,7 +401,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
       // フリーズ開始 → 完了後にカウントダウン再開 + CPU入札再開
       startFreeze(lane.lane_id, () => {
-        startCountdown(lane.lane_id, 15);
+        startCountdown(lane.lane_id, 8);
         scheduleCpuBid(lane.lane_id);
       });
     }

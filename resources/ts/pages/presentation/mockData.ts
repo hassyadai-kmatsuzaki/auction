@@ -14,7 +14,7 @@ export const makeLaneItem = (overrides: Partial<LaneItem> & { id: number; specie
   quantity: 2,
   quantity_unit: 'fish',
   active_bidders_count: 0,
-  countdown_seconds: 15,
+  countdown_seconds: 8,
   my_bid_status: null,
   is_premium: false,
   thumbnail_path: '/img/noimage.png',

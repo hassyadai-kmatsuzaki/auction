@@ -407,7 +407,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     // ── POST-AUCTION phase (steps 18-23) ──
     { targetRef: postAuctionNavRef as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: 'bottom', waitForAction: '「落札管理」をタップ' },
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
-    { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡、配送先の変更ができます。', placement: 'bottom' },
+    { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
     { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブでプロフィールや通知設定を管理できます。', placement: 'bottom',
       autoAction: () => { setPostAuctionTab('settings'); setSettingsSubTab(undefined); },
       autoActionDelay: 500,

@@ -90,11 +90,11 @@ export const DemoTourPopover: React.FC<Props> = ({
     setExpanded(false);
   }, [activeStep]);
 
-  // waitForAction時: ターゲット要素とその親をオーバーレイ(z-index:1400)の上に持ち上げる
+  // waitForAction時: ターゲット要素と全ての祖先をオーバーレイ(z-index:1400)の上に持ち上げる
+  // 深いDOM階層でもスポットライト領域がクリック可能になるよう、bodyまで辿る
   useEffect(() => {
     if (!step?.waitForAction || !step.targetRef.current) return;
     const el = step.targetRef.current;
-    const parent = el.parentElement;
 
     const saved: { node: HTMLElement; zIndex: string; position: string }[] = [];
     const raise = (node: HTMLElement) => {
@@ -104,8 +104,13 @@ export const DemoTourPopover: React.FC<Props> = ({
         node.style.position = 'relative';
       }
     };
-    raise(el);
-    if (parent && parent !== document.body) raise(parent);
+
+    // ターゲットからbodyまで全祖先を持ち上げる
+    let current: HTMLElement | null = el;
+    while (current && current !== document.body) {
+      raise(current);
+      current = current.parentElement;
+    }
 
     return () => {
       saved.forEach(({ node, zIndex, position }) => {
@@ -659,6 +664,73 @@ export const DemoTourPopover: React.FC<Props> = ({
             {/* ナビゲーションボタン */}
             <Box sx={{ mt: autoPlayingIndicator ? 0 : 1 }}>
               {navButtons}
+            </Box>
+          </Box>
+        </Paper>
+      </>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // デスクトップ: 最終ステップ（中央表示の完了カード）
+  // ════════════════════════════════════════════
+  if (isLastStep && !position.spotlightRect) {
+    return (
+      <>
+        {spotlightBackdrop}
+        <Paper
+          elevation={24}
+          sx={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 420,
+            maxWidth: 'calc(100vw - 48px)',
+            zIndex: 1401,
+            borderRadius: 4,
+            overflow: 'hidden',
+            animation: 'completionPop 0.4s ease-out',
+            '@keyframes completionPop': {
+              '0%': { opacity: 0, transform: 'translate(-50%, -50%) scale(0.85)' },
+              '100%': { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' },
+            },
+          }}
+        >
+          {/* Progress bar */}
+          <LinearProgress variant="determinate" value={100} color="success" sx={{ height: 5 }} />
+
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>🎉</Typography>
+            <Typography variant="h5" fontWeight={800} sx={{ mb: 1 }}>
+              {step.title}
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3, lineHeight: 1.8, whiteSpace: 'pre-line' }}>
+              {step.description}
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center' }}>
+              {onSignup && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="large"
+                  onClick={onSignup}
+                  fullWidth
+                  sx={{ fontWeight: 700, py: 1.2, fontSize: '1rem' }}
+                >
+                  アカウント作成に進む
+                </Button>
+              )}
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={onReset}
+                fullWidth
+                sx={{ fontWeight: 600 }}
+              >
+                デモTOPに戻る
+              </Button>
             </Box>
           </Box>
         </Paper>

@@ -13,20 +13,31 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
     const end = Date.now() + duration;
     const colors = ['#ff0000', '#ff6600', '#ffcc00', '#00cc00', '#0066ff', '#9900ff', '#ff69b4'];
 
+    // canvas-confettiが生成するcanvasをオーバーレイより上に表示
+    const fixCanvasZIndex = () => {
+      document.querySelectorAll('canvas').forEach(c => {
+        if (c.style.position === 'fixed' && c.style.pointerEvents === 'none') {
+          c.style.zIndex = '1403';
+        }
+      });
+    };
+
     const frame = () => {
       confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0, y: 0.7 }, colors });
       confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors });
+      fixCanvasZIndex();
       if (Date.now() < end) requestAnimationFrame(frame);
     };
     frame();
     confetti({ particleCount: 150, spread: 100, origin: { x: 0.5, y: 0.5 }, colors });
+    fixCanvasZIndex();
   }, []);
 
   return (
     <Box
       sx={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 1400, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1402, display: 'flex', alignItems: 'center', justifyContent: 'center',
         pointerEvents: 'none',
       }}
     >
