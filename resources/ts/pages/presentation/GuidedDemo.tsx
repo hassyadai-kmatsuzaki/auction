@@ -35,6 +35,7 @@ import {
   MOCK_AUCTIONS,
   type WonEntry,
 } from './mockData';
+import { calculatePriceIncrement } from './cpuBidder';
 
 type GuidedPhase = 'home' | 'items' | 'favorites' | 'waiting' | 'auction' | 'post-auction';
 
@@ -50,7 +51,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [phase, setPhase] = useState<GuidedPhase>('home');
 
   // ─── Auction state ───
-  const [lanes, setLanes] = useState<LiveLane[]>(JSON.parse(JSON.stringify(GUIDED_INITIAL_LANES)));
+  const [lanes, setLanes] = useState<LiveLane[]>(() => {
+    const initial: LiveLane[] = JSON.parse(JSON.stringify(GUIDED_INITIAL_LANES));
+    // ガイドデモではカウントダウン8秒表示（タイマーは入札時まで開始しない）
+    initial.forEach(l => { if (l.current_item) l.current_item.countdown_seconds = 8; });
+    return initial;
+  });
   const [upcoming, setUpcoming] = useState(GUIDED_UPCOMING.map(u => ({ ...u })));
   const [wonItems, setWonItems] = useState<WonEntry[]>([]);
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
@@ -60,6 +66,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [tourStep, setTourStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
+  // 入札合戦のラウンド数（step 13で使用）
+  const battleRoundRef = useRef(0);
 
   // Post-auction controlled tab
   const [postAuctionTab, setPostAuctionTab] = useState<string>('won-items');
@@ -198,7 +206,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const simulateOpponentBid = useCallback((laneId: number) => {
     stopTimer(laneId);
     updateLaneItem(laneId, item => {
-      const inc = Math.max(100, Math.round(item.current_price * 0.1));
+      const inc = calculatePriceIncrement(item.current_price);
       return {
         ...item,
         phase: 'freeze' as const,
@@ -212,75 +220,15 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     });
     notify('他の参加者が入札！価格が上昇しました', 'warning');
     runFreeze(laneId, 3, () => {
-      startCountdown(laneId, 15);
+      startCountdown(laneId, 8);
     });
   }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
 
-  // 入札合戦: 自動で複数ラウンドの攻防を再現
-  // ラウンド: 相手入札→フリーズ→自分入札→フリーズ→（繰り返し）
-  const simulateMultiRoundBattle = useCallback((laneId: number) => {
-    const totalRounds = 3;
-    let round = 0;
-
-    const doOpponentBid = () => {
-      stopTimer(laneId);
-      updateLaneItem(laneId, item => {
-        const inc = Math.max(100, Math.round(item.current_price * 0.1));
-        return {
-          ...item,
-          phase: 'freeze' as const,
-          freeze_remaining_seconds: 2,
-          freeze_countdown_seconds: 2,
-          current_price: item.current_price + inc,
-          active_bidders_count: Math.max(2, item.active_bidders_count),
-          my_bid_status: 'inactive' as const,
-        };
-      });
-      notify(`相手が入札！（${round + 1}/${totalRounds}ラウンド）`, 'warning');
-      runFreeze(laneId, 2, () => {
-        // フリーズ解除後、自分が自動入札
-        setTimeout(() => doUserBid(), 800);
-      });
-    };
-
-    const doUserBid = () => {
-      stopTimer(laneId);
-      updateLaneItem(laneId, item => {
-        const inc = Math.max(100, Math.round(item.current_price * 0.1));
-        return {
-          ...item,
-          phase: 'freeze' as const,
-          freeze_remaining_seconds: 2,
-          freeze_countdown_seconds: 2,
-          current_price: item.current_price + inc,
-          active_bidders_count: Math.max(2, item.active_bidders_count),
-          my_bid_status: 'active' as const,
-        };
-      });
-      notify('あなたが入札しました！', 'success');
-      runFreeze(laneId, 2, () => {
-        round++;
-        if (round < totalRounds) {
-          startCountdown(laneId, 15);
-          // 次ラウンドの相手入札（1秒後）
-          setTimeout(() => doOpponentBid(), 1000);
-        } else {
-          // 最終ラウンド完了 → ユーザーがactive状態でカウントダウン再開
-          startCountdown(laneId, 15);
-          notify('入札合戦が終了しました！あなたが最高入札者です', 'success');
-        }
-      });
-    };
-
-    // 最初の相手入札で合戦開始
-    doOpponentBid();
-  }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
-
-  // 旧simulateBattleCycle（handleBidToggle内のstep 13から呼ばれる場合のフォールバック）
-  const simulateBattleCycle = useCallback((laneId: number) => {
+  // 入札合戦(step 13): CPUが入札を返してくる（ユーザーの入札後に自動発動）
+  const simulateBattleResponse = useCallback((laneId: number) => {
     stopTimer(laneId);
     updateLaneItem(laneId, item => {
-      const inc = Math.max(100, Math.round(item.current_price * 0.1));
+      const inc = calculatePriceIncrement(item.current_price);
       return {
         ...item,
         phase: 'freeze' as const,
@@ -293,9 +241,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     });
     notify('他の参加者が入札！フリーズ中...', 'warning');
     runFreeze(laneId, 3, () => {
-      updateLaneItem(laneId, item => ({ ...item, my_bid_status: 'inactive' }));
-      startCountdown(laneId, 15);
-      notify('入札が解除されました。再度入札してください！', 'info');
+      startCountdown(laneId, 8);
+      notify('フリーズ解除！再度入札してください', 'info');
     });
   }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
 
@@ -318,7 +265,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     let currentPrice = lane1!.current_item!.current_price;
     const steps: number[] = [];
     while (currentPrice < limitPrice) {
-      const inc = Math.max(100, Math.round(currentPrice * 0.1));
+      const inc = calculatePriceIncrement(currentPrice);
       currentPrice += inc;
       steps.push(currentPrice);
     }
@@ -349,16 +296,26 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       notify('入札をオフにしました', 'info');
     } else {
       updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'active', active_bidders_count: i.active_bidders_count + 1 }));
-      startCountdown(lane.lane_id, 15);
+      startCountdown(lane.lane_id, 8);
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
       if (tourActive && tourStep === 11) {
-        setTimeout(() => goToStepRef.current(12), 1200);  // bid step → opponent bid
+        // step 11: 初回入札 → 次のステップへ
+        setTimeout(() => goToStepRef.current(12), 1200);
       }
       if (tourActive && tourStep === 13) {
-        setTimeout(() => simulateBattleCycle(lane.lane_id), 2000);  // battle step
+        // step 13: 入札合戦 — ユーザーが入札したらCPUが反撃
+        battleRoundRef.current += 1;
+        if (battleRoundRef.current >= 3) {
+          // 3ラウンド完了 → 次のステップへ
+          notify('入札合戦完了！次のステップに進みます', 'success');
+          setTimeout(() => goToStepRef.current(14), 1500);
+        } else {
+          // CPUが反撃（1.5秒後に入札を返す）
+          setTimeout(() => simulateBattleResponse(lane.lane_id), 1500);
+        }
       }
     }
-  }, [lanes, notify, updateLaneItem, startCountdown, tourActive, tourStep, simulateBattleCycle]);
+  }, [lanes, notify, updateLaneItem, startCountdown, tourActive, tourStep, simulateBattleResponse]);
 
   // ─── Limit ───
 
@@ -430,7 +387,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
     // ── ITEMS phase (steps 2-5) ──
     { targetRef: itemsHeaderRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。各商品に指値（上限価格）やお気に入りを設定できます。', placement: 'bottom' },
-    { targetRef: firstItemCardRef as React.RefObject<HTMLElement | null>, title: '商品の詳細を見てみよう', description: '商品カードをタップすると、写真や検査情報などの詳細を確認できます。タップしてみましょう。', placement: 'bottom', waitForAction: '商品カードをタップ' },
+    { targetRef: firstItemCardRef as React.RefObject<HTMLElement | null>, title: '商品の詳細を見てみよう', description: '商品カードの「詳細」チップをタップすると、写真や検査情報などの詳細を確認できます。', placement: 'bottom', waitForAction: '「詳細」チップをタップ' },
     { targetRef: firstItemFavoriteRef as React.RefObject<HTMLElement | null>, title: 'お気に入りに追加しよう', description: '気になる商品のハートアイコンをタップして、お気に入りに追加してみましょう。', placement: 'right', waitForAction: 'ハートアイコンをタップ' },
     { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ' },
 
@@ -443,8 +400,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: demoHeaderRef, title: 'オークション体験デモへようこそ！', description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。最大3つのレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきた！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦とフリーズ', description: '3ラウンドの入札合戦を自動再現します。価格上昇直後は「フリーズ」で誤タップを防ぎ、解除後に入札できるようになります。', placement: 'bottom', autoAction: () => { simulateMultiRoundBattle(1); }, autoActionDelay: 20000, autoActionLabel: '入札合戦を開始（3ラウンド）' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきます！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、3回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値が発動！自動入札オフ', description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateLimitTrigger(); }, autoActionDelay: 6000, autoActionLabel: '指値発動を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン1を落札します。紙吹雪の落札演出をお楽しみください！', placement: 'bottom', autoAction: () => { updateLaneItem(1, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(1), 500); }, autoActionDelay: 4500, autoActionLabel: '落札する' },
@@ -455,12 +412,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡、配送先の変更ができます。', placement: 'bottom' },
     { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブでプロフィールや通知設定を管理できます。', placement: 'bottom',
-      autoAction: () => { setPostAuctionTab('settings'); setSettingsSubTab(0); },
+      autoAction: () => { setPostAuctionTab('settings'); setSettingsSubTab(undefined); },
       autoActionDelay: 500,
     },
-    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。テスト送信も可能です。', placement: 'bottom',
+    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。テスト送信も可能です。', placement: 'top',
       autoAction: () => { setSettingsSubTab(1); },
-      autoActionDelay: 500,
+      autoActionDelay: 800,
     },
     { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
   ];
@@ -478,16 +435,11 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   const goToStep = useCallback((targetStep: number) => {
     if (targetStep < 0 || targetStep >= tourSteps.length) {
-      // Tour complete
       if (targetStep >= tourSteps.length) {
         setTourActive(false);
       }
       return;
     }
-    // Handle phase transitions
-    // 前進時のwaitForActionステップへの遷移はフェーズ変更しない
-    // （ユーザーのアクション自体がフェーズ遷移を担当するため）
-    // 後退時は常にフェーズ変更する
     const targetPhase = getPhaseForStep(targetStep);
     const targetStepDef = tourSteps[targetStep];
     const isForward = targetStep > tourStep;
@@ -495,13 +447,49 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       setPhase(targetPhase);
     }
 
-    // Cleanup from battle+freeze step (auction step 13)
+    // ── 後退時: オークションステップの状態をリセット ──
+    if (!isForward && targetStep <= 12) {
+      // step 9-12 に戻る場合: レーン1の価格・入札状態を初期値に戻す
+      stopTimer(1);
+      const initialItem = GUIDED_INITIAL_LANES[0].current_item!;
+      setLanes(prev => prev.map(l =>
+        l.lane_id === 1 ? {
+          ...l,
+          current_item: l.current_item ? {
+            ...l.current_item,
+            current_price: initialItem.current_price,
+            my_bid_status: null,
+            active_bidders_count: 0,
+            my_limit_price: null,
+            my_limit_triggered: false,
+            phase: 'bidding' as const,
+            freeze_remaining_seconds: 0,
+            countdown_seconds: 8,
+          } : l.current_item,
+        } : l
+      ));
+      // 入札合戦ラウンドもリセット
+      battleRoundRef.current = 0;
+      // 落札結果もリセット
+      setWonItems([]);
+      setCelebration(null);
+    }
+
+    // step 13 の cleanup
     if (tourStep === 13 && targetStep !== 13) {
       updateLaneItem(1, item => ({ ...item, phase: 'bidding', freeze_remaining_seconds: 0 }));
-      startCountdown(1, 15);
+      if (targetStep > 13) {
+        startCountdown(1, 8);
+      }
     }
+
+    // step 13 に入るときはラウンドリセット
+    if (targetStep === 13 && tourStep !== 13) {
+      battleRoundRef.current = 0;
+    }
+
     setTourStep(targetStep);
-  }, [tourStep, tourSteps, updateLaneItem, startCountdown, phase]);
+  }, [tourStep, tourSteps, updateLaneItem, startCountdown, stopTimer, phase]);
 
   goToStepRef.current = goToStep;
 
@@ -608,6 +596,10 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     }
   }, [tourActive, tourStep]);
 
+  const handleSignup = useCallback(() => {
+    window.location.href = '/register';
+  }, []);
+
   // Shared tour popover element (rendered in non-auction phases)
   const tourPopoverElement = tourActive ? (
     <DemoTourPopover
@@ -618,6 +610,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       onReset={onBackToTop}
       isAutoPlaying={isAutoPlaying}
       onExecuteAction={handleExecuteAction}
+      onSignup={handleSignup}
     />
   ) : null;
 
@@ -642,7 +635,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'favorites') {
     return (
       <DemoLayout currentPage="favorites" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8}>
-        <DemoFavorites onNavigateToAuctions={() => setPhase('items')} />
+        <DemoFavorites onNavigateToAuctions={() => setPhase('items')} blockNonLimitActions={tourActive} />
         {tourPopoverElement}
       </DemoLayout>
     );
@@ -826,6 +819,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             onReset={onBackToTop}
             isAutoPlaying={isAutoPlaying}
             onExecuteAction={handleExecuteAction}
+            onSignup={handleSignup}
           />
         )}
 

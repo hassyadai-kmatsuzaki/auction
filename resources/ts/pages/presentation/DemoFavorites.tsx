@@ -21,9 +21,11 @@ type MockItem = typeof MOCK_ITEMS[0];
 interface DemoFavoritesProps {
   onNavigateToAuctions: () => void;
   onLimitSet?: () => void;
+  /** ツアー中のインタラクション制限（指値設定以外をブロック） */
+  blockNonLimitActions?: boolean;
 }
 
-export function DemoFavorites({ onNavigateToAuctions, onLimitSet }: DemoFavoritesProps) {
+export function DemoFavorites({ onNavigateToAuctions, onLimitSet, blockNonLimitActions = false }: DemoFavoritesProps) {
   // デモ用: 最初から数件お気に入り登録済み
   const [favoriteItemIds, setFavoriteItemIds] = useState<Set<number>>(new Set([1, 2, 5, 7]));
   const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
@@ -91,13 +93,14 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSet }: DemoFavorite
             const s = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
             return (
               <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
-                <Card onClick={() => setSelectedItem(item)} sx={{
-                  cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s',
+                <Card onClick={() => { if (!blockNonLimitActions) setSelectedItem(item); }} sx={{
+                  cursor: blockNonLimitActions ? 'default' : 'pointer',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
                   position: 'relative', borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
+                  ...(!blockNonLimitActions && { '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }),
                 }}>
                   {/* お気に入り解除ボタン */}
-                  <IconButton onClick={(e) => handleRemoveFavorite(e, item.id)} size="small"
+                  <IconButton onClick={(e) => { if (blockNonLimitActions) { e.stopPropagation(); return; } handleRemoveFavorite(e, item.id); }} size="small"
                     sx={{
                       position: 'absolute', top: 4, left: 4, zIndex: 2,
                       bgcolor: 'rgba(255,255,255,0.85)', '&:hover': { bgcolor: 'rgba(255,255,255,1)' },

@@ -179,8 +179,8 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
-                  onClick={() => { setSelectedItem(item); onItemDetailOpened?.(); }}
                   onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)}
+                  onInfoClick={(e) => { e.stopPropagation(); setSelectedItem(item); onItemDetailOpened?.(); }}
                   favoriteButtonTourTarget={idx === 0 ? 'items-first-favorite' : undefined}
                 />
                 {/* 指値バッジ（カード下部に独立して配置）— 実際と同じ */}

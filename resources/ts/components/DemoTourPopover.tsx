@@ -42,6 +42,8 @@ interface Props {
   isAutoPlaying?: boolean;
   /** autoActionの実行ボタンが押された時 */
   onExecuteAction?: () => void;
+  /** アカウント作成ボタンが押された時 */
+  onSignup?: () => void;
 }
 
 const POPOVER_WIDTH = 340;
@@ -58,6 +60,7 @@ export const DemoTourPopover: React.FC<Props> = ({
   onReset,
   isAutoPlaying = false,
   onExecuteAction,
+  onSignup,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -442,14 +445,26 @@ export const DemoTourPopover: React.FC<Props> = ({
       </Button>
 
       {isLastStep ? (
-        <Button
-          size="small"
-          variant="contained"
-          onClick={onReset}
-          disabled={isAutoPlaying}
-        >
-          デモTOPに戻る
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={onReset}
+            disabled={isAutoPlaying}
+          >
+            デモTOPに戻る
+          </Button>
+          {onSignup && (
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={onSignup}
+            >
+              アカウント作成に進む
+            </Button>
+          )}
+        </Box>
       ) : step.waitForAction ? (
         <Box
           sx={{

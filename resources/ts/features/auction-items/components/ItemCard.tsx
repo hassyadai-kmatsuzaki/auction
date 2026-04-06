@@ -2,7 +2,11 @@ import React from 'react';
 import {
   Card, CardMedia, CardContent, Box, Typography, Chip, IconButton,
 } from '@mui/material';
-import { Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon } from '@mui/icons-material';
+import {
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
+  Info as InfoIcon,
+} from '@mui/icons-material';
 
 interface ItemData {
   id: number;
@@ -28,21 +32,23 @@ const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary
 interface Props {
   item: ItemData;
   isFavorited: boolean;
-  onClick: () => void;
+  onClick?: () => void;
   onFavoriteToggle: (e: React.MouseEvent) => void;
+  /** 詳細ボタン（infoアイコン）クリック時のコールバック */
+  onInfoClick?: (e: React.MouseEvent) => void;
   /** ツアー用: ハートアイコンに data-tour-target を付与 */
   favoriteButtonTourTarget?: string;
 }
 
-export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, favoriteButtonTourTarget }: Props) => {
+export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, onInfoClick, favoriteButtonTourTarget }: Props) => {
   const status = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
 
   return (
     <Card
       sx={{
-        height: '100%', cursor: 'pointer', position: 'relative',
+        height: '100%', position: 'relative',
         transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
+        ...(onClick && { cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }),
       }}
       onClick={onClick}
     >
@@ -81,6 +87,19 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }} noWrap>
             {item.inspection_info}
           </Typography>
+        )}
+        {onInfoClick && (
+          <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <Chip
+              icon={<InfoIcon sx={{ fontSize: 16 }} />}
+              label="詳細"
+              size="small"
+              color="primary"
+              variant="outlined"
+              onClick={onInfoClick}
+              sx={{ cursor: 'pointer' }}
+            />
+          </Box>
         )}
       </CardContent>
     </Card>
