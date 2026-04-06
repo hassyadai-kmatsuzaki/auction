@@ -384,10 +384,17 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       description: 'お気に入りの確認ができました。次はオークション会場へ進みましょう。',
       placement: 'bottom',
       autoAction: () => {
+        // 待機室へ遷移 — ツアーを一時停止し、DemoWaitingRoomの
+        // onAuctionStart経由でhandleAuctionStartが呼ばれるまで待つ。
+        // autoActionDelay後のgoToStep(9)による自動遷移を防ぐため
+        // isAutoPlayingは手動でリセットする。
         setPhase('waiting');
         setTourActive(false);
+        setIsAutoPlaying(false);
       },
-      autoActionDelay: 500,
+      // autoActionDelayを設定しない = handleExecuteActionの自動advance無効化のため
+      // 代わりにautoAction内で直接isAutoPlayingをfalseにする
+      autoActionDelay: 0,
       autoActionLabel: '待機室へ進む',
     },
 
@@ -432,10 +439,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       return;
     }
     // Handle phase transitions
+    // ただしwaitForActionステップへの遷移時は自動でフェーズ変更しない
+    // （ユーザーのアクション自体がフェーズ遷移を担当するため）
     const targetPhase = getPhaseForStep(targetStep);
-    if (targetPhase !== phase) {
+    const targetStepDef = tourSteps[targetStep];
+    if (targetPhase !== phase && !targetStepDef?.waitForAction) {
       setPhase(targetPhase);
-      // For waiting phase transition (items->waiting->auction), handled separately
     }
 
     // Cleanup from freeze step (auction step 14)
@@ -453,11 +462,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     if (step?.autoAction) {
       setIsAutoPlaying(true);
       step.autoAction();
-      // After action completes, auto-advance to next step
-      setTimeout(() => {
-        setIsAutoPlaying(false);
-        goToStep(tourStep + 1);
-      }, step.autoActionDelay || 1500);
+      const delay = step.autoActionDelay;
+      // delay === 0 はアクション内で完結する（待機室遷移など）ため自動advanceしない
+      if (delay !== 0) {
+        setTimeout(() => {
+          setIsAutoPlaying(false);
+          goToStep(tourStep + 1);
+        }, delay || 1500);
+      }
     }
   }, [tourStep, tourSteps, goToStep]);
 
