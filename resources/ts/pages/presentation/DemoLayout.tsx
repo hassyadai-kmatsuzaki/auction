@@ -70,7 +70,7 @@ export function DemoLayout({ currentPage, onNavigate, children }: DemoLayoutProp
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box
               component="img"
-              src="/img/logo.png"
+              src="/img/logo.png?v=1"
               alt="MEDAKA AUCTION PORT"
               onClick={() => { setDrawerOpen(false); onNavigate('home'); }}
               sx={{

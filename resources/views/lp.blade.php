@@ -26,7 +26,7 @@
 <header class="header" id="header">
   <div class="header__inner">
     <a href="/" class="header__logo">
-      <img src="/img/logo.png" alt="日本メダカオンライン市場" class="header__logo-img">
+      <img src="/img/logo.png?v=1" alt="日本メダカオンライン市場" class="header__logo-img">
     </a>
     <div class="header__right">
       <a href="/login" class="header__btn header__btn--login">ログイン</a>
@@ -41,22 +41,18 @@
 
 <!-- ===== HERO ===== -->
 <section class="hero">
-  <div class="hero__noise"></div>
-  <div class="hero__deco-text" aria-hidden="true">MEDAICHI</div>
   <div class="hero__inner">
     <div class="hero__left">
-      <h1 class="hero__title hero-anim" data-hero-delay="1">
-        <span class="hero__title-line">信頼できる</span>
-        <span class="hero__title-line">出品者からあなたへ</span>
-        <span class="hero__title-accent hero-anim" data-hero-delay="2">めだか専門<br>オークション。</span>
+      <p class="hero__sub hero-anim" data-hero-delay="1">審査制出品者のみ。プロ品質の選魚、めだか専門オークション</p>
+      <h1 class="hero__title hero-anim" data-hero-delay="2">
+        <span class="hero__title-accent">信頼できる<br>出品者から<br>あなたへ届く</span>
       </h1>
-      <p class="hero__sub hero-anim" data-hero-delay="3">その地方のリーダーの最新世代・最新品種が、<br>ここに集まる。</p>
-      <div class="hero__tags hero-anim" data-hero-delay="4">
+      <div class="hero__tags hero-anim" data-hero-delay="3">
         <span>審査制出品者のみ</span>
         <span>プロ品質の選魚</span>
         <span>めだか専門特化</span>
       </div>
-      <div class="hero__action hero-anim" data-hero-delay="5">
+      <div class="hero__action hero-anim" data-hero-delay="4">
         <a href="/register" class="btn-primary">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           無料で新規登録する
@@ -65,24 +61,17 @@
     </div>
     <div class="hero__right hero-anim" data-hero-delay="2">
       <div class="hero__visual">
-        <div class="hero__img-full">
+        <div class="hero__blob hero__blob--1" aria-hidden="true"></div>
+        <div class="hero__blob hero__blob--2" aria-hidden="true"></div>
+        <div class="hero__blob hero__blob--3" aria-hidden="true"></div>
+        <div class="hero__img-main">
           <img src="/img/lp/AdobeStock_194803795.jpeg" alt="めだか" loading="eager">
+        </div>
+        <div class="hero__img-sub">
+          <img src="/img/lp/AdobeStock_501966175.jpeg" alt="めだか" loading="eager">
         </div>
       </div>
     </div>
-  </div>
-  <!-- Marquee -->
-  <div class="hero__marquee" aria-hidden="true">
-    <div class="hero__marquee-track">
-      <span>MEDAKA ONLINE AUCTION</span>
-      <span>MEDAKA ONLINE AUCTION</span>
-      <span>MEDAKA ONLINE AUCTION</span>
-      <span>MEDAKA ONLINE AUCTION</span>
-    </div>
-  </div>
-  <div class="hero__scroll">
-    <span>SCROLL</span>
-    <div class="hero__scroll-line"></div>
   </div>
 </section>
 
@@ -264,49 +253,61 @@
 <!-- ===== PRICING ===== -->
 <section class="section section--pricing" id="pricing">
   <div class="container">
-    <div class="section__header anim" data-anim="fade-up">
+    <div class="section__header section__header--center anim" data-anim="fade-up">
       <span class="section__num">005</span>
       <span class="section__en">PRICE</span>
-      <h2 class="section__title">料金体系</h2>
+      <h2 class="section__title">入会金・年会費・落札手数料が<span class="pricing-title-zero">0</span>円</h2>
     </div>
 
-    <div class="pricing-hero anim" data-anim="fade-up">
-      <span class="pricing-hero__badge">ローンチキャンペーン実施中</span>
-      <p class="pricing-hero__label">入会金</p>
-      <p class="pricing-hero__old">&yen;100,000</p>
-      <div class="pricing-hero__arrow">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    <div class="pricing-cards anim" data-anim="fade-up">
+      <div class="pricing-card">
+        <h4 class="pricing-card__label">入会金</h4>
+        <p class="pricing-card__price"><span class="pricing-card__zero">0</span>円</p>
+        <p class="pricing-card__note">※ローンチキャンペーン期間中</p>
       </div>
-      <p class="pricing-hero__new">&yen;0</p>
-      <p class="pricing-hero__note">※ローンチキャンペーン期間中のみ</p>
+      <span class="pricing-plus">+</span>
+      <div class="pricing-card">
+        <h4 class="pricing-card__label">年会費</h4>
+        <p class="pricing-card__price"><span class="pricing-card__zero">0</span>円</p>
+        <p class="pricing-card__note">※ローンチキャンペーン期間中</p>
+      </div>
+      <span class="pricing-plus">+</span>
+      <div class="pricing-card">
+        <h4 class="pricing-card__label">落札手数料</h4>
+        <p class="pricing-card__price"><span class="pricing-card__zero">0</span>円</p>
+        <p class="pricing-card__note">※ローンチキャンペーン期間中</p>
+      </div>
     </div>
 
-    <div class="pricing-table anim" data-anim="fade-up">
-      <div class="pricing-row pricing-row--highlight">
-        <div class="pricing-row__label">
-          <span class="pricing-row__badge">注目</span>
-          入会金
-        </div>
-        <div class="pricing-row__value">
-          <span class="pricing-row__old">100,000円</span>
-          <span class="pricing-row__new">0円</span>
-          <span class="pricing-row__campaign">キャンペーン</span>
-        </div>
-      </div>
-      <div class="pricing-row">
-        <div class="pricing-row__label">年会費</div>
-        <div class="pricing-row__value"><strong>5,000円（税込）</strong></div>
-      </div>
-      <div class="pricing-row">
-        <div class="pricing-row__label">落札手数料</div>
-        <div class="pricing-row__value"><strong>落札価格の10%</strong></div>
-      </div>
-      <div class="pricing-row">
-        <div class="pricing-row__label">送料</div>
-        <div class="pricing-row__value">実費負担（プロ品質の梱包込み）</div>
+    <div class="pricing-campaign anim" data-anim="fade-up">
+      <div class="pricing-campaign__inner">
+        <span class="pricing-campaign__badge">キャンペーン実施中！</span>
+        <p class="pricing-campaign__text">0円スタートキャンペーン実施中！<br><strong>必要なのは会員登録だけ！</strong></p>
+        <span class="pricing-campaign__zero">0<small>円</small></span>
       </div>
     </div>
-    <p class="pricing-note anim" data-anim="fade-up">手数料は落札価格の10%のみ。わかりやすい料金体系で安心してご利用いただけます。</p>
+
+    <div class="pricing-detail anim" data-anim="fade-up">
+      <h3 class="pricing-detail__title">通常料金（キャンペーン終了後）</h3>
+      <div class="pricing-detail__table">
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">入会金</span>
+          <span class="pricing-detail__value">100,000円（税込）</span>
+        </div>
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">年会費</span>
+          <span class="pricing-detail__value">5,000円（税込）</span>
+        </div>
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">落札手数料</span>
+          <span class="pricing-detail__value">落札価格の10%</span>
+        </div>
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">送料</span>
+          <span class="pricing-detail__value">実費負担（プロ品質の梱包込み）</span>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -385,6 +386,117 @@
   </div>
 </section>
 
+<!-- ===== VOICE ===== -->
+<section class="section section--voice" id="voice">
+  <div class="container">
+    <div class="voice-layout">
+      <div class="voice-layout__left anim" data-anim="fade-up">
+        <span class="section__num">007</span>
+        <span class="section__en">VOICE</span>
+        <h2 class="section__title">ご利用者さまの声</h2>
+        <p class="voice-layout__desc">実際にご利用いただいたお客様から、多くの嬉しいお声をいただいています。品質と信頼のサービスを目指し、日々改善を続けています。</p>
+      </div>
+      <div class="voice-layout__right">
+        <div class="voice-card anim" data-anim="fade-up">
+          <div class="voice-card__body">
+            <p class="voice-card__text">フリマアプリで何度も失敗した経験がありましたが、こちらでは審査制の出品者のみなので安心して入札できました。届いた個体も写真通りで、梱包も丁寧。もうここ以外では買えません。</p>
+            <div class="voice-card__author">
+              <strong>T.K. 様</strong>
+              <span>めだか愛好家・個人コレクター</span>
+            </div>
+          </div>
+        </div>
+        <div class="voice-card anim" data-anim="fade-up" data-delay="1">
+          <div class="voice-card__body">
+            <p class="voice-card__text">即売会前の仕入れに毎回苦労していましたが、このプラットフォームのおかげでまとまった品質の個体を安定して確保できるようになりました。事業として計画が立てやすくなり、売上も安定しています。</p>
+            <div class="voice-card__author">
+              <strong>S.M. 様</strong>
+              <span>めだか販売店経営</span>
+            </div>
+          </div>
+        </div>
+        <div class="voice-card anim" data-anim="fade-up" data-delay="2">
+          <div class="voice-card__body">
+            <p class="voice-card__text">プロによる梱包・発送が本当にありがたいです。以前は個人発送で死着のリスクが常にありましたが、ここでは一度もトラブルがありません。生体を扱うプラットフォームとして、最も信頼できます。</p>
+            <div class="voice-card__author">
+              <strong>Y.H. 様</strong>
+              <span>ブリーダー・即売会出展者</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ ===== -->
+<section class="section section--faq" id="faq">
+  <div class="container">
+    <div class="section__header section__header--center anim" data-anim="fade-up">
+      <span class="section__num">008</span>
+      <span class="section__en">FAQ</span>
+      <h2 class="section__title">よくある質問</h2>
+    </div>
+    <div class="faq-list anim" data-anim="fade-up">
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__icon">Q</span>
+          <span>入会金・年会費は本当に無料ですか？</span>
+          <svg class="faq-item__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__icon faq-item__icon--a">A</span>
+          <p>はい、ローンチキャンペーン期間中は入会金・年会費・落札手数料すべて無料です。キャンペーン終了後は通常料金が適用されますが、キャンペーン期間中にご登録いただいた方は特別優待が適用されます。</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__icon">Q</span>
+          <span>出品者はどのように審査されていますか？</span>
+          <svg class="faq-item__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__icon faq-item__icon--a">A</span>
+          <p>出品者は全員、身分証明書の提出と運営による審査を通過した方のみです。さらに、既存の信頼できる出品者からの推薦制を採用しており、品質と信頼性を担保しています。</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__icon">Q</span>
+          <span>発送はどのように行われますか？</span>
+          <svg class="faq-item__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__icon faq-item__icon--a">A</span>
+          <p>業界歴20年のプロが梱包・発送を行います。生体輸送の専門知識を持つスタッフが、温度管理や酸素供給など適切な処理を施し、安全にお届けします。</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__icon">Q</span>
+          <span>死着保証はありますか？</span>
+          <svg class="faq-item__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__icon faq-item__icon--a">A</span>
+          <p>はい、万が一の死着時には保証制度がございます。到着後すぐに写真をお送りいただくことで、返金または代替個体での対応をさせていただきます。詳細は利用規約をご確認ください。</p>
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__icon">Q</span>
+          <span>支払い方法は何がありますか？</span>
+          <svg class="faq-item__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__icon faq-item__icon--a">A</span>
+          <p>クレジットカード（VISA・Mastercard・JCB・AMEX）でのオンライン決済に対応しています。落札後、マイページから安全に決済いただけます。</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
 <!-- ===== CTA ===== -->
 <section class="section section--cta" id="cta">
   <div class="container">
@@ -425,7 +537,7 @@
 <footer class="footer">
   <div class="container">
     <div class="footer__logo">
-      <img src="/img/logo.png" alt="日本メダカオンライン市場">
+      <img src="/img/logo.png?v=1" alt="日本メダカオンライン市場">
     </div>
     <p class="footer__operator">運営: サバント</p>
     <div class="footer__links">
