@@ -42,6 +42,8 @@ interface DemoLayoutProps {
   onGoToWaitingRoom?: () => void;
   /** バナーの「待機室へ入室」ボタンを無効化 */
   disableWaitingRoomBanner?: boolean;
+  /** ツアー中か（SP時にハンバーガーメニューをオーバーレイの上に表示） */
+  tourActive?: boolean;
 }
 
 const menuItems = [
@@ -53,7 +55,7 @@ const menuItems = [
   { text: '設定', icon: <SettingsIcon />, page: 'settings' },
 ];
 
-export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanner, onGoToWaitingRoom, disableWaitingRoomBanner }: DemoLayoutProps) {
+export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanner, onGoToWaitingRoom, disableWaitingRoomBanner, tourActive }: DemoLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ページ遷移時にサイドバーを閉じる
@@ -70,7 +72,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
             edge="start"
             color="inherit"
             onClick={() => setDrawerOpen(true)}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ mr: 2, display: { sm: 'none' }, ...(tourActive && { zIndex: 1451, position: 'relative' }) }}
           >
             <MenuIcon />
           </IconButton>
@@ -113,7 +115,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
       </AppBar>
 
       {/* サイドメニュー（モバイル） */}
-      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={tourActive ? { zIndex: 1460 } : undefined}>
         <Box sx={{ width: 250 }} role="presentation">
           <Box sx={{ p: 2 }}>
             <Typography variant="h6">メニュー</Typography>

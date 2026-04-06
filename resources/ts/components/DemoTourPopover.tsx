@@ -30,6 +30,8 @@ export interface TourStep {
   autoActionDelay?: number;
   /** autoActionのボタンラベル（デフォルト: "実行"） */
   autoActionLabel?: string;
+  /** タップリップルを表示する要素のCSSセレクタ（targetRef内の子要素を指定） */
+  tapTargetSelector?: string;
 }
 
 interface Props {
@@ -339,12 +341,24 @@ export const DemoTourPopover: React.FC<Props> = ({
       )}
 
       {/* Tap-here ripple indicator (only for waitForAction steps) */}
-      {spotlightRect && step.waitForAction && (
+      {spotlightRect && step.waitForAction && (() => {
+        // tapTargetSelector が指定されている場合、その要素の位置にリップルを表示
+        let rippleTop = spotlightRect.top + spotlightRect.height / 2 - 20;
+        let rippleLeft = spotlightRect.left + spotlightRect.width / 2 - 20;
+        if (step.tapTargetSelector && step.targetRef.current) {
+          const tapEl = step.targetRef.current.querySelector(step.tapTargetSelector);
+          if (tapEl) {
+            const tapRect = tapEl.getBoundingClientRect();
+            rippleTop = tapRect.top + tapRect.height / 2 - 20;
+            rippleLeft = tapRect.left + tapRect.width / 2 - 20;
+          }
+        }
+        return (
         <Box
           sx={{
             position: 'fixed',
-            top: spotlightRect.top + spotlightRect.height / 2 - 20,
-            left: spotlightRect.left + spotlightRect.width / 2 - 20,
+            top: rippleTop,
+            left: rippleLeft,
             width: 40,
             height: 40,
             zIndex: 1402,
@@ -379,7 +393,8 @@ export const DemoTourPopover: React.FC<Props> = ({
             }}
           />
         </Box>
-      )}
+        );
+      })()}
 
       {/* Click-blocking overlay: 4枚のBoxでスポットライト領域を囲み、外側だけブロック */}
       {/* waitForAction時はスポットライト内をクリック可能にする */}
@@ -544,7 +559,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 1401,
+            zIndex: 1450,
             borderRadius: '16px 16px 0 0',
             overflow: 'hidden',
             animation: 'footerSlideUp 0.3s ease-out',
@@ -697,7 +712,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             transform: 'translate(-50%, -50%)',
             width: 420,
             maxWidth: 'calc(100vw - 48px)',
-            zIndex: 1401,
+            zIndex: 1450,
             borderRadius: 4,
             overflow: 'hidden',
             animation: 'completionPop 0.4s ease-out',
@@ -770,7 +785,7 @@ export const DemoTourPopover: React.FC<Props> = ({
           top: position.top,
           left: position.left,
           width: POPOVER_WIDTH,
-          zIndex: 1401,
+          zIndex: 1450,
           borderRadius: 3,
           overflow: 'visible',
           animation: 'popoverEnter 0.3s ease-out',

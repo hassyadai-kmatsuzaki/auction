@@ -17,7 +17,7 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
     const fixCanvasZIndex = () => {
       document.querySelectorAll('canvas').forEach(c => {
         if (c.style.position === 'fixed' && c.style.pointerEvents === 'none') {
-          c.style.zIndex = '1403';
+          c.style.zIndex = '1501';
         }
       });
     };
@@ -37,7 +37,7 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
     <Box
       sx={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 1402, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center',
         pointerEvents: 'none',
       }}
     >
