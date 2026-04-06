@@ -353,6 +353,7 @@ export const DemoTourPopover: React.FC<Props> = ({
           );
         }
         // waitForAction時: スポットライト領域に穴を開けた4枚のBoxでブロック
+        // + スポットライト領域にクリック転送レイヤーを配置（z-indexスタッキング問題を回避）
         const sx = spotlightRect.left - SPOTLIGHT_PADDING;
         const sy = spotlightRect.top - SPOTLIGHT_PADDING;
         const sw = spotlightRect.width + SPOTLIGHT_PADDING * 2;
@@ -368,6 +369,19 @@ export const DemoTourPopover: React.FC<Props> = ({
             <Box sx={{ ...common, top: sy, left: 0, width: sx, height: sh }} />
             {/* 右 */}
             <Box sx={{ ...common, top: sy, left: sx + sw, right: 0, height: sh }} />
+            {/* クリック転送レイヤー: スポットライト領域のクリックをターゲット要素に転送 */}
+            <Box
+              onClick={() => step.targetRef.current?.click()}
+              sx={{
+                ...common,
+                top: sy,
+                left: sx,
+                width: sw,
+                height: sh,
+                cursor: 'pointer',
+                background: 'transparent',
+              }}
+            />
           </>
         );
       })()}
