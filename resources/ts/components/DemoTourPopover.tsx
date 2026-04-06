@@ -92,6 +92,31 @@ export const DemoTourPopover: React.FC<Props> = ({
     setExpanded(false);
   }, [activeStep]);
 
+  // waitForAction時: ターゲット要素とその親をオーバーレイ(z-index:1400)の上に持ち上げる
+  useEffect(() => {
+    if (!step?.waitForAction || !step.targetRef.current) return;
+    const el = step.targetRef.current;
+    const parent = el.parentElement;
+
+    const saved: { node: HTMLElement; zIndex: string; position: string }[] = [];
+    const raise = (node: HTMLElement) => {
+      saved.push({ node, zIndex: node.style.zIndex, position: node.style.position });
+      node.style.zIndex = '1401';
+      if (!node.style.position || node.style.position === 'static') {
+        node.style.position = 'relative';
+      }
+    };
+    raise(el);
+    if (parent && parent !== document.body) raise(parent);
+
+    return () => {
+      saved.forEach(({ node, zIndex, position }) => {
+        node.style.zIndex = zIndex;
+        node.style.position = position;
+      });
+    };
+  }, [step, activeStep]);
+
   const calculatePosition = useCallback(() => {
     if (!step?.targetRef?.current) {
       setPosition({
@@ -369,28 +394,6 @@ export const DemoTourPopover: React.FC<Props> = ({
             <Box sx={{ ...common, top: sy, left: 0, width: sx, height: sh }} />
             {/* 右 */}
             <Box sx={{ ...common, top: sy, left: sx + sw, right: 0, height: sh }} />
-            {/* クリック転送レイヤー: スポットライト領域のクリックを実際の要素に転送 */}
-            <Box
-              onClick={(e) => {
-                // 自身を一時的に非表示にして、下にある実際の要素を探してクリック
-                const el = e.currentTarget;
-                el.style.pointerEvents = 'none';
-                const target = document.elementFromPoint(e.clientX, e.clientY);
-                el.style.pointerEvents = 'all';
-                if (target instanceof HTMLElement) {
-                  target.click();
-                }
-              }}
-              sx={{
-                ...common,
-                top: sy,
-                left: sx,
-                width: sw,
-                height: sh,
-                cursor: 'pointer',
-                background: 'transparent',
-              }}
-            />
           </>
         );
       })()}

@@ -2,7 +2,7 @@
  * デモ共通出品一覧画面
  * 実際の AuctionItems.tsx と同じデザインを再現
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box, Container, Typography, Grid, Paper, Tabs, Tab, Chip, IconButton,
   Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -27,10 +27,9 @@ interface DemoItemListProps {
   onGoToWaitingRoom: () => void;
   onFavoriteAdded?: () => void;
   onLimitSet?: () => void;
-  onLimitModalChange?: (isOpen: boolean) => void;
 }
 
-export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onLimitModalChange }: DemoItemListProps) {
+export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -38,11 +37,6 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
   const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
   const [limitModalItem, setLimitModalItem] = useState<{ id: number; species_name: string; start_price: number } | null>(null);
   const [selectedItem, setSelectedItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
-
-  // 指値モーダルの開閉を親に通知
-  useEffect(() => {
-    onLimitModalChange?.(!!limitModalItem);
-  }, [limitModalItem, onLimitModalChange]);
 
   const totalItems = MOCK_ITEMS.length;
 
@@ -319,6 +313,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
           isRemoving={false}
           onSet={handleSetLimit}
           onRemove={handleRemoveLimitModal}
+          zIndex={1500}
         />
       )}
     </Container>

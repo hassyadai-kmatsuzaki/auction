@@ -28,12 +28,14 @@ interface Props {
   isRemoving?: boolean;
   onSet: (price: number) => void;
   onRemove: () => void;
+  /** Dialog の z-index を上書き（デモのオーバーレイより上に表示する場合） */
+  zIndex?: number;
 }
 
 export const BidLimitModal = React.memo(({
   open, onClose, speciesName, currentLimitPrice,
   currentPrice, quickOptions, isLive,
-  isSetting, isRemoving, onSet, onRemove,
+  isSetting, isRemoving, onSet, onRemove, zIndex,
 }: Props) => {
   const [inputValue, setInputValue] = useState<string>('');
   const [selectedQuick, setSelectedQuick] = useState<number | null>(null);
@@ -97,7 +99,7 @@ export const BidLimitModal = React.memo(({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth sx={zIndex ? { zIndex } : undefined}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <PriceCheckIcon color="primary" />

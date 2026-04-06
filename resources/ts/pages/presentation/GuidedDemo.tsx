@@ -56,7 +56,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
-  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [tourActive, setTourActive] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
@@ -516,7 +515,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   }, [tourActive, tourStep]);
 
   // Shared tour popover element (rendered in non-auction phases)
-  const tourPopoverElement = tourActive && !isLimitModalOpen ? (
+  const tourPopoverElement = tourActive ? (
     <DemoTourPopover
       steps={tourSteps}
       activeStep={tourStep}
@@ -541,7 +540,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate}>
-        <DemoItemList onGoToWaitingRoom={handleItemsGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onLimitModalChange={setIsLimitModalOpen} />
+        <DemoItemList onGoToWaitingRoom={handleItemsGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} />
         {tourPopoverElement}
       </DemoLayout>
     );
@@ -723,8 +722,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           </Box>
         </Container>
 
-        {/* Tour popover — 指値モーダルが開いている間は非表示 */}
-        {tourActive && !limitModalLaneId && (
+        {/* Tour popover */}
+        {tourActive && (
           <DemoTourPopover
             steps={tourSteps}
             activeStep={tourStep}
@@ -752,6 +751,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             isRemoving={false}
             onSet={handleSetLimit}
             onRemove={handleRemoveLimit}
+            zIndex={1500}
           />
         )}
 
