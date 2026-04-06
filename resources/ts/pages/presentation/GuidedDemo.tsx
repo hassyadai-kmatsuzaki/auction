@@ -706,7 +706,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           {/* Lane grid */}
           <Grid container spacing={2}>
             {lanes.map((lane, idx) => (
-              <Grid item xs={12} sm={6} key={lane.lane_id}>
+              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
                 <Box ref={(el: HTMLDivElement | null) => { laneCardRefs.current[idx] = el; }}>
                   <LaneCard
                     lane={lane} isLoading={false}

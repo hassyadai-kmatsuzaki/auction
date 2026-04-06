@@ -543,7 +543,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
           {/* Lane grid */}
           <Grid container spacing={2}>
             {lanes.map(lane => (
-              <Grid item xs={12} sm={6} key={lane.lane_id}>
+              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
                 {lane.current_item ? (
                   <LaneCard
                     lane={lane} isLoading={false}
