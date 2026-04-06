@@ -369,9 +369,18 @@ export const DemoTourPopover: React.FC<Props> = ({
             <Box sx={{ ...common, top: sy, left: 0, width: sx, height: sh }} />
             {/* 右 */}
             <Box sx={{ ...common, top: sy, left: sx + sw, right: 0, height: sh }} />
-            {/* クリック転送レイヤー: スポットライト領域のクリックをターゲット要素に転送 */}
+            {/* クリック転送レイヤー: スポットライト領域のクリックを実際の要素に転送 */}
             <Box
-              onClick={() => step.targetRef.current?.click()}
+              onClick={(e) => {
+                // 自身を一時的に非表示にして、下にある実際の要素を探してクリック
+                const el = e.currentTarget;
+                el.style.pointerEvents = 'none';
+                const target = document.elementFromPoint(e.clientX, e.clientY);
+                el.style.pointerEvents = 'all';
+                if (target instanceof HTMLElement) {
+                  target.click();
+                }
+              }}
               sx={{
                 ...common,
                 top: sy,
