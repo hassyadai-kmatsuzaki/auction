@@ -56,6 +56,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [tourActive, setTourActive] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
@@ -515,7 +516,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   }, [tourActive, tourStep]);
 
   // Shared tour popover element (rendered in non-auction phases)
-  const tourPopoverElement = tourActive ? (
+  const tourPopoverElement = tourActive && !isLimitModalOpen ? (
     <DemoTourPopover
       steps={tourSteps}
       activeStep={tourStep}
@@ -540,7 +541,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate}>
-        <DemoItemList onGoToWaitingRoom={handleItemsGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} />
+        <DemoItemList onGoToWaitingRoom={handleItemsGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onLimitModalChange={setIsLimitModalOpen} />
         {tourPopoverElement}
       </DemoLayout>
     );
