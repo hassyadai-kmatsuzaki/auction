@@ -174,7 +174,11 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }:
         <Grid container spacing={2}>
           {currentItems.map((item, idx) => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
-              <Box data-tour-target={idx === 0 ? 'items-first-card' : undefined} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+                {/* 最初のカードのハートアイコン位置にツアーターゲットを配置 */}
+                {idx === 0 && (
+                  <Box data-tour-target="items-first-favorite" sx={{ position: 'absolute', top: 4, left: 4, width: 32, height: 32, zIndex: 3, pointerEvents: 'none' }} />
+                )}
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
@@ -182,7 +186,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet }:
                   onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)}
                 />
                 {/* 指値バッジ（カード下部に独立して配置）— 実際と同じ */}
-                <Box sx={{
+                <Box data-tour-target={idx === 0 ? 'items-first-limit' : undefined} sx={{
                   px: 1.5, py: 1,
                   bgcolor: 'background.paper',
                   border: '1px solid',

@@ -78,7 +78,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const homeBannerRef = useRef<HTMLElement | null>(null);
   const itemsButtonRef = useRef<HTMLElement | null>(null);
   const itemsHeaderRef = useRef<HTMLElement | null>(null);
-  const firstItemRef = useRef<HTMLElement | null>(null);
+  const firstItemFavoriteRef = useRef<HTMLElement | null>(null);
+  const firstItemLimitRef = useRef<HTMLElement | null>(null);
   const waitingRoomButtonRef = useRef<HTMLElement | null>(null);
   const favoritesNavRef = useRef<HTMLElement | null>(null);
   const favoritesHeaderRef = useRef<HTMLElement | null>(null);
@@ -94,7 +95,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       homeBannerRef.current = document.querySelector('[data-tour-target="home-banner"]');
       itemsButtonRef.current = document.querySelector('[data-tour-target="home-items-button"]');
       itemsHeaderRef.current = document.querySelector('[data-tour-target="items-header"]');
-      firstItemRef.current = document.querySelector('[data-tour-target="items-first-card"]');
+      firstItemFavoriteRef.current = document.querySelector('[data-tour-target="items-first-favorite"]');
+      firstItemLimitRef.current = document.querySelector('[data-tour-target="items-first-limit"]');
       waitingRoomButtonRef.current = document.querySelector('[data-tour-target="items-waiting-button"]');
       favoritesNavRef.current = document.querySelector('[data-tour-target="favorites-nav"]');
       favoritesHeaderRef.current = document.querySelector('[data-tour-target="favorites-header"]');
@@ -352,8 +354,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
     // ── ITEMS phase (steps 2-4) ──
     { targetRef: itemsHeaderRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。各商品に指値（上限価格）やお気に入りを設定できます。', placement: 'bottom' },
-    { targetRef: firstItemRef as React.RefObject<HTMLElement | null>, title: 'お気に入りに追加しよう', description: '気になる商品のハートアイコンをタップして、お気に入りに追加してみましょう。', placement: 'bottom', waitForAction: 'ハートアイコンをタップ' },
-    { targetRef: firstItemRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ' },
+    { targetRef: firstItemFavoriteRef as React.RefObject<HTMLElement | null>, title: 'お気に入りに追加しよう', description: '気になる商品のハートアイコンをタップして、お気に入りに追加してみましょう。', placement: 'right', waitForAction: 'ハートアイコンをタップ' },
+    { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ' },
 
     // ── FAVORITES phase (steps 5-7) ──
     { targetRef: favoritesNavRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: 'bottom', waitForAction: '「お気に入り」をタップ' },
