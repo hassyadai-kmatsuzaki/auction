@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import {
   Box, Container, Typography, Button, Paper, Grid, Tabs, Tab,
-  Card, CardContent, CardMedia, Chip, Stepper, Step, StepLabel,
+  Card, CardContent, CardMedia, Chip, CircularProgress, Stepper, Step, StepLabel,
   TextField, Avatar, Switch, FormControlLabel, Divider, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Alert,
   Snackbar, Accordion, AccordionSummary, AccordionDetails,
@@ -202,6 +202,8 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
     shipping_address_line1: '', shipping_address_line2: '', shipping_name: '', shipping_phone: '',
   });
   const [shippingAddress, setShippingAddress] = useState('〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101');
+  const [shippingCalculated, setShippingCalculated] = useState(false);
+  const [calculatingShipping, setCalculatingShipping] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   // Generate mock data from actual won items
@@ -282,6 +284,16 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
   };
 
+  const MOCK_SHIPPING_FEE = 1200;
+  const handleCalculateShipping = () => {
+    setCalculatingShipping(true);
+    setTimeout(() => {
+      setCalculatingShipping(false);
+      setShippingCalculated(true);
+      setSnackbar({ open: true, message: `送料を計算しました（合計: ¥${MOCK_SHIPPING_FEE.toLocaleString()}）`, severity: 'success' });
+    }, 1500);
+  };
+
   if (wonItems.length === 0) {
     return (
       <Box>
@@ -337,7 +349,7 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
         <Grid item xs={12} sm={3}>
           <Paper sx={{ p: 2.5 }}>
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>配送料金合計</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: '#64748B' }}>¥0</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: '#64748B' }}>¥{shippingCalculated ? MOCK_SHIPPING_FEE.toLocaleString() : 0}</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -391,6 +403,23 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
               <Button size="small" startIcon={<EditIcon />} onClick={handleEditAddress} sx={{ fontSize: '0.75rem', ml: 'auto' }}>
                 変更
               </Button>
+              {shippingCalculated ? (
+                <Chip label="送料計算済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
+              ) : (
+                <Tooltip title={shippingAddress === '未設定' ? '配送先を先に設定してください' : ''}>
+                  <span>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={calculatingShipping ? <CircularProgress size={16} color="inherit" /> : <LocalShippingIcon />}
+                      onClick={handleCalculateShipping}
+                      disabled={shippingAddress === '未設定' || calculatingShipping}
+                    >
+                      送料計算
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
             </Box>
 
             {/* アクションボタン — 実際と同じ */}

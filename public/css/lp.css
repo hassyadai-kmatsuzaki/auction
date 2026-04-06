@@ -416,7 +416,6 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   width: 100%; aspect-ratio: 16/10; object-fit: cover;
   transition: transform 0.6s ease;
 }
-.problem-item:hover .problem-item__img img { transform: scale(1.03); }
 
 .problem-item__num {
   display: block;
@@ -458,10 +457,6 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 0.5s ease;
 }
-.feature-card:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--shadow-md);
-}
 
 .feature-card__visual {
   position: relative; overflow: hidden;
@@ -470,7 +465,6 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   width: 100%; aspect-ratio: 4/3; object-fit: cover;
   transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.feature-card:hover .feature-card__visual img { transform: scale(1.06); }
 
 .feature-card__num {
   position: absolute; bottom: 0; right: 12px;
@@ -514,7 +508,6 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   margin: 0 auto 1rem; color: #fff;
   transition: transform 0.3s ease;
 }
-.step:hover .step__icon { transform: scale(1.1); }
 .step__icon svg { width: 28px; height: 28px; }
 .step__icon--green { background: linear-gradient(135deg, #5d40c6, #7c5ce7); }
 .step__icon--blue { background: linear-gradient(135deg, #05b2f8, #0490cc); }
@@ -668,10 +661,6 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   overflow: hidden; box-shadow: var(--shadow-sm);
   border: 1px solid #eee;
   transition: transform 0.4s ease, box-shadow 0.4s ease;
-}
-.lineup-card:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-md);
 }
 
 .lineup-card__img { position: relative; }
