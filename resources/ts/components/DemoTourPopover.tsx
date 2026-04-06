@@ -683,17 +683,19 @@ export const DemoTourPopover: React.FC<Props> = ({
           },
         }}
       >
-        {/* Arrow */}
-        <Box
-          sx={{
-            position: 'absolute',
-            width: 16,
-            height: 16,
-            bgcolor: 'background.paper',
-            boxShadow: 3,
-            ...arrowStyles[position.arrowSide],
-          }}
-        />
+        {/* Arrow (hide when no target / centered mode) */}
+        {position.spotlightRect && (
+          <Box
+            sx={{
+              position: 'absolute',
+              width: 16,
+              height: 16,
+              bgcolor: 'background.paper',
+              boxShadow: 3,
+              ...arrowStyles[position.arrowSide],
+            }}
+          />
+        )}
 
         {/* Content wrapper with overflow hidden for progress bar clipping */}
         <Box sx={{ overflow: 'hidden', borderRadius: 'inherit' }}>

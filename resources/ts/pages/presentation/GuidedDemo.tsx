@@ -63,6 +63,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // Post-auction controlled tab
   const [postAuctionTab, setPostAuctionTab] = useState<string>('won-items');
+  const [settingsSubTab, setSettingsSubTab] = useState<number | undefined>(undefined);
 
   // Tour refs - auction phase (static)
   const demoHeaderRef = useRef<HTMLDivElement>(null);
@@ -454,11 +455,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡、配送先の変更ができます。', placement: 'bottom' },
     { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブでプロフィールや通知設定を管理できます。', placement: 'bottom',
-      autoAction: () => { setPostAuctionTab('settings'); },
+      autoAction: () => { setPostAuctionTab('settings'); setSettingsSubTab(0); },
       autoActionDelay: 500,
     },
-    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。テスト送信も可能です。', placement: 'bottom' },
-    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！実際のオークションでも同じ画面で操作できます。お疲れ様でした。', placement: 'bottom' },
+    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。テスト送信も可能です。', placement: 'bottom',
+      autoAction: () => { setSettingsSubTab(1); },
+      autoActionDelay: 500,
+    },
+    { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
   ];
 
   // Helper: determine which phase a step belongs to
@@ -664,6 +668,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           onBackToTop={onBackToTop}
           controlledTab={tourActive ? postAuctionTab : undefined}
           onTabChange={setPostAuctionTab}
+          controlledSettingsSubTab={tourActive ? settingsSubTab : undefined}
         />
         {tourPopoverElement}
       </DemoLayout>

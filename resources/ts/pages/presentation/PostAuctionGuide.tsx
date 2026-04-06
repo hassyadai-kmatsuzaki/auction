@@ -58,6 +58,8 @@ interface PostAuctionGuideProps {
   controlledTab?: string;
   /** タブが変更された際のコールバック */
   onTabChange?: (tab: string) => void;
+  /** 設定タブ内のサブタブ制御（0=プロフィール、1=通知設定） */
+  controlledSettingsSubTab?: number;
 }
 
 /**
@@ -65,7 +67,7 @@ interface PostAuctionGuideProps {
  * ガイド付きもガイドなしも同じ画面構成。
  * ガイド付きの場合はステッパーとナビゲーションボタンが追加される。
  */
-export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, controlledTab, onTabChange }: PostAuctionGuideProps) {
+export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, controlledTab, onTabChange, controlledSettingsSubTab }: PostAuctionGuideProps) {
   const [internalTab, setInternalTab] = useState(initialTab || 'won-items');
   const currentTab = controlledTab ?? internalTab;
   const setCurrentTab = (tab: string) => {
@@ -159,7 +161,7 @@ export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, 
         </Paper>
 
         {currentTab === 'won-items' && <StepWonItemManagement wonItems={wonItems} />}
-        {currentTab === 'settings' && <StepAccountSettings />}
+        {currentTab === 'settings' && <StepAccountSettings controlledSubTab={controlledSettingsSubTab} />}
 
         {/* ガイド付きナビゲーション */}
         {isGuided && (
@@ -537,8 +539,10 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
 // 設定ページ — 実際の Settings.tsx と同一デザイン
 // ====================================================================
 
-function StepAccountSettings() {
-  const [tabValue, setTabValue] = useState(0);
+function StepAccountSettings({ controlledSubTab }: { controlledSubTab?: number }) {
+  const [internalTabValue, setInternalTabValue] = useState(0);
+  const tabValue = controlledSubTab ?? internalTabValue;
+  const setTabValue = (v: number) => setInternalTabValue(v);
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
   const [profile, setProfile] = useState({
     name: 'デモ ユーザー', email: 'demo@example.com', phone: '090-1234-5678',
