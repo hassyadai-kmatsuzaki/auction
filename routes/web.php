@@ -10,4 +10,4 @@ Route::get('/', function () {
 // React SPAのルートとして全てのルートをapp.blade.phpに向ける（API パスとルートを除外）
 Route::get('/{any}', function () {
     return view('app');
-})->where('any', '^(?!api/).*');
+})->where('any', '^(?!api/).+');
