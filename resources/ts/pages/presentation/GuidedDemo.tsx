@@ -45,6 +45,21 @@ interface GuidedDemoProps {
 }
 
 // ====================================================================
+// デモ用 固定価格テーブル（ステップごとに確定した金額）
+// ====================================================================
+const DEMO_PRICES = {
+  INITIAL: 300,           // STEP 10-11: 初期価格
+  AFTER_USER_BID_1: 400,  // STEP 12: ユーザー初回入札後
+  AFTER_CPU_BID_1: 500,   // STEP 13: 相手入札後
+  AFTER_USER_BID_2: 600,  // STEP 14 入札合戦①: ユーザー入札
+  AFTER_CPU_BID_2: 700,   // STEP 14 入札合戦①: 相手反撃
+  AFTER_USER_BID_3: 800,  // STEP 14 入札合戦②: ユーザー入札（合戦完了）
+  LIMIT_PRICE: 1200,      // STEP 15: 指値 = ¥800 × 1.5
+  LIMIT_STEPS: [900, 1000, 1100, 1200], // STEP 16: 指値発動の価格推移
+  AFTER_WIN_BID: 1300,    // STEP 17: 落札入札後
+};
+
+// ====================================================================
 // メインコンポーネント
 // ====================================================================
 
@@ -211,43 +226,38 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     }, 1000);
   }, [updateLaneItem]);
 
-  // 相手が1回入札（フリーズ後にカウントダウン再開）
+  // 相手が1回入札（1秒待機後にフリーズ→カウントダウン再開）
   const simulateOpponentBid = useCallback((laneId: number) => {
-    stopTimer(laneId);
-    updateLaneItem(laneId, item => {
-      const inc = calculatePriceIncrement(item.current_price);
-      return {
+    setTimeout(() => {
+      stopTimer(laneId);
+      updateLaneItem(laneId, item => ({
         ...item,
         phase: 'freeze' as const,
         freeze_remaining_seconds: 3,
         freeze_countdown_seconds: 3,
-        current_price: item.current_price + inc,
+        current_price: DEMO_PRICES.AFTER_CPU_BID_1,
         active_bidders_count: Math.max(2, item.active_bidders_count),
-        // 本番と同じ: 相手が入札 → 自分はinactiveになる
         my_bid_status: item.my_bid_status === 'active' ? 'inactive' as const : item.my_bid_status,
-      };
-    });
-    notify('他の参加者が入札！価格が上昇しました', 'warning');
-    runFreeze(laneId, 3, () => {
-      startCountdown(laneId, 8);
-    });
+      }));
+      notify('他の参加者が入札！価格が上昇しました', 'warning');
+      runFreeze(laneId, 3, () => {
+        startCountdown(laneId, 8);
+      });
+    }, 1000);
   }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
 
   // 入札合戦(step 13): CPUが入札を返してくる（ユーザーの入札後に自動発動）
   const simulateBattleResponse = useCallback((laneId: number) => {
     stopTimer(laneId);
-    updateLaneItem(laneId, item => {
-      const inc = calculatePriceIncrement(item.current_price);
-      return {
-        ...item,
-        phase: 'freeze' as const,
-        freeze_remaining_seconds: 3,
-        freeze_countdown_seconds: 3,
-        current_price: item.current_price + inc,
-        active_bidders_count: Math.max(2, item.active_bidders_count),
-        my_bid_status: 'inactive' as const,
-      };
-    });
+    updateLaneItem(laneId, item => ({
+      ...item,
+      phase: 'freeze' as const,
+      freeze_remaining_seconds: 3,
+      freeze_countdown_seconds: 3,
+      current_price: DEMO_PRICES.AFTER_CPU_BID_2,
+      active_bidders_count: Math.max(2, item.active_bidders_count),
+      my_bid_status: 'inactive' as const,
+    }));
     notify('他の参加者が入札！フリーズ中...', 'warning');
     runFreeze(laneId, 3, () => {
       startCountdown(laneId, 8);
@@ -272,13 +282,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     const lane1 = lanes.find(l => l.lane_id === 1);
     const limitPrice = lane1?.current_item?.my_limit_price;
     if (!limitPrice) { notify('先にレーン1で指値を設定してください', 'error'); return; }
-    let currentPrice = lane1!.current_item!.current_price;
-    const steps: number[] = [];
-    while (currentPrice < limitPrice) {
-      const inc = calculatePriceIncrement(currentPrice);
-      currentPrice += inc;
-      steps.push(currentPrice);
-    }
+    const steps = DEMO_PRICES.LIMIT_STEPS;
     let i = 0;
     const interval = setInterval(() => {
       if (i >= steps.length) {
@@ -304,11 +308,18 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     if (currentStatus === 'active') {
       return;
     } else {
-      // 入札時に価格を上昇させる
-      updateLaneItem(lane.lane_id, i => {
-        const inc = calculatePriceIncrement(i.current_price);
-        return { ...i, my_bid_status: 'active', active_bidders_count: i.active_bidders_count + 1, current_price: i.current_price + inc };
-      });
+      // 入札時に固定価格を設定
+      const fixedPrice = tourActive && tourStep === 11 ? DEMO_PRICES.AFTER_USER_BID_1
+        : tourActive && tourStep === 13 && battleRoundRef.current === 0 ? DEMO_PRICES.AFTER_USER_BID_2
+        : tourActive && tourStep === 13 && battleRoundRef.current >= 1 ? DEMO_PRICES.AFTER_USER_BID_3
+        : tourActive && tourStep === 16 ? DEMO_PRICES.AFTER_WIN_BID
+        : null;
+      updateLaneItem(lane.lane_id, i => ({
+        ...i,
+        my_bid_status: 'active',
+        active_bidders_count: i.active_bidders_count + 1,
+        current_price: fixedPrice ?? i.current_price + calculatePriceIncrement(i.current_price),
+      }));
       startCountdown(lane.lane_id, 8);
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
       if (tourActive && tourStep === 11) {
@@ -425,7 +436,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: demoHeaderRef, title: 'オークション体験デモへようこそ！', description: 'このデモでは、実際のオークション画面を操作しながら、入札の流れを体験できます。吹き出しの指示に従って進めてください。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。複数のレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきます！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきます！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 5500, autoActionLabel: '相手の入札を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、2回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ', tapTargetSelector: '[data-tour-target="bid-limit-chip"]' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値が発動！自動入札オフ', description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateLimitTrigger(); }, autoActionDelay: 6000, autoActionLabel: '指値発動を見る' },
@@ -469,15 +480,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
     // ── 後退時: オークションステップの状態をリセット ──
     if (!isForward && targetStep <= 14) {
-      // step 9-14 に戻る場合: レーン1の価格・入札状態・指値を初期値に戻す
+      // step 9-14 に戻る場合: レーン1の価格・入札状態・指値を固定初期値に戻す
       stopTimer(1);
-      const initialItem = GUIDED_INITIAL_LANES[0].current_item!;
       setLanes(prev => prev.map(l =>
         l.lane_id === 1 ? {
           ...l,
           current_item: l.current_item ? {
             ...l.current_item,
-            current_price: initialItem.current_price,
+            current_price: DEMO_PRICES.INITIAL,
             my_bid_status: null,
             active_bidders_count: 0,
             my_limit_price: null,
@@ -893,7 +903,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             onSet={handleSetLimit}
             onRemove={handleRemoveLimit}
             zIndex={1500}
-            allowedPrice={tourActive && tourStep === 14 ? Math.floor(limitModalItemData.current_price * 1.5) : undefined}
+            allowedPrice={tourActive && tourStep === 14 ? DEMO_PRICES.LIMIT_PRICE : undefined}
           />
         )}
 

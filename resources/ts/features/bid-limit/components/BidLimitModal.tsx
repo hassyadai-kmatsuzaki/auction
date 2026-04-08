@@ -124,23 +124,19 @@ export const BidLimitModal = React.memo(({
           allowedPrice={allowedPrice}
         />
 
-        {!allowedPrice && (
-          <>
-            <Divider sx={{ my: 2 }} />
+        <Divider sx={{ my: 2 }} />
 
-            {/* カスタム入力 */}
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-              カスタム入力
-            </Typography>
-          </>
-        )}
+        {/* カスタム入力 */}
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          カスタム入力
+        </Typography>
         <TextField
           fullWidth
           type="number"
           placeholder="例: 8000"
           value={inputValue}
           onChange={handleInputChange}
-          sx={allowedPrice ? { display: 'none' } : undefined}
+          disabled={!!allowedPrice}
           InputProps={{
             startAdornment: <InputAdornment position="start">¥</InputAdornment>,
             inputProps: { min: 1 },
