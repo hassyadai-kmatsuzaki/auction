@@ -86,6 +86,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const homeBannerRef = useRef<HTMLElement | null>(null);
   const itemsButtonRef = useRef<HTMLElement | null>(null);
   const itemsHeaderRef = useRef<HTMLElement | null>(null);
+  const itemsFilterAreaRef = useRef<HTMLElement | null>(null);
   const firstItemCardRef = useRef<HTMLElement | null>(null);
   const firstItemFavoriteRef = useRef<HTMLElement | null>(null);
   const firstItemLimitRef = useRef<HTMLElement | null>(null);
@@ -114,6 +115,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       homeBannerRef.current = findVisible('[data-tour-target="home-banner"]');
       itemsButtonRef.current = findVisible('[data-tour-target="home-items-button"]');
       itemsHeaderRef.current = findVisible('[data-tour-target="items-header"]');
+      itemsFilterAreaRef.current = findVisible('[data-tour-target="items-filter-area"]');
       firstItemCardRef.current = findVisible('[data-tour-target="items-first-card"]');
       firstItemFavoriteRef.current = findVisible('[data-tour-target="items-first-favorite"]');
       firstItemLimitRef.current = findVisible('[data-tour-target="items-first-limit"]');
@@ -383,8 +385,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: itemsButtonRef as React.RefObject<HTMLElement | null>, title: '出品一覧を確認しよう', description: '「出品一覧」ボタンを押して出品されている商品を確認しましょう。', placement: 'bottom', waitForAction: '「出品一覧」をタップ' },
 
     // ── ITEMS phase (steps 2-5) ──
-    { targetRef: itemsHeaderRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。各商品に指値（上限価格）やお気に入りを設定できます。', placement: 'bottom' },
-    { targetRef: firstItemCardRef as React.RefObject<HTMLElement | null>, title: '商品の詳細を見てみよう', description: '商品カードの「詳細」チップをタップすると、写真や検査情報などの詳細を確認できます。', placement: 'bottom', waitForAction: '「詳細」チップをタップ', tapTargetSelector: '.MuiChip-outlined' },
+    { targetRef: itemsFilterAreaRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。各商品に指値（上限価格）やお気に入りを設定できます。', placement: 'bottom' },
+    { targetRef: firstItemCardRef as React.RefObject<HTMLElement | null>, title: '商品の詳細を見てみよう', description: '商品カードの「詳細」ボタンをタップすると、写真や検査情報などの詳細を確認できます。', placement: 'bottom', waitForAction: '「詳細」ボタンをタップ', tapTargetSelector: '[data-tour-target="item-detail-chip"]' },
     { targetRef: firstItemFavoriteRef as React.RefObject<HTMLElement | null>, title: 'お気に入りに追加しよう', description: '気になる商品のハートアイコンをタップして、お気に入りに追加してみましょう。', placement: 'right', waitForAction: 'ハートアイコンをタップ' },
     { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ' },
 
@@ -564,8 +566,13 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     }
   }, [tourActive]);
 
-  // Tour-aware: item detail opened on items page → advance from step 3 to step 4
+  // Tour-aware: item detail opened on items page (no auto-advance, wait for close)
   const handleItemDetailOpened = useCallback(() => {
+    // モーダルが開いたことを記録するのみ（閉じた時にステップを進める）
+  }, []);
+
+  // Tour-aware: item detail closed on items page → advance from step 3 to step 4
+  const handleItemDetailClosed = useCallback(() => {
     if (tourActive && tourStep === 3) {
       setTimeout(() => goToStepRef.current(4), 500);
     }
@@ -623,7 +630,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive}>
-        <DemoItemList onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} />
+        <DemoItemList onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} onItemDetailClosed={handleItemDetailClosed} disableFavoriteAndLimit={tourActive && tourStep === 3} />
         {tourPopoverElement}
       </DemoLayout>
     );

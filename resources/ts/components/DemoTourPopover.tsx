@@ -99,24 +99,31 @@ export const DemoTourPopover: React.FC<Props> = ({
     const el = step.targetRef.current;
 
     const saved: { node: HTMLElement; zIndex: string; position: string; isolation: string }[] = [];
-    const raise = (node: HTMLElement) => {
-      saved.push({
-        node,
-        zIndex: node.style.zIndex,
-        position: node.style.position,
-        isolation: node.style.isolation,
-      });
-      node.style.zIndex = '1401';
-      node.style.isolation = 'auto';
-      if (!node.style.position || node.style.position === 'static') {
-        node.style.position = 'relative';
-      }
-    };
 
-    // ターゲットからbodyまで全祖先を持ち上げる
-    let current: HTMLElement | null = el;
+    // ターゲット要素のみ z-index 1401 で前面に出す
+    saved.push({
+      node: el,
+      zIndex: el.style.zIndex,
+      position: el.style.position,
+      isolation: el.style.isolation,
+    });
+    el.style.zIndex = '1401';
+    if (!el.style.position || el.style.position === 'static') {
+      el.style.position = 'relative';
+    }
+
+    // 祖先は z-index を auto にしてスタッキングコンテキストを解除
+    // （ターゲットの z-index がルートコンテキストで評価されるようにする）
+    let current: HTMLElement | null = el.parentElement;
     while (current && current !== document.body) {
-      raise(current);
+      saved.push({
+        node: current,
+        zIndex: current.style.zIndex,
+        position: current.style.position,
+        isolation: current.style.isolation,
+      });
+      current.style.zIndex = 'auto';
+      current.style.isolation = 'auto';
       current = current.parentElement;
     }
 

@@ -92,13 +92,12 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom, disableWaitingRoom }:
               variant="contained"
               size="large"
               endIcon={<ArrowForwardIcon />}
-              onClick={onGoToWaitingRoom}
-              disabled={disableWaitingRoom}
               sx={{
                 fontWeight: 700,
                 px: 4,
                 py: 1.5,
                 fontSize: '1rem',
+                pointerEvents: 'none',
               }}
             >
               待機室へ入室
@@ -108,12 +107,12 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom, disableWaitingRoom }:
               variant="outlined"
               size="large"
               startIcon={<ListAltIcon />}
-              onClick={onGoToItems}
               sx={{
                 fontWeight: 700,
                 px: 4,
                 py: 1.5,
                 fontSize: '1rem',
+                pointerEvents: 'none',
               }}
             >
               出品一覧

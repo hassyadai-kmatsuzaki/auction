@@ -28,9 +28,14 @@ interface DemoItemListProps {
   onFavoriteAdded?: () => void;
   onLimitSet?: () => void;
   onItemDetailOpened?: () => void;
+  onItemDetailClosed?: () => void;
+  /** お気に入り・指値ボタンを無効化（STEP4: 詳細のみ操作可能） */
+  disableFavoriteAndLimit?: boolean;
+  /** 詳細・指値ボタンを無効化（STEP5: お気に入りのみ操作可能） */
+  disableInfoAndLimit?: boolean;
 }
 
-export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened }: DemoItemListProps) {
+export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened, onItemDetailClosed, disableFavoriteAndLimit, disableInfoAndLimit }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -130,7 +135,8 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
         </Box>
       </Paper>
 
-      {/* レーンタブ */}
+      {/* レーンタブ + ステータスフィルター */}
+      <Box data-tour-target="items-filter-area">
       <Paper sx={{ mb: 2 }}>
         <Tabs value={selectedLane} onChange={(_, v) => setSelectedLane(v)} variant="scrollable" scrollButtons="auto">
           <Tab label={`すべて (${totalItems})`} />
@@ -165,6 +171,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
           );
         })}
       </Box>
+      </Box>{/* /items-filter-area */}
 
       {/* アイテム一覧 */}
       {currentItems.length === 0 ? (
@@ -179,7 +186,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
-                  onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)}
+                  onFavoriteToggle={(e) => { if (!disableFavoriteAndLimit) handleFavoriteToggle(e, item.id); }}
                   onInfoClick={(e) => { e.stopPropagation(); setSelectedItem(item); onItemDetailOpened?.(); }}
                   favoriteButtonTourTarget={idx === 0 ? 'items-first-favorite' : undefined}
                 />
@@ -192,6 +199,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                   borderColor: 'divider',
                   borderBottomLeftRadius: 2,
                   borderBottomRightRadius: 2,
+                  ...(disableFavoriteAndLimit && { pointerEvents: 'none' }),
                 }}>
                   <BidLimitBadge
                     limitPrice={getLimitForItem(item.id).limit_price}
@@ -261,13 +269,13 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
       )}
       {/* Item Detail Dialog */}
       {selectedItem && (
-        <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="sm" fullWidth sx={{ zIndex: 1500 }}>
+        <Dialog open={!!selectedItem} onClose={() => { setSelectedItem(null); onItemDetailClosed?.(); }} maxWidth="sm" fullWidth sx={{ zIndex: 1500 }}>
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box>
               {selectedItem.species_name}
               <Typography variant="body2" color="text.secondary">No.{selectedItem.item_number}</Typography>
             </Box>
-            <IconButton onClick={() => setSelectedItem(null)} size="small"><CloseIcon /></IconButton>
+            <IconButton onClick={() => { setSelectedItem(null); onItemDetailClosed?.(); }} size="small"><CloseIcon /></IconButton>
           </DialogTitle>
           <DialogContent>
             <Box

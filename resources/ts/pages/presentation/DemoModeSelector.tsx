@@ -34,7 +34,7 @@ export function DemoModeSelector({ onSelectGuided, onSelectFree }: DemoModeSelec
           <Typography variant="h6" sx={{ opacity: 0.9, mb: 1, fontSize: { xs: '0.95rem', md: '1.15rem' } }}>
             ログイン不要でオークションの全機能を体験できます
           </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
+          <Typography variant="body2" sx={{ opacity: 0.7, color: 'white' }}>
             お好みのデモモードを選択してください
           </Typography>
         </Container>
