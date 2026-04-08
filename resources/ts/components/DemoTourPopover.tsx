@@ -115,12 +115,13 @@ export const DemoTourPopover: React.FC<Props> = ({
       current = current.parentElement;
     }
 
-    // 各祖先の兄弟要素を低いz-indexに抑えて前面に出ないようにする
+    // ターゲットの直接の親の兄弟要素のみ低いz-indexに抑えて前面に出ないようにする
+    // （祖先を遡りすぎるとポップオーバー等の兄弟要素も巻き込むため直接の親のみ）
     const siblingsSaved: { node: HTMLElement; zIndex: string; position: string }[] = [];
-    let ancestor: HTMLElement | null = el.parentElement;
-    while (ancestor && ancestor !== document.body) {
-      Array.from(ancestor.children).forEach(child => {
-        if (child instanceof HTMLElement && !saved.some(s => s.node === child)) {
+    const directParent = el.parentElement;
+    if (directParent && directParent !== document.body) {
+      Array.from(directParent.children).forEach(child => {
+        if (child instanceof HTMLElement && child !== el) {
           siblingsSaved.push({
             node: child,
             zIndex: child.style.zIndex,
@@ -132,7 +133,6 @@ export const DemoTourPopover: React.FC<Props> = ({
           }
         }
       });
-      ancestor = ancestor.parentElement;
     }
 
     return () => {
