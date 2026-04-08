@@ -46,6 +46,8 @@ interface Props {
   onExecuteAction?: () => void;
   /** アカウント作成ボタンが押された時 */
   onSignup?: () => void;
+  /** モバイルフッターを一時的に隠す（入札操作中など） */
+  hideFooter?: boolean;
 }
 
 const POPOVER_WIDTH = 340;
@@ -63,6 +65,7 @@ export const DemoTourPopover: React.FC<Props> = ({
   isAutoPlaying = false,
   onExecuteAction,
   onSignup,
+  hideFooter = false,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -547,11 +550,15 @@ export const DemoTourPopover: React.FC<Props> = ({
             zIndex: 1450,
             borderRadius: '16px 16px 0 0',
             overflow: 'hidden',
-            animation: 'footerSlideUp 0.3s ease-out',
-            '@keyframes footerSlideUp': {
-              '0%': { transform: 'translateY(100%)' },
-              '100%': { transform: 'translateY(0)' },
-            },
+            transform: hideFooter ? 'translateY(100%)' : 'translateY(0)',
+            transition: 'transform 0.35s ease-in-out',
+            ...(!hideFooter && {
+              animation: 'footerSlideUp 0.3s ease-out',
+              '@keyframes footerSlideUp': {
+                '0%': { transform: 'translateY(100%)' },
+                '100%': { transform: 'translateY(0)' },
+              },
+            }),
             pb: 'env(safe-area-inset-bottom, 0px)',
           }}
         >

@@ -144,31 +144,6 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
         </Tabs>
       </Paper>
 
-      {/* ステータスフィルター — 実際と同じ */}
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>表示:</Typography>
-        {[
-          { key: 'all',        label: 'すべて',   color: 'default' as const },
-          { key: 'registered', label: '出品中',   color: 'primary' as const },
-          { key: 'live',       label: '入札中',   color: 'error'   as const },
-          { key: 'sold',       label: '落札済',   color: 'success' as const },
-          { key: 'unsold',     label: '不成立',   color: 'default' as const },
-        ].map(({ key, label, color }) => {
-          const isAll = key === 'all';
-          const isActive = isAll ? statusFilter.length === 0 : statusFilter.includes(key);
-          return (
-            <Chip key={key} label={label} size="small"
-              color={isActive ? color : 'default'}
-              variant={isActive ? 'filled' : 'outlined'}
-              onClick={() => {
-                if (isAll) setStatusFilter([]);
-                else setStatusFilter(prev => prev.includes(key) ? prev.filter(s => s !== key) : [...prev, key]);
-              }}
-              sx={{ cursor: 'pointer', fontWeight: isActive ? 600 : 400 }}
-            />
-          );
-        })}
-      </Box>
       </Box>{/* /items-filter-area */}
 
       {/* アイテム一覧 */}
@@ -189,6 +164,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                   favoriteButtonTourTarget={idx === 0 ? 'items-first-favorite' : undefined}
                   disableFavorite={!!activeOnly && activeOnly !== 'favorite'}
                   disableInfo={!!activeOnly && activeOnly !== 'info'}
+                  hideStatus
                 />
                 {/* 指値バッジ（カード下部に独立して配置）— 実際と同じ */}
                 <Box data-tour-target={idx === 0 ? 'items-first-limit' : undefined} sx={{

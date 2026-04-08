@@ -42,9 +42,11 @@ interface Props {
   disableFavorite?: boolean;
   /** 詳細ボタンを無効化（見た目は維持、タップ・カーソル無効） */
   disableInfo?: boolean;
+  /** ステータスチップ（出品中等）を非表示にする */
+  hideStatus?: boolean;
 }
 
-export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, onInfoClick, favoriteButtonTourTarget, disableFavorite, disableInfo }: Props) => {
+export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, onInfoClick, favoriteButtonTourTarget, disableFavorite, disableInfo, hideStatus }: Props) => {
   const status = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
 
   return (
@@ -81,7 +83,7 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
           <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>
-          <Chip label={status.label} color={status.color} size="small" />
+          {!hideStatus && <Chip label={status.label} color={status.color} size="small" />}
         </Box>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
         <Box sx={{ mt: 1 }}>

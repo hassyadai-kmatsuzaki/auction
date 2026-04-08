@@ -71,6 +71,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
           <IconButton
             edge="start"
             color="inherit"
+            data-tour-target="hamburger-menu"
             onClick={() => setDrawerOpen(true)}
             sx={{ mr: 2, display: { sm: 'none' }, ...(tourActive && { zIndex: 1451, position: 'relative' }) }}
           >

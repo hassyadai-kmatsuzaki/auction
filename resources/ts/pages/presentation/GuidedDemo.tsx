@@ -7,6 +7,7 @@ import {
   Box, Container, Typography, Paper, Grid, Button,
   Chip, IconButton, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  useMediaQuery, useTheme,
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
@@ -48,6 +49,8 @@ interface GuidedDemoProps {
 // ====================================================================
 
 export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [phase, setPhase] = useState<GuidedPhase>('home');
 
   // ─── Auction state ───
@@ -65,6 +68,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [tourActive, setTourActive] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [hideMobileFooter, setHideMobileFooter] = useState(false);
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
   // 入札合戦のラウンド数（step 13で使用）
   const battleRoundRef = useRef(0);
@@ -91,6 +95,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const firstItemFavoriteRef = useRef<HTMLElement | null>(null);
   const firstItemLimitRef = useRef<HTMLElement | null>(null);
   const waitingRoomButtonRef = useRef<HTMLElement | null>(null);
+  const hamburgerMenuRef = useRef<HTMLElement | null>(null);
   const favoritesNavRef = useRef<HTMLElement | null>(null);
   const favoritesHeaderRef = useRef<HTMLElement | null>(null);
   const bannerWaitingRoomRef = useRef<HTMLElement | null>(null);
@@ -120,6 +125,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       firstItemFavoriteRef.current = findVisible('[data-tour-target="items-first-favorite"]');
       firstItemLimitRef.current = findVisible('[data-tour-target="items-first-limit"]');
       waitingRoomButtonRef.current = findVisible('[data-tour-target="items-waiting-button"]');
+      hamburgerMenuRef.current = findVisible('[data-tour-target="hamburger-menu"]');
       favoritesNavRef.current = findVisible('[data-tour-target="favorites-nav"]');
       favoritesHeaderRef.current = findVisible('[data-tour-target="favorites-header"]');
       bannerWaitingRoomRef.current = findVisible('[data-tour-target="banner-waiting-room"]');
@@ -243,6 +249,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     runFreeze(laneId, 3, () => {
       startCountdown(laneId, 8);
       notify('フリーズ解除！再度入札してください', 'info');
+      setHideMobileFooter(false);
     });
   }, [stopTimer, updateLaneItem, startCountdown, notify, runFreeze]);
 
@@ -300,15 +307,17 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
       if (tourActive && tourStep === 11) {
         // step 11: 初回入札 → 次のステップへ
-        setTimeout(() => goToStepRef.current(12), 1200);
+        setHideMobileFooter(true);
+        setTimeout(() => { setHideMobileFooter(false); goToStepRef.current(12); }, 1200);
       }
       if (tourActive && tourStep === 13) {
         // step 13: 入札合戦 — ユーザーが入札したらCPUが反撃
+        setHideMobileFooter(true);
         battleRoundRef.current += 1;
         if (battleRoundRef.current >= 3) {
           // 3ラウンド完了 → 次のステップへ
           notify('入札合戦完了！次のステップに進みます', 'success');
-          setTimeout(() => goToStepRef.current(14), 1500);
+          setTimeout(() => { setHideMobileFooter(false); goToStepRef.current(14); }, 1500);
         } else {
           // CPUが反撃（1.5秒後に入札を返す）
           setTimeout(() => simulateBattleResponse(lane.lane_id), 1500);
@@ -391,7 +400,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ', tapTargetSelector: '[data-tour-target="bid-limit-chip"]' },
 
     // ── FAVORITES phase (steps 6-8) ──
-    { targetRef: favoritesNavRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: 'bottom', waitForAction: '「お気に入り」をタップ' },
+    { targetRef: (isMobile ? hamburgerMenuRef : favoritesNavRef) as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: isMobile ? 'メニューを開いて「お気に入り」をタップしましょう。' : 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「お気に入り」をタップ' },
     { targetRef: favoritesHeaderRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧', description: 'お気に入り一覧です。ここからも指値の設定やお気に入りの解除ができます。自由に操作してみてください。', placement: 'bottom' },
     { targetRef: bannerWaitingRoomRef as React.RefObject<HTMLElement | null>, title: '待機室へ進もう', description: 'バナーの「待機室へ入室」をタップして、オークション会場へ進みましょう。', placement: 'bottom', waitForAction: '「待機室へ入室」をタップ' },
 
@@ -615,6 +624,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       isAutoPlaying={isAutoPlaying}
       onExecuteAction={handleExecuteAction}
       onSignup={handleSignup}
+      hideFooter={hideMobileFooter}
     />
   ) : null;
 
@@ -824,6 +834,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             isAutoPlaying={isAutoPlaying}
             onExecuteAction={handleExecuteAction}
             onSignup={handleSignup}
+            hideFooter={hideMobileFooter}
           />
         )}
 
