@@ -98,40 +98,51 @@ export const DemoTourPopover: React.FC<Props> = ({
     if (!step?.waitForAction || !step.targetRef.current) return;
     const el = step.targetRef.current;
 
-    const saved: { node: HTMLElement; zIndex: string; position: string; isolation: string }[] = [];
+    const saved: { node: HTMLElement; zIndex: string; position: string }[] = [];
 
-    // ターゲット要素のみ z-index 1401 で前面に出す
-    saved.push({
-      node: el,
-      zIndex: el.style.zIndex,
-      position: el.style.position,
-      isolation: el.style.isolation,
-    });
-    el.style.zIndex = '1401';
-    if (!el.style.position || el.style.position === 'static') {
-      el.style.position = 'relative';
-    }
-
-    // 祖先は z-index を auto にしてスタッキングコンテキストを解除
-    // （ターゲットの z-index がルートコンテキストで評価されるようにする）
-    let current: HTMLElement | null = el.parentElement;
+    // ターゲットからbodyまで全祖先を持ち上げる（クリック可能にするため）
+    let current: HTMLElement | null = el;
     while (current && current !== document.body) {
       saved.push({
         node: current,
         zIndex: current.style.zIndex,
         position: current.style.position,
-        isolation: current.style.isolation,
       });
-      current.style.zIndex = 'auto';
-      current.style.isolation = 'auto';
+      current.style.zIndex = '1401';
+      if (!current.style.position || current.style.position === 'static') {
+        current.style.position = 'relative';
+      }
       current = current.parentElement;
     }
 
+    // 各祖先の兄弟要素を低いz-indexに抑えて前面に出ないようにする
+    const siblingsSaved: { node: HTMLElement; zIndex: string; position: string }[] = [];
+    let ancestor: HTMLElement | null = el.parentElement;
+    while (ancestor && ancestor !== document.body) {
+      Array.from(ancestor.children).forEach(child => {
+        if (child instanceof HTMLElement && !saved.some(s => s.node === child)) {
+          siblingsSaved.push({
+            node: child,
+            zIndex: child.style.zIndex,
+            position: child.style.position,
+          });
+          child.style.zIndex = '0';
+          if (!child.style.position || child.style.position === 'static') {
+            child.style.position = 'relative';
+          }
+        }
+      });
+      ancestor = ancestor.parentElement;
+    }
+
     return () => {
-      saved.forEach(({ node, zIndex, position, isolation }) => {
+      saved.forEach(({ node, zIndex, position }) => {
         node.style.zIndex = zIndex;
         node.style.position = position;
-        node.style.isolation = isolation;
+      });
+      siblingsSaved.forEach(({ node, zIndex, position }) => {
+        node.style.zIndex = zIndex;
+        node.style.position = position;
       });
     };
   }, [step, activeStep]);

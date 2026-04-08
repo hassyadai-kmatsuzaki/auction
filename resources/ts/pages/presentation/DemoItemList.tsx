@@ -187,7 +187,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
                   onFavoriteToggle={(e) => { if (!disableFavoriteAndLimit) handleFavoriteToggle(e, item.id); }}
-                  onInfoClick={(e) => { e.stopPropagation(); setSelectedItem(item); onItemDetailOpened?.(); }}
+                  onInfoClick={(e) => { if (disableInfoAndLimit) return; e.stopPropagation(); setSelectedItem(item); onItemDetailOpened?.(); }}
                   favoriteButtonTourTarget={idx === 0 ? 'items-first-favorite' : undefined}
                 />
                 {/* 指値バッジ（カード下部に独立して配置）— 実際と同じ */}
@@ -199,7 +199,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                   borderColor: 'divider',
                   borderBottomLeftRadius: 2,
                   borderBottomRightRadius: 2,
-                  ...(disableFavoriteAndLimit && { pointerEvents: 'none' }),
+                  ...((disableFavoriteAndLimit || disableInfoAndLimit) && { pointerEvents: 'none' }),
                 }}>
                   <BidLimitBadge
                     limitPrice={getLimitForItem(item.id).limit_price}

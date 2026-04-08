@@ -630,7 +630,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive}>
-        <DemoItemList onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} onItemDetailClosed={handleItemDetailClosed} disableFavoriteAndLimit={tourActive && tourStep === 3} />
+        <DemoItemList onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} onItemDetailClosed={handleItemDetailClosed} disableFavoriteAndLimit={tourActive && tourStep === 3} disableInfoAndLimit={tourActive && tourStep === 4} />
         {tourPopoverElement}
       </DemoLayout>
     );
