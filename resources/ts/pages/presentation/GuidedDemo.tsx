@@ -104,6 +104,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const firstWonItemRef = useRef<HTMLElement | null>(null);
   const settingsTabRef = useRef<HTMLElement | null>(null);
   const notificationSectionRef = useRef<HTMLElement | null>(null);
+  const notificationSubTabRef = useRef<HTMLElement | null>(null);
 
   // Resolve dynamic refs after phase/tab changes
   const [, forceUpdate] = useState(0);
@@ -134,6 +135,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       firstWonItemRef.current = findVisible('[data-tour-target="won-first-item"]');
       settingsTabRef.current = findVisible('[data-tour-target="settings-tab"]');
       notificationSectionRef.current = findVisible('[data-tour-target="notification-section"]');
+      notificationSubTabRef.current = findVisible('[data-tour-target="notification-sub-tab"]');
     };
     // Resolve immediately and after a short delay (for DOM to settle)
     resolve();
@@ -418,14 +420,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: postAuctionNavRef as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: 'bottom', waitForAction: '「落札管理」をタップ' },
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
-    { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブでプロフィールや通知設定を管理できます。', placement: 'bottom',
-      autoAction: () => { setPostAuctionTab('settings'); setSettingsSubTab(undefined); },
-      autoActionDelay: 500,
-    },
-    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。テスト送信も可能です。', placement: 'top',
-      autoAction: () => { setSettingsSubTab(1); },
-      autoActionDelay: 800,
-    },
+    { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブをタップして、プロフィールや通知設定を確認しましょう。', placement: 'bottom', waitForAction: '「設定」タブをタップ' },
+    { targetRef: notificationSubTabRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: '「通知設定」タブをタップして、メール通知の設定を確認しましょう。', placement: 'bottom', waitForAction: '「通知設定」タブをタップ' },
     { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
   ];
 
@@ -614,6 +610,22 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     }
   }, [tourActive, tourStep]);
 
+  // Tour-aware: settings tab clicked → advance from step 21 to step 22
+  const handlePostAuctionTabChange = useCallback((tab: string) => {
+    setPostAuctionTab(tab);
+    if (tourActive && tourStep === 21 && tab === 'settings') {
+      setTimeout(() => goToStepRef.current(22), 300);
+    }
+  }, [tourActive, tourStep]);
+
+  // Tour-aware: notification sub-tab clicked → advance from step 22 to step 23
+  const handleSettingsSubTabChange = useCallback((subTab: number) => {
+    setSettingsSubTab(subTab);
+    if (tourActive && tourStep === 22 && subTab === 1) {
+      setTimeout(() => goToStepRef.current(23), 300);
+    }
+  }, [tourActive, tourStep]);
+
   const handleSignup = useCallback(() => {
     window.location.href = '/register';
   }, []);
@@ -679,8 +691,9 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           isGuided={!tourActive}
           onBackToTop={onBackToTop}
           controlledTab={tourActive ? postAuctionTab : undefined}
-          onTabChange={setPostAuctionTab}
+          onTabChange={handlePostAuctionTabChange}
           controlledSettingsSubTab={tourActive ? settingsSubTab : undefined}
+          onSettingsSubTabChange={handleSettingsSubTabChange}
         />
         {tourPopoverElement}
       </DemoLayout>

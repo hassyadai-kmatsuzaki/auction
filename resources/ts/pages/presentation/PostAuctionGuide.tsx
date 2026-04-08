@@ -60,6 +60,8 @@ interface PostAuctionGuideProps {
   onTabChange?: (tab: string) => void;
   /** 設定タブ内のサブタブ制御（0=プロフィール、1=通知設定） */
   controlledSettingsSubTab?: number;
+  /** 設定サブタブが変更された際のコールバック */
+  onSettingsSubTabChange?: (subTab: number) => void;
 }
 
 /**
@@ -67,7 +69,7 @@ interface PostAuctionGuideProps {
  * ガイド付きもガイドなしも同じ画面構成。
  * ガイド付きの場合はステッパーとナビゲーションボタンが追加される。
  */
-export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, controlledTab, onTabChange, controlledSettingsSubTab }: PostAuctionGuideProps) {
+export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, controlledTab, onTabChange, controlledSettingsSubTab, onSettingsSubTabChange }: PostAuctionGuideProps) {
   const [internalTab, setInternalTab] = useState(initialTab || 'won-items');
   const currentTab = controlledTab ?? internalTab;
   const setCurrentTab = (tab: string) => {
@@ -583,9 +585,10 @@ function StepAccountSettings({ controlledSubTab }: { controlledSubTab?: number }
         <Grid item xs={12} md={9}>
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+              <Tabs value={tabValue} onChange={(_, v) => { setTabValue(v); onSettingsSubTabChange?.(v); }}>
                 <Tab icon={<PersonIcon />} label="プロフィール" iconPosition="start" />
-                <Tab icon={<NotificationsIcon />} label="通知設定" iconPosition="start" />
+                <Tab icon={<NotificationsIcon />} label="通知設定" iconPosition="start"
+                  data-tour-target="notification-sub-tab" />
               </Tabs>
             </Box>
 
