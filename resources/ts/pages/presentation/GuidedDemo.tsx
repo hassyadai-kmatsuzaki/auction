@@ -541,9 +541,9 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     if (tourActive) {
       if (page === 'favorites' && tourStep === 6) { handleNavigateFavorites(); return; }
       if (page === 'post-auction' && tourStep === 18) {
+        setTourStep(19);
         setPhase('post-auction');
         setPostAuctionTab('won-items');
-        setTimeout(() => goToStepRef.current(19), 300);
         return;
       }
       // それ以外はブロック
@@ -559,10 +559,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // Tour-aware phase transition handlers
   const handleHomeGoToItems = useCallback(() => {
-    setPhase('items');
     if (tourActive && tourStep === 1) {
-      // After step 1 action (tap items button), advance to step 2
-      setTimeout(() => goToStepRef.current(2), 300);
+      // ステップを先に進めてからphaseを変更（フォールバック表示のちらつき防止）
+      setTourStep(2);
+      setPhase('items');
+    } else {
+      setPhase('items');
     }
   }, [tourActive, tourStep]);
 
@@ -603,9 +605,11 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // Tour-aware: navigate to favorites page
   const handleNavigateFavorites = useCallback(() => {
-    setPhase('favorites');
     if (tourActive && tourStep === 6) {
-      setTimeout(() => goToStepRef.current(7), 300);
+      setTourStep(7);
+      setPhase('favorites');
+    } else {
+      setPhase('favorites');
     }
   }, [tourActive, tourStep]);
 
@@ -719,7 +723,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           </Paper>
         </Container>
 
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Container maxWidth="xl" sx={{ py: 3, pb: tourActive && isMobile ? '220px' : 3 }}>
           {/* Lane grid */}
           <Grid container spacing={2}>
             {lanes.map((lane, idx) => (

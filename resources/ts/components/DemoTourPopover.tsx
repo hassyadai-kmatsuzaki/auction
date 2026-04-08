@@ -204,7 +204,12 @@ export const DemoTourPopover: React.FC<Props> = ({
         const rect = step.targetRef.current.getBoundingClientRect();
         const visibleBottom = window.innerHeight - MOBILE_FOOTER_HEIGHT;
         if (rect.bottom > visibleBottom || rect.top < 0) {
-          const scrollTarget = window.scrollY + rect.top - 80;
+          // ターゲットの下端がフッターの上に見えるようスクロール
+          // ターゲットが大きい場合は上端を画面上部に寄せる
+          const targetFitsAboveFooter = rect.height < (visibleBottom - 60);
+          const scrollTarget = targetFitsAboveFooter
+            ? window.scrollY + rect.bottom - visibleBottom + 16
+            : window.scrollY + rect.top - 60;
           window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
         }
       } else {
