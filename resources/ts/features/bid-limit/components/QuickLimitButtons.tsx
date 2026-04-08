@@ -15,6 +15,8 @@ interface Props {
   currentValue: number | null;
   onSelect: (value: number) => void;
   isLive?: boolean;
+  /** 指定した価格のみ選択可能にする（デモ用） */
+  allowedPrice?: number;
 }
 
 const MULTIPLIERS = [
@@ -24,7 +26,7 @@ const MULTIPLIERS = [
   { key: 'x3'   as const, label: '×3'   },
 ];
 
-export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSelect, isLive }: Props) => (
+export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSelect, isLive, allowedPrice }: Props) => (
   <Box>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
       <BoltIcon sx={{ fontSize: 16, color: 'warning.main' }} />
@@ -36,12 +38,14 @@ export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSel
       {MULTIPLIERS.map(({ key, label }) => {
         const value = quickOptions[key];
         const isSelected = currentValue === value;
+        const isDisabled = allowedPrice != null && value !== allowedPrice;
         return (
           <Button
             key={key}
             variant={isSelected ? 'contained' : 'outlined'}
             color={isSelected ? 'primary' : 'inherit'}
             size="small"
+            disabled={isDisabled}
             onClick={() => onSelect(value)}
             sx={{ flexDirection: 'column', py: 0.75, minWidth: 0 }}
           >

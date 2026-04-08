@@ -476,12 +476,13 @@ export const DemoTourPopover: React.FC<Props> = ({
       </Button>
 
       {isLastStep ? (
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 1, flex: 1, ml: 1 }}>
           <Button
             size="small"
             variant="outlined"
             onClick={onReset}
             disabled={isAutoPlaying}
+            fullWidth={isMobile}
           >
             デモTOPに戻る
           </Button>
@@ -491,6 +492,7 @@ export const DemoTourPopover: React.FC<Props> = ({
               variant="contained"
               color="success"
               onClick={onSignup}
+              fullWidth={isMobile}
             >
               アカウント作成に進む
             </Button>

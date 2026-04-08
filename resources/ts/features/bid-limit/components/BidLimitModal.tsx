@@ -30,12 +30,14 @@ interface Props {
   onRemove: () => void;
   /** Dialog の z-index を上書き（デモのオーバーレイより上に表示する場合） */
   zIndex?: number;
+  /** 指定した価格のみ選択可能にする（デモ用） */
+  allowedPrice?: number;
 }
 
 export const BidLimitModal = React.memo(({
   open, onClose, speciesName, currentLimitPrice,
   currentPrice, quickOptions, isLive,
-  isSetting, isRemoving, onSet, onRemove, zIndex,
+  isSetting, isRemoving, onSet, onRemove, zIndex, allowedPrice,
 }: Props) => {
   const [inputValue, setInputValue] = useState<string>('');
   const [selectedQuick, setSelectedQuick] = useState<number | null>(null);
@@ -119,20 +121,26 @@ export const BidLimitModal = React.memo(({
           currentValue={selectedQuick}
           onSelect={handleQuickSelect}
           isLive={isLive}
+          allowedPrice={allowedPrice}
         />
 
-        <Divider sx={{ my: 2 }} />
+        {!allowedPrice && (
+          <>
+            <Divider sx={{ my: 2 }} />
 
-        {/* カスタム入力 */}
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-          カスタム入力
-        </Typography>
+            {/* カスタム入力 */}
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+              カスタム入力
+            </Typography>
+          </>
+        )}
         <TextField
           fullWidth
           type="number"
           placeholder="例: 8000"
           value={inputValue}
           onChange={handleInputChange}
+          sx={allowedPrice ? { display: 'none' } : undefined}
           InputProps={{
             startAdornment: <InputAdornment position="start">¥</InputAdornment>,
             inputProps: { min: 1 },

@@ -574,8 +574,8 @@ function StepAccountSettings({ controlledSubTab, onSubTabChange }: { controlledS
 
             {/* 通知設定タブ — 実際の Settings.tsx と同一 */}
             {tabValue === 1 && (
-              <CardContent sx={{ p: 3 }}>
-                <Box data-tour-target="notification-section" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              <CardContent data-tour-target="notification-section" sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <NotificationsIcon sx={{ color: '#F59E0B' }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>メール通知設定</Typography>
                 </Box>

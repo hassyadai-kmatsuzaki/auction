@@ -303,7 +303,11 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     if (currentStatus === 'active') {
       return;
     } else {
-      updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'active', active_bidders_count: i.active_bidders_count + 1 }));
+      // 入札時に価格を上昇させる
+      updateLaneItem(lane.lane_id, i => {
+        const inc = calculatePriceIncrement(i.current_price);
+        return { ...i, my_bid_status: 'active', active_bidders_count: i.active_bidders_count + 1, current_price: i.current_price + inc };
+      });
       startCountdown(lane.lane_id, 8);
       notify(`レーン${lane.lane_number}に入札しました！`, 'success');
       if (tourActive && tourStep === 11) {
@@ -315,8 +319,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
         // step 13: 入札合戦 — ユーザーが入札したらCPUが反撃
         setHideMobileFooter(true);
         battleRoundRef.current += 1;
-        if (battleRoundRef.current >= 3) {
-          // 3ラウンド完了 → 次のステップへ
+        if (battleRoundRef.current >= 2) {
+          // 2ラウンド完了 → 次のステップへ
           notify('入札合戦完了！次のステップに進みます', 'success');
           setTimeout(() => { setHideMobileFooter(false); goToStepRef.current(14); }, 1500);
         } else {
@@ -410,14 +414,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: 'レーンカードの見方', description: '各レーンには品種名、現在価格、カウントダウンが表示されています。複数のレーンが同時に進行するのがこのオークションの特徴です。', placement: 'bottom' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきます！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、3回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、2回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ', tapTargetSelector: '[data-tour-target="bid-limit-chip"]' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値が発動！自動入札オフ', description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateLimitTrigger(); }, autoActionDelay: 6000, autoActionLabel: '指値発動を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン1を落札します。紙吹雪の落札演出をお楽しみください！', placement: 'bottom', autoAction: () => { updateLaneItem(1, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(1), 500); }, autoActionDelay: 4500, autoActionLabel: '落札する' },
     { targetRef: wonTableRef, title: 'オークション完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
 
     // ── POST-AUCTION phase (steps 18-23) ──
-    { targetRef: postAuctionNavRef as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: 'bottom', waitForAction: '「落札管理」をタップ' },
+    { targetRef: (isMobile ? hamburgerMenuRef : postAuctionNavRef) as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: isMobile ? 'メニューを開いて「落札管理」をタップしましょう。' : 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「落札管理」をタップ' },
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
     { targetRef: (isMobile ? hamburgerMenuRef : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? 'メニューを開いて「設定」をタップしましょう。' : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「設定」をタップ' },
@@ -452,8 +456,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     }
 
     // ── 後退時: オークションステップの状態をリセット ──
-    if (!isForward && targetStep <= 12) {
-      // step 9-12 に戻る場合: レーン1の価格・入札状態を初期値に戻す
+    if (!isForward && targetStep <= 14) {
+      // step 9-14 に戻る場合: レーン1の価格・入札状態・指値を初期値に戻す
       stopTimer(1);
       const initialItem = GUIDED_INITIAL_LANES[0].current_item!;
       setLanes(prev => prev.map(l =>
@@ -872,6 +876,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             onSet={handleSetLimit}
             onRemove={handleRemoveLimit}
             zIndex={1500}
+            allowedPrice={tourActive && tourStep === 14 ? Math.floor(limitModalItemData.current_price * 1.5) : undefined}
           />
         )}
 
