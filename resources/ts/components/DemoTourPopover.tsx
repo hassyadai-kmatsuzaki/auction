@@ -579,115 +579,134 @@ export const DemoTourPopover: React.FC<Props> = ({
             <Box sx={{ width: 32, height: 4, borderRadius: 2, bgcolor: 'grey.300' }} />
           </Box>
 
-          <Box
-            key={fadeKey}
-            sx={{
-              px: 2,
-              pt: 0.5,
-              pb: isLandscape ? 1 : 1.5,
-              animation: 'contentFadeIn 0.25s ease-out',
-              '@keyframes contentFadeIn': {
-                '0%': { opacity: 0, transform: 'translateX(8px)' },
-                '100%': { opacity: 1, transform: 'translateX(0)' },
-              },
-            }}
-          >
-            {/* ヘッダー行: ステップ番号 + 閉じるボタン */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {step.waitForAction ? (
+            /* waitForAction時: コンパクトモード（タイトル + アクションボタンのみ） */
+            <Box key={fadeKey} sx={{ px: 2, pt: 0.5, pb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <Typography
                   variant="caption"
                   sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.05em' }}
                 >
-                  STEP {activeStep + 1} / {steps.length}
+                  STEP {activeStep + 1}
                 </Typography>
-                {/* ステップドットインジケーター */}
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  {steps.map((_, i) => (
-                    <Box
-                      key={i}
-                      sx={{
-                        width: i === activeStep ? 12 : 6,
-                        height: 6,
-                        borderRadius: 3,
-                        bgcolor: i === activeStep ? 'primary.main' : i < activeStep ? 'primary.light' : 'grey.300',
-                        transition: 'all 0.3s ease',
-                      }}
-                    />
-                  ))}
+                <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.3, fontSize: '0.8rem' }}>
+                  {step.title}
+                </Typography>
+              </Box>
+              {navButtons}
+            </Box>
+          ) : (
+            /* 通常時: フルコンテンツ */
+            <Box
+              key={fadeKey}
+              sx={{
+                px: 2,
+                pt: 0.5,
+                pb: isLandscape ? 1 : 1.5,
+                animation: 'contentFadeIn 0.25s ease-out',
+                '@keyframes contentFadeIn': {
+                  '0%': { opacity: 0, transform: 'translateX(8px)' },
+                  '100%': { opacity: 1, transform: 'translateX(0)' },
+                },
+              }}
+            >
+              {/* ヘッダー行: ステップ番号 */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.05em' }}
+                  >
+                    STEP {activeStep + 1} / {steps.length}
+                  </Typography>
+                  {/* ステップドットインジケーター */}
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {steps.map((_, i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          width: i === activeStep ? 12 : 6,
+                          height: 6,
+                          borderRadius: 3,
+                          bgcolor: i === activeStep ? 'primary.main' : i < activeStep ? 'primary.light' : 'grey.300',
+                          transition: 'all 0.3s ease',
+                        }}
+                      />
+                    ))}
+                  </Box>
                 </Box>
               </Box>
-            </Box>
 
-            {/* タイトル */}
-            <Typography
-              variant="subtitle2"
-              fontWeight={700}
-              sx={{ mb: 0.25, lineHeight: 1.3, fontSize: isLandscape ? '0.8rem' : undefined }}
-            >
-              {step.title}
-            </Typography>
+              {/* タイトル */}
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                sx={{ mb: 0.25, lineHeight: 1.3, fontSize: isLandscape ? '0.8rem' : undefined }}
+              >
+                {step.title}
+              </Typography>
 
-            {/* 説明文 (ランドスケープ時は折りたたみ可能) */}
-            {isLandscape ? (
-              <>
-                <Collapse in={expanded} collapsedSize={0}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ lineHeight: 1.5, fontSize: '0.75rem', mb: 0.5 }}
-                  >
-                    {step.description}
-                  </Typography>
-                </Collapse>
-                <Button
-                  size="small"
-                  onClick={() => setExpanded(!expanded)}
-                  endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  sx={{ p: 0, minHeight: 'auto', fontSize: '0.7rem', color: 'grey.500' }}
-                >
-                  {expanded ? '閉じる' : '説明を見る'}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{
-                    lineHeight: 1.6,
-                    fontSize: '0.8rem',
-                    ...(!expanded && {
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }),
-                  }}
-                >
-                  {step.description}
-                </Typography>
-                {/* 長い説明文の場合のみ展開ボタンを表示 */}
-                {step.description.length > 50 && (
+              {/* 説明文 (ランドスケープ時は折りたたみ可能) */}
+              {isLandscape ? (
+                <>
+                  <Collapse in={expanded} collapsedSize={0}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ lineHeight: 1.5, fontSize: '0.75rem', mb: 0.5 }}
+                    >
+                      {step.description}
+                    </Typography>
+                  </Collapse>
                   <Button
                     size="small"
                     onClick={() => setExpanded(!expanded)}
-                    sx={{ p: 0, minHeight: 'auto', fontSize: '0.7rem', color: 'primary.main', mt: 0.25 }}
+                    endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    sx={{ p: 0, minHeight: 'auto', fontSize: '0.7rem', color: 'grey.500' }}
                   >
-                    {expanded ? '閉じる' : 'もっと見る'}
+                    {expanded ? '閉じる' : '説明を見る'}
                   </Button>
-                )}
-              </>
-            )}
+                </>
+              ) : (
+                <>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      lineHeight: 1.6,
+                      fontSize: '0.8rem',
+                      ...(!expanded && {
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }),
+                    }}
+                  >
+                    {step.description}
+                  </Typography>
+                  {/* 長い説明文の場合のみ展開ボタンを表示 */}
+                  {step.description.length > 50 && (
+                    <Button
+                      size="small"
+                      onClick={() => setExpanded(!expanded)}
+                      sx={{ p: 0, minHeight: 'auto', fontSize: '0.7rem', color: 'primary.main', mt: 0.25 }}
+                    >
+                      {expanded ? '閉じる' : 'もっと見る'}
+                    </Button>
+                  )}
+                </>
+              )}
 
-            {/* 自動再生インジケーター */}
-            {autoPlayingIndicator && <Box sx={{ mt: 0.75, mb: 0.5 }}>{autoPlayingIndicator}</Box>}
+              {/* 自動再生インジケーター */}
+              {autoPlayingIndicator && <Box sx={{ mt: 0.75, mb: 0.5 }}>{autoPlayingIndicator}</Box>}
 
-            {/* ナビゲーションボタン */}
-            <Box sx={{ mt: autoPlayingIndicator ? 0 : 1 }}>
-              {navButtons}
+              {/* ナビゲーションボタン */}
+              <Box sx={{ mt: autoPlayingIndicator ? 0 : 1 }}>
+                {navButtons}
+              </Box>
             </Box>
-          </Box>
+          )}
         </Paper>
       </>
     );
