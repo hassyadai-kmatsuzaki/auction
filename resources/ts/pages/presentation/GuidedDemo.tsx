@@ -388,7 +388,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: itemsFilterAreaRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。各商品に指値（上限価格）やお気に入りを設定できます。', placement: 'bottom' },
     { targetRef: firstItemCardRef as React.RefObject<HTMLElement | null>, title: '商品の詳細を見てみよう', description: '商品カードの「詳細」ボタンをタップすると、写真や検査情報などの詳細を確認できます。', placement: 'bottom', waitForAction: '「詳細」ボタンをタップ', tapTargetSelector: '[data-tour-target="item-detail-chip"]' },
     { targetRef: firstItemFavoriteRef as React.RefObject<HTMLElement | null>, title: 'お気に入りに追加しよう', description: '気になる商品のハートアイコンをタップして、お気に入りに追加してみましょう。', placement: 'right', waitForAction: 'ハートアイコンをタップ' },
-    { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ' },
+    { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）を設定しよう', description: '「上限設定」をタップして指値を設定してみましょう。設定した金額に達すると自動で入札がオフになる便利な機能です。', placement: 'bottom', waitForAction: '「上限設定」をタップ', tapTargetSelector: '[data-tour-target="bid-limit-chip"]' },
 
     // ── FAVORITES phase (steps 6-8) ──
     { targetRef: favoritesNavRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: 'bottom', waitForAction: '「お気に入り」をタップ' },
@@ -630,7 +630,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive}>
-        <DemoItemList onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} onItemDetailClosed={handleItemDetailClosed} disableFavoriteAndLimit={tourActive && tourStep === 3} disableInfoAndLimit={tourActive && tourStep === 4} />
+        <DemoItemList onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} onItemDetailClosed={handleItemDetailClosed} activeOnly={tourActive && tourStep === 3 ? 'info' : tourActive && tourStep === 4 ? 'favorite' : tourActive && tourStep === 5 ? 'limit' : undefined} />
         {tourPopoverElement}
       </DemoLayout>
     );

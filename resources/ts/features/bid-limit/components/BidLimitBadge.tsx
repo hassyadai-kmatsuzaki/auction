@@ -22,6 +22,7 @@ export const BidLimitBadge = React.memo(({ limitPrice, isTriggered, onEdit, onRe
     return (
       <Tooltip title="上限価格を設定すると、その価格に達したとき自動で入札オフになります">
         <Chip
+          data-tour-target="bid-limit-chip"
           icon={<PriceCheckIcon sx={{ fontSize: size === 'small' ? 14 : 16 }} />}
           label="上限設定"
           size={size}

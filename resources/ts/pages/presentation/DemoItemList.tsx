@@ -29,13 +29,11 @@ interface DemoItemListProps {
   onLimitSet?: () => void;
   onItemDetailOpened?: () => void;
   onItemDetailClosed?: () => void;
-  /** お気に入り・指値ボタンを無効化（STEP4: 詳細のみ操作可能） */
-  disableFavoriteAndLimit?: boolean;
-  /** 詳細・指値ボタンを無効化（STEP5: お気に入りのみ操作可能） */
-  disableInfoAndLimit?: boolean;
+  /** ガイド中に有効にする操作を限定（未指定時は全操作可能） */
+  activeOnly?: 'info' | 'favorite' | 'limit';
 }
 
-export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened, onItemDetailClosed, disableFavoriteAndLimit, disableInfoAndLimit }: DemoItemListProps) {
+export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened, onItemDetailClosed, activeOnly }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -186,9 +184,11 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                 <ItemCard
                   item={mapItem(item)}
                   isFavorited={favoriteIds.has(item.id)}
-                  onFavoriteToggle={(e) => { if (!disableFavoriteAndLimit) handleFavoriteToggle(e, item.id); }}
-                  onInfoClick={(e) => { if (disableInfoAndLimit) return; e.stopPropagation(); setSelectedItem(item); onItemDetailOpened?.(); }}
+                  onFavoriteToggle={(e) => { if (activeOnly && activeOnly !== 'favorite') return; handleFavoriteToggle(e, item.id); }}
+                  onInfoClick={(e) => { if (activeOnly && activeOnly !== 'info') return; e.stopPropagation(); setSelectedItem(item); onItemDetailOpened?.(); }}
                   favoriteButtonTourTarget={idx === 0 ? 'items-first-favorite' : undefined}
+                  disableFavorite={!!activeOnly && activeOnly !== 'favorite'}
+                  disableInfo={!!activeOnly && activeOnly !== 'info'}
                 />
                 {/* 指値バッジ（カード下部に独立して配置）— 実際と同じ */}
                 <Box data-tour-target={idx === 0 ? 'items-first-limit' : undefined} sx={{
@@ -199,7 +199,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
                   borderColor: 'divider',
                   borderBottomLeftRadius: 2,
                   borderBottomRightRadius: 2,
-                  ...((disableFavoriteAndLimit || disableInfoAndLimit) && { pointerEvents: 'none' }),
+                  ...(activeOnly && activeOnly !== 'limit' && { pointerEvents: 'none', cursor: 'default' }),
                 }}>
                   <BidLimitBadge
                     limitPrice={getLimitForItem(item.id).limit_price}

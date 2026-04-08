@@ -102,7 +102,6 @@ export function DemoHome({ onGoToItems, onGoToWaitingRoom, disableWaitingRoom }:
                 '&.Mui-disabled': {
                   bgcolor: 'primary.main',
                   color: 'white',
-                  opacity: 0.7,
                 },
               }}
             >

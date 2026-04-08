@@ -38,9 +38,13 @@ interface Props {
   onInfoClick?: (e: React.MouseEvent) => void;
   /** ツアー用: ハートアイコンに data-tour-target を付与 */
   favoriteButtonTourTarget?: string;
+  /** お気に入りボタンを無効化（見た目は維持、タップ・カーソル無効） */
+  disableFavorite?: boolean;
+  /** 詳細ボタンを無効化（見た目は維持、タップ・カーソル無効） */
+  disableInfo?: boolean;
 }
 
-export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, onInfoClick, favoriteButtonTourTarget }: Props) => {
+export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteToggle, onInfoClick, favoriteButtonTourTarget, disableFavorite, disableInfo }: Props) => {
   const status = STATUS_CONFIG[item.status] ?? { label: item.status, color: 'default' as const };
 
   return (
@@ -55,7 +59,10 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
       <IconButton
         onClick={onFavoriteToggle}
         data-tour-target={favoriteButtonTourTarget}
-        sx={{ position: 'absolute', top: 4, left: 4, zIndex: 2, bgcolor: 'rgba(255,255,255,0.85)', width: 32, height: 32 }}
+        sx={{
+          position: 'absolute', top: 4, left: 4, zIndex: 2, bgcolor: 'rgba(255,255,255,0.85)', width: 32, height: 32,
+          ...(disableFavorite && { pointerEvents: 'none', cursor: 'default' }),
+        }}
         size="small"
       >
         {isFavorited
@@ -98,7 +105,10 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
               color="primary"
               variant="outlined"
               onClick={onInfoClick}
-              sx={{ cursor: 'pointer' }}
+              sx={{
+                cursor: disableInfo ? 'default' : 'pointer',
+                ...(disableInfo && { pointerEvents: 'none' }),
+              }}
             />
           </Box>
         )}
