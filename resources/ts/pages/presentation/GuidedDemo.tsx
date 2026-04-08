@@ -329,8 +329,19 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
           setTimeout(() => simulateBattleResponse(lane.lane_id), 1500);
         }
       }
+      if (tourActive && tourStep === 16) {
+        // step 16: 落札 — 入札後に8秒カウントダウンで落札
+        setHideMobileFooter(true);
+        stopTimer(lane.lane_id);
+        startCountdown(lane.lane_id, 8);
+        setTimeout(() => {
+          handleWin(lane.lane_id);
+          setHideMobileFooter(false);
+          setTimeout(() => goToStepRef.current(17), 2000);
+        }, 8500);
+      }
     }
-  }, [lanes, notify, updateLaneItem, startCountdown, tourActive, tourStep, simulateBattleResponse]);
+  }, [lanes, notify, updateLaneItem, startCountdown, stopTimer, tourActive, tourStep, simulateBattleResponse, handleWin]);
 
   // ─── Limit ───
 
@@ -403,7 +414,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: itemsFilterAreaRef as React.RefObject<HTMLElement | null>, title: '出品一覧', description: '出品一覧です。レーンごとに商品を確認できます。各商品に指値（上限価格）やお気に入りを設定できます。', placement: 'bottom' },
     { targetRef: firstItemCardRef as React.RefObject<HTMLElement | null>, title: '商品の詳細を見てみよう', description: '商品カードの「詳細」ボタンをタップすると、写真や検査情報などの詳細を確認できます。', placement: 'bottom', waitForAction: '「詳細」ボタンをタップ', tapTargetSelector: '[data-tour-target="item-detail-chip"]' },
     { targetRef: firstItemFavoriteRef as React.RefObject<HTMLElement | null>, title: 'お気に入りに追加しよう', description: '気になる商品のハートアイコンをタップして、お気に入りに追加してみましょう。', placement: 'right', waitForAction: 'ハートアイコンをタップ' },
-    { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）について', description: '指値を設定すると、設定した金額に達した際に自動で入札がオフになります。実際のオークションデモの際に詳しくご説明します。', placement: 'bottom' },
+    { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）について', description: '指値を設定すると、設定した金額に達した際に自動で入札がオフになります。この後の実際のオークションデモの際に詳しくご説明します。', placement: 'bottom' },
 
     // ── FAVORITES phase (steps 6-8) ──
     { targetRef: (isMobile ? hamburgerMenuRef : favoritesNavRef) as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: isMobile ? 'メニューを開いて「お気に入り」をタップしましょう。' : 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「お気に入り」をタップ' },
@@ -418,7 +429,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、2回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ', tapTargetSelector: '[data-tour-target="bid-limit-chip"]' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値が発動！自動入札オフ', description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateLimitTrigger(); }, autoActionDelay: 6000, autoActionLabel: '指値発動を見る' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン1を落札します。紙吹雪の落札演出をお楽しみください！', placement: 'bottom', autoAction: () => { updateLaneItem(1, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(1), 500); }, autoActionDelay: 4500, autoActionLabel: '落札する' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '落札してみよう！', description: '「入札する」ボタンをタップしてください。カウントダウンが0秒になると落札です！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
     { targetRef: wonTableRef, title: 'オークション完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
 
     // ── POST-AUCTION phase (steps 18-23) ──
@@ -756,12 +767,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                     lane={lane} isLoading={false}
                     onBidToggle={handleBidToggle}
                     onDetailOpen={() => {}}
-                    disableDetail={tourActive && (tourStep === 11 || tourStep === 13)}
-                    onLimitEdit={tourActive && (tourStep === 11 || tourStep === 13) ? undefined : (itemId) => {
+                    disableDetail={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16)}
+                    onLimitEdit={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16) ? undefined : (itemId) => {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
                       if (targetLane) setLimitModalLaneId(targetLane.lane_id);
                     }}
-                    onLimitRemove={tourActive && (tourStep === 11 || tourStep === 13) ? undefined : (itemId) => {
+                    onLimitRemove={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16) ? undefined : (itemId) => {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
                       if (targetLane) {
                         updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
