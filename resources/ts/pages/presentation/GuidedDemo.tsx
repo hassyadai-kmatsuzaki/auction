@@ -102,8 +102,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const postAuctionNavRef = useRef<HTMLElement | null>(null);
   const wonItemsHeaderRef = useRef<HTMLElement | null>(null);
   const firstWonItemRef = useRef<HTMLElement | null>(null);
-  const settingsTabRef = useRef<HTMLElement | null>(null);
-  const notificationSectionRef = useRef<HTMLElement | null>(null);
+  const settingsNavRef = useRef<HTMLElement | null>(null);
   const notificationSubTabRef = useRef<HTMLElement | null>(null);
 
   // Resolve dynamic refs after phase/tab changes
@@ -133,8 +132,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       postAuctionNavRef.current = findVisible('[data-tour-target="post-auction-nav"]');
       wonItemsHeaderRef.current = findVisible('[data-tour-target="won-items-header"]');
       firstWonItemRef.current = findVisible('[data-tour-target="won-first-item"]');
-      settingsTabRef.current = findVisible('[data-tour-target="settings-tab"]');
-      notificationSectionRef.current = findVisible('[data-tour-target="notification-section"]');
+      settingsNavRef.current = findVisible('[data-tour-target="settings-nav"]');
       notificationSubTabRef.current = findVisible('[data-tour-target="notification-sub-tab"]');
     };
     // Resolve immediately and after a short delay (for DOM to settle)
@@ -420,7 +418,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: postAuctionNavRef as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: 'bottom', waitForAction: '「落札管理」をタップ' },
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
-    { targetRef: settingsTabRef as React.RefObject<HTMLElement | null>, title: '設定タブ', description: '「設定」タブをタップして、プロフィールや通知設定を確認しましょう。', placement: 'bottom', waitForAction: '「設定」タブをタップ' },
+    { targetRef: (isMobile ? hamburgerMenuRef : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? 'メニューを開いて「設定」をタップしましょう。' : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「設定」をタップ' },
     { targetRef: notificationSubTabRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: '「通知設定」タブをタップして、メール通知の設定を確認しましょう。', placement: 'bottom', waitForAction: '「通知設定」タブをタップ' },
     { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
   ];
@@ -543,6 +541,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
         setPostAuctionTab('won-items');
         return;
       }
+      if (page === 'settings' && tourStep === 21) {
+        setTourStep(22);
+        setPhase('post-auction');
+        setPostAuctionTab('settings');
+        return;
+      }
       // それ以外はブロック
       return;
     }
@@ -607,14 +611,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       setPhase('favorites');
     } else {
       setPhase('favorites');
-    }
-  }, [tourActive, tourStep]);
-
-  // Tour-aware: settings tab clicked → advance from step 21 to step 22
-  const handlePostAuctionTabChange = useCallback((tab: string) => {
-    setPostAuctionTab(tab);
-    if (tourActive && tourStep === 21 && tab === 'settings') {
-      setTimeout(() => goToStepRef.current(22), 300);
     }
   }, [tourActive, tourStep]);
 
@@ -688,10 +684,9 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       <DemoLayout currentPage={postAuctionTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive} tourActive={tourActive}>
         <PostAuctionGuide
           wonItems={wonItems}
-          isGuided={!tourActive}
           onBackToTop={onBackToTop}
           controlledTab={tourActive ? postAuctionTab : undefined}
-          onTabChange={handlePostAuctionTabChange}
+          onTabChange={setPostAuctionTab}
           controlledSettingsSubTab={tourActive ? settingsSubTab : undefined}
           onSettingsSubTabChange={handleSettingsSubTabChange}
         />

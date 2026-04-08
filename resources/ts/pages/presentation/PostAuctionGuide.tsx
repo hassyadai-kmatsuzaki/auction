@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import {
   Box, Container, Typography, Button, Paper, Grid, Tabs, Tab,
-  Card, CardContent, CardMedia, Chip, CircularProgress, Stepper, Step, StepLabel,
+  Card, CardContent, CardMedia, Chip, Stepper, Step, StepLabel,
   TextField, Avatar, Switch, FormControlLabel, Divider, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Alert,
   Snackbar, Accordion, AccordionSummary, AccordionDetails,
@@ -23,9 +23,6 @@ import {
   LocalShipping as LocalShippingIcon,
   OpenInNew as OpenInNewIcon,
   ContentCopy as CopyIcon,
-  ArrowForward as ArrowForwardIcon,
-  ArrowBack as ArrowBackIcon,
-  Home as HomeIcon,
   ExpandMore as ExpandMoreIcon,
   Event as EventIcon,
   Download as DownloadIcon,
@@ -48,8 +45,6 @@ const TAB_ITEMS = [
 interface PostAuctionGuideProps {
   /** デモで落札したアイテム一覧 */
   wonItems: WonEntry[];
-  /** ガイドモード（true=ステップバイステップ案内付き、false=自由閲覧） */
-  isGuided: boolean;
   /** トップに戻るコールバック */
   onBackToTop: () => void;
   /** 初期表示タブ */
@@ -69,7 +64,7 @@ interface PostAuctionGuideProps {
  * ガイド付きもガイドなしも同じ画面構成。
  * ガイド付きの場合はステッパーとナビゲーションボタンが追加される。
  */
-export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, controlledTab, onTabChange, controlledSettingsSubTab, onSettingsSubTabChange }: PostAuctionGuideProps) {
+export function PostAuctionGuide({ wonItems, onBackToTop, initialTab, controlledTab, onTabChange, controlledSettingsSubTab, onSettingsSubTabChange }: PostAuctionGuideProps) {
   const [internalTab, setInternalTab] = useState(initialTab || 'won-items');
   const currentTab = controlledTab ?? internalTab;
   const setCurrentTab = (tab: string) => {
@@ -77,116 +72,36 @@ export function PostAuctionGuide({ wonItems, isGuided, onBackToTop, initialTab, 
     onTabChange?.(tab);
   };
 
-  // ガイド付きの場合のステップ番号（タブ値から算出）
-  const currentStepIndex = TAB_ITEMS.findIndex(t => t.value === currentTab);
-
-  const handleGuidedPrev = () => {
-    if (currentStepIndex > 0) {
-      setCurrentTab(TAB_ITEMS[currentStepIndex - 1].value);
-    } else {
-      onBackToTop();
-    }
-  };
-
-  const handleGuidedNext = () => {
-    if (currentStepIndex < TAB_ITEMS.length - 1) {
-      setCurrentTab(TAB_ITEMS[currentStepIndex + 1].value);
-    } else {
-      onBackToTop();
-    }
-  };
+  // 未使用だがインターフェースの互換性のため setCurrentTab を保持
+  void setCurrentTab;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Header */}
-      <Box sx={{ background: 'linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)', color: 'white', py: 3, px: 2 }}>
-        <Container maxWidth="lg">
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box>
-              <Typography variant="h5" fontWeight="bold">
-                {isGuided ? '落札者管理ガイド' : 'オークション完了'}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {isGuided
-                  ? 'オークション終了後の操作を一つずつ確認していきましょう'
-                  : '落札結果の確認と各種設定ができます'}
-              </Typography>
-            </Box>
-            <Button variant="outlined" sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }} onClick={onBackToTop}>
-              トップに戻る
-            </Button>
-          </Box>
-        </Container>
-      </Box>
-
-      {/* Won items summary */}
-      {wonItems.length > 0 && (
-        <Container maxWidth="lg" sx={{ pt: 3 }}>
-          <Paper sx={{ p: 2, mb: 2, bgcolor: 'success.50', border: '1px solid', borderColor: 'success.200' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <TrophyIcon color="warning" />
-              <Typography variant="subtitle1" fontWeight="bold">落札おめでとうございます！</Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary">
-              {wonItems.length}点の商品を落札しました。合計: ¥{wonItems.reduce((s, w) => s + w.total_amount, 0).toLocaleString()}
-            </Typography>
-          </Paper>
+      {currentTab === 'won-items' ? (
+        <>
+          {/* Won items summary */}
+          {wonItems.length > 0 && (
+            <Container maxWidth="lg" sx={{ pt: 3 }}>
+              <Paper sx={{ p: 2, mb: 2, bgcolor: 'success.50', border: '1px solid', borderColor: 'success.200' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <TrophyIcon color="warning" />
+                  <Typography variant="subtitle1" fontWeight="bold">落札おめでとうございます！</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  {wonItems.length}点の商品を落札しました。合計: ¥{wonItems.reduce((s, w) => s + w.total_amount, 0).toLocaleString()}
+                </Typography>
+              </Paper>
+            </Container>
+          )}
+          <Container maxWidth="lg" sx={{ pt: 1 }}>
+            <StepWonItemManagement wonItems={wonItems} />
+          </Container>
+        </>
+      ) : (
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <StepAccountSettings controlledSubTab={controlledSettingsSubTab} onSubTabChange={onSettingsSubTabChange} />
         </Container>
       )}
-
-      {/* Stepper（ガイド付きのみ） */}
-      {isGuided && (
-        <Container maxWidth="lg" sx={{ pt: wonItems.length > 0 ? 1 : 3 }}>
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Stepper activeStep={currentStepIndex} alternativeLabel>
-              {TAB_ITEMS.map((tab, index) => (
-                <Step key={tab.value} completed={index < currentStepIndex}
-                  sx={{ cursor: 'pointer' }}
-                  onClick={() => setCurrentTab(tab.value)}>
-                  <StepLabel>{tab.label}</StepLabel>
-                </Step>
-              ))}
-            </Stepper>
-          </Paper>
-        </Container>
-      )}
-
-      {/* Tabs */}
-      <Container maxWidth="lg" sx={{ pt: isGuided ? 0 : 1 }}>
-        <Paper sx={{ mb: 3 }}>
-          <Tabs value={currentTab} onChange={(_, v) => setCurrentTab(v)}>
-            {TAB_ITEMS.map(tab => (
-              <Tab key={tab.value} value={tab.value} label={tab.label} icon={tab.icon} iconPosition="start"
-                data-tour-target={tab.value === 'settings' ? 'settings-tab' : undefined} />
-            ))}
-          </Tabs>
-        </Paper>
-
-        {currentTab === 'won-items' && <StepWonItemManagement wonItems={wonItems} />}
-        {currentTab === 'settings' && <StepAccountSettings controlledSubTab={controlledSettingsSubTab} />}
-
-        {/* ガイド付きナビゲーション */}
-        {isGuided && (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, mb: 4 }}>
-            <Button
-              variant="outlined"
-              startIcon={currentStepIndex === 0 ? <HomeIcon /> : <ArrowBackIcon />}
-              onClick={handleGuidedPrev}
-            >
-              {currentStepIndex === 0 ? 'トップに戻る' : '前へ'}
-            </Button>
-            {currentStepIndex < TAB_ITEMS.length - 1 ? (
-              <Button variant="contained" endIcon={<ArrowForwardIcon />} onClick={handleGuidedNext}>
-                次へ
-              </Button>
-            ) : (
-              <Button variant="contained" color="success" onClick={onBackToTop}>
-                デモ完了！トップに戻る
-              </Button>
-            )}
-          </Box>
-        )}
-      </Container>
     </Box>
   );
 }
@@ -541,7 +456,7 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
 // 設定ページ — 実際の Settings.tsx と同一デザイン
 // ====================================================================
 
-function StepAccountSettings({ controlledSubTab }: { controlledSubTab?: number }) {
+function StepAccountSettings({ controlledSubTab, onSubTabChange }: { controlledSubTab?: number; onSubTabChange?: (subTab: number) => void }) {
   const [internalTabValue, setInternalTabValue] = useState(0);
   const tabValue = controlledSubTab ?? internalTabValue;
   const setTabValue = (v: number) => setInternalTabValue(v);
@@ -585,7 +500,7 @@ function StepAccountSettings({ controlledSubTab }: { controlledSubTab?: number }
         <Grid item xs={12} md={9}>
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={tabValue} onChange={(_, v) => { setTabValue(v); onSettingsSubTabChange?.(v); }}>
+              <Tabs value={tabValue} onChange={(_, v) => { setTabValue(v); onSubTabChange?.(v); }}>
                 <Tab icon={<PersonIcon />} label="プロフィール" iconPosition="start" />
                 <Tab icon={<NotificationsIcon />} label="通知設定" iconPosition="start"
                   data-tour-target="notification-sub-tab" />

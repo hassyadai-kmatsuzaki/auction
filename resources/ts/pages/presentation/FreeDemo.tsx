@@ -499,7 +499,6 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       <DemoLayout currentPage={settingsTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate}>
         <PostAuctionGuide
           wonItems={wonItems}
-          isGuided={false}
           onBackToTop={onBackToTop}
           initialTab={settingsTab}
         />

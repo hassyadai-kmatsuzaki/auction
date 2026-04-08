@@ -36,7 +36,7 @@ interface DemoItemListProps {
 export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened, onItemDetailClosed, activeOnly }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [statusFilter] = useState<string[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
   const [limitModalItem, setLimitModalItem] = useState<{ id: number; species_name: string; start_price: number } | null>(null);

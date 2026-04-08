@@ -102,7 +102,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
                 key={item.page}
                 color="inherit"
                 onClick={() => onNavigate(item.page)}
-                {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : {})}
+                {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : item.page === 'settings' ? { 'data-tour-target': 'settings-nav' } : {})}
                 sx={{
                   borderBottom: currentPage === item.page ? 2 : 0,
                   borderRadius: 0,
@@ -131,7 +131,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
                     onNavigate(item.page);
                     setDrawerOpen(false);
                   }}
-                  {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : {})}
+                  {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : item.page === 'settings' ? { 'data-tour-target': 'settings-nav' } : {})}
                 >
                   <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
