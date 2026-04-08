@@ -92,61 +92,25 @@ export const DemoTourPopover: React.FC<Props> = ({
     setExpanded(false);
   }, [activeStep]);
 
-  // waitForAction時: ターゲット要素からbodyまでの祖先チェーンをオーバーレイの上に持ち上げる
-  // これにより深いDOM階層でもスポットライト領域がクリック可能になる
+  // waitForAction時: ターゲット要素のみをオーバーレイの上に持ち上げる
+  // スポットライト穴 + pointerEvents: none により祖先の z-index 操作は不要
+  // ターゲット自身のみ z-index を上げて視覚的に前面に出す
   useEffect(() => {
     if (!step?.waitForAction || !step.targetRef.current) return;
     const el = step.targetRef.current;
 
-    const saved: { node: HTMLElement; zIndex: string; position: string }[] = [];
-
-    // ターゲットからbodyまで全祖先を持ち上げる（クリック可能にするため）
-    let current: HTMLElement | null = el;
-    while (current && current !== document.body) {
-      saved.push({
-        node: current,
-        zIndex: current.style.zIndex,
-        position: current.style.position,
-      });
-      current.style.zIndex = '1401';
-      if (!current.style.position || current.style.position === 'static') {
-        current.style.position = 'relative';
-      }
-      current = current.parentElement;
-    }
-
-    // 各祖先の兄弟要素を低いz-indexに抑えて前面に出ないようにする
-    // ただし position: fixed の要素（ポップオーバー、オーバーレイ等）は除外
-    const siblingsSaved: { node: HTMLElement; zIndex: string; position: string }[] = [];
-    let ancestor: HTMLElement | null = el.parentElement;
-    while (ancestor && ancestor !== document.body) {
-      Array.from(ancestor.children).forEach(child => {
-        if (child instanceof HTMLElement && !saved.some(s => s.node === child)) {
-          // fixed要素はポップオーバーやオーバーレイなのでスキップ
-          if (getComputedStyle(child).position === 'fixed') return;
-          siblingsSaved.push({
-            node: child,
-            zIndex: child.style.zIndex,
-            position: child.style.position,
-          });
-          child.style.zIndex = '0';
-          if (!child.style.position || child.style.position === 'static') {
-            child.style.position = 'relative';
-          }
-        }
-      });
-      ancestor = ancestor.parentElement;
+    const saved = {
+      zIndex: el.style.zIndex,
+      position: el.style.position,
+    };
+    el.style.zIndex = '1401';
+    if (!el.style.position || el.style.position === 'static') {
+      el.style.position = 'relative';
     }
 
     return () => {
-      saved.forEach(({ node, zIndex, position }) => {
-        node.style.zIndex = zIndex;
-        node.style.position = position;
-      });
-      siblingsSaved.forEach(({ node, zIndex, position }) => {
-        node.style.zIndex = zIndex;
-        node.style.position = position;
-      });
+      el.style.zIndex = saved.zIndex;
+      el.style.position = saved.position;
     };
   }, [step, activeStep]);
 
