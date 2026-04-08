@@ -29,6 +29,13 @@ class BidService
      */
     public function getLiveState(Auction $auction, ?int $userId = null): array
     {
+        // WebSocket切断時のフォールバックポーリング負荷を軽減（500人×3秒=166req/sec → キャッシュHit）
+        $cacheKey = "auction:{$auction->id}:live_state:" . ($userId ?? 'guest');
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $lanes            = $auction->lanes()->with(['currentItem.media', 'currentItem.sellerProfile', 'items'])->orderBy('lane_number')->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
@@ -191,7 +198,7 @@ class BidService
 
         $auctionSettings = $auction->getAuctionSettings();
 
-        return [
+        $result = [
             'auction_id'    => $auction->id,
             'auction_title' => $auction->title,
             'status'        => $auction->status,
@@ -200,6 +207,11 @@ class BidService
             'countdown_tiers'       => $auction->getCountdownTiers(),
             'lanes'         => $lanesData,
         ];
+
+        // 2秒TTLでキャッシュ（ポーリング負荷軽減）
+        Cache::put($cacheKey, $result, 2);
+
+        return $result;
     }
 
     /**

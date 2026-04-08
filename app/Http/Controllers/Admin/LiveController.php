@@ -56,26 +56,26 @@ class LiveController extends Controller
             $query->orderByRaw("FIELD(status, 'live', 'scheduled', 'preparing')");
         }
         
+        // Eager loading で N+1 クエリを解消（旧: オークションごとに5+クエリ → 3クエリに集約）
         $auctions = $query->orderBy('event_date', 'asc')
+            ->with(['lanes', 'items'])
+            ->withCount([
+                'items as total_items',
+                'items as registered_items' => fn ($q) => $q->where('status', 'registered'),
+                'items as live_items' => fn ($q) => $q->where('status', 'live'),
+                'items as sold_items' => fn ($q) => $q->where('status', 'sold'),
+                'items as unsold_items' => fn ($q) => $q->where('status', 'unsold'),
+            ])
             ->get()
             ->map(function ($auction) {
-                // レーン情報
-                $lanes = Lane::where('auction_id', $auction->id)->get();
+                $lanes = $auction->lanes;
                 $activeLanes = $lanes->where('status', 'active')->count();
-                
-                // アイテム統計
-                $items = Item::where('auction_id', $auction->id);
-                $totalItems = (clone $items)->count();
-                $registeredItems = (clone $items)->where('status', 'registered')->count();
-                $liveItems = (clone $items)->where('status', 'live')->count();
-                $soldItems = (clone $items)->where('status', 'sold')->count();
-                $unsoldItems = (clone $items)->where('status', 'unsold')->count();
 
-                // レーンに割り当て済みのアイテム数
-                $assignedItems = DB::table('lane_items')
-                    ->join('lanes', 'lane_items.lane_id', '=', 'lanes.id')
-                    ->where('lanes.auction_id', $auction->id)
-                    ->count();
+                // レーンに割り当て済みのアイテム数（eager loaded lanes から集計）
+                $laneIds = $lanes->pluck('id');
+                $assignedItems = $laneIds->isNotEmpty()
+                    ? DB::table('lane_items')->whereIn('lane_id', $laneIds)->count()
+                    : 0;
 
                 return [
                     'id' => $auction->id,
@@ -86,12 +86,12 @@ class LiveController extends Controller
                     'statistics' => [
                         'lane_count' => $lanes->count(),
                         'active_lanes' => $activeLanes,
-                        'total_items' => $totalItems,
-                        'registered_items' => $registeredItems,
+                        'total_items' => $auction->total_items,
+                        'registered_items' => $auction->registered_items,
                         'assigned_items' => $assignedItems,
-                        'live_items' => $liveItems,
-                        'sold_items' => $soldItems,
-                        'unsold_items' => $unsoldItems,
+                        'live_items' => $auction->live_items,
+                        'sold_items' => $auction->sold_items,
+                        'unsold_items' => $auction->unsold_items,
                     ],
                 ];
             });

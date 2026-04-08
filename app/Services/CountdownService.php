@@ -25,8 +25,18 @@ class CountdownService
 {
     /**
      * Tick interval in seconds (0.5 = 500ms)
+     * 0.5秒精度を維持（フリーズ0.1秒刻み・落札カウント0.5秒刻み対応）
      */
     public const TICK_INTERVAL = 0.5;
+
+    /**
+     * ブロードキャスト間引き間隔（秒）
+     * bidding/pre_bid フェーズでは BROADCAST_INTERVAL 秒に1回だけブロードキャスト
+     * freeze フェーズでは毎tick（0.5秒）ブロードキャスト（精度が必要なため）
+     *
+     * 500人同時接続対応: 6,000msg/sec → 3,000msg/sec に削減
+     */
+    public const BROADCAST_INTERVAL = 1.0;
 
     public function __construct(
         private readonly FinalizeBidAction                $finalizeBidAction,
@@ -264,15 +274,24 @@ class CountdownService
         // カウントダウンを0.5秒減らす
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
-        try {
-            broadcast(new CountdownTick(
-                $auction->id, $lane->id, $item->id,
-                (float) $state['remaining_seconds'],
-                $activeBidderCount, $item->current_price,
-                'bidding'
-            ));
-        } catch (\Exception $e) {
-            Log::warning("Broadcast error lane {$laneId}: " . $e->getMessage());
+        // bidding フェーズ: BROADCAST_INTERVAL 秒に1回だけブロードキャスト（負荷削減）
+        // 残り秒が整数値 or 0 の場合にブロードキャスト（0.5秒刻みなら2tickに1回 = 1秒間隔）
+        $remaining = (float) $state['remaining_seconds'];
+        // 浮動小数点誤差を回避: 10倍して整数化してから剰余判定
+        $shouldBroadcast = $remaining <= 0
+            || ((int) round($remaining * 10)) % ((int) (self::BROADCAST_INTERVAL * 10)) === 0;
+
+        if ($shouldBroadcast) {
+            try {
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    $remaining,
+                    $activeBidderCount, $item->current_price,
+                    'bidding'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("Broadcast error lane {$laneId}: " . $e->getMessage());
+            }
         }
 
         // カウントダウン終了時の処理
@@ -316,15 +335,22 @@ class CountdownService
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
         $state['pre_bid_remaining_seconds'] = $state['remaining_seconds'];
 
-        try {
-            broadcast(new CountdownTick(
-                $auction->id, $lane->id, $item->id,
-                (float) $state['remaining_seconds'],
-                0, $item->current_price,
-                'pre_bid'
-            ));
-        } catch (\Exception $e) {
-            Log::warning("Pre-bid broadcast error lane {$laneId}: " . $e->getMessage());
+        // pre_bid フェーズ: BROADCAST_INTERVAL 秒に1回だけブロードキャスト（負荷削減）
+        $remaining = (float) $state['remaining_seconds'];
+        $shouldBroadcast = $remaining <= 0
+            || ((int) round($remaining * 10)) % ((int) (self::BROADCAST_INTERVAL * 10)) === 0;
+
+        if ($shouldBroadcast) {
+            try {
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    $remaining,
+                    0, $item->current_price,
+                    'pre_bid'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("Pre-bid broadcast error lane {$laneId}: " . $e->getMessage());
+            }
         }
 
         if ($state['remaining_seconds'] <= 0) {
@@ -399,11 +425,21 @@ class CountdownService
 
         DB::beginTransaction();
         try {
-            $oldPrice  = $item->current_price;
+            // 悲観ロックで最新の価格を取得（ロストアップデート防止）
+            $freshItem = Item::lockForUpdate()->find($item->id);
+            if (!$freshItem || $freshItem->status !== 'live') {
+                DB::rollBack();
+                return;
+            }
+
+            $oldPrice  = $freshItem->current_price;
             $increment = $auction->calculatePriceIncrement($oldPrice);
             $newPrice  = $oldPrice + $increment;
 
-            $item->update(['current_price' => $newPrice]);
+            $freshItem->update(['current_price' => $newPrice]);
+
+            // 呼び出し元の $item も最新価格に同期
+            $item->current_price = $newPrice;
 
             \App\Models\PriceEvent::recordAutoIncrement($item->id, $oldPrice, $newPrice, $activeBidderCount);
 
@@ -584,6 +620,13 @@ class CountdownService
             try {
                 $triggered = $limit->markAsTriggered();
                 if (!$triggered) {
+                    // 別スレッドが先にトリガー済み。
+                    // オーファン防止: レコードを削除してユーザーが再設定可能にする
+                    $limit->refresh();
+                    if ($limit->is_triggered) {
+                        $limit->delete();
+                        Log::info("BidLimit orphan cleanup: item={$item->id}, user={$limit->user_id} (already triggered by another thread)");
+                    }
                     continue;
                 }
 

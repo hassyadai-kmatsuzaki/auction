@@ -94,9 +94,12 @@ class JoinBidAction
             }
         }
 
+        // コミット後に最新の入札者数を再取得（トランザクション外なので古い値を使わない）
+        $freshBidderCount = BidParticipant::forItem($item->id)->active()->count();
+
         // 入札者が2人以上になった場合、即座に価格上昇 → フリーズカウントダウン
         // 最後に入札した人（このユーザー）が落札権利者となり、他の入札者は自動離脱
-        if ($activeBidderCount >= 2 && $lane) {
+        if ($freshBidderCount >= 2 && $lane) {
             try {
                 $lane->load('auction');
                 $countdownService = app(CountdownService::class);
@@ -107,7 +110,7 @@ class JoinBidAction
         }
 
         $freshItem = $item->fresh();
-        $latestBidderCount = BidParticipant::forItem($item->id)->active()->count();
+        $latestBidderCount = $freshBidderCount;
 
         return BidResultDto::success([
             'participant_id'      => $participant->id,

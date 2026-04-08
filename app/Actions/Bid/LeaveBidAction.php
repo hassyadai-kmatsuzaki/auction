@@ -29,13 +29,18 @@ class LeaveBidAction
 
         DB::beginTransaction();
         try {
-            $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
+            // 悲観ロックで自分のレコードを取得（他スレッドの同時離脱を防止）
+            $participant = BidParticipant::forItem($item->id)
+                ->forUser($userId)
+                ->lockForUpdate()
+                ->first();
             if (!$participant || !$participant->is_active) {
                 DB::rollBack();
                 return BidResultDto::failure('入札に参加していません。');
             }
 
             // 最高入札者（落札権利者）は入札を解除できない
+            // lockForUpdate 内でカウントするため、同時離脱で全員離脱する競合を防止
             $activeBidders = BidParticipant::forItem($item->id)->active()->count();
             if ($activeBidders === 1 && $participant->is_active) {
                 DB::rollBack();

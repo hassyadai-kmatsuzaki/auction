@@ -2,10 +2,10 @@
 
 namespace App\Actions\Line;
 
+use App\Jobs\SendFavoriteApproachingNotificationJob;
 use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
-use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -49,8 +49,6 @@ class NotifyFavoriteApproachingAction
                 ->with('item')
                 ->get();
 
-            $notificationService = app(NotificationService::class);
-
             foreach ($favorites as $favorite) {
                 $item = $favorite->item;
                 if (!$item) continue;
@@ -68,17 +66,14 @@ class NotifyFavoriteApproachingAction
 
                 $ahead = $remainingCount + 1;
 
-                try {
-                    $notificationService->sendFavoriteApproachingNotification(
-                        $favorite->user_id,
-                        $item->species_name,
-                        $ahead,
-                        "レーン{$lane->lane_number}",
-                        $lane->auction->title
-                    );
-                } catch (\Exception $e) {
-                    Log::warning("Favorite notification error: user={$favorite->user_id} - " . $e->getMessage());
-                }
+                // 非同期ジョブにディスパッチ（同期送信だと10人分で2〜5秒ブロック）
+                SendFavoriteApproachingNotificationJob::dispatch(
+                    $favorite->user_id,
+                    $item->species_name,
+                    $ahead,
+                    "レーン{$lane->lane_number}",
+                    $lane->auction->title
+                );
             }
 
             if ($favorites->isNotEmpty()) {

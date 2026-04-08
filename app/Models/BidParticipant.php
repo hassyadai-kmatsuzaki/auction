@@ -104,15 +104,26 @@ class BidParticipant extends BaseModel
         ?string $ipAddress = null,
         ?string $userAgent = null,
     ): self {
-        return static::updateOrCreate(
-            ['item_id' => $itemId, 'user_id' => $userId],
+        // INSERT ... ON DUPLICATE KEY UPDATE でアトミックに処理
+        // updateOrCreate() の check-then-act 競合を回避
+        static::upsert(
             [
-                'is_active'      => $isActive,
-                'activated_at'   => $isActive ? now() : null,
-                'deactivated_at' => $isActive ? null : now(),
-                'ip_address'     => $ipAddress,
-                'user_agent'     => $userAgent,
-            ]
+                [
+                    'item_id'        => $itemId,
+                    'user_id'        => $userId,
+                    'is_active'      => $isActive,
+                    'activated_at'   => $isActive ? now() : null,
+                    'deactivated_at' => $isActive ? null : now(),
+                    'ip_address'     => $ipAddress,
+                    'user_agent'     => $userAgent,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
+                ],
+            ],
+            ['item_id', 'user_id'], // ユニークキー
+            ['is_active', 'activated_at', 'deactivated_at', 'ip_address', 'user_agent', 'updated_at'] // 更新カラム
         );
+
+        return static::where('item_id', $itemId)->where('user_id', $userId)->first();
     }
 }

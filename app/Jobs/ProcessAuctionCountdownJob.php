@@ -39,6 +39,8 @@ class ProcessAuctionCountdownJob implements ShouldQueue
 
     /**
      * Tick interval in seconds (shared with CountdownService)
+     * 0.5秒精度を維持（フリーズ0.1秒刻み・落札カウント0.5秒刻み対応）
+     * ブロードキャスト負荷削減は CountdownService 側で間引き制御
      */
     public const TICK_INTERVAL = 0.5;
 
@@ -46,7 +48,7 @@ class ProcessAuctionCountdownJob implements ShouldQueue
      * Heartbeat TTL in seconds.
      * Must be longer than any expected pause duration.
      */
-    public const HEARTBEAT_TTL = 14400; // 4時間（ジョブtimeoutと同じ）
+    public const HEARTBEAT_TTL = 60; // 60秒（ジョブ死亡後すぐにキャッシュから自動削除 → モニターが検知）
 
     /**
      * Create a new job instance.

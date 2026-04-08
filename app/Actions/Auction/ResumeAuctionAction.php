@@ -44,10 +44,13 @@ class ResumeAuctionAction
             Cache::forget($lockKey);
             Cache::forget("countdown_job_finished:auction:{$auction->id}");
 
-            // 世代番号をインクリメント → 古いジョブは次のループで自発的に終了する
+            // 世代番号をアトミックにインクリメント → 古いジョブは次のループで自発的に終了する
             $genKey = ProcessAuctionCountdownJob::generationKey($auction->id);
-            $newGen = ((int) Cache::get($genKey, 0)) + 1;
-            Cache::put($genKey, $newGen, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
+            // Cache::increment はアトミック操作。複数管理者が同時にresumeしても重複しない
+            if (!Cache::has($genKey)) {
+                Cache::put($genKey, 0, 14400); // 世代番号はジョブtimeout(4時間)分保持
+            }
+            $newGen = Cache::increment($genKey);
 
             $reason = $heartbeat ? "heartbeat {$staleSec}s stale" : 'heartbeat missing';
             Log::info("Resume: Re-dispatching countdown job for auction {$auction->id} ({$reason}, generation={$newGen})");

@@ -9,6 +9,7 @@ import { CountdownChip } from './CountdownChip';
 import { BidButton } from './BidButton';
 import { PreBidOverlay } from './PreBidOverlay';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
+import { useInterpolatedCountdown } from '../hooks/useInterpolatedCountdown';
 
 interface Props {
   lane: LiveLane;
@@ -25,6 +26,18 @@ interface Props {
  */
 export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove }: Props) => {
   const item = lane.current_item;
+
+  // クライアント側カウントダウン補間（サーバー1秒tick間をローカルで滑らかに表示）
+  // フックルール: 早期return前に呼び出す必要がある
+  const phase = item?.phase as 'bidding' | 'freeze' | 'pre_bid' | undefined;
+  const interpolatedSeconds = useInterpolatedCountdown(
+    item?.countdown_seconds ?? 0,
+    phase,
+  );
+  const interpolatedPreBidSeconds = useInterpolatedCountdown(
+    item?.pre_bid_remaining_seconds ?? 0,
+    phase === 'pre_bid' ? 'bidding' : 'freeze', // pre_bid は補間する、それ以外は無効化
+  );
 
   if (!item) {
     return (
@@ -177,11 +190,11 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
 
         {/* カウントダウン表示 */}
         {isPreBid ? (
-          <PreBidOverlay remainingSeconds={item.pre_bid_remaining_seconds ?? 0} />
+          <PreBidOverlay remainingSeconds={interpolatedPreBidSeconds} />
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
             <CountdownChip
-              seconds={item.countdown_seconds}
+              seconds={interpolatedSeconds}
               isCompetitive={isCompetitive}
               phase={isFreeze ? 'freeze' : 'bidding'}
               freezeTotalSeconds={item.freeze_countdown_seconds}
