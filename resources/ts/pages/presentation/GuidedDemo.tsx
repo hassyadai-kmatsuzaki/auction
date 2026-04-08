@@ -299,8 +299,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     if (item.phase === 'freeze') { notify('誤タップ防止中です。もう少々お待ちください。', 'error'); return; }
     if (item.phase === 'pre_bid') { notify('入札開始待機中です。もう少々お待ちください。', 'error'); return; }
     if (currentStatus === 'active') {
-      updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'inactive', active_bidders_count: Math.max(0, i.active_bidders_count - 1) }));
-      notify('入札をオフにしました', 'info');
+      return;
     } else {
       updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'active', active_bidders_count: i.active_bidders_count + 1 }));
       startCountdown(lane.lane_id, 8);
@@ -410,7 +409,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札してみよう！', description: 'レーン1の「入札する」ボタンをタップしてみてください！', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '他の参加者が入札してきます！', description: 'フリーズ（誤タップ防止）が入った後、価格が上がりカウントダウンがリセットされる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateOpponentBid(1); }, autoActionDelay: 4500, autoActionLabel: '相手の入札を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '入札合戦！再度入札しよう', description: 'フリーズ解除後に「入札する」ボタンをタップしてください。相手が入札を返してくるので、3回入札してみましょう。', placement: 'bottom', waitForAction: 'レーン1の「入札する」をタップ', tapTargetSelector: '.MuiCardActions-root button:first-child' },
-    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ', tapTargetSelector: '[class*="BidLimitBadge"], [class*="bidLimit"]' },
+    { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値（上限価格）を設定しよう', description: '指値を設定すると、価格が金額に達したとき自動で入札がオフになります。レーン1の「上限設定」を押してください。', placement: 'bottom', waitForAction: 'レーン1の「上限設定」をタップ', tapTargetSelector: '[data-tour-target="bid-limit-chip"]' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '指値が発動！自動入札オフ', description: '相手が連続入札して指値に到達します。自動で入札がオフになる様子を確認してください。', placement: 'bottom', autoAction: () => { simulateLimitTrigger(); }, autoActionDelay: 6000, autoActionLabel: '指値発動を見る' },
     { targetRef: lane1Ref as React.RefObject<HTMLDivElement | null>, title: '落札の瞬間！', description: 'レーン1を落札します。紙吹雪の落札演出をお楽しみください！', placement: 'bottom', autoAction: () => { updateLaneItem(1, item => ({ ...item, my_bid_status: 'active', active_bidders_count: 2 })); setTimeout(() => handleWin(1), 500); }, autoActionDelay: 4500, autoActionLabel: '落札する' },
     { targetRef: wonTableRef, title: 'オークション完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
@@ -505,12 +504,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     const step = tourSteps[tourStep];
     if (step?.autoAction) {
       setIsAutoPlaying(true);
+      setHideMobileFooter(true);
       step.autoAction();
       const delay = step.autoActionDelay;
       // delay === 0 はアクション内で完結する（待機室遷移など）ため自動advanceしない
       if (delay !== 0) {
         setTimeout(() => {
           setIsAutoPlaying(false);
+          setHideMobileFooter(false);
           goToStep(tourStep + 1);
         }, delay || 1500);
       }
@@ -689,7 +690,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   // phase === 'auction'
   return (
     <DemoLayout currentPage="items" onNavigate={handleNavigate} tourActive={tourActive}>
-      <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative' }}>
+      <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative', overflow: 'hidden' }}>
         {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 
         {/* Auction header — matches real AuctionHeader */}
@@ -704,11 +705,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                   2/2レーン進行中
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
                 <Chip icon={<WifiIcon />} label="リアルタイム接続中" color="success" size="small" />
                 <Chip icon={<PlayArrowIcon />} label="開催中" color="success" size="small" />
                 <Button size="small" variant="outlined" startIcon={<ViewListIcon />}
-                  onClick={() => setPhase('items')}>
+                  onClick={() => setPhase('items')}
+                  sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
                   出品一覧
                 </Button>
                 <IconButton size="small" onClick={() => {}}>
