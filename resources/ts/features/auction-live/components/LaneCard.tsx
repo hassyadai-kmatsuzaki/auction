@@ -17,13 +17,15 @@ interface Props {
   onDetailOpen: (lane: LiveLane) => void;
   onLimitEdit?: (itemId: number) => void;
   onLimitRemove?: (itemId: number) => void;
+  /** 詳細ボタンを無効化 */
+  disableDetail?: boolean;
 }
 
 /**
  * レーンカード1枚
  * React.memo + 細粒度メモ化で不要な再レンダリングを防ぐ
  */
-export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove }: Props) => {
+export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove, disableDetail }: Props) => {
   const item = lane.current_item;
 
   if (!item) {
@@ -215,7 +217,9 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
           activeBidderCount={item.active_bidders_count}
           onToggle={() => onBidToggle(item.id, item.my_bid_status)}
         />
-        <IconButton color="primary" onClick={() => onDetailOpen(lane)}>
+        <IconButton color="primary" onClick={() => onDetailOpen(lane)}
+          disabled={disableDetail}
+          sx={disableDetail ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
           <InfoIcon />
         </IconButton>
       </CardActions>

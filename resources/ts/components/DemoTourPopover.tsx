@@ -75,8 +75,9 @@ export const DemoTourPopover: React.FC<Props> = ({
     top: number;
     left: number;
     arrowSide: 'top' | 'bottom' | 'left' | 'right';
+    arrowOffset: number;
     spotlightRect: DOMRect | null;
-  }>({ top: 0, left: 0, arrowSide: 'top', spotlightRect: null });
+  }>({ top: 0, left: 0, arrowSide: 'top', arrowOffset: 0, spotlightRect: null });
   const popoverRef = useRef<HTMLDivElement>(null);
   const step = steps[activeStep];
   const isLastStep = activeStep === steps.length - 1;
@@ -123,6 +124,7 @@ export const DemoTourPopover: React.FC<Props> = ({
         top: window.innerHeight / 2 - 100,
         left: window.innerWidth / 2 - POPOVER_WIDTH / 2,
         arrowSide: 'top',
+        arrowOffset: 0,
         spotlightRect: null,
       });
       return;
@@ -131,7 +133,7 @@ export const DemoTourPopover: React.FC<Props> = ({
     const targetRect = step.targetRef.current.getBoundingClientRect();
 
     if (isMobile) {
-      setPosition({ top: 0, left: 0, arrowSide: 'top', spotlightRect: targetRect });
+      setPosition({ top: 0, left: 0, arrowSide: 'top', arrowOffset: 0, spotlightRect: targetRect });
       return;
     }
 
@@ -181,10 +183,16 @@ export const DemoTourPopover: React.FC<Props> = ({
         break;
     }
 
+    const unclampedLeft = left;
     left = Math.max(12, Math.min(left, window.innerWidth - POPOVER_WIDTH - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - popoverHeight - 12));
 
-    setPosition({ top, left, arrowSide, spotlightRect: targetRect });
+    // ポップオーバーがクランプされた場合、矢印をターゲット中心に合わせるオフセット
+    const arrowOffset = (arrowSide === 'top' || arrowSide === 'bottom')
+      ? unclampedLeft - left
+      : 0;
+
+    setPosition({ top, left, arrowSide, arrowOffset, spotlightRect: targetRect });
   }, [step, isMobile]);
 
   useEffect(() => {
@@ -782,9 +790,12 @@ export const DemoTourPopover: React.FC<Props> = ({
   // ════════════════════════════════════════════
   // デスクトップ: 従来のポップオーバー
   // ════════════════════════════════════════════
+  const arrowLeftPos = position.arrowOffset
+    ? `calc(50% + ${position.arrowOffset}px)`
+    : '50%';
   const arrowStyles: Record<string, object> = {
-    top: { top: -8, left: '50%', transform: 'translateX(-50%) rotate(45deg)' },
-    bottom: { bottom: -8, left: '50%', transform: 'translateX(-50%) rotate(45deg)' },
+    top: { top: -8, left: arrowLeftPos, transform: 'translateX(-50%) rotate(45deg)' },
+    bottom: { bottom: -8, left: arrowLeftPos, transform: 'translateX(-50%) rotate(45deg)' },
     left: { left: -8, top: '50%', transform: 'translateY(-50%) rotate(45deg)' },
     right: { right: -8, top: '50%', transform: 'translateY(-50%) rotate(45deg)' },
   };

@@ -104,6 +104,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const firstWonItemRef = useRef<HTMLElement | null>(null);
   const settingsNavRef = useRef<HTMLElement | null>(null);
   const notificationSubTabRef = useRef<HTMLElement | null>(null);
+  const notificationSectionRef = useRef<HTMLElement | null>(null);
 
   // Resolve dynamic refs after phase/tab changes
   const [, forceUpdate] = useState(0);
@@ -134,6 +135,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       firstWonItemRef.current = findVisible('[data-tour-target="won-first-item"]');
       settingsNavRef.current = findVisible('[data-tour-target="settings-nav"]');
       notificationSubTabRef.current = findVisible('[data-tour-target="notification-sub-tab"]');
+      notificationSectionRef.current = findVisible('[data-tour-target="notification-section"]');
     };
     // Resolve immediately and after a short delay (for DOM to settle)
     resolve();
@@ -420,6 +422,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
     { targetRef: (isMobile ? hamburgerMenuRef : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? 'メニューを開いて「設定」をタップしましょう。' : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「設定」をタップ' },
     { targetRef: notificationSubTabRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: '「通知設定」タブをタップして、メール通知の設定を確認しましょう。', placement: 'bottom', waitForAction: '「通知設定」タブをタップ' },
+    { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。落札通知や入金確認など、取引に関する通知とオークション開催通知を個別に設定できます。', placement: 'bottom' },
     { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
   ];
 
@@ -743,11 +746,12 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                     lane={lane} isLoading={false}
                     onBidToggle={handleBidToggle}
                     onDetailOpen={() => {}}
-                    onLimitEdit={(itemId) => {
+                    disableDetail={tourActive && (tourStep === 11 || tourStep === 13)}
+                    onLimitEdit={tourActive && (tourStep === 11 || tourStep === 13) ? undefined : (itemId) => {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
                       if (targetLane) setLimitModalLaneId(targetLane.lane_id);
                     }}
-                    onLimitRemove={(itemId) => {
+                    onLimitRemove={tourActive && (tourStep === 11 || tourStep === 13) ? undefined : (itemId) => {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
                       if (targetLane) {
                         updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
