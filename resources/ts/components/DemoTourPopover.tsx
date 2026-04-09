@@ -48,6 +48,8 @@ interface Props {
   onSignup?: () => void;
   /** モバイルフッターを一時的に隠す（入札操作中など） */
   hideFooter?: boolean;
+  /** Drawerが開いているか（SP: z-indexをDrawerより上にする） */
+  drawerOpen?: boolean;
 }
 
 const POPOVER_WIDTH = 340;
@@ -66,10 +68,16 @@ export const DemoTourPopover: React.FC<Props> = ({
   onExecuteAction,
   onSignup,
   hideFooter = false,
+  drawerOpen = false,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isLandscape = useMediaQuery('(orientation: landscape) and (max-height: 500px)');
+
+  // Drawer(z-index:1460)が開いている時はオーバーレイ類をDrawerより上に引き上げる
+  const zOverlay = drawerOpen ? 1470 : 1400;    // 視覚オーバーレイ & クリックブロック
+  const zHighlight = drawerOpen ? 1472 : 1402;  // スポットライト枠 & タップエフェクト
+  const zPopover = drawerOpen ? 1480 : 1450;    // ポップオーバー & モバイルフッター
 
   const [position, setPosition] = useState<{
     top: number;
@@ -107,7 +115,7 @@ export const DemoTourPopover: React.FC<Props> = ({
       zIndex: el.style.zIndex,
       position: el.style.position,
     };
-    el.style.zIndex = '1401';
+    el.style.zIndex = String(zOverlay + 1);
     if (!el.style.position || el.style.position === 'static') {
       el.style.position = 'relative';
     }
@@ -116,7 +124,7 @@ export const DemoTourPopover: React.FC<Props> = ({
       el.style.zIndex = saved.zIndex;
       el.style.position = saved.position;
     };
-  }, [step, activeStep]);
+  }, [step, activeStep, zOverlay]);
 
   const calculatePosition = useCallback(() => {
     if (!step?.targetRef?.current) {
@@ -264,7 +272,7 @@ export const DemoTourPopover: React.FC<Props> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          zIndex: 1400,
+          zIndex: zOverlay,
           pointerEvents: 'none',
         }}
       >
@@ -309,7 +317,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             height: spotlightRect.height + SPOTLIGHT_PADDING * 2,
             borderRadius: '12px',
             pointerEvents: 'none',
-            zIndex: 1402,
+            zIndex: zHighlight,
             // waitForAction時: ゴールドの強いパルスで「ここをタップ」を示す
             // それ以外: 青の穏やかなパルス
             ...(step.waitForAction ? {
@@ -362,7 +370,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             left: rippleLeft,
             width: 40,
             height: 40,
-            zIndex: 1402,
+            zIndex: zHighlight,
             pointerEvents: 'none',
           }}
         >
@@ -403,7 +411,7 @@ export const DemoTourPopover: React.FC<Props> = ({
         // スポットライト穴がない or waitForActionでない場合: 全面ブロック
         if (!spotlightRect || !step.waitForAction) {
           return (
-            <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1400, pointerEvents: 'all' }} />
+            <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: zOverlay, pointerEvents: 'all' }} />
           );
         }
         // waitForAction時: スポットライト領域に穴を開けた4枚のBoxでブロック
@@ -412,7 +420,7 @@ export const DemoTourPopover: React.FC<Props> = ({
         const sy = spotlightRect.top - SPOTLIGHT_PADDING;
         const sw = spotlightRect.width + SPOTLIGHT_PADDING * 2;
         const sh = spotlightRect.height + SPOTLIGHT_PADDING * 2;
-        const common = { position: 'fixed' as const, zIndex: 1400, pointerEvents: 'all' as const };
+        const common = { position: 'fixed' as const, zIndex: zOverlay, pointerEvents: 'all' as const };
         return (
           <>
             {/* 上 */}
@@ -562,7 +570,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 1450,
+            zIndex: zPopover,
             borderRadius: '16px 16px 0 0',
             overflow: 'hidden',
             transform: hideFooter ? 'translateY(100%)' : 'translateY(0)',
@@ -738,7 +746,7 @@ export const DemoTourPopover: React.FC<Props> = ({
             transform: 'translate(-50%, -50%)',
             width: 420,
             maxWidth: 'calc(100vw - 48px)',
-            zIndex: 1450,
+            zIndex: zPopover,
             borderRadius: 4,
             overflow: 'hidden',
             animation: 'completionPop 0.4s ease-out',

@@ -673,6 +673,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       onExecuteAction={handleExecuteAction}
       onSignup={handleSignup}
       hideFooter={hideMobileFooter}
+      drawerOpen={drawerOpen}
     />
   ) : null;
 
