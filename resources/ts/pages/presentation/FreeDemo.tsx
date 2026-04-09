@@ -228,15 +228,19 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
       stopCountdown(laneId);
 
-      // 本番同様: 相手が入札 → 自分(ユーザー)はinactiveになる
+      // 相手が入札 → 指値が設定されていれば入札中を維持（指値到達時のみ自動オフ）
+      // 指値未設定の場合は相手入札で自分はinactiveになる
+      const limitTriggered = !!(i => i.my_limit_price && newPrice >= i.my_limit_price)(lane.current_item);
       updateLaneItem(laneId, i => ({
         ...i,
         current_price: newPrice,
         active_bidders_count: Math.max(2, i.active_bidders_count),
-        // 指値チェック: 新価格が指値以上なら発動
-        my_limit_triggered: (i.my_limit_price && newPrice >= i.my_limit_price) ? true : i.my_limit_triggered,
-        // ユーザーがactiveだったらinactiveに（本番と同じ: 価格上昇時に前の入札者はdeactivate）
-        my_bid_status: i.my_bid_status === 'active' ? 'inactive' as const : i.my_bid_status,
+        my_limit_triggered: limitTriggered ? true : i.my_limit_triggered,
+        my_bid_status: limitTriggered
+          ? 'inactive' as const  // 指値到達 → 自動オフ
+          : i.my_limit_price
+            ? i.my_bid_status     // 指値設定済み → 入札中を維持
+            : i.my_bid_status === 'active' ? 'inactive' as const : i.my_bid_status, // 指値なし → 相手入札で解除
       }));
 
       // フリーズ開始 → 完了後にカウントダウン再開 + 次のCPU入札をスケジュール
@@ -382,8 +386,8 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     if (item.phase === 'freeze') { notify('誤タップ防止中です。もう少々お待ちください。', 'error'); return; }
     if (item.phase === 'pre_bid') { notify('入札開始待機中です。もう少々お待ちください。', 'error'); return; }
     if (currentStatus === 'active') {
-      updateLaneItem(lane.lane_id, i => ({ ...i, my_bid_status: 'inactive', active_bidders_count: Math.max(0, i.active_bidders_count - 1) }));
-      notify('入札をオフにしました', 'info');
+      // 入札中の手動解除は不可（相手の入札によってのみ解除される）
+      return;
     } else {
       // ユーザーが入札 = 価格上昇 + フリーズ（本番で2人以上activeの時と同じ挙動）
       const increment = calculatePriceIncrement(item.current_price);

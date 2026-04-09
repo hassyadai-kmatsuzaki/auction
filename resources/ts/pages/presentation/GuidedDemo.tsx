@@ -85,6 +85,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [hideMobileFooter, setHideMobileFooter] = useState(false);
   const [itemListResetKey, setItemListResetKey] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
   // 入札合戦のラウンド数（step 13で使用）
   const battleRoundRef = useRef(0);
@@ -157,7 +158,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     resolve();
     const t = setTimeout(() => { resolve(); forceUpdate(n => n + 1); }, 100);
     return () => clearTimeout(t);
-  }, [phase, postAuctionTab, tourStep]);
+  }, [phase, postAuctionTab, tourStep, drawerOpen]);
 
   const notify = useCallback((message: string, severity: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -428,7 +429,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: firstItemLimitRef as React.RefObject<HTMLElement | null>, title: '指値（上限価格）について', description: '指値を設定すると、設定した金額に達した際に自動で入札がオフになります。この後の実際のオークションデモの際に詳しくご説明します。', placement: 'bottom' },
 
     // ── FAVORITES phase (steps 6-8) ──
-    { targetRef: (isMobile ? hamburgerMenuRef : favoritesNavRef) as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: isMobile ? 'メニューを開いて「お気に入り」をタップしましょう。' : 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「お気に入り」をタップ' },
+    { targetRef: (isMobile ? (drawerOpen ? favoritesNavRef : hamburgerMenuRef) : favoritesNavRef) as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: isMobile ? (drawerOpen ? '「お気に入り」をタップしましょう。' : 'メニューを開いて「お気に入り」をタップしましょう。') : 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「お気に入り」をタップ' : 'メニューをタップ') : '「お気に入り」をタップ' },
     { targetRef: favoritesHeaderRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧', description: 'お気に入り一覧です。ここからも指値の設定やお気に入りの解除ができます。自由に操作してみてください。', placement: 'bottom' },
     { targetRef: bannerWaitingRoomRef as React.RefObject<HTMLElement | null>, title: '待機室へ進もう', description: 'バナーの「待機室へ入室」をタップして、オークション会場へ進みましょう。', placement: 'bottom', waitForAction: '「待機室へ入室」をタップ' },
 
@@ -444,10 +445,10 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: wonTableRef, title: 'オークション完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
 
     // ── POST-AUCTION phase (steps 18-23) ──
-    { targetRef: (isMobile ? hamburgerMenuRef : postAuctionNavRef) as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: isMobile ? 'メニューを開いて「落札管理」をタップしましょう。' : 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「落札管理」をタップ' },
+    { targetRef: (isMobile ? (drawerOpen ? postAuctionNavRef : hamburgerMenuRef) : postAuctionNavRef) as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: isMobile ? (drawerOpen ? '「落札管理」をタップしましょう。' : 'メニューを開いて「落札管理」をタップしましょう。') : 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「落札管理」をタップ' : 'メニューをタップ') : '「落札管理」をタップ' },
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
-    { targetRef: (isMobile ? hamburgerMenuRef : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? 'メニューを開いて「設定」をタップしましょう。' : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: 'bottom', waitForAction: isMobile ? 'メニューをタップ' : '「設定」をタップ' },
+    { targetRef: (isMobile ? (drawerOpen ? settingsNavRef : hamburgerMenuRef) : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? (drawerOpen ? '「設定」をタップしましょう。' : 'メニューを開いて「設定」をタップしましょう。') : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「設定」をタップ' : 'メニューをタップ') : '「設定」をタップ' },
     { targetRef: notificationSubTabRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: '「通知設定」タブをタップして、メール通知の設定を確認しましょう。', placement: 'bottom', waitForAction: '「通知設定」タブをタップ' },
     { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。落札通知や入金確認など、取引に関する通知とオークション開催通知を個別に設定できます。', placement: 'bottom' },
     { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
@@ -677,7 +678,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   if (phase === 'home') {
     return (
-      <DemoLayout currentPage="home" onNavigate={handleNavigate} tourActive={tourActive}>
+      <DemoLayout currentPage="home" onNavigate={handleNavigate} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
         <DemoHome onGoToItems={handleHomeGoToItems} onGoToWaitingRoom={() => setPhase('waiting')} disableWaitingRoom={tourActive} />
         {tourPopoverElement}
       </DemoLayout>
@@ -686,7 +687,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   if (phase === 'items') {
     return (
-      <DemoLayout currentPage="items" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive}>
+      <DemoLayout currentPage="items" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
         <DemoItemList key={itemListResetKey} onGoToWaitingRoom={handleGoToWaitingRoom} onFavoriteAdded={handleItemFavoriteAdded} onLimitSet={handleItemLimitSet} onItemDetailOpened={handleItemDetailOpened} onItemDetailClosed={handleItemDetailClosed} activeOnly={tourActive && tourStep === 3 ? 'info' : tourActive && tourStep === 4 ? 'favorite' : undefined} />
         {tourPopoverElement}
       </DemoLayout>
@@ -695,7 +696,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   if (phase === 'favorites') {
     return (
-      <DemoLayout currentPage="favorites" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive}>
+      <DemoLayout currentPage="favorites" onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive && tourStep !== 8} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
         <DemoFavorites onNavigateToAuctions={() => setPhase('items')} blockNonLimitActions={tourActive} />
         {tourPopoverElement}
       </DemoLayout>
@@ -704,7 +705,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   if (phase === 'waiting') {
     return (
-      <DemoLayout currentPage="home" onNavigate={handleNavigate} tourActive={tourActive}>
+      <DemoLayout currentPage="home" onNavigate={handleNavigate} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
         <DemoWaitingRoom
           auctionTitle={MOCK_AUCTIONS[0].title}
           onAuctionStart={handleAuctionStart}
@@ -715,7 +716,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   if (phase === 'post-auction') {
     return (
-      <DemoLayout currentPage={postAuctionTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive} tourActive={tourActive}>
+      <DemoLayout currentPage={postAuctionTab === 'settings' ? 'settings' : 'post-auction'} onNavigate={handleNavigate} showAuctionBanner onGoToWaitingRoom={handleGoToWaitingRoom} disableWaitingRoomBanner={tourActive} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
         <PostAuctionGuide
           wonItems={wonItems}
           onBackToTop={onBackToTop}
@@ -731,7 +732,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // phase === 'auction'
   return (
-    <DemoLayout currentPage="items" onNavigate={handleNavigate} tourActive={tourActive}>
+    <DemoLayout currentPage="items" onNavigate={handleNavigate} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
       <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative', overflow: 'hidden' }}>
         {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 

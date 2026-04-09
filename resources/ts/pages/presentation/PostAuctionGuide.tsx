@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
-  Receipt as ReceiptIcon,
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Person as PersonIcon,
@@ -37,10 +36,6 @@ import {
 // タブ定義
 // ====================================================================
 
-const TAB_ITEMS = [
-  { value: 'won-items', label: '落札管理', icon: <ReceiptIcon /> },
-  { value: 'settings', label: '設定', icon: <SettingsIcon /> },
-];
 
 interface PostAuctionGuideProps {
   /** デモで落札したアイテム一覧 */
@@ -64,7 +59,7 @@ interface PostAuctionGuideProps {
  * ガイド付きもガイドなしも同じ画面構成。
  * ガイド付きの場合はステッパーとナビゲーションボタンが追加される。
  */
-export function PostAuctionGuide({ wonItems, onBackToTop, initialTab, controlledTab, onTabChange, controlledSettingsSubTab, onSettingsSubTabChange }: PostAuctionGuideProps) {
+export function PostAuctionGuide({ wonItems, initialTab, controlledTab, onTabChange, controlledSettingsSubTab, onSettingsSubTabChange }: PostAuctionGuideProps) {
   const [internalTab, setInternalTab] = useState(initialTab || 'won-items');
   const currentTab = controlledTab ?? internalTab;
   const setCurrentTab = (tab: string) => {

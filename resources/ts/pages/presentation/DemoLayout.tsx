@@ -44,6 +44,8 @@ interface DemoLayoutProps {
   disableWaitingRoomBanner?: boolean;
   /** ツアー中か（SP時にハンバーガーメニューをオーバーレイの上に表示） */
   tourActive?: boolean;
+  /** Drawerの開閉通知 */
+  onDrawerToggle?: (open: boolean) => void;
 }
 
 const menuItems = [
@@ -55,8 +57,17 @@ const menuItems = [
   { text: '設定', icon: <SettingsIcon />, page: 'settings' },
 ];
 
-export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanner, onGoToWaitingRoom, disableWaitingRoomBanner, tourActive }: DemoLayoutProps) {
+export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanner, onGoToWaitingRoom, disableWaitingRoomBanner, tourActive, onDrawerToggle }: DemoLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const handleDrawerOpen = () => {
+    setDrawerOpen(true);
+    onDrawerToggle?.(true);
+  };
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+    onDrawerToggle?.(false);
+  };
 
   // ページ遷移時にサイドバーを閉じる
   useEffect(() => {
@@ -72,7 +83,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
             edge="start"
             color="inherit"
             data-tour-target="hamburger-menu"
-            onClick={() => setDrawerOpen(true)}
+            onClick={handleDrawerOpen}
             sx={{ mr: 2, display: { sm: 'none' }, ...(tourActive && { zIndex: 1451, position: 'relative' }) }}
           >
             <MenuIcon />
@@ -83,7 +94,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
               component="img"
               src="/img/logo.png?v=1"
               alt="MEDAKA AUCTION PORT"
-              onClick={() => { setDrawerOpen(false); onNavigate('home'); }}
+              onClick={() => { handleDrawerClose(); onNavigate('home'); }}
               sx={{
                 height: 48,
                 width: '100%',
@@ -116,7 +127,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
       </AppBar>
 
       {/* サイドメニュー（モバイル） */}
-      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={tourActive ? { zIndex: 1460 } : undefined}>
+      <Drawer anchor="left" open={drawerOpen} onClose={handleDrawerClose} sx={tourActive ? { zIndex: 1460 } : undefined}>
         <Box sx={{ width: 250 }} role="presentation">
           <Box sx={{ p: 2 }}>
             <Typography variant="h6">メニュー</Typography>
@@ -129,7 +140,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
                   selected={currentPage === item.page}
                   onClick={() => {
                     onNavigate(item.page);
-                    setDrawerOpen(false);
+                    handleDrawerClose();
                   }}
                   {...(item.page === 'favorites' ? { 'data-tour-target': 'favorites-nav' } : item.page === 'post-auction' ? { 'data-tour-target': 'post-auction-nav' } : item.page === 'settings' ? { 'data-tour-target': 'settings-nav' } : {})}
                 >
