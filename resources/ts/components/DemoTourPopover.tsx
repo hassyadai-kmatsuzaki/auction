@@ -355,7 +355,9 @@ export const DemoTourPopover: React.FC<Props> = ({
         let rippleTop = spotlightRect.top + spotlightRect.height / 2 - 20;
         let rippleLeft = spotlightRect.left + spotlightRect.width / 2 - 20;
         if (step.tapTargetSelector && step.targetRef.current) {
-          const tapEl = step.targetRef.current.querySelector(step.tapTargetSelector);
+          const tapEl = step.targetRef.current.matches(step.tapTargetSelector)
+            ? step.targetRef.current
+            : step.targetRef.current.querySelector(step.tapTargetSelector);
           if (tapEl) {
             const tapRect = tapEl.getBoundingClientRect();
             rippleTop = tapRect.top + tapRect.height / 2 - 20;
