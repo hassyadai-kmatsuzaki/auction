@@ -430,7 +430,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
     // ── FAVORITES phase (steps 6-8) ──
     { targetRef: (isMobile ? (drawerOpen ? favoritesNavRef : hamburgerMenuRef) : favoritesNavRef) as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧へ', description: isMobile ? (drawerOpen ? '「お気に入り」をタップしましょう。' : 'メニューを開いて「お気に入り」をタップしましょう。') : 'ヘッダーの「お気に入り」をタップして、お気に入り一覧ページを確認しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「お気に入り」をタップ' : 'メニューをタップ') : '「お気に入り」をタップ' },
-    { targetRef: favoritesHeaderRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧', description: 'お気に入り一覧です。ここからも指値の設定やお気に入りの解除ができます。自由に操作してみてください。', placement: 'bottom' },
+    { targetRef: favoritesHeaderRef as React.RefObject<HTMLElement | null>, title: 'お気に入り一覧', description: 'お気に入り一覧です。ここからも指値の設定やお気に入りの解除ができます。', placement: 'bottom' },
     { targetRef: bannerWaitingRoomRef as React.RefObject<HTMLElement | null>, title: '待機室へ進もう', description: 'バナーの「待機室へ入室」をタップして、オークション会場へ進みましょう。', placement: 'bottom', waitForAction: '「待機室へ入室」をタップ' },
 
     // ── AUCTION phase (steps 8-17, Lane 1 only) ──
@@ -445,10 +445,10 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     { targetRef: wonTableRef, title: 'オークション完了！', description: '落札結果が表示されました。次は落札者管理画面を確認しましょう。「次へ」で進みます。', placement: 'top' },
 
     // ── POST-AUCTION phase (steps 18-23) ──
-    { targetRef: (isMobile ? (drawerOpen ? postAuctionNavRef : hamburgerMenuRef) : postAuctionNavRef) as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: isMobile ? (drawerOpen ? '「落札管理」をタップしましょう。' : 'メニューを開いて「落札管理」をタップしましょう。') : 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「落札管理」をタップ' : 'メニューをタップ') : '「落札管理」をタップ' },
+    { targetRef: (isMobile ? (drawerOpen ? postAuctionNavRef : hamburgerMenuRef) : postAuctionNavRef) as React.RefObject<HTMLElement | null>, title: '落札管理画面へ', description: isMobile ? (drawerOpen ? '「落札管理」をタップしましょう。' : 'メニューを開いて「落札管理」をタップしましょう。') : 'ヘッダーの「落札管理」をタップして、落札管理画面に移動しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「落札管理」をタップ' : 'メニューをタップ') : '「落札管理」をタップ', tapTargetSelector: isMobile ? (drawerOpen ? '[data-tour-target="post-auction-nav"]' : '[data-tour-target="hamburger-menu"]') : '[data-tour-target="post-auction-nav"]' },
     { targetRef: wonItemsHeaderRef as React.RefObject<HTMLElement | null>, title: '落札管理画面', description: '落札管理画面です。落札した商品の支払い・配送状況を確認できます。', placement: 'bottom' },
     { targetRef: firstWonItemRef as React.RefObject<HTMLElement | null>, title: '落札商品の詳細', description: '各商品の支払い状況、配送追跡ができます。', placement: 'bottom' },
-    { targetRef: (isMobile ? (drawerOpen ? settingsNavRef : hamburgerMenuRef) : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? (drawerOpen ? '「設定」をタップしましょう。' : 'メニューを開いて「設定」をタップしましょう。') : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「設定」をタップ' : 'メニューをタップ') : '「設定」をタップ' },
+    { targetRef: (isMobile ? (drawerOpen ? settingsNavRef : hamburgerMenuRef) : settingsNavRef) as React.RefObject<HTMLElement | null>, title: '設定ページへ', description: isMobile ? (drawerOpen ? '「設定」をタップしましょう。' : 'メニューを開いて「設定」をタップしましょう。') : 'ヘッダーの「設定」をタップして、設定ページに移動しましょう。', placement: isMobile && drawerOpen ? 'right' : 'bottom', waitForAction: isMobile ? (drawerOpen ? '「設定」をタップ' : 'メニューをタップ') : '「設定」をタップ', tapTargetSelector: isMobile ? (drawerOpen ? '[data-tour-target="settings-nav"]' : '[data-tour-target="hamburger-menu"]') : '[data-tour-target="settings-nav"]' },
     { targetRef: notificationSubTabRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: '「通知設定」タブをタップして、メール通知の設定を確認しましょう。', placement: 'bottom', waitForAction: '「通知設定」タブをタップ' },
     { targetRef: notificationSectionRef as React.RefObject<HTMLElement | null>, title: '通知設定', description: 'メール通知のオン/オフを切り替えられます。落札通知や入金確認など、取引に関する通知とオークション開催通知を個別に設定できます。', placement: 'bottom' },
     { targetRef: { current: null } as React.RefObject<HTMLElement | null>, title: 'デモ完了！', description: 'ガイド付きデモが完了しました！\n実際のオークションでも同じ画面で操作できます。\nお疲れ様でした。', placement: 'bottom' },
