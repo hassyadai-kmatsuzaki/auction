@@ -39,6 +39,7 @@ import {
   makeLane,
   FREE_LANE1_ITEMS, FREE_LANE2_ITEMS,
   CPU_CHARACTERS,
+  MOCK_AUCTIONS,
   type WonEntry,
 } from './mockData';
 import { initCpuState, calculatePriceIncrement, type CpuBidState } from './cpuBidder';
@@ -57,6 +58,11 @@ const LANE_QUEUES: LaneItem[][] = [
 
 export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   const [phase, setPhase] = useState<FreeDemoPhase>('home');
+
+  // 初回マウント時にページ最上部へスクロール
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // ─── Auction state ───
   const [lanes, setLanes] = useState<LiveLane[]>(() => {
@@ -491,7 +497,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     return (
       <DemoLayout currentPage="home" onNavigate={handleNavigate}>
         <DemoWaitingRoom
-          auctionTitle="ガイドなしデモ — フリーオークション"
+          auctionTitle={MOCK_AUCTIONS[0].title}
           onAuctionStart={() => setPhase('auction')}
         />
       </DemoLayout>
@@ -521,7 +527,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
               <Box>
                 <Typography variant="h5" fontWeight="bold">
-                  ガイドなしデモ — フリーオークション
+                  {MOCK_AUCTIONS[0].title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {2 - completedLanes.size}/{2}レーン進行中

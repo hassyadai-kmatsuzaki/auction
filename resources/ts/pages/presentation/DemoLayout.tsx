@@ -187,7 +187,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
               </Typography>
             </Box>
             <Typography variant="h4" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.5rem', md: '2rem' } }}>
-              2026年春季メダカオークション
+              デモフリーオークション
             </Typography>
             <Button
               data-tour-target="banner-waiting-room"

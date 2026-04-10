@@ -119,7 +119,7 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSet, blockNonLimitA
 
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }} noWrap>
-                      2026年春季メダカオークション ({getAuctionStatusLabel('scheduled')})
+                      デモフリーオークション ({getAuctionStatusLabel('scheduled')})
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                       <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>

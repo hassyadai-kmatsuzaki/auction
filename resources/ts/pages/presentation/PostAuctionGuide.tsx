@@ -119,7 +119,7 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const paymentDeadline = tomorrow.toISOString().split('T')[0];
 
-  const auctionTitle = '2026年春季メダカオークション';
+  const auctionTitle = 'デモフリーオークション';
   const auctionDate = new Date().toISOString().split('T')[0];
   const allItems: MockWonItem[] = wonItems.map((w, i) => ({
     id: i + 1,
@@ -129,7 +129,7 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
       species_name: w.species_name,
       quantity: w.quantity,
       thumbnail_path: '/img/noimage.png',
-      auction: { id: 1, title: '2026年春季メダカオークション', event_date: new Date().toISOString().split('T')[0] },
+      auction: { id: 1, title: 'デモフリーオークション', event_date: new Date().toISOString().split('T')[0] },
     },
     winning_price: w.winning_price,
     quantity: w.quantity,
