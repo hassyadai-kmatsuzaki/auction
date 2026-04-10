@@ -330,4 +330,23 @@ export interface WonEntry {
   winning_price: number;
   quantity: number;
   total_amount: number;
+  thumbnail_path?: string;
+  item_number?: number;
+  lane_number?: number;
 }
+
+// ====================================================================
+// 出品一覧ID ↔ オークションID マッピング
+// MOCK_ITEMS.id → FREE_LANE_ITEMS.id の対応（species_name で紐付け）
+// ====================================================================
+
+export const ITEM_ID_TO_LANE_ITEM_ID: Record<number, number> = {
+  1: 101,   // 紅白ラメ ペア
+  2: 201,   // 幹之フルボディ
+  4: 102,   // 三色ラメ
+  5: 202,   // オロチ ペア
+  8: 103,   // サファイア ペア
+};
+
+export const LANE_ITEM_ID_TO_ITEM_ID: Record<number, number> =
+  Object.fromEntries(Object.entries(ITEM_ID_TO_LANE_ITEM_ID).map(([k, v]) => [Number(v), Number(k)]));

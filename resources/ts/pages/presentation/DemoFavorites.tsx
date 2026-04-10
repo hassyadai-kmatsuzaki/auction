@@ -20,15 +20,24 @@ type MockItem = typeof MOCK_ITEMS[0];
 
 interface DemoFavoritesProps {
   onNavigateToAuctions: () => void;
-  onLimitSet?: () => void;
+  onLimitSetCallback?: () => void;
   /** ツアー中のインタラクション制限（指値設定以外をブロック） */
   blockNonLimitActions?: boolean;
+  /** 共有: お気に入りID (親から渡された場合はローカル状態を使わない) */
+  favoriteIds?: Set<number>;
+  onFavoriteToggle?: (itemId: number) => void;
+  /** 共有: 指値設定 */
+  limitSettings?: Record<number, { limit_price: number | null; is_triggered: boolean }>;
+  onLimitSet?: (itemId: number, price: number) => void;
+  onLimitRemove?: (itemId: number) => void;
 }
 
-export function DemoFavorites({ onNavigateToAuctions, onLimitSet, blockNonLimitActions = false }: DemoFavoritesProps) {
-  // デモ用: 最初から数件お気に入り登録済み
-  const [favoriteItemIds, setFavoriteItemIds] = useState<Set<number>>(new Set([1, 2, 5, 7]));
-  const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
+export function DemoFavorites({ onNavigateToAuctions, onLimitSetCallback, blockNonLimitActions = false, favoriteIds: externalFavoriteIds, onFavoriteToggle, limitSettings: externalLimitSettings, onLimitSet, onLimitRemove }: DemoFavoritesProps) {
+  // ローカル状態はガイド付きデモ用フォールバック
+  const [localFavoriteIds, setLocalFavoriteIds] = useState<Set<number>>(new Set([1, 2, 5, 7]));
+  const [localLimitSettings, setLocalLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
+  const favoriteItemIds = externalFavoriteIds ?? localFavoriteIds;
+  const limitSettings = externalLimitSettings ?? localLimitSettings;
   const [limitModalItem, setLimitModalItem] = useState<MockItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<MockItem | null>(null);
 
@@ -36,24 +45,23 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSet, blockNonLimitA
 
   const handleRemoveFavorite = (e: React.MouseEvent, itemId: number) => {
     e.stopPropagation();
-    setFavoriteItemIds(prev => {
-      const next = new Set(prev);
-      next.delete(itemId);
-      return next;
-    });
+    if (onFavoriteToggle) { onFavoriteToggle(itemId); return; }
+    setLocalFavoriteIds(prev => { const next = new Set(prev); next.delete(itemId); return next; });
   };
 
   const getLimitForItem = (itemId: number) => limitSettings[itemId] ?? { limit_price: null, is_triggered: false };
 
   const handleSetLimit = (price: number) => {
     if (!limitModalItem) return;
-    setLimitSettings(prev => ({ ...prev, [limitModalItem.id]: { limit_price: price, is_triggered: false } }));
+    if (onLimitSet) { onLimitSet(limitModalItem.id, price); }
+    else { setLocalLimitSettings(prev => ({ ...prev, [limitModalItem.id]: { limit_price: price, is_triggered: false } })); }
     setLimitModalItem(null);
-    onLimitSet?.();
+    onLimitSetCallback?.();
   };
 
   const handleRemoveLimit = (itemId: number) => {
-    setLimitSettings(prev => { const next = { ...prev }; delete next[itemId]; return next; });
+    if (onLimitRemove) { onLimitRemove(itemId); return; }
+    setLocalLimitSettings(prev => { const next = { ...prev }; delete next[itemId]; return next; });
   };
 
   const getAuctionStatusLabel = (status: string) => {

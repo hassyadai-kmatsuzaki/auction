@@ -40,6 +40,7 @@ import {
   FREE_LANE1_ITEMS, FREE_LANE2_ITEMS,
   CPU_CHARACTERS,
   MOCK_AUCTIONS,
+  LANE_ITEM_ID_TO_ITEM_ID,
   type WonEntry,
 } from './mockData';
 import { initCpuState, calculatePriceIncrement, type CpuBidState } from './cpuBidder';
@@ -62,6 +63,27 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   // 初回マウント時にページ最上部へスクロール
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, []);
+
+  // ─── Shared state (出品一覧 ↔ お気に入り ↔ オークション で共有) ───
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
+
+  const handleFavoriteToggle = useCallback((itemId: number) => {
+    setFavoriteIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
+
+  const handleItemLimitSet = useCallback((itemId: number, price: number) => {
+    setLimitSettings(prev => ({ ...prev, [itemId]: { limit_price: price, is_triggered: false } }));
+  }, []);
+
+  const handleItemLimitRemove = useCallback((itemId: number) => {
+    setLimitSettings(prev => { const next = { ...prev }; delete next[itemId]; return next; });
   }, []);
 
   // ─── Auction state ───
@@ -235,19 +257,25 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       stopCountdown(laneId);
 
       // 相手が入札 → 指値が設定されていれば入札中を維持（指値到達時のみ自動オフ）
-      // 指値未設定の場合は相手入札で自分はinactiveになる
-      const limitTriggered = !!(i => i.my_limit_price && newPrice >= i.my_limit_price)(lane.current_item);
+      // 指値未設定の場合は相手入札で自分はinactiveになる（本番準拠）
+      const limitTriggered = !!(item.my_limit_price && newPrice >= item.my_limit_price);
       updateLaneItem(laneId, i => ({
         ...i,
         current_price: newPrice,
         active_bidders_count: Math.max(2, i.active_bidders_count),
         my_limit_triggered: limitTriggered ? true : i.my_limit_triggered,
+        my_limit_price: limitTriggered ? null : i.my_limit_price, // 指値到達 → 指値解除（本番準拠）
         my_bid_status: limitTriggered
           ? 'inactive' as const  // 指値到達 → 自動オフ
           : i.my_limit_price
             ? i.my_bid_status     // 指値設定済み → 入札中を維持
             : i.my_bid_status === 'active' ? 'inactive' as const : i.my_bid_status, // 指値なし → 相手入札で解除
       }));
+      // 指値到達時: 共有 limitSettings にも反映
+      if (limitTriggered) {
+        const itemListId = LANE_ITEM_ID_TO_ITEM_ID[item.id];
+        if (itemListId) setLimitSettings(prev => { const next = { ...prev }; delete next[itemListId]; return next; });
+      }
 
       // フリーズ開始 → 完了後にカウントダウン再開 + 次のCPU入札をスケジュール
       startFreeze(laneId, () => {
@@ -280,13 +308,25 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       return;
     }
 
-    // Load next item with pre_bid phase
+    // Load next item with pre_bid phase, inheriting limit from limitSettings if set
     laneItemIndexRef.current[laneIndex] = nextIdx;
     const nextItem = { ...queue[nextIdx] };
+    const nextItemListId = LANE_ITEM_ID_TO_ITEM_ID[nextItem.id];
+    const inheritedLimit = nextItemListId ? limitSettings[nextItemListId] : undefined;
+    const hasValidLimit = inheritedLimit?.limit_price && !inheritedLimit.is_triggered;
     setLanes(prev => prev.map(l =>
       l.lane_id === laneId ? {
         ...l,
-        current_item: { ...nextItem, phase: 'pre_bid' as const, pre_bid_remaining_seconds: 3, countdown_seconds: 8, my_bid_status: null, active_bidders_count: 0 }
+        current_item: {
+          ...nextItem,
+          phase: 'pre_bid' as const,
+          pre_bid_remaining_seconds: 3,
+          countdown_seconds: 8,
+          my_bid_status: hasValidLimit ? 'active' : null,
+          active_bidders_count: hasValidLimit ? 1 : 0,
+          my_limit_price: hasValidLimit ? inheritedLimit!.limit_price : null,
+          my_limit_triggered: false,
+        }
       } : l
     ));
 
@@ -318,11 +358,15 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
     if (item.my_bid_status === 'active' && item.active_bidders_count >= 1) {
       const price = item.current_price;
       const qty = item.quantity;
+      const lane = lanesRef.current.find(l => l.lane_id === laneId);
       setWonItems(w => [...w, {
         species_name: item.species_name,
         winning_price: price,
         quantity: qty,
         total_amount: Math.floor(price * qty * 1.1),
+        thumbnail_path: item.thumbnail_path,
+        item_number: item.item_number,
+        lane_number: lane?.lane_number,
       }]);
       setCelebration({ species_name: item.species_name, winning_price: price });
       setTimeout(() => setCelebration(null), 3000);
@@ -353,6 +397,25 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   // ─── Start initial countdowns + CPU bidding ───
   useEffect(() => {
     if (phase !== 'auction') return;
+    // 出品一覧で設定された指値をオークション初期アイテムに引き継ぐ
+    setLanes(prev => prev.map(lane => {
+      if (!lane.current_item) return lane;
+      const itemListId = LANE_ITEM_ID_TO_ITEM_ID[lane.current_item.id];
+      const limit = itemListId ? limitSettings[itemListId] : undefined;
+      if (limit?.limit_price && !limit.is_triggered) {
+        return {
+          ...lane,
+          current_item: {
+            ...lane.current_item,
+            my_limit_price: limit.limit_price,
+            my_limit_triggered: false,
+            my_bid_status: 'active',
+            active_bidders_count: Math.max(1, lane.current_item.active_bidders_count),
+          },
+        };
+      }
+      return lane;
+    }));
     [1, 2].forEach(laneId => {
       startCountdown(laneId, 8);
       // 各レーンのCPU入札を開始（初回は1〜3秒後にランダム開始）
@@ -401,11 +464,14 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       stopCountdown(lane.lane_id);
       stopCpuTimer(lane.lane_id); // CPU入札スケジュールも一旦停止
 
+      // 自分の入札で自分の指値を超えるケースをチェック
+      const selfLimitTriggered = !!(item.my_limit_price && newPrice >= item.my_limit_price);
       updateLaneItem(lane.lane_id, i => ({
         ...i,
         my_bid_status: 'active',
         active_bidders_count: Math.max(2, i.active_bidders_count + 1),
         current_price: newPrice,
+        my_limit_triggered: selfLimitTriggered ? true : i.my_limit_triggered,
       }));
       notify(`レーン${lane.lane_number}に入札しました！ ¥${newPrice.toLocaleString()}`, 'success');
 
@@ -424,14 +490,40 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
   const handleSetLimit = useCallback((price: number) => {
     if (!limitModalLaneId) return;
-    updateLaneItem(limitModalLaneId, item => ({ ...item, my_limit_price: price, my_limit_triggered: false }));
+    const lane = lanesRef.current.find(l => l.lane_id === limitModalLaneId);
+    const item = lane?.current_item;
+    if (item && item.current_price >= price) {
+      notify('現在価格が既に上限を超えています', 'error');
+      setLimitModalLaneId(null);
+      return;
+    }
+    // 指値設定 + 自動active化（本番準拠: SetBidLimitAction → JoinBidAction）
+    updateLaneItem(limitModalLaneId, i => ({
+      ...i,
+      my_limit_price: price,
+      my_limit_triggered: false,
+      my_bid_status: 'active',
+      active_bidders_count: Math.max(2, i.active_bidders_count),
+    }));
+    // 共有 limitSettings にも同期
+    if (item) {
+      const itemListId = LANE_ITEM_ID_TO_ITEM_ID[item.id];
+      if (itemListId) setLimitSettings(prev => ({ ...prev, [itemListId]: { limit_price: price, is_triggered: false } }));
+    }
     setLimitModalLaneId(null);
-    notify(`上限価格を ¥${price.toLocaleString()} に設定しました`, 'success');
+    notify(`上限価格を ¥${price.toLocaleString()} に設定し、入札に参加しました`, 'success');
   }, [limitModalLaneId, updateLaneItem, notify]);
 
   const handleRemoveLimit = useCallback(() => {
     if (!limitModalLaneId) return;
-    updateLaneItem(limitModalLaneId, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
+    const lane = lanesRef.current.find(l => l.lane_id === limitModalLaneId);
+    const item = lane?.current_item;
+    updateLaneItem(limitModalLaneId, i => ({ ...i, my_limit_price: null, my_limit_triggered: false }));
+    // 共有 limitSettings にも同期
+    if (item) {
+      const itemListId = LANE_ITEM_ID_TO_ITEM_ID[item.id];
+      if (itemListId) setLimitSettings(prev => { const next = { ...prev }; delete next[itemListId]; return next; });
+    }
     setLimitModalLaneId(null);
     notify('上限設定を解除しました', 'info');
   }, [limitModalLaneId, updateLaneItem, notify]);
@@ -480,7 +572,14 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   if (phase === 'items') {
     return (
       <DemoLayout currentPage="items" onNavigate={handleNavigate}>
-        <DemoItemList onGoToWaitingRoom={() => setPhase('waiting')} />
+        <DemoItemList
+          onGoToWaitingRoom={() => setPhase('waiting')}
+          favoriteIds={favoriteIds}
+          onFavoriteToggle={handleFavoriteToggle}
+          limitSettings={limitSettings}
+          onLimitSet={handleItemLimitSet}
+          onLimitRemove={handleItemLimitRemove}
+        />
       </DemoLayout>
     );
   }
@@ -488,7 +587,14 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   if (phase === 'favorites') {
     return (
       <DemoLayout currentPage="favorites" onNavigate={handleNavigate}>
-        <DemoFavorites onNavigateToAuctions={() => setPhase('items')} />
+        <DemoFavorites
+          onNavigateToAuctions={() => setPhase('items')}
+          favoriteIds={favoriteIds}
+          onFavoriteToggle={handleFavoriteToggle}
+          limitSettings={limitSettings}
+          onLimitSet={handleItemLimitSet}
+          onLimitRemove={handleItemLimitRemove}
+        />
       </DemoLayout>
     );
   }
@@ -566,6 +672,8 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
                       if (targetLane) {
                         updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
+                        const itemListId = LANE_ITEM_ID_TO_ITEM_ID[itemId];
+                        if (itemListId) setLimitSettings(prev => { const next = { ...prev }; delete next[itemListId]; return next; });
                         notify('上限設定を解除しました', 'info');
                       }
                     }}

@@ -125,10 +125,10 @@ function StepWonItemManagement({ wonItems }: { wonItems: WonEntry[] }) {
     id: i + 1,
     item: {
       id: i + 1,
-      item_number: i + 1,
+      item_number: w.item_number ?? (i + 1),
       species_name: w.species_name,
       quantity: w.quantity,
-      thumbnail_path: '/img/noimage.png',
+      thumbnail_path: w.thumbnail_path || '/img/noimage.png',
       auction: { id: 1, title: 'デモフリーオークション', event_date: new Date().toISOString().split('T')[0] },
     },
     winning_price: w.winning_price,

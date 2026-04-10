@@ -26,19 +26,29 @@ import { MOCK_AUCTIONS, MOCK_ITEMS, MOCK_LANES_LIST, STATUS_CONFIG } from './moc
 interface DemoItemListProps {
   onGoToWaitingRoom: () => void;
   onFavoriteAdded?: () => void;
-  onLimitSet?: () => void;
+  onLimitSetCallback?: () => void;
   onItemDetailOpened?: () => void;
   onItemDetailClosed?: () => void;
   /** ガイド中に有効にする操作を限定（未指定時は全操作可能） */
   activeOnly?: 'info' | 'favorite' | 'limit';
+  /** 共有: お気に入りID (親から渡された場合はローカル状態を使わない) */
+  favoriteIds?: Set<number>;
+  onFavoriteToggle?: (itemId: number) => void;
+  /** 共有: 指値設定 (親から渡された場合はローカル状態を使わない) */
+  limitSettings?: Record<number, { limit_price: number | null; is_triggered: boolean }>;
+  onLimitSet?: (itemId: number, price: number) => void;
+  onLimitRemove?: (itemId: number) => void;
 }
 
-export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, onItemDetailOpened, onItemDetailClosed, activeOnly }: DemoItemListProps) {
+export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCallback, onItemDetailOpened, onItemDetailClosed, activeOnly, favoriteIds: externalFavoriteIds, onFavoriteToggle, limitSettings: externalLimitSettings, onLimitSet, onLimitRemove }: DemoItemListProps) {
   const [selectedLane, setSelectedLane] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter] = useState<string[]>([]);
-  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
-  const [limitSettings, setLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
+  // ローカル状態は外部 props がない場合のフォールバック（ガイド付きデモ用）
+  const [localFavoriteIds, setLocalFavoriteIds] = useState<Set<number>>(new Set());
+  const [localLimitSettings, setLocalLimitSettings] = useState<Record<number, { limit_price: number | null; is_triggered: boolean }>>({});
+  const favoriteIds = externalFavoriteIds ?? localFavoriteIds;
+  const limitSettings = externalLimitSettings ?? localLimitSettings;
   const [limitModalItem, setLimitModalItem] = useState<{ id: number; species_name: string; start_price: number } | null>(null);
   const [selectedItem, setSelectedItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
 
@@ -72,21 +82,16 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
   };
 
   const handleLimitRemove = (itemId: number) => {
-    setLimitSettings(prev => {
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
+    if (onLimitRemove) { onLimitRemove(itemId); return; }
+    setLocalLimitSettings(prev => { const next = { ...prev }; delete next[itemId]; return next; });
   };
 
   const handleSetLimit = (price: number) => {
     if (!limitModalItem) return;
-    setLimitSettings(prev => ({
-      ...prev,
-      [limitModalItem.id]: { limit_price: price, is_triggered: false },
-    }));
+    if (onLimitSet) { onLimitSet(limitModalItem.id, price); }
+    else { setLocalLimitSettings(prev => ({ ...prev, [limitModalItem.id]: { limit_price: price, is_triggered: false } })); }
     setLimitModalItem(null);
-    onLimitSet?.();
+    onLimitSetCallback?.();
   };
 
   const handleRemoveLimitModal = () => {
@@ -97,14 +102,10 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSet, o
 
   const handleFavoriteToggle = (e: React.MouseEvent, itemId: number) => {
     e.stopPropagation();
-    setFavoriteIds(prev => {
+    if (onFavoriteToggle) { onFavoriteToggle(itemId); return; }
+    setLocalFavoriteIds(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-        onFavoriteAdded?.();
-      }
+      if (next.has(itemId)) { next.delete(itemId); } else { next.add(itemId); onFavoriteAdded?.(); }
       return next;
     });
   };
