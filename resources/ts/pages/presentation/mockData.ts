@@ -43,7 +43,7 @@ export const makeLane = (id: number, num: number, name: string, item: LaneItem):
 
 export const GUIDED_INITIAL_ITEMS: LaneItem[] = [
   makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'ブリーダーA', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
-  makeLaneItem({ id: 2, species_name: '幹之フルボディ', current_price: 500, quantity: 5, is_premium: true, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
+  makeLaneItem({ id: 2, species_name: '幹之フルボディ', current_price: 500, quantity: 5, is_premium: false, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
 ];
 
 export const GUIDED_INITIAL_LANES: LiveLane[] = [
@@ -53,7 +53,7 @@ export const GUIDED_INITIAL_LANES: LiveLane[] = [
 
 export const GUIDED_UPCOMING: (UpcomingItem & { laneNumber: number })[] = [
   { id: 10, item_number: 3, species_name: '三色ラメ', start_price: 400, thumbnail_path: '/img/medaka/三色ラメ.jpeg', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
-  { id: 11, item_number: 4, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: true, is_favorited: true, quantity: 2, laneNumber: 2 },
+  { id: 11, item_number: 4, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: false, is_favorited: true, quantity: 2, laneNumber: 2 },
 ];
 
 // ====================================================================
@@ -189,13 +189,13 @@ export interface ItemData {
 
 export const MOCK_ITEMS: ItemData[] = [
   { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 200, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/紅白ラメ.jpg', inspection_info: '体長3cm前後、発色良好' },
-  { id: 2, item_number: 2, species_name: '幹之フルボディ', quantity: 5, start_price: 300, current_price: 300, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', inspection_info: 'フルボディ確認済み' },
+  { id: 2, item_number: 2, species_name: '幹之フルボディ', quantity: 5, start_price: 300, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', inspection_info: 'フルボディ確認済み' },
   { id: 3, item_number: 3, species_name: '楊貴妃ダルマ', quantity: 1, start_price: 150, current_price: 150, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' },
   { id: 4, item_number: 4, species_name: '三色ラメ 3匹セット', quantity: 3, start_price: 400, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/三色ラメ.jpeg', inspection_info: '三色バランス良好' },
-  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 600, current_price: 600, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/オロチ.jpg', inspection_info: '漆黒度S級' },
+  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 600, current_price: 600, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/オロチ.jpg', inspection_info: '漆黒度S級' },
   { id: 6, item_number: 6, species_name: '夜桜ゴールド', quantity: 1, start_price: 350, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/夜桜ゴールド.jpg' },
-  { id: 7, item_number: 7, species_name: '煌 3匹セット', quantity: 3, start_price: 500, current_price: 500, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/01.png', inspection_info: 'ラメ数100以上' },
-  { id: 8, item_number: 8, species_name: 'サファイア ペア', quantity: 2, start_price: 800, current_price: 800, status: 'registered', is_premium: true, thumbnail_path: '/img/medaka/02.png' },
+  { id: 7, item_number: 7, species_name: '煌 3匹セット', quantity: 3, start_price: 500, current_price: 500, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/01.png', inspection_info: 'ラメ数100以上' },
+  { id: 8, item_number: 8, species_name: 'サファイア ペア', quantity: 2, start_price: 800, current_price: 800, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/02.png' },
   { id: 9, item_number: 9, species_name: 'ブラックダイヤ', quantity: 1, start_price: 450, current_price: 450, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/03.png', inspection_info: '体外光あり' },
   { id: 10, item_number: 10, species_name: '松井ヒレ長 ペア', quantity: 2, start_price: 300, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/04.png' },
 ];

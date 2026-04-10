@@ -553,6 +553,9 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   // Navigation handler for DemoLayout
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const handleNavigate = (page: string) => {
+    // ページ遷移時にお気に入り・指値をリセット
+    setFavoriteIds(new Set());
+    setLimitSettings({});
     if (page === 'home') { setPhase('home'); setSettingsTab(undefined); }
     else if (page === 'items') { setPhase('items'); setSettingsTab(undefined); }
     else if (page === 'favorites') { setPhase('favorites'); setSettingsTab(undefined); }
