@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
+import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
@@ -79,6 +80,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [wonItems, setWonItems] = useState<WonEntry[]>([]);
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
+  const [detailLane, setDetailLane] = useState<LiveLane | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
   const [tourActive, setTourActive] = useState(false);
   const [tourStep, setTourStep] = useState(0);
@@ -778,7 +780,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                   <LaneCard
                     lane={lane} isLoading={false}
                     onBidToggle={handleBidToggle}
-                    onDetailOpen={() => {}}
+                    onDetailOpen={(l) => setDetailLane(l)}
                     disableDetail={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16)}
                     onLimitEdit={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16) ? undefined : (itemId) => {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
@@ -909,6 +911,29 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             allowedPrice={tourActive && tourStep === 14 ? DEMO_PRICES.LIMIT_PRICE : undefined}
           />
         )}
+
+        {/* ItemDetailDialog（本番と同じ詳細ダイアログ） */}
+        <ItemDetailDialog
+          open={!!detailLane}
+          item={
+            (detailLane
+              ? lanes.find(l => l.lane_id === detailLane.lane_id)?.current_item
+              : null) as LaneItem | null
+          }
+          onClose={() => setDetailLane(null)}
+          onBidToggle={(itemId, status) => handleBidToggle(itemId, status)}
+          onLimitEdit={(itemId) => {
+            const targetLane = lanes.find(la => la.current_item?.id === itemId);
+            if (targetLane) setLimitModalLaneId(targetLane.lane_id);
+          }}
+          onLimitRemove={(itemId) => {
+            const targetLane = lanes.find(la => la.current_item?.id === itemId);
+            if (targetLane) {
+              updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
+              notify('上限設定を解除しました', 'info');
+            }
+          }}
+        />
 
         <Snackbar open={snackbar.open} autoHideDuration={3000}
           onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
