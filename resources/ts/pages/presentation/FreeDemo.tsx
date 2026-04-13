@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem, UpcomingItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
+import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { DemoLayout } from './DemoLayout';
@@ -80,6 +81,11 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
 
   const handleItemLimitSet = useCallback((itemId: number, price: number) => {
     setLimitSettings(prev => ({ ...prev, [itemId]: { limit_price: price, is_triggered: false } }));
+    // 指値設定 → 自動でお気に入りに追加
+    setFavoriteIds(prev => {
+      if (prev.has(itemId)) return prev;
+      return new Set([...prev, itemId]);
+    });
   }, []);
 
   const handleItemLimitRemove = useCallback((itemId: number) => {
@@ -102,6 +108,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   const [wonItems, setWonItems] = useState<WonEntry[]>([]);
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
+  const [detailLane, setDetailLane] = useState<LiveLane | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
   const countdownTimersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
   const freezeTimersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
@@ -553,9 +560,11 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   // Navigation handler for DemoLayout
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const handleNavigate = (page: string) => {
-    // ページ遷移時にお気に入り・指値をリセット
-    setFavoriteIds(new Set());
-    setLimitSettings({});
+    // オークション中に他ページに遷移した場合のみお気に入り・指値をリセット
+    if (phase === 'auction') {
+      setFavoriteIds(new Set());
+      setLimitSettings({});
+    }
     if (page === 'home') { setPhase('home'); setSettingsTab(undefined); }
     else if (page === 'items') { setPhase('items'); setSettingsTab(undefined); }
     else if (page === 'favorites') { setPhase('favorites'); setSettingsTab(undefined); }
@@ -666,7 +675,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                   <LaneCard
                     lane={lane} isLoading={false}
                     onBidToggle={handleBidToggle}
-                    onDetailOpen={() => {}}
+                    onDetailOpen={(l) => setDetailLane(l)}
                     onLimitEdit={(itemId) => {
                       const targetLane = lanes.find(la => la.current_item?.id === itemId);
                       if (targetLane) setLimitModalLaneId(targetLane.lane_id);
@@ -761,6 +770,43 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
             </Paper>
           )}
         </Container>
+
+        {/* ItemDetailDialog — 本番 AuctionLive と同じ */}
+        <ItemDetailDialog
+          open={!!detailLane}
+          item={
+            (detailLane
+              ? lanes.find(l => l.lane_id === detailLane.lane_id)?.current_item
+              : null) as LaneItem | null
+          }
+          onClose={() => setDetailLane(null)}
+          onBidToggle={(itemId, status) => {
+            const lane = lanesRef.current.find(l => l.current_item?.id === itemId);
+            const item = lane?.current_item;
+            if (item?.phase === 'pre_bid') {
+              notify('入札開始待機中です。もう少々お待ちください。', 'error');
+              return;
+            }
+            if (item?.phase === 'freeze') {
+              notify('誤タップ防止中です。もう少々お待ちください。', 'error');
+              return;
+            }
+            handleBidToggle(itemId, status);
+          }}
+          onLimitEdit={(itemId) => {
+            const targetLane = lanes.find(la => la.current_item?.id === itemId);
+            if (targetLane) setLimitModalLaneId(targetLane.lane_id);
+          }}
+          onLimitRemove={(itemId) => {
+            const targetLane = lanes.find(la => la.current_item?.id === itemId);
+            if (targetLane) {
+              updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
+              const itemListId = LANE_ITEM_ID_TO_ITEM_ID[itemId];
+              if (itemListId) setLimitSettings(prev => { const next = { ...prev }; delete next[itemListId]; return next; });
+              notify('上限設定を解除しました', 'info');
+            }
+          }}
+        />
 
         {/* BidLimitModal */}
         {limitModalLaneId && limitModalItemData && (

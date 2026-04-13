@@ -96,7 +96,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
 
   // Tour refs - auction phase (static)
   const demoHeaderRef = useRef<HTMLDivElement>(null);
-  const laneCardRefs = useRef<(HTMLDivElement | null)[]>([null, null]);
+  const laneCardRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null, null, null]);
   const lane1Ref = useRef<HTMLDivElement | null>(null);
   const lane2Ref = useRef<HTMLDivElement | null>(null);
   const upcomingRef = useRef<HTMLDivElement>(null);
@@ -746,7 +746,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                   {MOCK_AUCTIONS[0].title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  2/2レーン進行中
+                  6/6レーン進行中
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>

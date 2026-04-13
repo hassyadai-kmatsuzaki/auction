@@ -38,45 +38,100 @@ export const makeLane = (id: number, num: number, name: string, item: LaneItem):
 });
 
 // ====================================================================
-// ガイド付きデモ用データ（2レーン x 各1アイテム + upcoming 2）
+// ガイド付きデモ用データ（6レーン x 各1アイテム + upcoming 2）
 // ====================================================================
 
+const DEMO_IMG = '/img/demo/medaka';
+
 export const GUIDED_INITIAL_ITEMS: LaneItem[] = [
-  makeLaneItem({ id: 1, species_name: '紅白ラメ ペア', current_price: 300, quantity: 2, seller_name: 'ブリーダーA', thumbnail_path: '/img/medaka/紅白ラメ.jpg' }),
-  makeLaneItem({ id: 2, species_name: '幹之フルボディ', current_price: 500, quantity: 5, is_premium: false, seller_name: 'ブリーダーB', thumbnail_path: '/img/medaka/幹之フルボディ.jpg' }),
+  makeLaneItem({
+    id: 1, species_name: 'エメキン 20匹(10ペア)', current_price: 300, quantity: 20, seller_name: 'ブリーダーA',
+    thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`,
+    media: [
+      { id: 101, item_id: 1, media_type: 'photo', file_path: `${DEMO_IMG}/エメキン_上見.jpg`, display_order: 1 },
+      { id: 102, item_id: 1, media_type: 'photo', file_path: `${DEMO_IMG}/エメキン_上見②.jpg`, display_order: 2 },
+      { id: 103, item_id: 1, media_type: 'video_side', file_path: `${DEMO_IMG}/エメキン_横見_10秒.mp4`, duration: 10, display_order: 3 },
+    ],
+  }),
+  makeLaneItem({
+    id: 2, species_name: '紅帝リアルロングフィン 35匹', current_price: 500, quantity: 35, seller_name: 'ブリーダーB',
+    thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`,
+    media: [
+      { id: 201, item_id: 2, media_type: 'photo', file_path: `${DEMO_IMG}/紅帝リアルロングフィン＿横見.jpg`, display_order: 1 },
+      { id: 202, item_id: 2, media_type: 'photo', file_path: `${DEMO_IMG}/紅帝リアルロングフィン_上見.jpg`, display_order: 2 },
+      { id: 203, item_id: 2, media_type: 'video_side', file_path: `${DEMO_IMG}/紅帝リアルロングフィン_横見_8秒.mp4`, duration: 8, display_order: 3 },
+    ],
+  }),
+  makeLaneItem({
+    id: 3, species_name: '三色体外光亜種 40匹', current_price: 400, quantity: 40, seller_name: 'ブリーダーC',
+    thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`,
+    media: [
+      { id: 301, item_id: 3, media_type: 'photo', file_path: `${DEMO_IMG}/三色体外光亜種_上見.jpg`, display_order: 1 },
+      { id: 302, item_id: 3, media_type: 'photo', file_path: `${DEMO_IMG}/三色体外光亜種_上見②.jpg`, display_order: 2 },
+      { id: 303, item_id: 3, media_type: 'video_top', file_path: `${DEMO_IMG}/三色体外光亜種_上見_8秒.mp4`, duration: 8, display_order: 3 },
+    ],
+  }),
+  makeLaneItem({
+    id: 4, species_name: '和墨ミッドナイトフリル 40匹', current_price: 600, quantity: 40, seller_name: 'ブリーダーD',
+    thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`,
+    media: [
+      { id: 401, item_id: 4, media_type: 'photo', file_path: `${DEMO_IMG}/和墨ミッドナイトフリル_横見.jpg`, display_order: 1 },
+      { id: 402, item_id: 4, media_type: 'photo', file_path: `${DEMO_IMG}/和墨ミッドナイトフリル＿上見.jpg`, display_order: 2 },
+      { id: 403, item_id: 4, media_type: 'video_top', file_path: `${DEMO_IMG}/和墨ミッドナイトフリル_上見_8秒.mp4`, duration: 8, display_order: 3 },
+    ],
+  }),
+  makeLaneItem({
+    id: 5, species_name: '和墨白銀 20匹(10ペア)', current_price: 350, quantity: 20, seller_name: 'ブリーダーE',
+    thumbnail_path: `${DEMO_IMG}/和墨白銀_サムネ.jpg`,
+    media: [
+      { id: 501, item_id: 5, media_type: 'photo', file_path: `${DEMO_IMG}/和墨白銀_横見.jpg`, display_order: 1 },
+      { id: 502, item_id: 5, media_type: 'photo', file_path: `${DEMO_IMG}/和墨白銀_上見.jpg`, display_order: 2 },
+      { id: 503, item_id: 5, media_type: 'video_side', file_path: `${DEMO_IMG}/和墨白銀_横見_10秒.mp4`, duration: 10, display_order: 3 },
+    ],
+  }),
+  makeLaneItem({
+    id: 6, species_name: '黒天幻龍 10匹(5ペア)', current_price: 800, quantity: 10, seller_name: 'ブリーダーF',
+    thumbnail_path: `${DEMO_IMG}/黒天幻龍_サムネ.jpg`,
+    media: [
+      { id: 601, item_id: 6, media_type: 'photo', file_path: `${DEMO_IMG}/黒天幻龍_横見.jpg`, display_order: 1 },
+      { id: 602, item_id: 6, media_type: 'video_side', file_path: `${DEMO_IMG}/黒天幻龍_10秒.MP4`, duration: 10, display_order: 2 },
+    ],
+  }),
 ];
 
 export const GUIDED_INITIAL_LANES: LiveLane[] = [
   makeLane(1, 1, 'レーン 1', GUIDED_INITIAL_ITEMS[0]),
   makeLane(2, 2, 'レーン 2', GUIDED_INITIAL_ITEMS[1]),
+  makeLane(3, 3, 'レーン 3', GUIDED_INITIAL_ITEMS[2]),
+  makeLane(4, 4, 'レーン 4', GUIDED_INITIAL_ITEMS[3]),
+  makeLane(5, 5, 'レーン 5', GUIDED_INITIAL_ITEMS[4]),
+  makeLane(6, 6, 'レーン 6', GUIDED_INITIAL_ITEMS[5]),
 ];
 
 export const GUIDED_UPCOMING: (UpcomingItem & { laneNumber: number })[] = [
-  { id: 10, item_number: 3, species_name: '三色ラメ', start_price: 400, thumbnail_path: '/img/medaka/三色ラメ.jpeg', is_premium: false, is_favorited: false, quantity: 3, laneNumber: 1 },
-  { id: 11, item_number: 4, species_name: 'オロチ ペア', start_price: 600, thumbnail_path: '/img/medaka/オロチ.jpg', is_premium: false, is_favorited: true, quantity: 2, laneNumber: 2 },
+  { id: 10, item_number: 7, species_name: 'エメキン 選別漏れ 30匹', start_price: 200, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, is_premium: false, is_favorited: false, quantity: 30, laneNumber: 1 },
+  { id: 11, item_number: 8, species_name: '紅帝リアルロングフィン 若魚 20匹', start_price: 400, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, is_premium: false, is_favorited: true, quantity: 20, laneNumber: 2 },
 ];
 
 // ====================================================================
-// ガイドなしデモ用データ（2レーン x 3アイテム = 6アイテム）
+// ガイドなしデモ用データ（6レーン x 各1アイテム）
 // ====================================================================
 
 const MEDAKA_SPECIES = [
-  // レーン1（3匹）
-  { id: 101, species_name: '紅白ラメ ペア', price: 300, quantity: 2, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/紅白ラメ.jpg' },
-  { id: 102, species_name: '三色ラメ 3匹', price: 400, quantity: 3, premium: false, seller: 'ブリーダーB', thumbnail: '/img/medaka/三色ラメ.jpeg' },
-  { id: 103, species_name: 'サファイア ペア', price: 800, quantity: 2, premium: true, seller: 'ブリーダーC', thumbnail: '/img/medaka/02.png' },
-  // レーン2（3匹）
-  { id: 201, species_name: '幹之フルボディ', price: 500, quantity: 5, premium: true, seller: 'ブリーダーB', thumbnail: '/img/medaka/幹之フルボディ.jpg' },
-  { id: 202, species_name: 'オロチ ペア', price: 600, quantity: 2, premium: true, seller: 'ブリーダーD', thumbnail: '/img/medaka/オロチ.jpg' },
-  { id: 203, species_name: '女雛 3匹', price: 250, quantity: 3, premium: false, seller: 'ブリーダーA', thumbnail: '/img/medaka/05.png' },
+  { id: 101, species_name: 'エメキン 20匹(10ペア)', price: 300, quantity: 20, premium: false, seller: 'ブリーダーA', thumbnail: `${DEMO_IMG}/エメキン_サムネ.jpg` },
+  { id: 201, species_name: '紅帝リアルロングフィン 35匹', price: 500, quantity: 35, premium: false, seller: 'ブリーダーB', thumbnail: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg` },
+  { id: 301, species_name: '三色体外光亜種 40匹', price: 400, quantity: 40, premium: false, seller: 'ブリーダーC', thumbnail: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg` },
+  { id: 401, species_name: '和墨ミッドナイトフリル 40匹', price: 600, quantity: 40, premium: false, seller: 'ブリーダーD', thumbnail: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg` },
+  { id: 501, species_name: '和墨白銀 20匹(10ペア)', price: 350, quantity: 20, premium: false, seller: 'ブリーダーE', thumbnail: `${DEMO_IMG}/和墨白銀_サムネ.jpg` },
+  { id: 601, species_name: '黒天幻龍 10匹(5ペア)', price: 800, quantity: 10, premium: false, seller: 'ブリーダーF', thumbnail: `${DEMO_IMG}/黒天幻龍_サムネ.jpg` },
 ];
 
-/** レーン1のアイテムキュー（3個） */
-export const FREE_LANE1_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 101 && s.id <= 103)
+/** レーン1のアイテムキュー */
+export const FREE_LANE1_ITEMS = MEDAKA_SPECIES.filter(s => s.id === 101)
   .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
 
-/** レーン2のアイテムキュー（3個） */
-export const FREE_LANE2_ITEMS = MEDAKA_SPECIES.filter(s => s.id >= 201 && s.id <= 203)
+/** レーン2のアイテムキュー */
+export const FREE_LANE2_ITEMS = MEDAKA_SPECIES.filter(s => s.id === 201)
   .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
 
 // ====================================================================
@@ -142,29 +197,29 @@ export interface MockWonItem {
 export const MOCK_WON_ITEMS: MockWonItem[] = [
   {
     id: 1,
-    item: { id: 1, item_number: 12, species_name: '紅白ラメ ペア', quantity: 2, thumbnail_path: '/img/medaka/紅白ラメ.jpg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 850, quantity: 2, total_amount: 1870, commission_amount: 170,
+    item: { id: 1, item_number: 1, species_name: 'エメキン 20匹(10ペア)', quantity: 20, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 850, quantity: 20, total_amount: 18700, commission_amount: 1700,
     payment_status: 'confirmed', delivery_status: 'shipped',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', tracking_number: '1234-5678-9012', shipping_company: 'ヤマト運輸', shipped_at: '2026-03-10',
   },
   {
     id: 2,
-    item: { id: 2, item_number: 28, species_name: '幹之フルボディ', quantity: 5, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 1200, quantity: 5, total_amount: 6600, commission_amount: 600,
+    item: { id: 2, item_number: 2, species_name: '紅帝リアルロングフィン 35匹', quantity: 35, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 1200, quantity: 35, total_amount: 46200, commission_amount: 4200,
     payment_status: 'confirmed', delivery_status: 'completed',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', shipped_at: '2026-03-08',
   },
   {
     id: 3,
-    item: { id: 3, item_number: 55, species_name: '楊貴妃ダルマ', quantity: 1, thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 420, quantity: 1, total_amount: 462, commission_amount: 42,
+    item: { id: 3, item_number: 3, species_name: '三色体外光亜種 40匹', quantity: 40, thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 420, quantity: 40, total_amount: 18480, commission_amount: 1680,
     payment_status: 'pending', payment_deadline: '2026-03-19', delivery_status: 'pending',
     shipping_address: '未設定',
   },
   {
     id: 4,
-    item: { id: 4, item_number: 71, species_name: 'サファイア ペア', quantity: 2, thumbnail_path: '/img/medaka/01.png', auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
-    winning_price: 1500, quantity: 2, total_amount: 3300, commission_amount: 300,
+    item: { id: 4, item_number: 4, species_name: '和墨ミッドナイトフリル 40匹', quantity: 40, thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    winning_price: 1500, quantity: 40, total_amount: 66000, commission_amount: 6000,
     payment_status: 'paid', delivery_status: 'preparing',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101',
   },
@@ -188,21 +243,21 @@ export interface ItemData {
 }
 
 export const MOCK_ITEMS: ItemData[] = [
-  { id: 1, item_number: 1, species_name: '紅白ラメ ペア', quantity: 2, start_price: 200, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/紅白ラメ.jpg', inspection_info: '体長3cm前後、発色良好' },
-  { id: 2, item_number: 2, species_name: '幹之フルボディ', quantity: 5, start_price: 300, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/幹之フルボディ.jpg', inspection_info: 'フルボディ確認済み' },
-  { id: 3, item_number: 3, species_name: '楊貴妃ダルマ', quantity: 1, start_price: 150, current_price: 150, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/楊貴妃ダルマ.jpeg' },
-  { id: 4, item_number: 4, species_name: '三色ラメ 3匹セット', quantity: 3, start_price: 400, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/三色ラメ.jpeg', inspection_info: '三色バランス良好' },
-  { id: 5, item_number: 5, species_name: 'オロチ ペア', quantity: 2, start_price: 600, current_price: 600, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/オロチ.jpg', inspection_info: '漆黒度S級' },
-  { id: 6, item_number: 6, species_name: '夜桜ゴールド', quantity: 1, start_price: 350, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/夜桜ゴールド.jpg' },
-  { id: 7, item_number: 7, species_name: '煌 3匹セット', quantity: 3, start_price: 500, current_price: 500, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/01.png', inspection_info: 'ラメ数100以上' },
-  { id: 8, item_number: 8, species_name: 'サファイア ペア', quantity: 2, start_price: 800, current_price: 800, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/02.png' },
-  { id: 9, item_number: 9, species_name: 'ブラックダイヤ', quantity: 1, start_price: 450, current_price: 450, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/03.png', inspection_info: '体外光あり' },
-  { id: 10, item_number: 10, species_name: '松井ヒレ長 ペア', quantity: 2, start_price: 300, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: '/img/medaka/04.png' },
+  { id: 1, item_number: 1, species_name: 'エメキン 20匹(10ペア)', quantity: 20, start_price: 200, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, inspection_info: '発色良好、ペア選別済み' },
+  { id: 2, item_number: 2, species_name: '紅帝リアルロングフィン 35匹', quantity: 35, start_price: 300, current_price: 500, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, inspection_info: 'ロングフィン確認済み' },
+  { id: 3, item_number: 3, species_name: '三色体外光亜種 40匹', quantity: 40, start_price: 300, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`, inspection_info: '三色バランス良好' },
+  { id: 4, item_number: 4, species_name: '和墨ミッドナイトフリル 40匹', quantity: 40, start_price: 400, current_price: 600, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`, inspection_info: '墨質良好' },
+  { id: 5, item_number: 5, species_name: '和墨白銀 20匹(10ペア)', quantity: 20, start_price: 250, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/和墨白銀_サムネ.jpg`, inspection_info: '白銀体外光あり' },
+  { id: 6, item_number: 6, species_name: '黒天幻龍 10匹(5ペア)', quantity: 10, start_price: 500, current_price: 800, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/黒天幻龍_サムネ.jpg`, inspection_info: '希少個体' },
 ];
 
 export const MOCK_LANES_LIST = [
-  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter((_, i) => i < 5) },
-  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter((_, i) => i >= 5) },
+  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter(i => i.id === 1) },
+  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter(i => i.id === 2) },
+  { lane_name: 'レーン 3', items: MOCK_ITEMS.filter(i => i.id === 3) },
+  { lane_name: 'レーン 4', items: MOCK_ITEMS.filter(i => i.id === 4) },
+  { lane_name: 'レーン 5', items: MOCK_ITEMS.filter(i => i.id === 5) },
+  { lane_name: 'レーン 6', items: MOCK_ITEMS.filter(i => i.id === 6) },
 ];
 
 // ====================================================================
@@ -341,11 +396,12 @@ export interface WonEntry {
 // ====================================================================
 
 export const ITEM_ID_TO_LANE_ITEM_ID: Record<number, number> = {
-  1: 101,   // 紅白ラメ ペア
-  2: 201,   // 幹之フルボディ
-  4: 102,   // 三色ラメ
-  5: 202,   // オロチ ペア
-  8: 103,   // サファイア ペア
+  1: 101,   // エメキン
+  2: 201,   // 紅帝リアルロングフィン
+  3: 301,   // 三色体外光亜種
+  4: 401,   // 和墨ミッドナイトフリル
+  5: 501,   // 和墨白銀
+  6: 601,   // 黒天幻龍
 };
 
 export const LANE_ITEM_ID_TO_ITEM_ID: Record<number, number> =
