@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,7 +17,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'check.role' => \App\Http\Middleware\CheckRole::class,
         ]);
-        
+
+        // ALB（HTTPS終端）配下での X-Forwarded-* を信頼
+        $middleware->trustProxies(at: '*', headers:
+            Request::HEADER_X_FORWARDED_FOR |
+            Request::HEADER_X_FORWARDED_HOST |
+            Request::HEADER_X_FORWARDED_PORT |
+            Request::HEADER_X_FORWARDED_PROTO |
+            Request::HEADER_X_FORWARDED_AWS_ELB
+        );
+
         // APIではCSRF保護を無効化
         $middleware->validateCsrfTokens(except: [
             'api/*',
