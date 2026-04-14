@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
+use App\Models\SellerSettlement;
 use App\Models\WonItem;
 use App\Models\User;
 use Carbon\Carbon;
@@ -58,21 +59,31 @@ class SettlementController extends Controller
                 ->where('items.auction_id', $row->auction_id)
                 ->sum('won_items.shipping_fee');
 
-            // 精算ステータスを判定（オークション終了後1週間で精算完了と仮定）
-            $auctionEndDate = $auction->event_date;
-            $paymentDate = $auctionEndDate->copy()->addDays(7);
-            $status = Carbon::now()->gte($paymentDate) ? 'completed' : 'pending';
+            // 精算ステータスは管理者が手動管理する seller_settlements を参照
+            // レコードがなければ pending 扱い
+            $settlement = SellerSettlement::firstOrCreate(
+                [
+                    'auction_id' => $row->auction_id,
+                    'seller_profile_id' => $sellerProfileId,
+                ],
+                ['status' => SellerSettlement::STATUS_PENDING],
+            );
 
             $settlements[] = [
                 'id' => $row->auction_id,
+                'settlement_id' => $settlement->id,
                 'auction' => $auction->title,
                 'auction_date' => $auction->event_date->format('Y-m-d'),
                 'total_sales' => (float) $row->total_sales,
                 'commission' => (float) $row->total_commission,
                 'shipping_fee' => (int) $shippingFees,
                 'net_amount' => (float) $row->total_net,
-                'status' => $status,
-                'paid_at' => $status === 'completed' ? $paymentDate->format('Y-m-d') : null,
+                'status' => $settlement->status,
+                'paid_at' => optional($settlement->paid_at)->format('Y-m-d'),
+                'scheduled_payment_date' => optional($settlement->scheduled_payment_date)->format('Y-m-d'),
+                'payment_method' => $settlement->payment_method,
+                'transaction_reference' => $settlement->transaction_reference,
+                'note' => $settlement->note,
                 'items_count' => (int) $row->items_count,
             ];
         }
@@ -80,8 +91,8 @@ class SettlementController extends Controller
         // 日付で降順ソート
         usort($settlements, fn($a, $b) => strtotime($b['auction_date']) - strtotime($a['auction_date']));
 
-        // 統計を計算
-        $completedSettlements = array_filter($settlements, fn($s) => $s['status'] === 'completed');
+        // 統計を計算（status=completed のみ）
+        $completedSettlements = array_filter($settlements, fn($s) => $s['status'] === SellerSettlement::STATUS_COMPLETED);
         $totalNetAmount = array_sum(array_column($completedSettlements, 'net_amount'));
         $totalSales = array_sum(array_column($completedSettlements, 'total_sales'));
         $totalCommission = array_sum(array_column($completedSettlements, 'commission'));
@@ -150,23 +161,33 @@ class SettlementController extends Controller
         $totalNet = $wonItems->sum('seller_amount');
         $totalShippingFee = $wonItems->sum('shipping_fee');
 
-        // 精算ステータス
-        $paymentDate = $auction->event_date->copy()->addDays(7);
-        $status = Carbon::now()->gte($paymentDate) ? 'completed' : 'pending';
+        // 精算ステータスは管理者が手動管理する seller_settlements から取得
+        $settlement = SellerSettlement::firstOrCreate(
+            [
+                'auction_id' => $auctionId,
+                'seller_profile_id' => $sellerProfileId,
+            ],
+            ['status' => SellerSettlement::STATUS_PENDING],
+        );
 
         return response()->json([
             'success' => true,
             'data' => [
                 'settlement' => [
                     'id' => $auctionId,
+                    'settlement_id' => $settlement->id,
                     'auction' => $auction->title,
                     'auction_date' => $auction->event_date->format('Y-m-d'),
                     'total_sales' => $totalSales,
                     'commission' => $totalCommission,
                     'shipping_fee' => (int) $totalShippingFee,
                     'net_amount' => $totalNet,
-                    'status' => $status,
-                    'paid_at' => $status === 'completed' ? $paymentDate->format('Y-m-d') : null,
+                    'status' => $settlement->status,
+                    'paid_at' => optional($settlement->paid_at)->format('Y-m-d'),
+                    'scheduled_payment_date' => optional($settlement->scheduled_payment_date)->format('Y-m-d'),
+                    'payment_method' => $settlement->payment_method,
+                    'transaction_reference' => $settlement->transaction_reference,
+                    'note' => $settlement->note,
                     'items_count' => $wonItems->count(),
                 ],
                 'items' => $wonItems->map(function ($wonItem) {

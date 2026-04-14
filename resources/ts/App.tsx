@@ -55,6 +55,7 @@ const UserManagement         = lazy(() => import('./pages/admin/UserManagement')
 const UserDetail             = lazy(() => import('./pages/admin/UserDetail'));
 const UserCreate             = lazy(() => import('./pages/admin/UserCreate'));
 const Settings               = lazy(() => import('./pages/admin/Settings'));
+const Scaling                = lazy(() => import('./pages/admin/Scaling'));
 const SellerManagement       = lazy(() => import('./pages/admin/SellerManagement'));
 const SellerDetail           = lazy(() => import('./pages/admin/SellerDetail'));
 const BuyerManagement        = lazy(() => import('./pages/admin/BuyerManagement'));
@@ -221,6 +222,9 @@ function App() {
             
             {/* 設定 */}
             <Route path="settings" element={<Settings />} />
+
+            {/* インフラスケーリング */}
+            <Route path="scaling" element={<Scaling />} />
             
             {/* デザインシステム */}
             <Route path="design-system" element={<DesignSystem />} />

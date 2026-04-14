@@ -15,6 +15,7 @@ use App\Http\Controllers\Seller\ProfileController as SellerProfileController;
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
 use App\Http\Controllers\Seller\ShippingController as SellerShippingController;
 use App\Http\Controllers\Seller\SettlementController as SellerSettlementController;
+use App\Http\Controllers\Admin\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\ItemController as AdminItemController;
 use App\Http\Controllers\Admin\LiveController as AdminLiveController;
 use App\Http\Controllers\Admin\WonItemController as AdminWonItemController;
@@ -183,6 +184,21 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::get('shipping-master', [ShippingRateController::class, 'index']);
     Route::put('shipping-master/rates', [ShippingRateController::class, 'updateRates']);
     Route::put('shipping-master/packing-materials', [ShippingRateController::class, 'updatePackingMaterials']);
+
+    // 出品者精算管理
+    Route::get('settlements', [AdminSettlementController::class, 'index']);
+    Route::get('settlements/{id}', [AdminSettlementController::class, 'show']);
+    Route::patch('settlements/{id}', [AdminSettlementController::class, 'update']);
+    Route::post('settlements/{id}/mark-paid', [AdminSettlementController::class, 'markPaid']);
+    Route::post('settlements/{id}/recalculate', [AdminSettlementController::class, 'recalculate']);
+
+    // インフラスケーリング
+    Route::prefix('scaling')->group(function () {
+        Route::get('/status', [\App\Http\Controllers\Admin\ScalingController::class, 'status']);
+        Route::post('/scale-up', [\App\Http\Controllers\Admin\ScalingController::class, 'scaleUp']);
+        Route::post('/scale-down', [\App\Http\Controllers\Admin\ScalingController::class, 'scaleDown']);
+        Route::post('/release-lock', [\App\Http\Controllers\Admin\ScalingController::class, 'releaseLock']);
+    });
 });
 
 // ユーザーAPI（参加者・出品者共通）

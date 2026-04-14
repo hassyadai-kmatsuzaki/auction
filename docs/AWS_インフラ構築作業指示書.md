@@ -27,8 +27,9 @@
 17. [STEP 14: 監視・アラート設定](#step-14-監視アラート設定)
 18. [STEP 15: オークションモード切り替え（手動）](#step-15-オークションモード切り替え手動)
 19. [STEP 16: オークションモード切り替え（自動化）](#step-16-オークションモード切り替え自動化)
-20. [参考: 構成図](#参考-構成図)
-21. [月額コスト見積もり](#月額コスト見積もり)
+20. [STEP 17: 管理画面からのスケーリング実行](#step-17-管理画面からのスケーリング実行)
+21. [参考: 構成図](#参考-構成図)
+22. [月額コスト見積もり](#月額コスト見積もり)
 
 ---
 
@@ -1952,6 +1953,149 @@ Phase 3（安定運用後）:
   → AuctionObserver で自動登録（方法 B）を実装
   → スケールダウン忘れリスクがゼロに
 ```
+
+---
+
+## STEP 17: 管理画面からのスケーリング実行
+
+STEP 16 の Lambda を管理画面から手動で呼び出せる機能を実装済み。
+スケジュール登録なしでワンボタンでのスケーリングが可能。
+
+### 17-1. 機能概要
+
+管理画面 `/admin/scaling` にアクセスすると以下が可能:
+
+- **現在のモード表示**: EC2 インスタンスタイプから `通常モード` / `オークションモード` / `カスタム構成` を判定
+- **スケールアップ実行**: ボタン + テキスト確認 (`SCALE_UP` と入力)
+- **スケールダウン実行**: ボタン + テキスト確認 (`SCALE_DOWN` と入力)
+- **実行中ロック**: 重複実行防止（30分 TTL）
+- **最終実行ログ**: 直近のスケーリング履歴表示
+- **自動更新**: 15秒ごとにステータス再取得
+
+### 17-2. 実装済みファイル
+
+| 層 | ファイル |
+|---|---|
+| バックエンド | `app/Services/AwsScalingService.php` |
+| バックエンド | `app/Http/Controllers/Admin/ScalingController.php` |
+| バックエンド | `config/aws.php` |
+| ルート | `routes/api.php`（`admin/scaling/*`） |
+| フロントエンド | `resources/ts/pages/admin/Scaling.tsx` |
+| ナビゲーション | `resources/ts/layouts/AdminLayout.tsx` |
+| ルーティング | `resources/ts/App.tsx` |
+
+### 17-3. API エンドポイント
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| GET | `/api/admin/scaling/status` | 現在のモードと最終実行を取得 |
+| POST | `/api/admin/scaling/scale-up` | Lambda `auction-scale-up` を非同期実行 |
+| POST | `/api/admin/scaling/scale-down` | Lambda `auction-scale-down` を非同期実行 |
+| POST | `/api/admin/scaling/release-lock` | 実行中ロックの強制解除（トラブル時用） |
+
+すべて `auth:sanctum` + `check.role:admin` ミドルウェアで保護。
+
+### 17-4. 必要な .env 追加
+
+```env
+# === AWS インフラスケーリング ===
+AWS_EC2_INSTANCE_ID=i-xxxxxxxxxxxxxxxxx
+AWS_NORMAL_INSTANCE_TYPE=t3.small
+AWS_AUCTION_INSTANCE_TYPE=t3.large
+AWS_LAMBDA_SCALE_UP=auction-scale-up
+AWS_LAMBDA_SCALE_DOWN=auction-scale-down
+```
+
+### 17-5. EC2 IAM ロールへの追加ポリシー
+
+管理画面から Lambda を呼び出すため、`auction-ec2-role` に以下を追加:
+
+**ポリシー名: `auction-ec2-scaling-invoke`**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeScalingLambdas",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": [
+        "arn:aws:lambda:ap-northeast-1:xxxxxxxxxxxx:function:auction-scale-up",
+        "arn:aws:lambda:ap-northeast-1:xxxxxxxxxxxx:function:auction-scale-down"
+      ]
+    },
+    {
+      "Sid": "DescribeEC2ForStatus",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**適用手順:**
+
+1. IAM コンソール → ポリシー → 「ポリシーを作成」
+2. 上記 JSON を貼り付け → 名前 `auction-ec2-scaling-invoke` で作成
+3. ロール `auction-ec2-role` → 「許可を追加」→「ポリシーをアタッチ」→ 上記ポリシーを選択
+
+### 17-6. セキュリティ設計
+
+| 項目 | 実装 |
+|------|------|
+| 認証 | Laravel Sanctum（`auth:sanctum`） |
+| 認可 | `check.role:admin` ミドルウェアで管理者のみ許可 |
+| 二段階確認 | ダイアログで `SCALE_UP` / `SCALE_DOWN` 文字列入力を要求 |
+| 重複実行防止 | `Cache::lock()` で排他制御（TTL 30分） |
+| モード判定 | 現在のモードと逆の操作のみボタン活性化 |
+| 監査ログ | Laravel ログ + SNS 通知（Lambda 側） |
+
+### 17-7. 運用フロー
+
+```
+管理者が /admin/scaling にアクセス
+  │
+  ▼
+現在のモード確認（例: 通常モード = t3.small）
+  │
+  ▼
+「スケールアップ実行」ボタンクリック
+  │
+  ▼
+確認ダイアログ → "SCALE_UP" を入力 → 実行
+  │
+  ▼
+Laravel: Cache ロック取得 → Lambda を非同期 Invoke
+  │
+  ▼
+Lambda: EC2/RDS/ElastiCache/SSM を順次変更（15分程度）
+  │
+  ▼
+Lambda: SNS にメール通知（成功/失敗）
+  │
+  ▼
+管理画面: 15秒ごとに状態更新 → 新モードに切り替わったことを確認
+```
+
+### 17-8. トラブルシューティング
+
+**ロックが解除されない場合:**
+- 30分経過で自動解除されるが、手動解除も可能
+- 画面の「ロック解除」ボタンをクリック
+- または `POST /api/admin/scaling/release-lock`
+
+**Lambda が起動しない場合:**
+- IAM ポリシー `auction-ec2-scaling-invoke` がアタッチされているか確認
+- Lambda 関数名が `.env` の値と一致しているか確認
+- CloudWatch Logs で Lambda の実行ログを確認
+
+**モードが `custom` と表示される場合:**
+- EC2 のインスタンスタイプが `t3.small` / `t3.large` 以外になっている
+- AWS コンソールで手動変更されたか、.env の `AWS_NORMAL_INSTANCE_TYPE` / `AWS_AUCTION_INSTANCE_TYPE` と実際の値が違う
 
 ---
 
