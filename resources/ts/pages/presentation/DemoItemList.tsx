@@ -6,7 +6,6 @@ import { useState } from 'react';
 import {
   Box, Container, Typography, Grid, Paper, Tabs, Tab, Chip, IconButton,
   Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogTitle, DialogContent,
 } from '@mui/material';
 import {
   ViewModule as ViewModuleIcon,
@@ -15,13 +14,13 @@ import {
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   Info as InfoIcon,
-  Close as CloseIcon,
 } from '@mui/icons-material';
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
+import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
-import { MOCK_AUCTIONS, MOCK_ITEMS, MOCK_LANES_LIST, STATUS_CONFIG } from './mockData';
+import { MOCK_AUCTIONS, MOCK_ITEMS, MOCK_LANES_LIST, STATUS_CONFIG, itemDataToLaneItem } from './mockData';
 
 interface DemoItemListProps {
   onGoToWaitingRoom: () => void;
@@ -244,42 +243,12 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
           </Table>
         </TableContainer>
       )}
-      {/* Item Detail Dialog */}
-      {selectedItem && (
-        <Dialog open={!!selectedItem} onClose={() => { setSelectedItem(null); onItemDetailClosed?.(); }} maxWidth="sm" fullWidth sx={{ zIndex: 1500 }}>
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box>
-              {selectedItem.species_name}
-              <Typography variant="body2" color="text.secondary">No.{selectedItem.item_number}</Typography>
-            </Box>
-            <IconButton onClick={() => { setSelectedItem(null); onItemDetailClosed?.(); }} size="small"><CloseIcon /></IconButton>
-          </DialogTitle>
-          <DialogContent>
-            <Box
-              component="img"
-              src={selectedItem.thumbnail_path || '/img/noimage.png'}
-              alt={selectedItem.species_name}
-              sx={{ width: '100%', maxHeight: 400, objectFit: 'contain', mb: 2 }}
-            />
-            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-              {selectedItem.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
-              <Chip label={(STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }).label}
-                color={(STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }).color} size="small" />
-            </Box>
-            <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 1 }}>
-              ¥{Number(selectedItem.start_price).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {selectedItem.quantity}匹セット
-            </Typography>
-            {selectedItem.inspection_info && (
-              <Typography variant="body2" color="text.secondary">
-                検査情報: {selectedItem.inspection_info}
-              </Typography>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Item Detail Dialog（本番と同じメディアギャラリー） */}
+      <ItemDetailDialog
+        open={!!selectedItem}
+        item={selectedItem ? itemDataToLaneItem(selectedItem) : null}
+        onClose={() => { setSelectedItem(null); onItemDetailClosed?.(); }}
+      />
 
       {/* BidLimitModal */}
       {limitModalItem && (

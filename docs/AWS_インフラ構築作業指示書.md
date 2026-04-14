@@ -916,11 +916,19 @@ DB_PASSWORD={RDS マスターパスワード}
 
 # ---- Redis (ElastiCache) ----
 REDIS_CLIENT=phpredis
+REDIS_SCHEME=tls  # ElastiCache「転送中の暗号化=有効」の場合は必須。平文なら tcp
 REDIS_HOST={ElastiCache プライマリエンドポイント}
-REDIS_PASSWORD={ElastiCache AUTH トークン}
+REDIS_PASSWORD={ElastiCache AUTH トークン}  # AUTH 未設定なら空のまま（=null は NG、文字列"null"として扱われる）
 REDIS_PORT=6379
 REDIS_DB=0
 REDIS_CACHE_DB=1
+
+# ⚠️ TLS 有効な ElastiCache を使う場合、config/database.php の
+#   redis.default / redis.cache 両方に下記行を追加する必要がある:
+#     'scheme' => env('REDIS_SCHEME', 'tcp'),
+#   追加しないと REDIS_SCHEME=tls が無視され、TCP 接続は通るが
+#   TLS ハンドシェイクされず、SELECT コマンド時点で
+#   「RedisException: read error on connection to ...」が発生する。
 
 # ---- Session ----
 SESSION_DRIVER=redis
@@ -1866,7 +1874,11 @@ class AuctionObserver
             'version' => 'latest',
         ]);
 
-        $auctionDate = Carbon::parse($auction->start_date);
+        // 実際のモデルフィールドは event_date + start_time
+        $auctionDate = Carbon::parse(
+            $auction->event_date->format('Y-m-d') . ' ' . $auction->start_time,
+            'Asia/Tokyo'
+        );
 
         // スケールアップ: 開催2日前 AM3:00 JST
         $scaleUpAt = $auctionDate->copy()->subDays(2)->setTime(3, 0);

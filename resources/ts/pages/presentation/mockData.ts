@@ -240,15 +240,19 @@ export interface ItemData {
   is_premium: boolean;
   thumbnail_path?: string;
   inspection_info?: string;
+  media?: { id: number; item_id: number; media_type: string; file_path: string; duration?: number; display_order: number }[];
 }
 
+/** GUIDED_INITIAL_ITEMS から media 配列を id で引く */
+const mediaForItem = (id: number) => GUIDED_INITIAL_ITEMS.find(i => i.id === id)?.media ?? [];
+
 export const MOCK_ITEMS: ItemData[] = [
-  { id: 1, item_number: 1, species_name: 'エメキン 20匹(10ペア)', quantity: 20, start_price: 200, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, inspection_info: '発色良好、ペア選別済み' },
-  { id: 2, item_number: 2, species_name: '紅帝リアルロングフィン 35匹', quantity: 35, start_price: 300, current_price: 500, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, inspection_info: 'ロングフィン確認済み' },
-  { id: 3, item_number: 3, species_name: '三色体外光亜種 40匹', quantity: 40, start_price: 300, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`, inspection_info: '三色バランス良好' },
-  { id: 4, item_number: 4, species_name: '和墨ミッドナイトフリル 40匹', quantity: 40, start_price: 400, current_price: 600, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`, inspection_info: '墨質良好' },
-  { id: 5, item_number: 5, species_name: '和墨白銀 20匹(10ペア)', quantity: 20, start_price: 250, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/和墨白銀_サムネ.jpg`, inspection_info: '白銀体外光あり' },
-  { id: 6, item_number: 6, species_name: '黒天幻龍 10匹(5ペア)', quantity: 10, start_price: 500, current_price: 800, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/黒天幻龍_サムネ.jpg`, inspection_info: '希少個体' },
+  { id: 1, item_number: 1, species_name: 'エメキン 20匹(10ペア)', quantity: 20, start_price: 200, current_price: 300, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, inspection_info: '発色良好、ペア選別済み', media: mediaForItem(1) },
+  { id: 2, item_number: 2, species_name: '紅帝リアルロングフィン 35匹', quantity: 35, start_price: 300, current_price: 500, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, inspection_info: 'ロングフィン確認済み', media: mediaForItem(2) },
+  { id: 3, item_number: 3, species_name: '三色体外光亜種 40匹', quantity: 40, start_price: 300, current_price: 400, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`, inspection_info: '三色バランス良好', media: mediaForItem(3) },
+  { id: 4, item_number: 4, species_name: '和墨ミッドナイトフリル 40匹', quantity: 40, start_price: 400, current_price: 600, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`, inspection_info: '墨質良好', media: mediaForItem(4) },
+  { id: 5, item_number: 5, species_name: '和墨白銀 20匹(10ペア)', quantity: 20, start_price: 250, current_price: 350, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/和墨白銀_サムネ.jpg`, inspection_info: '白銀体外光あり', media: mediaForItem(5) },
+  { id: 6, item_number: 6, species_name: '黒天幻龍 10匹(5ペア)', quantity: 10, start_price: 500, current_price: 800, status: 'registered', is_premium: false, thumbnail_path: `${DEMO_IMG}/黒天幻龍_サムネ.jpg`, inspection_info: '希少個体', media: mediaForItem(6) },
 ];
 
 export const MOCK_LANES_LIST = [
@@ -389,6 +393,21 @@ export interface WonEntry {
   item_number?: number;
   lane_number?: number;
 }
+
+// ====================================================================
+// ItemData → LaneItem 変換（デモの詳細ダイアログ用）
+// ====================================================================
+
+export const itemDataToLaneItem = (item: ItemData): LaneItem => makeLaneItem({
+  id: item.id,
+  species_name: item.species_name,
+  current_price: item.current_price,
+  quantity: item.quantity,
+  thumbnail_path: item.thumbnail_path,
+  media: item.media as LaneItem['media'],
+  is_premium: item.is_premium,
+  seller_name: 'デモ出品者',
+});
 
 // ====================================================================
 // 出品一覧ID ↔ オークションID マッピング
