@@ -243,6 +243,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
       {/* 画像拡大ライトボックス */}
       <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="xl" fullWidth
         PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none', m: 1, maxHeight: '98vh' } }}
+        sx={zIndex !== undefined ? { zIndex: zIndex + 100 } : undefined}
       >
         <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
           <IconButton onClick={() => setLightboxOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}>
@@ -273,6 +274,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
       {/* 動画全画面 */}
       <Dialog open={videoDialogOpen} onClose={() => setVideoDialogOpen(false)} maxWidth="xl" fullWidth
         PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', m: 1, maxHeight: '98vh' } }}
+        sx={zIndex !== undefined ? { zIndex: zIndex + 100 } : undefined}
       >
         <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
           <IconButton onClick={() => setVideoDialogOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}>
