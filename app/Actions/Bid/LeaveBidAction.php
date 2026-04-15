@@ -59,6 +59,7 @@ class LeaveBidAction
                     ->toOthers();
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning("LeaveBid BidderUpdated broadcast error: " . $e->getMessage());
+                app(\App\Services\Monitoring\MetricRecorder::class)->broadcastFailure('BidderUpdated', $e->getMessage());
             }
         }
 

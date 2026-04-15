@@ -81,6 +81,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // マニュアルAPI（全ロール共通）
     Route::get('/manuals', [ManualController::class, 'index']);
     Route::get('/manuals/{id}', [ManualController::class, 'show']);
+
+    // LINE連携（ロール問わず利用可）
+    Route::prefix('line/settings')->group(function () {
+        Route::get('/redirect',       [\App\Http\Controllers\Auth\LineAuthController::class, 'redirect']);
+        Route::get('/status',          [\App\Http\Controllers\Auth\LineAuthController::class, 'status']);
+        Route::delete('/unlink',       [\App\Http\Controllers\Auth\LineAuthController::class, 'unlink']);
+        Route::get('/notifications',   [\App\Http\Controllers\Participant\LineSettingsController::class, 'index']);
+        Route::put('/notifications',   [\App\Http\Controllers\Participant\LineSettingsController::class, 'update']);
+        Route::post('/test',           [\App\Http\Controllers\Participant\LineSettingsController::class, 'test']);
+    });
 });
 
 // 管理者API
@@ -178,7 +188,13 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::patch('won-items/{id}/notes', [AdminWonItemController::class, 'updateNotes']);
     Route::post('auctions/{auctionId}/winners/{winnerId}/calculate-shipping', [AdminWonItemController::class, 'calculateShipping']);
     Route::get('auctions/{auctionId}/winners/{winnerId}/invoice', [InvoiceController::class, 'adminDownloadInvoice']);
+    Route::get('auctions/{auctionId}/winners/{winnerId}/delivery-note', [InvoiceController::class, 'adminDownloadDeliveryNote']);
     Route::get('auctions/{auctionId}/sellers/{sellerId}/payment-notice', [InvoiceController::class, 'adminDownloadPaymentNotice']);
+
+    // 帳票管理（一覧）
+    Route::get('documents/invoices', [\App\Http\Controllers\Admin\DocumentController::class, 'invoices']);
+    Route::get('documents/payment-notices', [\App\Http\Controllers\Admin\DocumentController::class, 'paymentNotices']);
+    Route::get('documents/delivery-notes', [\App\Http\Controllers\Admin\DocumentController::class, 'deliveryNotes']);
 
     // 配送マスタ管理
     Route::get('shipping-master', [ShippingRateController::class, 'index']);

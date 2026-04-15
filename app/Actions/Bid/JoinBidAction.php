@@ -10,6 +10,7 @@ use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Services\CountdownService;
+use App\Services\Monitoring\MetricRecorder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -74,6 +75,7 @@ class JoinBidAction
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+            app(MetricRecorder::class)->bidFailure($item->id, $userId, 'join_bid_db_error', $e->getMessage());
             throw $e;
         }
 
@@ -91,6 +93,7 @@ class JoinBidAction
                     ->toOthers();
             } catch (\Exception $e) {
                 Log::warning("JoinBid BidderUpdated broadcast error: " . $e->getMessage());
+                app(MetricRecorder::class)->broadcastFailure('BidderUpdated', $e->getMessage());
             }
         }
 
@@ -103,6 +106,7 @@ class JoinBidAction
                 $countdownService->handleImmediatePriceIncrement($lane, $item->fresh(), $auction, $userId);
             } catch (\Exception $e) {
                 Log::error("Immediate price increment error on join: " . $e->getMessage());
+                app(MetricRecorder::class)->priceIncrementFailed($item->id, 'immediate_on_join', $e->getMessage());
             }
         }
 

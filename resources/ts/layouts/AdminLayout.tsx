@@ -99,7 +99,7 @@ export default function AdminLayout() {
     { text: 'マニュアル', icon: <MenuBookIcon />, path: '/admin/manual' },
     { text: '設定', icon: <SettingsIcon />, path: '/admin/settings' },
     { text: 'インフラスケーリング', icon: <CloudIcon />, path: '/admin/scaling' },
-    { text: '帳票管理（準備中）', icon: <ReceiptIcon />, path: '/admin/documents', disabled: true },
+    { text: '帳票管理', icon: <ReceiptIcon />, path: '/admin/documents' },
     { text: 'AI分析（準備中）', icon: <AIIcon />, path: '/admin/ai-analytics', disabled: true },
   ];
 

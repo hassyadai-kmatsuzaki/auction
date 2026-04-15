@@ -279,7 +279,7 @@ class NotificationService
             // 出品者にもLINE通知
             $sellerUserId = $this->getSellerUserId($item);
             if ($sellerUserId) {
-                $this->sendLine($sellerUserId, 'won_item',
+                $this->sendLine($sellerUserId, 'item_sold',
                     "🎉 出品した生体が落札されました！\n"
                     . $item->species_name . "\n"
                     . "落札価格: ¥" . number_format($wonItem->winning_price) . "/匹"
@@ -308,7 +308,7 @@ class NotificationService
 
             $sellerUserId = $this->getSellerUserId($item);
             if ($sellerUserId) {
-                $this->sendLine($sellerUserId, 'won_item',
+                $this->sendLine($sellerUserId, 'payment_received',
                     "💰 入金が確認されました\n"
                     . $item->species_name . "\n"
                     . "発送をお願いします。"

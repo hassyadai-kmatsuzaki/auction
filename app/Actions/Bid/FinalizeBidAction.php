@@ -11,6 +11,7 @@ use App\Models\Lane;
 use App\Models\PriceEvent;
 use App\Models\User;
 use App\Models\WonItem;
+use App\Services\Monitoring\MetricRecorder;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -102,6 +103,8 @@ class FinalizeBidAction
             throw $e;
         }
 
+        app(MetricRecorder::class)->itemSold($item->id, $winnerId, (float) $finalPrice);
+
         // トランザクション外でブロードキャスト
         $lane = Lane::where('current_item_id', $item->id)->first();
         if ($lane) {
@@ -113,6 +116,7 @@ class FinalizeBidAction
                 ));
             } catch (\Exception $e) {
                 Log::warning("ItemSold broadcast error: " . $e->getMessage());
+                app(MetricRecorder::class)->broadcastFailure('ItemSold', $e->getMessage());
             }
         }
 
@@ -144,6 +148,8 @@ class FinalizeBidAction
             DB::rollBack();
             throw $e;
         }
+
+        app(MetricRecorder::class)->itemUnsold($item->id);
 
         return BidResultDto::success([
             'item_id' => $item->id,

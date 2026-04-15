@@ -31,9 +31,45 @@ import {
   AccountBalance as BankIcon,
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
-  Send as SendIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import NotificationPreferencesPanel, {
+  NotificationRow,
+} from '@/features/notifications/NotificationPreferencesPanel';
+
+const SELLER_NOTIFICATION_ROWS: NotificationRow[] = [
+  {
+    category: 'auction',
+    label: '新規オークション開催のお知らせ',
+    description: '新しいオークションが開催される際にお知らせ',
+    emailKey: 'email_new_auction',
+    emailTestType: 'new_auction',
+    lineType: 'new_auction',
+  },
+  {
+    category: 'transaction',
+    label: '出品商品の落札通知',
+    description: '出品した商品が落札された際にお知らせ',
+    emailKey: 'email_item_sold',
+    emailTestType: 'item_sold',
+    lineType: 'item_sold',
+  },
+  {
+    category: 'transaction',
+    label: '入金確認通知',
+    description: '落札者からの入金が確認された際にお知らせ',
+    emailKey: 'email_payment_received',
+    emailTestType: 'payment_received',
+    lineType: 'payment_received',
+  },
+  {
+    category: 'reminder',
+    label: '発送リマインダー',
+    description: '発送期限が近づいた際にリマインド',
+    emailKey: 'email_shipping_reminder',
+    emailTestType: 'shipping_reminder',
+  },
+];
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -98,7 +134,22 @@ export default function SellerProfile() {
   const [saving, setSaving] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  const [testSending, setTestSending] = useState<string | null>(null);
+
+  // LINE連携コールバック結果のトースト表示
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const line = params.get('line');
+    if (line === 'success') {
+      setSnackbar({ open: true, message: 'LINE連携が完了しました', severity: 'success' });
+      params.delete('line');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (line === 'error') {
+      setSnackbar({ open: true, message: 'LINE連携に失敗しました', severity: 'error' });
+      params.delete('line');
+      params.delete('reason');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [formData, setFormData] = useState({
@@ -245,18 +296,6 @@ export default function SellerProfile() {
     }
   };
 
-  const handleSaveNotifications = async () => {
-    try {
-      setSaving(true);
-      await axios.put('/api/seller/profile/notifications', notificationSettings);
-      setSnackbar({ open: true, message: '通知設定を保存しました。', severity: 'success' });
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleSaveDisplay = async () => {
     try {
       setSaving(true);
@@ -266,20 +305,6 @@ export default function SellerProfile() {
       setSnackbar({ open: true, message: err.response?.data?.message || '保存に失敗しました。', severity: 'error' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSendTestMail = async (type: string) => {
-    setTestSending(type);
-    try {
-      const response = await axios.post('/api/seller/profile/notifications/test', { type });
-      if (response.data.success) {
-        setSnackbar({ open: true, message: 'テストメールを送信しました。受信をご確認ください。', severity: 'success' });
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || 'テストメールの送信に失敗しました。', severity: 'error' });
-    } finally {
-      setTestSending(null);
     }
   };
 
@@ -728,121 +753,30 @@ export default function SellerProfile() {
             <TabPanel value={tabValue} index={2}>
               <CardContent sx={{ p: 3 }}>
                 {/* 通知設定 */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <NotificationsIcon sx={{ color: '#F59E0B' }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     通知設定
                   </Typography>
                 </Box>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
+                  メールとLINEの通知をまとめて管理できます。LINE連携後はLINE列のトグルも有効になります。
+                </Typography>
 
-                <Box sx={{ mb: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={notificationSettings.email_new_auction}
-                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_new_auction: e.target.checked })}
-                        />
-                      }
-                      label="新規オークション開催のお知らせ"
-                    />
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={testSending === 'new_auction' ? <CircularProgress size={14} /> : <SendIcon />}
-                      onClick={() => handleSendTestMail('new_auction')}
-                      disabled={testSending !== null}
-                    >
-                      テスト送信
-                    </Button>
-                  </Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
-                    新しいオークションが開催される際にメールでお知らせします
-                  </Typography>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={notificationSettings.email_item_sold}
-                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_item_sold: e.target.checked })}
-                        />
-                      }
-                      label="出品商品の落札通知"
-                    />
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={testSending === 'item_sold' ? <CircularProgress size={14} /> : <SendIcon />}
-                      onClick={() => handleSendTestMail('item_sold')}
-                      disabled={testSending !== null}
-                    >
-                      テスト送信
-                    </Button>
-                  </Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
-                    出品した商品が落札された際にメールでお知らせします
-                  </Typography>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={notificationSettings.email_payment_received}
-                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_payment_received: e.target.checked })}
-                        />
-                      }
-                      label="入金確認通知"
-                    />
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={testSending === 'payment_received' ? <CircularProgress size={14} /> : <SendIcon />}
-                      onClick={() => handleSendTestMail('payment_received')}
-                      disabled={testSending !== null}
-                    >
-                      テスト送信
-                    </Button>
-                  </Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6, mb: 2 }}>
-                    落札者からの入金が確認された際にメールでお知らせします
-                  </Typography>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={notificationSettings.email_shipping_reminder}
-                          onChange={(e) => setNotificationSettings({ ...notificationSettings, email_shipping_reminder: e.target.checked })}
-                        />
-                      }
-                      label="発送リマインダー"
-                    />
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={testSending === 'shipping_reminder' ? <CircularProgress size={14} /> : <SendIcon />}
-                      onClick={() => handleSendTestMail('shipping_reminder')}
-                      disabled={testSending !== null}
-                    >
-                      テスト送信
-                    </Button>
-                  </Box>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', ml: 6 }}>
-                    発送期限が近づいた際にリマインドメールを送信します
-                  </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-                    onClick={handleSaveNotifications}
-                    disabled={saving}
-                  >
-                    通知設定を保存
-                  </Button>
-                </Box>
+                <NotificationPreferencesPanel
+                  role="seller"
+                  rows={SELLER_NOTIFICATION_ROWS}
+                  emailSettings={notificationSettings as unknown as Record<string, boolean>}
+                  emailUpdateUrl="/api/seller/profile/notifications"
+                  emailTestUrl="/api/seller/profile/notifications/test"
+                  onSaved={(next) =>
+                    setNotificationSettings({
+                      ...notificationSettings,
+                      ...(next as typeof notificationSettings),
+                    })
+                  }
+                  onNotify={(message, severity) => setSnackbar({ open: true, message, severity })}
+                />
 
                 <Divider sx={{ my: 4 }} />
 

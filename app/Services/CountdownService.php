@@ -12,6 +12,7 @@ use App\Models\BidLimitPrice;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\BidParticipant;
+use App\Services\Monitoring\MetricRecorder;
 use App\Events\BidderUpdated;
 use App\Events\BidLimitReached;
 use App\Events\CountdownTick;
@@ -33,6 +34,7 @@ class CountdownService
         private readonly LeaveBidAction                   $leaveBidAction,
         private readonly SetBidLimitAction                $setBidLimitAction,
         private readonly NotifyFavoriteApproachingAction  $favoriteNotifyAction,
+        private readonly MetricRecorder                   $metrics,
     ) {}
 
     /** @deprecated 後方互換性のため残存 — CountdownService は BidService に依存しない */
@@ -273,7 +275,10 @@ class CountdownService
             ));
         } catch (\Exception $e) {
             Log::warning("Broadcast error lane {$laneId}: " . $e->getMessage());
+            $this->metrics->broadcastFailure('CountdownTick', $e->getMessage());
         }
+
+        $this->metrics->countdownTick($laneId, 'bidding', (float) $state['remaining_seconds']);
 
         // カウントダウン終了時の処理
         if ($state['remaining_seconds'] <= 0) {
@@ -325,7 +330,10 @@ class CountdownService
             ));
         } catch (\Exception $e) {
             Log::warning("Pre-bid broadcast error lane {$laneId}: " . $e->getMessage());
+            $this->metrics->broadcastFailure('CountdownTick', $e->getMessage());
         }
+
+        $this->metrics->countdownTick($laneId, 'pre_bid', (float) $state['remaining_seconds']);
 
         if ($state['remaining_seconds'] <= 0) {
             $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
@@ -366,7 +374,10 @@ class CountdownService
             ));
         } catch (\Exception $e) {
             Log::warning("Freeze broadcast error lane {$laneId}: " . $e->getMessage());
+            $this->metrics->broadcastFailure('CountdownTick', $e->getMessage());
         }
+
+        $this->metrics->countdownTick($laneId, 'freeze', (float) $state['remaining_seconds']);
 
         if ($state['remaining_seconds'] <= 0) {
             $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
@@ -397,8 +408,36 @@ class CountdownService
             return;
         }
 
+        // 並行呼び出しに備えて呼び出し時点の想定価格を記録
+        $expectedOldPrice = (float) $item->current_price;
+
         DB::beginTransaction();
         try {
+            // 🔒 行ロックを取得し、最新状態で再検証する
+            //    （他ワーカーが先に上昇させていたら冪等にスキップ）
+            $locked = Item::where('id', $item->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status !== 'live') {
+                DB::rollBack();
+                return;
+            }
+
+            if ((float) $locked->current_price !== $expectedOldPrice) {
+                DB::rollBack();
+                Log::info("handlePriceIncrement: price already changed by another handler. item={$locked->id}, expected={$expectedOldPrice}, actual={$locked->current_price} — skipping.");
+                return;
+            }
+
+            $freshActiveCount = BidParticipant::forItem($locked->id)->active()->count();
+            if ($freshActiveCount <= 1) {
+                DB::rollBack();
+                Log::info("handlePriceIncrement: active count dropped to {$freshActiveCount} under lock. item={$locked->id} — skipping.");
+                return;
+            }
+
+            // 以降は行ロック済みの最新インスタンスを使用
+            $item = $locked;
+            $activeBidderCount = $freshActiveCount;
+
             $oldPrice  = $item->current_price;
             $increment = $auction->calculatePriceIncrement($oldPrice);
             $newPrice  = $oldPrice + $increment;
@@ -462,9 +501,12 @@ class CountdownService
             }
 
             DB::commit();
+
+            $this->metrics->priceIncrement($item->id, $lane->id, $oldPrice, $newPrice, 'auto_increment');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Price increment error: " . $e->getMessage());
+            $this->metrics->priceIncrementFailed($item->id, 'handle_price_increment', $e->getMessage());
             return;
         }
 
@@ -899,6 +941,22 @@ class CountdownService
      */
     public function adjustPriceByBidLimits(Item $item, Auction $auction, Lane $lane, bool $startFreeze = true): void
     {
+        $expectedOldPrice = (float) $item->current_price;
+
+        // 🔒 行ロックを取得して最新状態で開始する
+        //    （他ワーカーが先に価格を上昇させていたら、現在価格を基準に再計算する）
+        DB::beginTransaction();
+        $locked = Item::where('id', $item->id)->lockForUpdate()->first();
+        if (!$locked || $locked->status !== 'live') {
+            DB::rollBack();
+            return;
+        }
+
+        // 他ハンドラによる変更があれば最新値を使う（スキップではなく継続）
+        if ((float) $locked->current_price !== $expectedOldPrice) {
+            Log::info("adjustPriceByBidLimits: price changed by another handler. expected={$expectedOldPrice}, actual={$locked->current_price} — recalculating with latest.");
+        }
+        $item = $locked;
         $currentPrice = $item->current_price;
 
         $limits = BidLimitPrice::where('item_id', $item->id)
@@ -909,6 +967,7 @@ class CountdownService
             ->get();
 
         if ($limits->count() < 2) {
+            DB::rollBack();
             return;
         }
 
@@ -1002,13 +1061,20 @@ class CountdownService
         }
 
         if ($targetPrice <= $currentPrice) {
+            DB::rollBack();
             return;
         }
 
         Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, lowest_limit={$lowestLimit}, second_limit={$secondLowestLimit}, protected=" . json_encode($protectedUserIds) . ", startFreeze={$startFreeze}");
 
-        $item->update(['current_price' => $targetPrice]);
-        \App\Models\PriceEvent::recordAutoIncrement($item->id, $currentPrice, $targetPrice, $limits->count());
+        try {
+            $item->update(['current_price' => $targetPrice]);
+            \App\Models\PriceEvent::recordAutoIncrement($item->id, $currentPrice, $targetPrice, $limits->count());
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("adjustPriceByBidLimits: price update failed — " . $e->getMessage());
+            throw $e;
+        }
 
         $freshItem = $item->fresh();
 
@@ -1073,6 +1139,16 @@ class CountdownService
             }
         } catch (\Exception $e) {
             Log::error("adjustPriceByBidLimits checkBidLimits error: " . $e->getMessage());
+        }
+
+        // 🔓 価格変更とそれに伴う指値トリガー処理までを1トランザクションで確定
+        try {
+            DB::commit();
+            $this->metrics->priceIncrement($item->id, $lane->id, (float) $currentPrice, (float) $targetPrice, 'bid_limit_adjust');
+        } catch (\Throwable $e) {
+            Log::error("adjustPriceByBidLimits commit failed: " . $e->getMessage());
+            $this->metrics->priceIncrementFailed($item->id, 'adjust_price_by_bid_limits', $e->getMessage());
+            throw $e;
         }
 
         if ($startFreeze) {

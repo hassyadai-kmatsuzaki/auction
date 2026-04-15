@@ -330,4 +330,26 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         
         Log::info("Auction countdown job COMPLETED for auction {$this->auctionId}, iterations: {$iterations}, idle: {$idleIterations}" . ($superseded ? ' (superseded by new generation)' : ''));
     }
+
+    /**
+     * ジョブ失敗時のフック（tries を使い切った / 未捕捉例外）
+     * CloudWatch メトリクスに失敗を記録する
+     */
+    public function failed(\Throwable $e): void
+    {
+        try {
+            app(\App\Services\Monitoring\MetricRecorder::class)->jobFailure(
+                'ProcessAuctionCountdownJob',
+                $e->getMessage(),
+                [
+                    'auction_id' => (string) $this->auctionId,
+                    'generation' => (string) $this->generation,
+                ]
+            );
+        } catch (\Throwable $metricErr) {
+            Log::warning('MetricRecorder failed in job failed(): ' . $metricErr->getMessage());
+        }
+
+        Log::critical("ProcessAuctionCountdownJob FAILED auction={$this->auctionId}: " . $e->getMessage());
+    }
 }

@@ -3,23 +3,45 @@
 namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
+use App\Models\LineAccount;
 use App\Models\LineNotificationSetting;
+use App\Services\LineService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class LineSettingsController extends Controller
 {
+    public function __construct(private readonly LineService $lineService) {}
+
     /** 通知種別の定義 */
     private const NOTIFICATION_TYPES = [
-        'auction_start'       => 'オークション開始通知',
-        'won_item'            => '落札通知',
-        'payment_reminder'    => '入金催促',
-        'shipping_completed'  => '発送完了通知',
-        'auction_preview'     => 'オークション予告（前日）',
-        'bid_limit_reached'   => '指値発動通知',
-        'new_auction'         => '新規オークション通知',
-        'favorite_approaching'=> 'お気に入り順番接近通知',
+        'auction_start'        => 'オークション開始通知',
+        'won_item'             => '落札通知',
+        'payment_reminder'     => '入金催促',
+        'shipping_completed'   => '発送完了通知',
+        'auction_preview'      => 'オークション予告（前日）',
+        'bid_limit_reached'    => '指値発動通知',
+        'new_auction'          => '新規オークション通知',
+        'favorite_approaching' => 'お気に入り順番接近通知',
+        // 出品者向け
+        'item_sold'            => '出品商品の落札通知（出品者）',
+        'payment_received'     => '入金確認通知（出品者）',
+    ];
+
+    /** タイプ別のテストメッセージ */
+    private const TEST_MESSAGES = [
+        'auction_start' => "🔔 [テスト] オークションが開始されました！\n【テスト】第99回メダカライブオークション\n今すぐ参加しましょう！",
+        'won_item' => "🎉 [テスト] 落札おめでとうございます！\n【テスト】三色ラメ体外光\n¥15,000/匹\n合計: ¥16,500（税込）",
+        'payment_reminder' => "⚠️ [テスト] 入金期限が近づいています\n【テスト】三色ラメ体外光\n期限まで24時間前",
+        'shipping_completed' => "📦 [テスト] 発送が完了しました\n【テスト】三色ラメ体外光\n追跡番号: 1234-5678-9012",
+        'auction_preview' => "📅 [テスト] 明日オークション開催\n【テスト】第99回メダカライブオークション",
+        'bid_limit_reached' => "⚠️ [テスト] 上限価格に到達しました\n【テスト】三色ラメ体外光\n上限: ¥10,000\n現在価格: ¥10,500\n自動的に入札オフになりました",
+        'new_auction' => "📢 [テスト] 新しいオークションが追加されました\n【テスト】第99回メダカライブオークション\n開催日: 未定",
+        'favorite_approaching' => "⏰ [テスト] お気に入りの【テスト】三色ラメ体外光の出番まであと3つです！\n準備してください！",
+        'item_sold' => "🎉 [テスト] 出品した生体が落札されました！\n【テスト】三色ラメ体外光\n落札価格: ¥15,000/匹",
+        'payment_received' => "💰 [テスト] 入金が確認されました\n【テスト】三色ラメ体外光\n発送をお願いします。",
     ];
 
     /** 通知設定一覧を取得 */
@@ -60,5 +82,49 @@ class LineSettingsController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => '通知設定を保存しました']);
+    }
+
+    /** LINEテスト通知を送信 */
+    public function test(Request $request): JsonResponse
+    {
+        $request->validate([
+            'type' => 'required|string|in:' . implode(',', array_keys(self::NOTIFICATION_TYPES)),
+        ]);
+
+        $userId = Auth::id();
+        $type   = $request->input('type');
+
+        $lineAccount = LineAccount::where('user_id', $userId)->where('is_active', true)->first();
+        if (!$lineAccount) {
+            return response()->json([
+                'success' => false,
+                'message' => 'LINE連携が必要です。先にLINEと連携してください。',
+            ], 400);
+        }
+
+        $message = self::TEST_MESSAGES[$type] ?? "[テスト] " . (self::NOTIFICATION_TYPES[$type] ?? '通知');
+
+        try {
+            $success = $this->lineService->pushText($lineAccount->line_user_id, $message);
+            if (!$success) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'LINEへの送信に失敗しました。設定をご確認ください。',
+                ], 500);
+            }
+
+            Log::info('LINEテスト通知送信', ['user_id' => $userId, 'type' => $type]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'LINEテスト通知を送信しました。',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('LINEテスト通知エラー', ['user_id' => $userId, 'type' => $type, 'error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'LINEテスト通知の送信に失敗しました。',
+            ], 500);
+        }
     }
 }

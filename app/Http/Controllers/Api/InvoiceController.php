@@ -133,6 +133,35 @@ class InvoiceController extends Controller
     }
 
     /**
+     * 納品書PDFダウンロード（管理者向け・オークション×落札者単位）
+     * GET /api/admin/auctions/{auctionId}/winners/{winnerId}/delivery-note
+     */
+    public function adminDownloadDeliveryNote(int $auctionId, int $winnerId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $winner = \App\Models\User::findOrFail($winnerId);
+
+        try {
+            $pdf = $this->invoiceService->generateDeliveryNote($auction, $winner);
+            $content = $pdf->output();
+
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"delivery_note_auction_{$auctionId}_winner_{$winnerId}.pdf\"",
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('納品書PDF生成エラー（管理者）', [
+                'auction_id' => $auctionId,
+                'winner_id' => $winnerId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => '納品書の生成に失敗しました'], 500);
+        }
+    }
+
+    /**
      * 出品者支払通知書PDFダウンロード（管理者向け）
      * GET /api/admin/auctions/{auctionId}/sellers/{sellerId}/payment-notice
      */

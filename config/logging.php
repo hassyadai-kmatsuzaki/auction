@@ -127,6 +127,26 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Alerts channel — CloudWatch EMF 形式のアプリメトリクスを出力
+        |--------------------------------------------------------------------------
+        |
+        | storage/logs/alerts.log に1行=1JSON で書き込む。
+        | CloudWatch Logs Agent がこのファイルを LogGroup `/auction/app/alerts` に転送し、
+        | CloudWatch が EMF の `_aws.CloudWatchMetrics` を自動抽出してメトリクス化する。
+        |
+        | MetricRecorder が使用する。直接呼ばない。
+        */
+        'alerts' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/alerts.log'),
+            'level' => 'info',
+            'days' => env('ALERTS_LOG_DAYS', 30),
+            'tap' => [\App\Logging\PlainJsonFormatter::class],
+            'replace_placeholders' => false,
+        ],
+
     ],
 
 ];

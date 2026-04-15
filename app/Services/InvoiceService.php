@@ -163,6 +163,76 @@ class InvoiceService
     }
 
     /**
+     * 納品書PDFを生成（オークション×落札者単位）
+     */
+    public function generateDeliveryNote(Auction $auction, User $winner): \Barryvdh\DomPDF\PDF
+    {
+        $wonItems = $this->getWonItems($auction, $winner);
+
+        $documentNumber = sprintf('DLV-%s-A%05d-W%05d', Carbon::now()->format('Ymd'), $auction->id, $winner->id);
+
+        $companyName = SystemSetting::get('company_name', 'メダカオークション運営事務局');
+        $companyAddress = SystemSetting::get('company_address', '');
+        $companyPhone = SystemSetting::get('company_phone', '');
+        $companyEmail = SystemSetting::get('company_email', '');
+
+        $firstItem = $wonItems->first();
+
+        $items = $wonItems->map(function ($wonItem) {
+            $item = $wonItem->item;
+            return [
+                'item_number' => $item->item_number ?? '',
+                'species_name' => $item->species_name ?? '',
+                'quantity' => $wonItem->quantity,
+                'shipping_company' => $wonItem->shipping_company ?? '',
+                'tracking_number' => $wonItem->tracking_number ?? '',
+                'delivery_status' => $this->formatDeliveryStatus($wonItem->delivery_status),
+                'shipped_at' => $wonItem->shipped_at?->format('Y年m月d日') ?? '',
+            ];
+        })->values()->toArray();
+
+        $totalQuantity = $wonItems->sum('quantity');
+
+        $data = [
+            'document_number' => $documentNumber,
+            'issue_date' => Carbon::now()->format('Y年m月d日'),
+            'buyer_name' => $firstItem->shipping_name ?? $winner->name ?? '',
+            'buyer_postal_code' => $firstItem->shipping_postal_code ?? '',
+            'buyer_address' => trim(
+                ($firstItem->shipping_prefecture ?? '') .
+                ($firstItem->shipping_city ?? '') .
+                ($firstItem->shipping_address_line1 ?? '') .
+                ' ' . ($firstItem->shipping_address_line2 ?? '')
+            ),
+            'buyer_phone' => $firstItem->shipping_phone ?? '',
+            'auction_title' => $auction->title ?? '',
+            'auction_date' => $auction->event_date?->format('Y年m月d日') ?? '',
+            'items' => $items,
+            'total_quantity' => $totalQuantity,
+            'total_items_count' => count($items),
+            'company_name' => $companyName,
+            'company_address' => $companyAddress,
+            'company_phone' => $companyPhone,
+            'company_email' => $companyEmail,
+        ];
+
+        return Pdf::loadView('pdf.delivery_note', $data)
+            ->setPaper('a4')
+            ->setOption('defaultFont', 'ipagothic')
+            ->setOption('isRemoteEnabled', true);
+    }
+
+    private function formatDeliveryStatus(?string $status): string
+    {
+        return match ($status) {
+            'preparing' => '準備中',
+            'shipped' => '発送済み',
+            'completed' => '配達完了',
+            default => '未発送',
+        };
+    }
+
+    /**
      * 出品者支払通知書PDFを生成（オークション×出品者単位）
      */
     public function generateSellerPaymentNotice(Auction $auction, SellerProfile $seller): \Barryvdh\DomPDF\PDF

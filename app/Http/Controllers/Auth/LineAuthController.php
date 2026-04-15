@@ -26,12 +26,22 @@ class LineAuthController extends Controller
             return response()->json(['success' => false, 'message' => 'ログインが必要です'], 401);
         }
 
+        // 連携後に戻るページ（ホワイトリストで検証）
+        $returnTo = $request->input('return_to', '/participant/settings');
+        $allowedReturns = ['/participant/settings', '/seller/profile'];
+        if (!in_array($returnTo, $allowedReturns, true)) {
+            $returnTo = '/participant/settings';
+        }
+
         // state にユーザーIDを埋め込み（コールバック時にセッションが切れていても復元可能）
         $token = Str::random(40);
         $state = base64_encode(json_encode(['token' => $token, 'user_id' => $userId]));
 
         // キャッシュに保存（セッションはAPIとブラウザで共有されない場合があるため）
-        \Illuminate\Support\Facades\Cache::put("line_oauth:{$token}", $userId, now()->addMinutes(10));
+        \Illuminate\Support\Facades\Cache::put("line_oauth:{$token}", [
+            'user_id' => $userId,
+            'return_to' => $returnTo,
+        ], now()->addMinutes(10));
 
         return response()->json([
             'success' => true,
@@ -48,17 +58,24 @@ class LineAuthController extends Controller
 
         Log::info('LINE callback received', ['has_code' => !!$code, 'has_state' => !!$stateRaw]);
 
-        if (!$code) {
-            return redirect("{$baseUrl}/participant/settings?line=error&reason=code");
-        }
-
-        // state からユーザーIDを復元（セッション非依存）
+        // state からユーザーID・戻り先を復元（セッション非依存）
         $userId = null;
+        $returnTo = '/participant/settings';
         if ($stateRaw) {
             $decoded = json_decode(base64_decode($stateRaw), true);
             if ($decoded && !empty($decoded['token'])) {
-                $userId = \Illuminate\Support\Facades\Cache::pull("line_oauth:{$decoded['token']}");
+                $cached = \Illuminate\Support\Facades\Cache::pull("line_oauth:{$decoded['token']}");
+                if (is_array($cached)) {
+                    $userId = $cached['user_id'] ?? null;
+                    $returnTo = $cached['return_to'] ?? $returnTo;
+                } elseif (is_numeric($cached)) {
+                    $userId = (int) $cached;
+                }
             }
+        }
+
+        if (!$code) {
+            return redirect("{$baseUrl}{$returnTo}?line=error&reason=code");
         }
 
         // キャッシュから取れなかった場合はセッション認証にフォールバック
@@ -77,7 +94,7 @@ class LineAuthController extends Controller
 
         if (!$lineAccount) {
             Log::error('LINE callback: linkAction failed', ['user_id' => $userId]);
-            return redirect("{$baseUrl}/participant/settings?line=error&reason=link");
+            return redirect("{$baseUrl}{$returnTo}?line=error&reason=link");
         }
 
         Log::info('LINE account linked successfully', [
@@ -85,7 +102,7 @@ class LineAuthController extends Controller
             'display_name' => $lineAccount->display_name,
         ]);
 
-        return redirect("{$baseUrl}/participant/settings?line=success");
+        return redirect("{$baseUrl}{$returnTo}?line=success");
     }
 
     /** LINE連携状態を取得 */
