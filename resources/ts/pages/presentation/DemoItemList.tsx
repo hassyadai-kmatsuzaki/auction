@@ -248,6 +248,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
         open={!!selectedItem}
         item={selectedItem ? itemDataToLaneItem(selectedItem) : null}
         onClose={() => { setSelectedItem(null); onItemDetailClosed?.(); }}
+        zIndex={1500}
       />
 
       {/* BidLimitModal */}

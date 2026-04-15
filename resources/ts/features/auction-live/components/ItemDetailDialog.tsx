@@ -24,6 +24,7 @@ interface Props {
   onBidToggle?: (itemId: number, currentStatus: 'active' | 'inactive' | null) => void;
   onLimitEdit?: (itemId: number) => void;
   onLimitRemove?: (itemId: number) => void;
+  zIndex?: number;
 }
 
 type MediaEntry = { type: 'image' | 'video'; url: string };
@@ -55,7 +56,7 @@ const buildMediaList = (item: LaneItem | null): MediaEntry[] => {
   return list;
 };
 
-export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove }: Props) => {
+export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex }: Props) => {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [videoDialogUrl, setVideoDialogUrl] = useState('');
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
@@ -73,7 +74,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
 
   return (
     <>
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth sx={zIndex !== undefined ? { zIndex } : undefined}>
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6">

@@ -933,6 +933,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
               notify('上限設定を解除しました', 'info');
             }
           }}
+          zIndex={1500}
         />
 
         <Snackbar open={snackbar.open} autoHideDuration={3000}
