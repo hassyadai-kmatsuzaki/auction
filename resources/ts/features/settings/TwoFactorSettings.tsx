@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Box, Typography, Button, Alert, TextField, Paper, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText,
-  Divider, CircularProgress,
+  CircularProgress,
 } from '@mui/material';
 import { Security, QrCode2, ContentCopy } from '@mui/icons-material';
 import axios from '../../lib/axios';

@@ -71,3 +71,15 @@ export const aiDashboardApi = {
     return res.data.data;
   },
 };
+
+// ─── ユーティリティ（オークション・商品取得） ───────
+export const adminDataApi = {
+  getAuctions: async () => {
+    const res = await axios.get('/api/admin/auctions');
+    return res.data.data.auctions ?? res.data.data ?? [];
+  },
+  getItems: async (auctionId: number) => {
+    const res = await axios.get(`/api/admin/auctions/${auctionId}/items`, { params: { per_page: 100 } });
+    return res.data.data.items ?? res.data.data ?? [];
+  },
+};

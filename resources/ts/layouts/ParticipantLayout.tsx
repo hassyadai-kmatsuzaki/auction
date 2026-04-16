@@ -22,7 +22,7 @@ import {
   Gavel as GavelIcon,
   Receipt as ReceiptIcon,
   Logout as LogoutIcon,
-  List as ListIcon,
+
   Settings as SettingsIcon,
   PlayArrow as PlayArrowIcon,
   SportsEsports as DemoIcon,

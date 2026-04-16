@@ -3,7 +3,7 @@ import {
   Box, Typography, Rating, Chip, Paper, List, ListItem,
   ListItemText, ListItemAvatar, Avatar, Divider, CircularProgress,
 } from '@mui/material';
-import { Star, ThumbUp, ThumbDown, Remove } from '@mui/icons-material';
+import { ThumbUp, ThumbDown, Remove } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
 interface ReviewSummary {

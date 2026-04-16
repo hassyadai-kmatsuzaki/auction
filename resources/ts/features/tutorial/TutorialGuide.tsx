@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Box, Stepper, Step, StepLabel, StepContent, Button, Typography,
-  Paper, Dialog, DialogTitle, DialogContent, DialogActions, Chip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Chip,
 } from '@mui/material';
 import { School, CheckCircle } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -32,8 +32,7 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
         const data = res.data.data;
         setSteps(data);
 
-        // 初回訪問（未完了ステップがある）で自動表示
-        const hasIncomplete = data.some((s: TutorialStep) => !s.completed);
+        // 初回訪問（全ステップ未完了）で自動表示
         const allNew = data.every((s: TutorialStep) => !s.completed);
         if (allNew && data.length > 0) {
           setOpen(true);

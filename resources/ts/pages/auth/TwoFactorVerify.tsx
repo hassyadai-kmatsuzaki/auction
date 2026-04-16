@@ -5,12 +5,9 @@ import {
 } from '@mui/material';
 import { LockOutlined } from '@mui/icons-material';
 import axios from '../../lib/axios';
-import { useAuth } from '../../contexts/AuthContext';
-
 export default function TwoFactorVerify() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
   const userId = (location.state as { userId?: number })?.userId;
 
   const [code, setCode] = useState('');
