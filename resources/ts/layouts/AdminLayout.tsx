@@ -36,6 +36,11 @@ import {
   Psychology as AIIcon,
   MenuBook as MenuBookIcon,
   Cloud as CloudIcon,
+  CameraAlt as CameraIcon,
+  Timeline as TimelineIcon,
+  Warning as WarningIcon,
+  Recommend as RecommendIcon,
+  Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -67,6 +72,7 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [auctionMenuOpen, setAuctionMenuOpen] = React.useState(true);
   const [userMenuOpen, setUserMenuOpen] = React.useState(true);
+  const [aiMenuOpen, setAiMenuOpen] = React.useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -100,7 +106,15 @@ export default function AdminLayout() {
     { text: '設定', icon: <SettingsIcon />, path: '/admin/settings' },
     { text: 'インフラスケーリング', icon: <CloudIcon />, path: '/admin/scaling' },
     { text: '帳票管理', icon: <ReceiptIcon />, path: '/admin/documents' },
-    { text: 'AI分析（準備中）', icon: <AIIcon />, path: '/admin/ai-analytics', disabled: true },
+    { text: 'レポート', icon: <AssessmentIcon />, path: '/admin/reports' },
+  ];
+
+  const aiSubItems = [
+    { text: 'AI分析ダッシュボード', icon: <AIIcon />, path: '/admin/ai-analytics' },
+    { text: '画像認識', icon: <CameraIcon />, path: '/admin/ai/image-recognition' },
+    { text: '価格予測', icon: <TimelineIcon />, path: '/admin/ai/price-prediction' },
+    { text: '不正検知', icon: <WarningIcon />, path: '/admin/ai/fraud-detection' },
+    { text: 'レコメンド', icon: <RecommendIcon />, path: '/admin/ai/recommendations' },
   ];
 
   const isPathActive = (path: string) => {
@@ -312,12 +326,9 @@ export default function AdminLayout() {
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={location.pathname === item.path}
-                disabled={item.disabled}
                 onClick={() => {
-                  if (!item.disabled) {
-                    navigate(item.path);
-                    setMobileOpen(false);
-                  }
+                  navigate(item.path);
+                  setMobileOpen(false);
                 }}
                 sx={{
                   py: 1.2,
@@ -332,23 +343,82 @@ export default function AdminLayout() {
                       fontWeight: 600,
                     },
                   },
-                  '&.Mui-disabled': {
-                    opacity: 0.6,
-                  },
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
                 <ListItemText
                   primary={item.text}
-                  primaryTypographyProps={{ 
-                    fontSize: '0.875rem', 
+                  primaryTypographyProps={{
+                    fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: item.disabled ? 'text.secondary' : 'inherit',
                   }}
                 />
               </ListItemButton>
             </ListItem>
           ))}
+
+          {/* AI機能（折りたたみメニュー） */}
+          <ListItem disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              onClick={() => setAiMenuOpen(!aiMenuOpen)}
+              sx={{
+                py: 1.2,
+                ...(location.pathname.startsWith('/admin/ai') ? {
+                  backgroundColor: '#F5F3FF',
+                  '& .MuiListItemIcon-root': { color: '#7C3AED' },
+                  '& .MuiListItemText-primary': { color: '#7C3AED', fontWeight: 600 },
+                } : {}),
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <AIIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="AI機能"
+                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
+              />
+              <Chip label="NEW" size="small" color="secondary" sx={{ height: 18, fontSize: '0.6rem', mr: 1 }} />
+              {aiMenuOpen ? (
+                <ExpandLess sx={{ fontSize: 18, color: 'text.secondary' }} />
+              ) : (
+                <ExpandMore sx={{ fontSize: 18, color: 'text.secondary' }} />
+              )}
+            </ListItemButton>
+          </ListItem>
+          <Collapse in={aiMenuOpen} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {aiSubItems.map((item) => (
+                <ListItemButton
+                  key={item.path}
+                  sx={{
+                    pl: 5.5,
+                    py: 1,
+                    ml: 1,
+                    mr: 1,
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      backgroundColor: '#F5F3FF',
+                      '& .MuiListItemIcon-root': { color: '#7C3AED' },
+                      '& .MuiListItemText-primary': { color: '#7C3AED', fontWeight: 600 },
+                    },
+                  }}
+                  selected={location.pathname === item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobileOpen(false);
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 18 } }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.text}
+                    primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: 500 }}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </Collapse>
         </List>
       </Box>
 
