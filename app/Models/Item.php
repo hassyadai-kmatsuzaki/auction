@@ -20,6 +20,9 @@ class Item extends BaseModel
         'seller_display_order',
         'species_name',
         'quantity',
+        'sex',
+        'parent_fish_info',
+        'breeding_environment',
         'start_price',
         'current_price',
         'reserve_price',      // @deprecated フロントエンドで未使用。DB互換のため残存。
@@ -49,6 +52,8 @@ class Item extends BaseModel
         'is_premium' => 'boolean',
         'live_started_at' => 'datetime',
         'live_ended_at' => 'datetime',
+        'parent_fish_info' => 'array',
+        'breeding_environment' => 'array',
     ];
 
     /**
@@ -114,6 +119,16 @@ class Item extends BaseModel
         return $this->belongsToMany(Lane::class, 'lane_items')
                     ->withPivot(['sequence_order', 'started_at', 'finished_at'])
                     ->withTimestamps();
+    }
+
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    public function pedigreeCertificate()
+    {
+        return $this->hasOne(PedigreeCertificate::class);
     }
 
     public function imageAnalysis()

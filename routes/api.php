@@ -264,6 +264,14 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::post('/generate', [\App\Http\Controllers\Admin\ReportController::class, 'generate']);
     });
 
+    // 血統証明書管理
+    Route::prefix('pedigree')->group(function () {
+        Route::get('/{itemId}', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'show']);
+        Route::post('/', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'store']);
+        Route::post('/{id}/issue', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'issue']);
+        Route::get('/{id}/download', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'download']);
+    });
+
     // エスクロー管理
     Route::prefix('escrow')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\EscrowController::class, 'index']);
@@ -348,6 +356,55 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     
+    // 出品者一覧（フィルタ用）
+    Route::get('/sellers', function () {
+        $sellers = \App\Models\SellerProfile::with('user:id,name')
+            ->whereHas('user', fn($q) => $q->where('is_active', true))
+            ->get()
+            ->map(fn($sp) => ['id' => $sp->id, 'name' => $sp->user->name ?? $sp->display_name ?? "出品者{$sp->id}"]);
+        return response()->json(['success' => true, 'data' => $sellers]);
+    });
+
+    // 商品検索（出品者・価格帯・人気度フィルタ対応）
+    Route::get('/items/search', function (\Illuminate\Http\Request $request) {
+        $query = \App\Models\Item::whereIn('status', ['registered', 'live'])
+            ->with(['media' => fn($q) => $q->orderBy('display_order')->limit(1)]);
+
+        if ($request->filled('auction_id')) {
+            $query->where('auction_id', $request->auction_id);
+        }
+        if ($request->filled('seller_profile_id')) {
+            $query->where('seller_profile_id', $request->seller_profile_id);
+        }
+        if ($request->filled('species')) {
+            $query->where('species_name', 'like', "%{$request->species}%");
+        }
+        if ($request->filled('price_min')) {
+            $query->where('start_price', '>=', (int) $request->price_min);
+        }
+        if ($request->filled('price_max')) {
+            $query->where('start_price', '<=', (int) $request->price_max);
+        }
+        if ($request->filled('sex')) {
+            $query->where('sex', $request->sex);
+        }
+
+        $sortBy = $request->get('sort', 'item_number');
+        if ($sortBy === 'popularity') {
+            // 人気度 = お気に入り数の多い順
+            $query->withCount('favorites')->orderByDesc('favorites_count');
+        } elseif ($sortBy === 'price_asc') {
+            $query->orderBy('start_price');
+        } elseif ($sortBy === 'price_desc') {
+            $query->orderByDesc('start_price');
+        } else {
+            $query->orderBy('item_number');
+        }
+
+        $items = $query->paginate(30);
+        return response()->json(['success' => true, 'data' => $items]);
+    });
+
     // AIレコメンド
     Route::get('/recommendations', function (\Illuminate\Http\Request $request) {
         $service = app(\App\Services\AI\RecommendationService::class);
