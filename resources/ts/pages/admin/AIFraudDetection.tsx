@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { aiFraudApi } from '../../api/admin/aiApi';
 import {
   Box,
   Typography,
@@ -175,8 +176,38 @@ export default function AIFraudDetection() {
   const [selectedAlert, setSelectedAlert] = useState<typeof fraudAlerts[0] | null>(null);
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [liveAlerts, setLiveAlerts] = useState<any[]>([]);
 
-  const filteredAlerts = fraudAlerts.filter((alert) => {
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (filterSeverity !== 'all') params.severity = filterSeverity;
+    if (filterStatus !== 'all') params.status = filterStatus;
+    aiFraudApi.getAlerts(params).then((data) => {
+      if (data?.data) {
+        setLiveAlerts(data.data.map((a: any) => ({
+          id: a.id,
+          type: a.alert_type === 'shill_bidding' ? 'サクラ入札疑い' :
+                a.alert_type === 'bid_pattern' ? '入札パターン異常' :
+                a.alert_type === 'price_manipulation' ? '価格操作' :
+                a.alert_type === 'account_abuse' ? 'アカウント不正' : a.alert_type,
+          description: a.description,
+          user: { id: `U-${a.user_id}`, name: a.user?.name ?? '不明', email: a.user?.email ?? '' },
+          severity: a.severity,
+          status: a.status,
+          detectedAt: a.created_at,
+          auctionId: a.auction_id ? `A-${a.auction_id}` : '-',
+          itemId: '-',
+          riskScore: a.severity === 'critical' ? 95 : a.severity === 'high' ? 85 : a.severity === 'medium' ? 60 : 30,
+          details: a.evidence ?? {},
+        })));
+      }
+    }).catch(() => {});
+  }, [filterSeverity, filterStatus]);
+
+  // APIデータがあればそちらを使い、なければモックデータにフォールバック
+  const activeAlerts = liveAlerts.length > 0 ? liveAlerts : fraudAlerts;
+
+  const filteredAlerts = activeAlerts.filter((alert) => {
     if (filterSeverity !== 'all' && alert.severity !== filterSeverity) return false;
     if (filterStatus !== 'all' && alert.status !== filterStatus) return false;
     return true;

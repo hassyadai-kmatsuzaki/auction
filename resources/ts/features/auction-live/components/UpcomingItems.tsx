@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import type { LiveLane, UpcomingItem } from '@/types';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 
 interface Props {
   lanes: LiveLane[];
@@ -56,8 +57,9 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
               {item.thumbnail_path ? (
                 <Box
                   component="img"
-                  src={item.thumbnail_path}
+                  src={optimizedImageUrl(item.thumbnail_path, 'thumb')}
                   alt={item.species_name}
+                  loading="lazy"
                   sx={{ width: '100%', aspectRatio: '3/2', objectFit: 'cover', display: 'block' }}
                 />
               ) : (
@@ -148,7 +150,7 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
               {infoItem.thumbnail_path && (
                 <Box
                   component="img"
-                  src={infoItem.thumbnail_path}
+                  src={optimizedImageUrl(infoItem.thumbnail_path, 'medium')}
                   alt={infoItem.species_name}
                   sx={{ width: '100%', borderRadius: 1.5, mb: 2, objectFit: 'cover' }}
                 />

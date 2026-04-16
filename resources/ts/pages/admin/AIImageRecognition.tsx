@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { aiImageApi } from '../../api/admin/aiApi';
 import {
   Box,
   Typography,
@@ -148,13 +149,23 @@ export default function AIImageRecognition() {
     setUploadedImages(newImages);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setIsAnalyzing(true);
-    // Mock: 解析処理
-    setTimeout(() => {
+    try {
+      // 商品IDを指定して解析（UIからの選択に応じて変更）
+      const itemId = prompt('解析する商品IDを入力してください');
+      if (!itemId) { setIsAnalyzing(false); return; }
+      const result = await aiImageApi.analyze(Number(itemId));
+      if (result.success && result.data) {
+        alert(`解析完了: 品種=${result.data.predicted_breed ?? '不明'}, 品質スコア=${result.data.quality_score ?? '-'}`);
+      } else {
+        alert('解析結果を取得できませんでした（画像が登録されていない可能性があります）');
+      }
+    } catch (err: any) {
+      alert('解析エラー: ' + (err.response?.data?.message || err.message));
+    } finally {
       setIsAnalyzing(false);
-      alert('解析が完了しました（デモ）');
-    }, 2000);
+    }
   };
 
   const getStatusIcon = (status: string) => {

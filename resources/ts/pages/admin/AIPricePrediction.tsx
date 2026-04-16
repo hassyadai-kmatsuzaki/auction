@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { aiPriceApi } from '../../api/admin/aiApi';
 import {
   Box,
   Typography,
@@ -118,17 +119,20 @@ export default function AIPricePrediction() {
     confidence: number;
   } | null>(null);
 
-  const handlePredict = () => {
-    // Mock: 予測処理
-    const basePrice = Math.floor(Math.random() * 3000) + 500;
-    const qualityMultiplier = qualityScore / 100;
-    const recommended = Math.floor(basePrice * qualityMultiplier);
-    setPredictionResult({
-      min: Math.floor(recommended * 0.8),
-      max: Math.floor(recommended * 1.3),
-      recommended,
-      confidence: 85 + Math.random() * 10,
-    });
+  const handlePredict = async () => {
+    const itemId = prompt('予測する商品IDを入力してください');
+    if (!itemId) return;
+    try {
+      const data = await aiPriceApi.predict(Number(itemId));
+      setPredictionResult({
+        min: data.price_low,
+        max: data.price_high,
+        recommended: data.predicted_price,
+        confidence: data.confidence,
+      });
+    } catch (err: any) {
+      alert('予測エラー: ' + (err.response?.data?.message || err.message));
+    }
   };
 
   return (

@@ -33,6 +33,7 @@ import axios from '../../lib/axios';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { bidLimitApi, type BidLimitData } from '../../api/participant/bidLimitApi';
+import { optimizedImageUrl } from '../../lib/optimizedMedia';
 
 interface FavoriteItem {
   id: number;
@@ -283,8 +284,9 @@ export default function Favorites() {
 
                 <CardMedia
                   component="img"
-                  image={item.thumbnail_path || '/img/noimage.png'}
+                  image={optimizedImageUrl(item.thumbnail_path, 'small')}
                   alt={item.species_name}
+                  loading="lazy"
                   sx={{ aspectRatio: '3/2', objectFit: 'cover' }}
                 />
 

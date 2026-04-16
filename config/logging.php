@@ -138,6 +138,14 @@ return [
         |
         | MetricRecorder が使用する。直接呼ばない。
         */
+        'audit' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit.log'),
+            'level' => 'info',
+            'days' => 90,
+            'replace_placeholders' => false,
+        ],
+
         'alerts' => [
             'driver' => 'daily',
             'path' => storage_path('logs/alerts.log'),

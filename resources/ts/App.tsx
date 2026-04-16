@@ -12,6 +12,8 @@ import Register from './pages/auth/Register';
 import SetPassword from './pages/auth/SetPassword';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import TwoFactorVerify from './pages/auth/TwoFactorVerify';
+import GoogleCallback from './pages/auth/GoogleCallback';
 
 // Layouts（同期ロード）
 import ParticipantLayout from './layouts/ParticipantLayout';
@@ -105,6 +107,8 @@ function App() {
             <Route path="/auth/set-password" element={<SetPassword />} />
             <Route path="/auth/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
             <Route path="/auth/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+            <Route path="/auth/two-factor" element={<TwoFactorVerify />} />
+            <Route path="/auth/google-callback" element={<GoogleCallback />} />
 
           {/* プレゼンテーション（認証不要） */}
           <Route path="/presentation" element={<Presentation />} />

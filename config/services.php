@@ -40,6 +40,22 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+    ],
+
+    'yamato' => [
+        'api_key' => env('YAMATO_API_KEY'),
+        'api_url' => env('YAMATO_API_URL', 'https://api.kuronekoyamato.co.jp/api/v1'),
+    ],
+
+    'sagawa' => [
+        'api_key' => env('SAGAWA_API_KEY'),
+        'api_url' => env('SAGAWA_API_URL', 'https://api.sagawa-exp.co.jp/api/v1'),
+    ],
+
     'line' => [
         'login_channel_id'     => env('LINE_LOGIN_CHANNEL_ID', ''),
         'login_channel_secret' => env('LINE_LOGIN_CHANNEL_SECRET', ''),

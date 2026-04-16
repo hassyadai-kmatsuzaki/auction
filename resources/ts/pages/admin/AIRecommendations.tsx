@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { aiRecommendApi } from '../../api/admin/aiApi';
 import {
   Box,
   Typography,

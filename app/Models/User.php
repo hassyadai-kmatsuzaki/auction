@@ -42,6 +42,12 @@ class User extends Authenticatable
         'is_active',
         'email_verified_at',
         'notification_settings',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_confirmed_at',
+        'google_id',
+        'trust_score',
+        'review_count',
     ];
 
     /**
@@ -52,6 +58,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -69,6 +77,7 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'password' => 'hashed',
             'notification_settings' => 'array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 

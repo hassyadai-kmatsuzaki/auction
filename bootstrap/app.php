@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'check.role' => \App\Http\Middleware\CheckRole::class,
+            'rate.limit' => \App\Http\Middleware\RateLimitByIp::class,
+            'audit' => \App\Http\Middleware\AuditLog::class,
         ]);
 
         // ALB（HTTPS終端）配下での X-Forwarded-* を信頼
@@ -48,6 +50,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // オークション前日予告通知（毎日18:00に翌日分をチェック）
         $schedule->job(new \App\Jobs\SendAuctionPreviewJob)->dailyAt('18:00')
+            ->withoutOverlapping();
+
+        // 週次レポート自動生成（毎週月曜 9:00）
+        $schedule->command('reports:generate weekly')->weeklyOn(1, '09:00')
+            ->withoutOverlapping();
+
+        // 月次レポート自動生成（毎月1日 9:00）
+        $schedule->command('reports:generate monthly')->monthlyOn(1, '09:00')
             ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

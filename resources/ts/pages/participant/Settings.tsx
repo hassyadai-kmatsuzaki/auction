@@ -22,8 +22,10 @@ import {
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Email as EmailIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import TwoFactorSettings from '../../features/settings/TwoFactorSettings';
 import NotificationPreferencesPanel, {
   NotificationRow,
 } from '@/features/notifications/NotificationPreferencesPanel';
@@ -297,6 +299,7 @@ export default function ParticipantSettings() {
               <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
                 <Tab icon={<PersonIcon />} label="プロフィール" iconPosition="start" />
                 <Tab icon={<NotificationsIcon />} label="通知設定" iconPosition="start" />
+                <Tab icon={<SecurityIcon />} label="セキュリティ" iconPosition="start" />
               </Tabs>
             </Box>
 
@@ -434,6 +437,12 @@ export default function ParticipantSettings() {
                   }
                   onNotify={(message, severity) => setSnackbar({ open: true, message, severity })}
                 />
+              </CardContent>
+            </TabPanel>
+
+            <TabPanel value={tabValue} index={2}>
+              <CardContent sx={{ p: 3 }}>
+                <TwoFactorSettings />
               </CardContent>
             </TabPanel>
           </Card>

@@ -38,8 +38,11 @@ import {
   Download as DownloadIcon,
   ExpandMore as ExpandMoreIcon,
   Event as EventIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import ReviewDialog from '../../features/reviews/ReviewDialog';
+import { optimizedImageUrl } from '../../lib/optimizedMedia';
 
 interface WonItemData {
   id: number;
@@ -146,6 +149,7 @@ export default function WonItems() {
 
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WonItemData | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<{ wonItemId: number; sellerName: string } | null>(null);
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -479,8 +483,9 @@ export default function WonItems() {
                         <Grid item xs={12} sm={2}>
                           <CardMedia
                             component="img"
-                            image={wonItem.item?.thumbnail_path || '/img/noimage.png'}
+                            image={optimizedImageUrl(wonItem.item?.thumbnail_path, 'small')}
                             alt={wonItem.item?.species_name || '商品'}
+                            loading="lazy"
                             sx={{ borderRadius: 1, aspectRatio: '3/2', objectFit: 'cover', width: '100%' }}
                           />
                         </Grid>
@@ -500,6 +505,19 @@ export default function WonItems() {
                               size="small"
                               sx={{ bgcolor: '#DBEAFE', color: '#3B82F6', fontWeight: 600, fontSize: '0.7rem' }}
                             />
+                            {wonItem.delivery_status === 'completed' && wonItem.payment_status === 'paid' && (
+                              <Button
+                                size="small"
+                                startIcon={<StarIcon />}
+                                onClick={() => setReviewTarget({
+                                  wonItemId: wonItem.id,
+                                  sellerName: wonItem.seller_name ?? '出品者',
+                                })}
+                                sx={{ fontSize: '0.7rem' }}
+                              >
+                                評価する
+                              </Button>
+                            )}
                           </Box>
 
                           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -638,6 +656,17 @@ export default function WonItems() {
           <Button onClick={() => setTrackingDetailOpen(false)}>閉じる</Button>
         </DialogActions>
       </Dialog>
+
+      {/* 評価ダイアログ */}
+      {reviewTarget && (
+        <ReviewDialog
+          open={!!reviewTarget}
+          onClose={() => setReviewTarget(null)}
+          wonItemId={reviewTarget.wonItemId}
+          targetName={reviewTarget.sellerName}
+          onSubmitted={() => setSnackbar({ open: true, message: '評価を送信しました', severity: 'success' })}
+        />
+      )}
 
       {/* スナックバー */}
       <Snackbar

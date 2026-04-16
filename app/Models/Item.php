@@ -115,4 +115,14 @@ class Item extends BaseModel
                     ->withPivot(['sequence_order', 'started_at', 'finished_at'])
                     ->withTimestamps();
     }
+
+    public function imageAnalysis()
+    {
+        return $this->hasOne(AIImageAnalysis::class)->latestOfMany();
+    }
+
+    public function pricePrediction()
+    {
+        return $this->hasOne(AIPricePrediction::class)->latestOfMany();
+    }
 }

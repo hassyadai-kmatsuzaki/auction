@@ -9,6 +9,7 @@ import { CountdownChip } from './CountdownChip';
 import { BidButton } from './BidButton';
 import { PreBidOverlay } from './PreBidOverlay';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 
 interface Props {
   lane: LiveLane;
@@ -148,8 +149,9 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
 
       <CardMedia
         component="img"
-        image={item.thumbnail_path || '/img/noimage.png'}
+        image={optimizedImageUrl(item.thumbnail_path, 'small')}
         alt={item.species_name}
+        loading="lazy"
         sx={{ aspectRatio: '3/2', objectFit: 'cover' }}
       />
 

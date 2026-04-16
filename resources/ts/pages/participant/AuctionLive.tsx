@@ -21,6 +21,7 @@ import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal
 import { useEntranceControl } from '../../features/auction-live/hooks/useEntranceControl';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
 import { AuctionHeader } from '../../features/auction-live/components/AuctionHeader';
+import { optimizedImageUrl, prefetchImages } from '../../lib/optimizedMedia';
 import { MyBidStatus } from '../../features/auction-live/components/MyBidStatus';
 import { WonItemsPanel } from '../../features/auction-live/components/WonItemsPanel';
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
@@ -209,6 +210,25 @@ export default function AuctionLive() {
       queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
     },
   });
+
+  // 次の商品画像をプリフェッチ（商品切替時に即表示するため）
+  useEffect(() => {
+    if (!liveState?.lanes) return;
+    const urls: string[] = [];
+    for (const lane of liveState.lanes) {
+      // 各レーンの次の商品のサムネイルをプリフェッチ
+      if (lane.upcoming_items?.length) {
+        for (const item of lane.upcoming_items.slice(0, 2)) {
+          if (item.thumbnail_path) {
+            urls.push(optimizedImageUrl(item.thumbnail_path, 'small'));
+          }
+        }
+      }
+    }
+    if (urls.length > 0) {
+      prefetchImages(urls);
+    }
+  }, [liveState?.lanes]);
 
   // liveState から入室制御情報を同期（useEffect内でstateを更新：レンダリング中のsetState禁止パターン回避）
   useEffect(() => {

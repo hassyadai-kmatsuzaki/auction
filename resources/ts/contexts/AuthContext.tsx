@@ -10,7 +10,7 @@ interface AuthUser extends Omit<User, 'roles'> {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ twoFactorRequired?: boolean; userId?: number } | void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   hasRole: (roleName: string) => boolean;
@@ -55,13 +55,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<{ twoFactorRequired?: boolean; userId?: number } | void> => {
     const response = await axios.post('/api/auth/login', {
       email,
       password,
     });
 
-    const { token, user: userData } = response.data.data;
+    const data = response.data.data;
+
+    // 2FA が必要な場合
+    if (data.two_factor_required) {
+      return { twoFactorRequired: true, userId: data.user_id };
+    }
+
+    const { token, user: userData } = data;
 
     localStorage.setItem('auth_token', token);
     localStorage.setItem('user', JSON.stringify(userData));

@@ -344,6 +344,19 @@ class CountdownService
 
             Cache::put($this->getCacheKey($laneId), $state, 3600);
 
+            // pre_bid→bidding 遷移時に初回カウントダウン値をbroadcast
+            try {
+                $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    (float) $bidSeconds,
+                    $activeBidderCount, $item->current_price,
+                    'bidding'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("PreBid->Bid broadcast error lane {$laneId}: " . $e->getMessage());
+            }
+
             Log::info("Pre-bid ended, bidding started: lane {$laneId}, item {$item->id}, countdown={$bidSeconds}s");
 
             return ['action' => 'pre_bid_end', 'lane_id' => $laneId];
@@ -386,6 +399,19 @@ class CountdownService
             $state['started_at'] = now()->timestamp;
 
             Cache::put($this->getCacheKey($laneId), $state, 3600);
+
+            // freeze→bidding 遷移時に初回カウントダウン値をbroadcast
+            // これがないとフロントは bidding 初回値を受信できず表示がずれる
+            try {
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    (float) $bidSeconds,
+                    $activeBidderCount, $freshPrice,
+                    'bidding'
+                ));
+            } catch (\Exception $e) {
+                Log::warning("Freeze->Bid broadcast error lane {$laneId}: " . $e->getMessage());
+            }
 
             Log::info("Freeze ended, bid countdown started: lane {$laneId}, item {$item->id}, countdown={$bidSeconds}s");
 

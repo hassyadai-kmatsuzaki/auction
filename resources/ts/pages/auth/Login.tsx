@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { Login as LoginIcon } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import GoogleLoginButton from '../../features/auth/GoogleLoginButton';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -29,7 +30,13 @@ export default function Login() {
 
     try {
       // AuthContextのlogin関数を使用
-      await login(email, password);
+      const result = await login(email, password);
+
+      // 2FA が必要な場合
+      if (result?.twoFactorRequired) {
+        navigate('/auth/two-factor', { state: { userId: result.userId } });
+        return;
+      }
 
       // リダイレクト元があればそこに戻る
       const from = (location.state as { from?: Location })?.from;
@@ -120,6 +127,14 @@ export default function Login() {
               {loading ? 'ログイン中...' : 'ログイン'}
             </Button>
           </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2 }}>
+            <Box sx={{ flex: 1, borderBottom: '1px solid', borderColor: 'divider' }} />
+            <Typography variant="body2" color="text.secondary">または</Typography>
+            <Box sx={{ flex: 1, borderBottom: '1px solid', borderColor: 'divider' }} />
+          </Box>
+
+          <GoogleLoginButton />
 
           <Box sx={{ textAlign: 'center', mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Link

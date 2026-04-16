@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { aiDashboardApi, aiFraudApi } from '../../api/admin/aiApi';
 import {
   Box,
   Typography,
@@ -56,14 +57,14 @@ import {
   Bar,
 } from 'recharts';
 
-// Mock データ
-const aiMetrics = {
-  imageAnalysisCount: 1245,
-  imageAnalysisAccuracy: 94.2,
-  pricePredicationAccuracy: 87.5,
-  fraudDetectionCount: 3,
-  recommendClickRate: 23.4,
-  dataCollected: 15680,
+// デフォルト値（API取得前）
+const defaultMetrics = {
+  imageAnalysisCount: 0,
+  imageAnalysisAccuracy: 0,
+  pricePredicationAccuracy: 0,
+  fraudDetectionCount: 0,
+  recommendClickRate: 0,
+  dataCollected: 0,
 };
 
 const accuracyTrend = [
@@ -108,6 +109,35 @@ const priceHistory = [
 export default function AIAnalytics() {
   const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
+  const [aiMetrics, setAiMetrics] = useState(defaultMetrics);
+  const [fraudAlertsList, setFraudAlertsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    // AI ダッシュボード統計を取得
+    aiDashboardApi.getSummary().then((data) => {
+      setAiMetrics({
+        imageAnalysisCount: data.image_analyses ?? 0,
+        imageAnalysisAccuracy: 0, // 精度は解析結果から別途集計
+        pricePredicationAccuracy: 0,
+        fraudDetectionCount: (data.fraud_alerts?.open ?? 0) + (data.fraud_alerts?.investigating ?? 0),
+        recommendClickRate: 0,
+        dataCollected: data.recommendations_generated ?? 0,
+      });
+    }).catch(() => {});
+
+    // 不正検知アラート取得
+    aiFraudApi.getAlerts({ status: 'open' }).then((data) => {
+      setFraudAlertsList((data.data ?? []).slice(0, 3).map((a: any) => ({
+        id: a.id,
+        type: a.alert_type === 'shill_bidding' ? 'サクラ入札' :
+              a.alert_type === 'bid_pattern' ? '入札パターン異常' :
+              a.alert_type === 'price_manipulation' ? '価格操作' : a.alert_type,
+        user: a.user?.name ?? `ID:${a.user_id}`,
+        severity: a.severity,
+        timestamp: new Date(a.created_at).toLocaleString('ja-JP'),
+      })));
+    }).catch(() => {});
+  }, []);
 
   const StatCard = ({ 
     title, 
@@ -526,14 +556,14 @@ export default function AIAnalytics() {
                 すべて見る
               </Button>
             </Box>
-            {fraudAlerts.length === 0 ? (
+            {fraudAlertsList.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
                 <CheckCircleIcon sx={{ fontSize: 48, mb: 1, color: 'success.main' }} />
                 <Typography>現在アラートはありません</Typography>
               </Box>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {fraudAlerts.map((alert) => (
+                {fraudAlertsList.map((alert) => (
                   <Box
                     key={alert.id}
                     sx={{

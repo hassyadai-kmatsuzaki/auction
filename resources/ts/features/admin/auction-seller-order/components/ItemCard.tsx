@@ -3,6 +3,7 @@ import { Star as StarIcon, DragIndicator as DragIndicatorIcon } from '@mui/icons
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SellerOrderItem } from '../api/sellerOrderApi';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 
 interface ItemCardProps {
   item: SellerOrderItem;
@@ -20,7 +21,7 @@ export default function ItemCard({ item }: ItemCardProps) {
   };
 
   const thumbnailUrl = item.thumbnail_path
-    ? `/storage/${item.thumbnail_path}`
+    ? optimizedImageUrl(`/storage/${item.thumbnail_path}`, 'thumb')
     : '/images/no-image.png';
 
   return (

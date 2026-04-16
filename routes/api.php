@@ -31,7 +31,10 @@ use App\Http\Controllers\NotificationTestController;
 use App\Http\Controllers\ManualController;
 use App\Http\Controllers\Api\ShippingCalculateController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\OptimizedMediaController;
 use App\Http\Controllers\Admin\ShippingRateController;
+use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -58,14 +61,21 @@ Route::get('/health', function () {
 // LINE Login コールバック（ブラウザからリダイレクトされる。認証はController内で手動チェック）
 Route::get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController::class, 'callback']);
 
-// 認証API（ゲスト）
-Route::prefix('auth')->group(function () {
+// 認証API（ゲスト・レート制限付き）
+Route::middleware('rate.limit:10,1')->prefix('auth')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
     Route::post('/register', [RegisterController::class, 'register']);
     Route::post('/forgot-password', [PasswordResetController::class, 'forgot']);
     Route::post('/reset-password', [PasswordResetController::class, 'reset']);
     Route::post('/verify-token', [SetPasswordController::class, 'verify']);
     Route::post('/set-password', [SetPasswordController::class, 'setPassword']);
+
+    // 2FA認証（ログイン時）
+    Route::post('/two-factor/verify', [TwoFactorController::class, 'verify']);
+
+    // Google OAuth
+    Route::get('/google/redirect', [GoogleAuthController::class, 'redirect']);
+    Route::get('/google/callback', [GoogleAuthController::class, 'callback']);
 });
 
 // 配送料金計算API（認証必須）
@@ -73,14 +83,31 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/shipping/calculate', [ShippingCalculateController::class, 'calculate']);
 });
 
+// 画像最適化API（元画像がpublicディスクで公開済みのため認証不要）
+Route::get('/media/{mediaId}/optimized', [OptimizedMediaController::class, 'show']);
+Route::get('/media/optimized-by-path', [OptimizedMediaController::class, 'showByPath']);
+
 // 認証API（認証必須）
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [LoginController::class, 'logout']);
     Route::get('/auth/me', [LoginController::class, 'me']);
 
+    // チュートリアルAPI（全ロール共通）
+    Route::get('/tutorials', [\App\Http\Controllers\Api\TutorialController::class, 'index']);
+    Route::post('/tutorials/complete', [\App\Http\Controllers\Api\TutorialController::class, 'complete']);
+
     // マニュアルAPI（全ロール共通）
     Route::get('/manuals', [ManualController::class, 'index']);
     Route::get('/manuals/{id}', [ManualController::class, 'show']);
+
+    // 2FA管理（認証済みユーザー）
+    Route::prefix('two-factor')->group(function () {
+        Route::get('/status', [TwoFactorController::class, 'status']);
+        Route::post('/setup', [TwoFactorController::class, 'setup']);
+        Route::post('/confirm', [TwoFactorController::class, 'confirm']);
+        Route::delete('/disable', [TwoFactorController::class, 'disable']);
+        Route::post('/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes']);
+    });
 
     // LINE連携（ロール問わず利用可）
     Route::prefix('line/settings')->group(function () {
@@ -94,7 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // 管理者API
-Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin')->group(function () {
     Route::apiResource('users', UserController::class);
     Route::post('users/{id}/restore', [UserController::class, 'restore']);
     
@@ -208,6 +235,43 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('admin')->group(
     Route::post('settlements/{id}/mark-paid', [AdminSettlementController::class, 'markPaid']);
     Route::post('settlements/{id}/recalculate', [AdminSettlementController::class, 'recalculate']);
 
+    // AI API
+    Route::prefix('ai')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Admin\AIController::class, 'dashboard']);
+        // 画像認識
+        Route::post('/image-analysis/{itemId}', [\App\Http\Controllers\Admin\AIController::class, 'analyzeImage']);
+        Route::post('/image-analysis/batch/{auctionId}', [\App\Http\Controllers\Admin\AIController::class, 'batchAnalyzeImages']);
+        Route::get('/image-analysis/{itemId}/results', [\App\Http\Controllers\Admin\AIController::class, 'imageAnalysisResults']);
+        // 価格予測
+        Route::post('/price-prediction/{itemId}', [\App\Http\Controllers\Admin\AIController::class, 'predictPrice']);
+        Route::get('/market-trends', [\App\Http\Controllers\Admin\AIController::class, 'marketTrends']);
+        // 不正検知
+        Route::post('/fraud-detection/{auctionId}', [\App\Http\Controllers\Admin\AIController::class, 'runFraudDetection']);
+        Route::get('/fraud-alerts', [\App\Http\Controllers\Admin\AIController::class, 'fraudAlerts']);
+        Route::patch('/fraud-alerts/{id}', [\App\Http\Controllers\Admin\AIController::class, 'resolveFraudAlert']);
+        // レコメンド
+        Route::post('/recommendations/{userId}', [\App\Http\Controllers\Admin\AIController::class, 'generateRecommendations']);
+        // NLP
+        Route::post('/nlp/extract', [\App\Http\Controllers\Admin\AIController::class, 'extractItemInfo']);
+        Route::post('/nlp/classify', [\App\Http\Controllers\Admin\AIController::class, 'classifyCategory']);
+    });
+
+    // レポートAPI
+    Route::prefix('reports')->group(function () {
+        Route::get('/weekly', [\App\Http\Controllers\Admin\ReportController::class, 'weekly']);
+        Route::get('/monthly', [\App\Http\Controllers\Admin\ReportController::class, 'monthly']);
+        Route::post('/generate', [\App\Http\Controllers\Admin\ReportController::class, 'generate']);
+    });
+
+    // エスクロー管理
+    Route::prefix('escrow')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\EscrowController::class, 'index']);
+        Route::post('/{id}/confirm-payment', [\App\Http\Controllers\Admin\EscrowController::class, 'confirmPayment']);
+        Route::post('/{id}/release', [\App\Http\Controllers\Admin\EscrowController::class, 'release']);
+        Route::post('/{id}/refund', [\App\Http\Controllers\Admin\EscrowController::class, 'refund']);
+        Route::post('/{id}/dispute', [\App\Http\Controllers\Admin\EscrowController::class, 'dispute']);
+    });
+
     // インフラスケーリング
     Route::prefix('scaling')->group(function () {
         Route::get('/status', [\App\Http\Controllers\Admin\ScalingController::class, 'status']);
@@ -283,10 +347,30 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     
+    // AIレコメンド
+    Route::get('/recommendations', function (\Illuminate\Http\Request $request) {
+        $service = app(\App\Services\AI\RecommendationService::class);
+        $recs = $service->getForUser($request->user()->id);
+        return response()->json(['success' => true, 'data' => $recs]);
+    });
+
+    // 検索条件保存
+    Route::get('/saved-searches', [\App\Http\Controllers\Participant\SavedSearchController::class, 'index']);
+    Route::post('/saved-searches', [\App\Http\Controllers\Participant\SavedSearchController::class, 'store']);
+    Route::delete('/saved-searches/{id}', [\App\Http\Controllers\Participant\SavedSearchController::class, 'destroy']);
+
+    // 配送追跡
+    Route::get('/tracking/{trackingNumber}', [\App\Http\Controllers\Api\TrackingController::class, 'show']);
+
     // お気に入り
     Route::get('/favorites', [ParticipantFavoriteController::class, 'index']);
     Route::post('/favorites/toggle', [ParticipantFavoriteController::class, 'toggle']);
     Route::post('/favorites/check', [ParticipantFavoriteController::class, 'checkBulk']);
+
+    // 評価
+    Route::get('/reviews/received', [\App\Http\Controllers\Participant\ReviewController::class, 'received']);
+    Route::post('/reviews', [\App\Http\Controllers\Participant\ReviewController::class, 'store']);
+    Route::get('/reviews/user/{userId}', [\App\Http\Controllers\Participant\ReviewController::class, 'summary']);
 
     // 設定
     Route::get('/settings', [ParticipantSettingsController::class, 'index']);

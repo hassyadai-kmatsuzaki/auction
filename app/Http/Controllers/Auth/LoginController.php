@@ -45,6 +45,17 @@ class LoginController extends Controller
             ]);
         }
 
+        // 2FA が有効な場合はコード入力を要求
+        if ($user->two_factor_confirmed_at) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'two_factor_required' => true,
+                    'user_id' => $user->id,
+                ],
+            ]);
+        }
+
         // 最終ログイン日時を更新
         $user->update(['last_login_at' => now()]);
 

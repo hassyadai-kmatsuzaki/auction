@@ -15,6 +15,7 @@ import type { LaneItem } from '@/types';
 import { BidButton } from './BidButton';
 import { CountdownChip } from './CountdownChip';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 
 interface Props {
   open: boolean;
@@ -39,10 +40,14 @@ const resolveUrl = (url: string, item?: LaneItem | null): string => {
   return url;
 };
 
-const buildMediaList = (item: LaneItem | null): MediaEntry[] => {
+type MediaEntryWithOriginal = MediaEntry & { originalUrl: string };
+
+const buildMediaList = (item: LaneItem | null): MediaEntryWithOriginal[] => {
   if (!item) return [];
-  const list: MediaEntry[] = [];
-  if (item.thumbnail_path) list.push({ type: 'image', url: item.thumbnail_path });
+  const list: MediaEntryWithOriginal[] = [];
+  if (item.thumbnail_path) {
+    list.push({ type: 'image', url: optimizedImageUrl(item.thumbnail_path, 'medium'), originalUrl: item.thumbnail_path });
+  }
   item.media?.forEach((m: any) => {
     const rawUrl = m.file_url || m.file_path || m.url;
     if (!rawUrl) return;
@@ -50,9 +55,13 @@ const buildMediaList = (item: LaneItem | null): MediaEntry[] => {
     const url = resolveUrl(rawUrl, item);
     if (url === item.thumbnail_path) return;
     const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
-    list.push({ type: isVideo ? 'video' : 'image', url });
+    list.push({
+      type: isVideo ? 'video' : 'image',
+      url: isVideo ? url : optimizedImageUrl(url, 'medium'),
+      originalUrl: url,
+    });
   });
-  if (list.length === 0) list.push({ type: 'image', url: '/img/noimage.png' });
+  if (list.length === 0) list.push({ type: 'image', url: '/img/noimage.png', originalUrl: '/img/noimage.png' });
   return list;
 };
 
@@ -89,7 +98,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
             <Grid item xs={12} md={6}>
               <Box sx={{ position: 'relative', borderRadius: 2, overflow: 'hidden', bgcolor: 'grey.100' }}>
                 {current?.type === 'video' ? (
-                  <video src={current.url} controls style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain' }} />
+                  <video src={current.originalUrl} controls preload="metadata" playsInline style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain' }} />
                 ) : (
                   <img
                     src={current?.url || '/img/noimage.png'}
@@ -117,13 +126,13 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                     >
                       {m.type === 'video' ? (
                         <Box sx={{ width: '100%', height: '100%', bgcolor: 'black', position: 'relative' }}>
-                          <video src={m.url} preload="metadata" muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <video src={m.originalUrl} preload="none" muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.3)' }}>
                             <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
                           </Box>
                         </Box>
                       ) : (
-                        <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={m.type === 'image' ? optimizedImageUrl(m.originalUrl, 'thumb') : m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       )}
                     </Box>
                   ))}
@@ -262,8 +271,9 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
           {(() => {
             const m = mediaList[lightboxIndex];
             if (!m) return null;
-            if (m.type === 'video') return <video src={m.url} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />;
-            return <img src={m.url} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} />;
+            if (m.type === 'video') return <video src={m.originalUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />;
+            // ライトボックスではlargeプリセットを使用
+            return <img src={optimizedImageUrl(m.originalUrl, 'large')} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} />;
           })()}
         </Box>
         <Typography variant="caption" sx={{ color: 'grey.500', textAlign: 'center', py: 1 }}>

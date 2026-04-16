@@ -7,6 +7,7 @@ import {
   FavoriteBorder as FavoriteBorderIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 
 interface ItemData {
   id: number;
@@ -77,8 +78,8 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
           sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />
       )}
 
-      <CardMedia component="img" image={item.thumbnail_path || '/img/noimage.png'}
-        alt={item.species_name} sx={{ aspectRatio: '3/2', objectFit: 'cover' }} />
+      <CardMedia component="img" image={optimizedImageUrl(item.thumbnail_path, 'small')}
+        alt={item.species_name} loading="lazy" sx={{ aspectRatio: '3/2', objectFit: 'cover' }} />
 
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
