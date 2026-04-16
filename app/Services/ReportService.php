@@ -72,8 +72,8 @@ class ReportService
                 ->count('user_id'),
             'active_sellers' => DB::table('items')
                 ->whereBetween('created_at', [$start, $end])
-                ->distinct('seller_id')
-                ->count('seller_id'),
+                ->distinct('seller_profile_id')
+                ->count('seller_profile_id'),
         ];
 
         // 入金率

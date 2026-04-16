@@ -38,10 +38,12 @@ export default function AIRecommendations() {
   const [stats, setStats] = useState<{ recommendations_generated: number } | null>(null);
 
   useEffect(() => {
-    // 参加者一覧を取得
-    axios.get('/api/admin/users', { params: { per_page: 200 } }).then((res) => {
-      const allUsers = res.data.data?.users ?? res.data.data ?? [];
-      setUsers(allUsers.filter((u: any) => u.roles?.some((r: any) => r.name === 'participant')));
+    // 参加者ロールのユーザー一覧を取得
+    axios.get('/api/admin/users', { params: { per_page: 200, role: 'participant' } }).then((res) => {
+      // Laravel paginator: res.data.data は { data: [...], current_page, ... }
+      const paginated = res.data.data;
+      const userList = Array.isArray(paginated) ? paginated : (paginated?.data ?? []);
+      setUsers(userList);
     }).catch(() => {});
 
     // 統計取得

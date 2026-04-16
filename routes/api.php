@@ -239,8 +239,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::prefix('ai')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Admin\AIController::class, 'dashboard']);
         // 画像認識
-        Route::post('/image-analysis/{itemId}', [\App\Http\Controllers\Admin\AIController::class, 'analyzeImage']);
+        // batch は {itemId} ワイルドカードより前に定義（先食い防止）
         Route::post('/image-analysis/batch/{auctionId}', [\App\Http\Controllers\Admin\AIController::class, 'batchAnalyzeImages']);
+        Route::post('/image-analysis/{itemId}', [\App\Http\Controllers\Admin\AIController::class, 'analyzeImage']);
         Route::get('/image-analysis/{itemId}/results', [\App\Http\Controllers\Admin\AIController::class, 'imageAnalysisResults']);
         // 価格予測
         Route::post('/price-prediction/{itemId}', [\App\Http\Controllers\Admin\AIController::class, 'predictPrice']);

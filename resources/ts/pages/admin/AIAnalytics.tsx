@@ -21,8 +21,6 @@ import {
   Recommend as RecommendIcon,
   Assessment as AssessmentIcon,
   AutoAwesome as AutoAwesomeIcon,
-  Speed as SpeedIcon,
-  DataUsage as DataUsageIcon,
   Timeline as TimelineIcon,
   ArrowForward as ArrowForwardIcon,
   CheckCircle as CheckCircleIcon,
@@ -34,10 +32,7 @@ import {
 // デフォルト値（API取得前）
 const defaultMetrics = {
   imageAnalysisCount: 0,
-  imageAnalysisAccuracy: 0,
-  pricePredicationAccuracy: 0,
   fraudDetectionCount: 0,
-  recommendClickRate: 0,
   dataCollected: 0,
 };
 
@@ -53,10 +48,7 @@ export default function AIAnalytics() {
     aiDashboardApi.getSummary().then((data) => {
       setAiMetrics({
         imageAnalysisCount: data.image_analyses ?? 0,
-        imageAnalysisAccuracy: 0, // 精度は解析結果から別途集計
-        pricePredicationAccuracy: 0,
         fraudDetectionCount: (data.fraud_alerts?.open ?? 0) + (data.fraud_alerts?.investigating ?? 0),
-        recommendClickRate: 0,
         dataCollected: data.recommendations_generated ?? 0,
       });
     }).catch(() => {});
@@ -219,63 +211,31 @@ export default function AIAnalytics() {
 
       {/* メトリクスカード */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={4} lg={2}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
             title="画像解析数"
             value={aiMetrics.imageAnalysisCount.toLocaleString()}
             unit="件"
-            change={12.5}
             icon={<CameraIcon />}
             color="#3B82F6"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
-            title="画像認識精度"
-            value={aiMetrics.imageAnalysisAccuracy}
-            unit="%"
-            change={2.1}
-            icon={<SpeedIcon />}
-            color="#10B981"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2}>
-          <StatCard
-            title="価格予測精度"
-            value={aiMetrics.pricePredicationAccuracy}
-            unit="%"
-            change={1.8}
-            icon={<TimelineIcon />}
-            color="#F59E0B"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2}>
-          <StatCard
-            title="不正検知"
+            title="未対応アラート"
             value={aiMetrics.fraudDetectionCount}
             unit="件"
             icon={<WarningIcon />}
             color="#EF4444"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
-            title="レコメンドCTR"
-            value={aiMetrics.recommendClickRate}
-            unit="%"
-            change={5.2}
+            title="レコメンド生成数"
+            value={aiMetrics.dataCollected.toLocaleString()}
+            unit="件"
             icon={<RecommendIcon />}
             color="#8B5CF6"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2}>
-          <StatCard
-            title="学習データ"
-            value={(aiMetrics.dataCollected / 1000).toFixed(1)}
-            unit="K件"
-            change={8.3}
-            icon={<DataUsageIcon />}
-            color="#06B6D4"
           />
         </Grid>
       </Grid>

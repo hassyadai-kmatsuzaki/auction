@@ -511,7 +511,7 @@ export default function WonItems() {
                                 startIcon={<StarIcon />}
                                 onClick={() => setReviewTarget({
                                   wonItemId: wonItem.id,
-                                  sellerName: wonItem.seller_name ?? '出品者',
+                                  sellerName: wonItem.item?.species_name ?? '出品者',
                                 })}
                                 sx={{ fontSize: '0.7rem' }}
                               >

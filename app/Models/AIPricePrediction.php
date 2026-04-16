@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AIPricePrediction extends Model
 {
+    protected $table = 'ai_price_predictions';
+
     protected $fillable = [
         'item_id', 'species_name', 'predicted_price', 'price_low', 'price_high',
         'confidence', 'factors', 'actual_price', 'model_version',

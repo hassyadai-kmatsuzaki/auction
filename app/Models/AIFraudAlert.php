@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AIFraudAlert extends Model
 {
+    protected $table = 'ai_fraud_alerts';
+
     protected $fillable = [
         'auction_id', 'user_id', 'alert_type', 'severity', 'description',
         'evidence', 'status', 'resolution_notes', 'resolved_by', 'resolved_at',

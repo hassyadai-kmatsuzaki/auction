@@ -97,9 +97,9 @@ class PricePredictionService
      */
     private function calculateQuantityFactor(int $quantity, string $speciesName): float
     {
-        $avgQuantity = (float) DB::table('items')
+        $avgQuantity = (float) (DB::table('items')
             ->where('species_name', $speciesName)
-            ->avg('quantity') ?? 1;
+            ->avg('quantity') ?? 1);
 
         if ($avgQuantity <= 0) return 1.0;
 

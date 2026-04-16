@@ -90,7 +90,7 @@ EOT;
         $response = Http::withToken($this->apiKey)
             ->timeout(30)
             ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-4o-mini',
+                'model' => $this->model,
                 'messages' => [
                     [
                         'role' => 'user',

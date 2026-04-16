@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AIRecommendation extends Model
 {
+    protected $table = 'ai_recommendations';
+
     protected $fillable = [
         'user_id', 'item_id', 'score', 'reason', 'source', 'was_viewed', 'was_bid',
     ];

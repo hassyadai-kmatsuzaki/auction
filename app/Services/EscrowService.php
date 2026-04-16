@@ -14,11 +14,13 @@ class EscrowService
      */
     public function createFromWonItem(WonItem $wonItem): EscrowTransaction
     {
+        $wonItem->loadMissing('item.sellerProfile');
+
         return EscrowTransaction::create([
             'won_item_id' => $wonItem->id,
             'buyer_id' => $wonItem->winner_id,
-            'seller_id' => $wonItem->item->seller_id,
-            'amount' => $wonItem->total_amount,
+            'seller_id' => $wonItem->item->sellerProfile->user_id,
+            'amount' => (int) $wonItem->total_amount,
             'status' => 'awaiting_payment',
         ]);
     }
