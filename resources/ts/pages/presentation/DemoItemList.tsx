@@ -71,6 +71,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
     thumbnail_path: item.thumbnail_path,
     inspection_info: item.inspection_info,
     seller_name: item.seller_name,
+    seller_profile_image_url: item.seller_profile_image_url ?? null,
   });
 
   const statusFiltered = statusFilter.length > 0
@@ -296,6 +297,8 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
         open={!!selectedItem}
         item={selectedItem ? itemDataToLaneItem(selectedItem) : null}
         onClose={() => { setSelectedItem(null); onItemDetailClosed?.(); }}
+        priceLabel="start"
+        startPrice={selectedItem?.start_price}
         zIndex={1500}
       />
 

@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import {
   Container, Box, Typography, Grid, Card, CardMedia, CardContent,
-  Chip, Paper, Button, IconButton,
+  Chip, Paper, Button, IconButton, Avatar,
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
@@ -133,6 +133,24 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSetCallback, blockN
                       <Chip label={s.label} color={s.color} size="small" />
                     </Box>
                     <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
+                    {item.seller_name && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+                        <Avatar
+                          src={item.seller_profile_image_url || undefined}
+                          sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+                        >
+                          {!item.seller_profile_image_url && item.seller_name.charAt(0)}
+                        </Avatar>
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          {item.seller_name}
+                        </Typography>
+                      </Box>
+                    )}
+                    {item.inspection_info && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }} noWrap>
+                        {item.inspection_info}
+                      </Typography>
+                    )}
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="h6" color="primary.main" fontWeight="bold">
                         ¥{Number(item.start_price).toLocaleString()}〜
@@ -161,6 +179,8 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSetCallback, blockN
         open={!!selectedItem}
         item={selectedItem ? itemDataToLaneItem(selectedItem) : null}
         onClose={() => setSelectedItem(null)}
+        priceLabel="start"
+        startPrice={selectedItem?.start_price}
       />
 
       {/* BidLimitModal */}

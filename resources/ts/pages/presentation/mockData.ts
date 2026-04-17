@@ -25,6 +25,7 @@ export const makeLaneItem = (overrides: Partial<LaneItem> & { id: number; specie
   my_limit_price: null,
   my_limit_triggered: false,
   seller_name: 'デモ出品者',
+  seller_profile_image_url: null,
   ...overrides,
 });
 
@@ -243,6 +244,7 @@ export interface ItemData {
   inspection_info?: string;
   media?: { id: number; item_id: number; media_type: string; file_path: string; duration?: number; display_order: number }[];
   seller_name?: string;
+  seller_profile_image_url?: string | null;
 }
 
 /** GUIDED_INITIAL_ITEMS から media 配列を id で引く */
@@ -409,6 +411,8 @@ export const itemDataToLaneItem = (item: ItemData): LaneItem => makeLaneItem({
   media: item.media as LaneItem['media'],
   is_premium: item.is_premium,
   seller_name: item.seller_name ?? 'デモ出品者',
+  seller_profile_image_url: item.seller_profile_image_url ?? null,
+  inspection_info: item.inspection_info,
 });
 
 // ====================================================================

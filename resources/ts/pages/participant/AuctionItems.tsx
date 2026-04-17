@@ -51,6 +51,7 @@ const toLaneItem = (item: ItemData | null): LaneItem | null => {
     my_limit_price: null,
     my_limit_triggered: false,
     seller_name: item.seller_name ?? (item as any).seller?.seller_name ?? '',
+    seller_profile_image_url: item.seller_profile_image_url ?? (item as any).seller?.profile_image_url ?? null,
     media: item.media as LaneItem['media'],
     inspection_info: item.inspection_info,
   } as LaneItem;
@@ -362,8 +363,26 @@ export default function AuctionItems() {
       {/* 詳細ダイアログ（デモと同じメディアギャラリー） */}
       <ItemDetailDialog
         open={!!selectedItem}
-        item={toLaneItem(selectedItem)}
+        item={(() => {
+          if (!selectedItem) return null;
+          const base = toLaneItem(selectedItem);
+          if (!base) return null;
+          const limit = limitSettings[selectedItem.id];
+          return {
+            ...base,
+            my_limit_price: limit?.limit_price ?? null,
+            my_limit_triggered: limit?.is_triggered ?? false,
+          } as LaneItem;
+        })()}
         onClose={() => setSelectedItem(null)}
+        priceLabel="start"
+        startPrice={selectedItem?.start_price}
+        onLimitEdit={() => {
+          if (selectedItem) setLimitModalItem(selectedItem);
+        }}
+        onLimitRemove={() => {
+          if (selectedItem) handleRemoveLimit(selectedItem.id);
+        }}
       />
 
       {/* 指値（上限価格）設定モーダル（開始前） */}

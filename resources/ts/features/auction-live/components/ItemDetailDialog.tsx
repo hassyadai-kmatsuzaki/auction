@@ -29,6 +29,8 @@ interface Props {
   priceLabel?: 'current' | 'start';
   /** 開始価格（priceLabel='start' の場合に表示する価格。未指定なら item.current_price を使用） */
   startPrice?: number;
+  /** DialogActions に追加で挿入するボタン等 */
+  extraActions?: React.ReactNode;
 }
 
 type MediaEntry = { type: 'image' | 'video'; url: string };
@@ -68,7 +70,7 @@ const buildMediaList = (item: LaneItem | null): MediaEntryWithOriginal[] => {
   return list;
 };
 
-export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex, priceLabel = 'current', startPrice }: Props) => {
+export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex, priceLabel = 'current', startPrice, extraActions }: Props) => {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [videoDialogUrl, setVideoDialogUrl] = useState('');
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
@@ -258,6 +260,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>閉じる</Button>
+          {extraActions}
         </DialogActions>
       </Dialog>
 
