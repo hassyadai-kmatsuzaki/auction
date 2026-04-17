@@ -53,10 +53,28 @@ class AuctionController extends Controller
                 ->get();
         }
         
+        // 各オークションに紐づく出品者(生産者)名のユニークリストを一括取得
+        $auctionIds = $auctions->pluck('id')->all();
+        $sellersByAuction = [];
+        if (!empty($auctionIds)) {
+            $rows = Item::query()
+                ->whereIn('auction_id', $auctionIds)
+                ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
+                ->join('seller_profiles', 'items.seller_profile_id', '=', 'seller_profiles.id')
+                ->select('items.auction_id', 'seller_profiles.seller_name')
+                ->distinct()
+                ->get();
+            foreach ($rows as $row) {
+                if (!empty($row->seller_name)) {
+                    $sellersByAuction[$row->auction_id][] = $row->seller_name;
+                }
+            }
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'auctions' => $auctions->map(function ($auction) {
+                'auctions' => $auctions->map(function ($auction) use ($sellersByAuction) {
                     $data = [
                         'id'          => $auction->id,
                         'title'       => $auction->title,
@@ -66,6 +84,7 @@ class AuctionController extends Controller
                         'description' => $auction->description,
                         'lane_count'  => $auction->lane_count,
                         'entrance_allowed' => null, // scheduled 以外は null
+                        'sellers'     => array_values(array_unique($sellersByAuction[$auction->id] ?? [])),
                     ];
 
                     // scheduled の場合のみ入室可否を付与
@@ -230,12 +249,15 @@ class AuctionController extends Controller
             // レーンに割り当てられたアイテムを取得
             $laneItems = $lane->items()
                 ->whereIn('items.status', ['registered', 'live', 'sold', 'unsold'])
-                ->with(['media' => function ($query) {
-                    $query->orderBy('display_order');
-                }])
+                ->with([
+                    'media' => function ($query) {
+                        $query->orderBy('display_order');
+                    },
+                    'sellerProfile:id,seller_name',
+                ])
                 ->orderBy('lane_items.sequence_order')
                 ->get();
-            
+
             $lanesData[] = [
                 'lane_number' => $lane->lane_number,
                 'lane_name' => "レーン{$lane->lane_number}",
@@ -255,22 +277,26 @@ class AuctionController extends Controller
                         'is_premium' => $item->is_premium,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
+                        'seller_name' => $item->sellerProfile?->seller_name,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),
             ];
         }
-        
+
         // レーンに割り当てられていないアイテムも取得
         $unassignedItems = Item::where('auction_id', $auctionId)
             ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
             ->whereDoesntHave('lanes')
-            ->with(['media' => function ($query) {
-                $query->orderBy('display_order');
-            }])
+            ->with([
+                'media' => function ($query) {
+                    $query->orderBy('display_order');
+                },
+                'sellerProfile:id,seller_name',
+            ])
             ->orderBy('item_number')
             ->get();
-        
+
         if ($unassignedItems->count() > 0) {
             $lanesData[] = [
                 'lane_number' => 0,
@@ -291,6 +317,7 @@ class AuctionController extends Controller
                         'is_premium' => $item->is_premium,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
+                        'seller_name' => $item->sellerProfile?->seller_name,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),

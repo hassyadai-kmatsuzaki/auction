@@ -27,6 +27,7 @@ import {
   Inventory as InventoryIcon,
   ArrowForward as ArrowForwardIcon,
   MeetingRoom as MeetingRoomIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import type { Auction } from '../../types';
 import axios from '../../lib/axios';
@@ -320,6 +321,23 @@ export default function AuctionList() {
                             <Typography variant="body2" fontWeight={600}>
                               {auction.total_items}点
                             </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    )}
+                    {auction.sellers && auction.sellers.length > 0 && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                          <PersonIcon fontSize="small" sx={{ color: 'primary.main', mt: 0.25 }} />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              生産者
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}>
+                              {auction.sellers.map((seller) => (
+                                <Chip key={seller} label={seller} size="small" variant="outlined" />
+                              ))}
+                            </Box>
                           </Box>
                         </Box>
                       </Grid>

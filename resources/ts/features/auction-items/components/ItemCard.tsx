@@ -21,6 +21,7 @@ interface ItemData {
   thumbnail_path?: string;
   status: string;
   media?: any[];
+  seller_name?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
@@ -87,6 +88,11 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
           {!hideStatus && <Chip label={status.label} color={status.color} size="small" />}
         </Box>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
+        {item.seller_name && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }} noWrap>
+            出品者：{item.seller_name}
+          </Typography>
+        )}
         <Box sx={{ mt: 1 }}>
           <Typography variant="h6" color="primary.main" fontWeight="bold">
             ¥{Number(item.start_price).toLocaleString()}〜

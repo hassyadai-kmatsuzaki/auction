@@ -4,6 +4,7 @@ import {
   Container, Box, Typography, Grid, Chip, Paper, Tabs, Tab,
   Button, IconButton, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
   ViewModule as ViewModuleIcon, ViewList as ViewListIcon,
@@ -49,7 +50,7 @@ const toLaneItem = (item: ItemData | null): LaneItem | null => {
     freeze_countdown_seconds: 0,
     my_limit_price: null,
     my_limit_triggered: false,
-    seller_name: (item as any).seller?.seller_name ?? '',
+    seller_name: item.seller_name ?? (item as any).seller?.seller_name ?? '',
     media: item.media as LaneItem['media'],
     inspection_info: item.inspection_info,
   } as LaneItem;
@@ -64,6 +65,7 @@ export default function AuctionItems() {
   const [viewMode, setViewMode]             = useState<'grid' | 'list'>('grid');
   const [selectedItem, setSelectedItem]     = useState<ItemData | null>(null);
   const [favoriteIds, setFavoriteIds]       = useState<Set<number>>(new Set());
+  const [sellerFilter, setSellerFilter]     = useState<string>('all');
 
   const queryClient = useQueryClient();
   // 指値モーダル
@@ -146,9 +148,22 @@ export default function AuctionItems() {
 
   const isLiveAuction = auction?.status === 'live';
 
-  const currentItems: ItemData[] = selectedLane === 0
+  const laneFilteredItems: ItemData[] = selectedLane === 0
     ? lanes.flatMap((l: any) => l.items)
     : lanes[selectedLane - 1]?.items ?? [];
+
+  // 選択レーンの生産者ユニークリスト（フィルタ候補）
+  const sellerOptions: string[] = Array.from(
+    new Set(
+      laneFilteredItems
+        .map((i) => i.seller_name)
+        .filter((s): s is string => !!s && s.length > 0)
+    )
+  ).sort();
+
+  const currentItems: ItemData[] = sellerFilter === 'all'
+    ? laneFilteredItems
+    : laneFilteredItems.filter((i) => i.seller_name === sellerFilter);
 
   if (isLoading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -201,13 +216,43 @@ export default function AuctionItems() {
 
       {/* レーンタブ */}
       <Paper sx={{ mb: 2 }}>
-        <Tabs value={selectedLane} onChange={(_, v) => setSelectedLane(v)} variant="scrollable" scrollButtons="auto">
+        <Tabs value={selectedLane} onChange={(_, v) => { setSelectedLane(v); setSellerFilter('all'); }} variant="scrollable" scrollButtons="auto">
           <Tab label={`すべて (${totalItems})`} />
           {lanes.map((lane: any, i: number) => (
             <Tab key={i} label={`${lane.lane_name} (${lane.items.length})`} />
           ))}
         </Tabs>
       </Paper>
+
+      {/* 生産者フィルタ */}
+      {sellerOptions.length > 0 && (
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel id="seller-filter-label">生産者で絞り込み</InputLabel>
+            <Select
+              labelId="seller-filter-label"
+              label="生産者で絞り込み"
+              value={sellerFilter}
+              onChange={(e) => setSellerFilter(e.target.value as string)}
+            >
+              <MenuItem value="all">すべて ({laneFilteredItems.length})</MenuItem>
+              {sellerOptions.map((seller) => {
+                const count = laneFilteredItems.filter((i) => i.seller_name === seller).length;
+                return (
+                  <MenuItem key={seller} value={seller}>
+                    {seller} ({count})
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
+          {sellerFilter !== 'all' && (
+            <Button size="small" variant="text" onClick={() => setSellerFilter('all')}>
+              フィルタを解除
+            </Button>
+          )}
+        </Box>
+      )}
 
       {/* アイテム一覧 */}
       {currentItems.length === 0 ? (
@@ -256,6 +301,7 @@ export default function AuctionItems() {
               <TableRow>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>No.</TableCell>
                 <TableCell>品種名</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>生産者</TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>匹数</TableCell>
                 <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>開始価格</TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>ステータス</TableCell>
@@ -277,6 +323,7 @@ export default function AuctionItems() {
                         {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
                       </Box>
                     </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.seller_name || '—'}</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{item.quantity}匹</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{Number(item.start_price).toLocaleString()}</TableCell>
                     <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>

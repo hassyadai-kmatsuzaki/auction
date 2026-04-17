@@ -6,6 +6,7 @@ import { useState } from 'react';
 import {
   Box, Container, Typography, Grid, Paper, Tabs, Tab, Chip, IconButton,
   Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
   ViewModule as ViewModuleIcon,
@@ -50,6 +51,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
   const limitSettings = externalLimitSettings ?? localLimitSettings;
   const [limitModalItem, setLimitModalItem] = useState<{ id: number; species_name: string; start_price: number } | null>(null);
   const [selectedItem, setSelectedItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
+  const [sellerFilter, setSellerFilter] = useState<string>('all');
 
   const totalItems = MOCK_ITEMS.length;
 
@@ -68,11 +70,25 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
     is_premium: item.is_premium,
     thumbnail_path: item.thumbnail_path,
     inspection_info: item.inspection_info,
+    seller_name: item.seller_name,
   });
 
-  const currentItems = statusFilter.length > 0
+  const statusFiltered = statusFilter.length > 0
     ? allLaneItems.filter((item) => statusFilter.includes(item.status))
     : allLaneItems;
+
+  // 選択レーンの生産者ユニークリスト（フィルタ候補）
+  const sellerOptions: string[] = Array.from(
+    new Set(
+      statusFiltered
+        .map((i) => i.seller_name)
+        .filter((s): s is string => !!s && s.length > 0)
+    )
+  ).sort();
+
+  const currentItems = sellerFilter === 'all'
+    ? statusFiltered
+    : statusFiltered.filter((i) => i.seller_name === sellerFilter);
 
   const getLimitForItem = (itemId: number) => limitSettings[itemId] ?? { limit_price: null, is_triggered: false };
 
@@ -136,13 +152,43 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
       {/* レーンタブ + ステータスフィルター */}
       <Box data-tour-target="items-filter-area">
       <Paper sx={{ mb: 2 }}>
-        <Tabs value={selectedLane} onChange={(_, v) => setSelectedLane(v)} variant="scrollable" scrollButtons="auto">
+        <Tabs value={selectedLane} onChange={(_, v) => { setSelectedLane(v); setSellerFilter('all'); }} variant="scrollable" scrollButtons="auto">
           <Tab label={`すべて (${totalItems})`} />
           {MOCK_LANES_LIST.map((lane, i) => (
             <Tab key={i} label={`${lane.lane_name} (${lane.items.length})`} />
           ))}
         </Tabs>
       </Paper>
+
+      {/* 生産者フィルタ */}
+      {sellerOptions.length > 0 && (
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 220 }} disabled={!!activeOnly}>
+            <InputLabel id="demo-seller-filter-label">生産者で絞り込み</InputLabel>
+            <Select
+              labelId="demo-seller-filter-label"
+              label="生産者で絞り込み"
+              value={sellerFilter}
+              onChange={(e) => setSellerFilter(e.target.value as string)}
+            >
+              <MenuItem value="all">すべて ({statusFiltered.length})</MenuItem>
+              {sellerOptions.map((seller) => {
+                const count = statusFiltered.filter((i) => i.seller_name === seller).length;
+                return (
+                  <MenuItem key={seller} value={seller}>
+                    {seller} ({count})
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
+          {sellerFilter !== 'all' && (
+            <Button size="small" variant="text" onClick={() => setSellerFilter('all')}>
+              フィルタを解除
+            </Button>
+          )}
+        </Box>
+      )}
 
       </Box>{/* /items-filter-area */}
 
@@ -196,6 +242,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
               <TableRow>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>No.</TableCell>
                 <TableCell>品種名</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>生産者</TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>匹数</TableCell>
                 <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>開始価格</TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>ステータス</TableCell>
@@ -215,6 +262,7 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
                         {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
                       </Box>
                     </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.seller_name || '—'}</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{item.quantity}匹</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{Number(item.start_price).toLocaleString()}</TableCell>
                     <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>

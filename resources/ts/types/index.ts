@@ -45,6 +45,8 @@ export interface Auction {
   updated_at?: string;
   /** scheduled のとき: 待機室に入室可能かどうか（null = live/finished など非該当） */
   entrance_allowed?: boolean | null;
+  /** このオークションに出品している生産者（出品者）名のユニークリスト */
+  sellers?: string[];
 }
 
 export interface Item {
@@ -62,6 +64,7 @@ export interface Item {
   premium_fee?: number;
   thumbnail_path?: string;
   status: 'registered' | 'live' | 'sold' | 'unsold' | 'cancelled';
+  seller_name?: string;
 }
 
 export interface ItemMedia {
