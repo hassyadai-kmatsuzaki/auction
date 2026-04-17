@@ -70,7 +70,17 @@ class ReviewController extends Controller
             ], 422);
         }
 
-        $revieweeId = $isBuyer ? $wonItem->item->seller->id : $wonItem->winner_id;
+        $revieweeId = $isBuyer
+            ? $wonItem->item->seller?->id
+            : $wonItem->winner_id;
+
+        // 評価対象ユーザーが存在しない場合
+        if (!$revieweeId || !\App\Models\User::where('id', $revieweeId)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => '評価対象のユーザーアカウントが存在しません',
+            ], 422);
+        }
 
         $review = UserReview::create([
             'reviewer_id' => $user->id,

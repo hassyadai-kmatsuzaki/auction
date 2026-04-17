@@ -16,6 +16,7 @@ use App\Actions\Bid\SetBidLimitAction;
 use App\Actions\Line\NotifyFavoriteApproachingAction;
 use App\Services\BidService;
 use App\Services\CountdownService;
+use App\Services\Monitoring\MetricRecorder;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(LeaveBidAction::class),
                 $app->make(SetBidLimitAction::class),
                 $app->make(NotifyFavoriteApproachingAction::class),
+                $app->make(MetricRecorder::class),
             );
         });
     }

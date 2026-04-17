@@ -46,8 +46,15 @@ class RecommendationService
         usort($recommendations, fn($a, $b) => $b['score'] <=> $a['score']);
         $recommendations = array_slice($recommendations, 0, $limit);
 
-        // DB保存
+        // DB保存（FK制約違反を防ぐため、存在しないitem_idはスキップ）
+        $existingItemIds = Item::whereIn('id', array_column($recommendations, 'item_id'))
+            ->pluck('id')
+            ->toArray();
+
         foreach ($recommendations as $rec) {
+            if (!in_array($rec['item_id'], $existingItemIds)) {
+                continue;
+            }
             AIRecommendation::updateOrCreate(
                 ['user_id' => $user->id, 'item_id' => $rec['item_id']],
                 [

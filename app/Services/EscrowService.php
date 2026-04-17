@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\EscrowTransaction;
+use App\Models\User;
 use App\Models\WonItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,10 +17,21 @@ class EscrowService
     {
         $wonItem->loadMissing('item.sellerProfile');
 
+        $buyerId = $wonItem->winner_id;
+        $sellerId = $wonItem->item->sellerProfile?->user_id;
+
+        // FK制約違反を防ぐ: buyer/seller が存在しなければエラー
+        if (!$buyerId || !User::where('id', $buyerId)->exists()) {
+            throw new \RuntimeException('買い手ユーザーが存在しません (ID: ' . $buyerId . ')');
+        }
+        if (!$sellerId || !User::where('id', $sellerId)->exists()) {
+            throw new \RuntimeException('出品者ユーザーが存在しません');
+        }
+
         return EscrowTransaction::create([
             'won_item_id' => $wonItem->id,
-            'buyer_id' => $wonItem->winner_id,
-            'seller_id' => $wonItem->item->sellerProfile->user_id,
+            'buyer_id' => $buyerId,
+            'seller_id' => $sellerId,
             'amount' => (int) $wonItem->total_amount,
             'status' => 'awaiting_payment',
         ]);
