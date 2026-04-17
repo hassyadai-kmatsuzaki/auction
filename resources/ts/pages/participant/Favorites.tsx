@@ -36,6 +36,7 @@ import {
   ArrowBack as ArrowBackIcon,
   ViewModule as GridViewIcon,
   ViewList as ListViewIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
@@ -431,6 +432,17 @@ export default function Favorites() {
                     <Typography variant="caption" color="text.secondary">
                       {item.quantity}匹セット
                     </Typography>
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Chip
+                      icon={<InfoIcon sx={{ fontSize: 16 }} />}
+                      label="詳細"
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      onClick={(e) => { e.stopPropagation(); handleDetailOpen(item); }}
+                      sx={{ cursor: 'pointer' }}
+                    />
                   </Box>
                 </CardContent>
               </Card>

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Chip, IconButton, Tooltip } from '@mui/material';
-import { PriceCheck as PriceCheckIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Chip, Tooltip } from '@mui/material';
+import { PriceCheck as PriceCheckIcon, Cancel as CancelIcon } from '@mui/icons-material';
 
 interface Props {
   limitPrice: number | null;
@@ -35,28 +35,35 @@ export const BidLimitBadge = React.memo(({ limitPrice, isTriggered, onEdit, onRe
     );
   }
 
+  const showRemove = Boolean(onRemove) && !isTriggered;
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <Chip
-        icon={<PriceCheckIcon sx={{ fontSize: size === 'small' ? 14 : 16 }} />}
-        label={`上限: ¥${Math.floor(limitPrice).toLocaleString()}`}
-        size={size}
-        color={isTriggered ? 'default' : 'primary'}
-        variant={isTriggered ? 'outlined' : 'filled'}
-        onClick={onEdit}
-        sx={{
-          cursor: 'pointer',
-          fontSize: size === 'small' ? '0.65rem' : '0.75rem',
-          opacity: isTriggered ? 0.6 : 1,
-          textDecoration: isTriggered ? 'line-through' : 'none',
-        }}
-      />
-      {onRemove && !isTriggered && (
-        <IconButton size="small" onClick={onRemove} sx={{ p: 0.25 }}>
-          <CloseIcon sx={{ fontSize: 12 }} />
-        </IconButton>
-      )}
-    </Box>
+    <Chip
+      icon={<PriceCheckIcon sx={{ fontSize: size === 'small' ? 14 : 16 }} />}
+      label={`上限: ¥${Math.floor(limitPrice).toLocaleString()}`}
+      size={size}
+      color={isTriggered ? 'default' : 'primary'}
+      variant={isTriggered ? 'outlined' : 'filled'}
+      onClick={onEdit}
+      onDelete={showRemove ? onRemove : undefined}
+      deleteIcon={
+        showRemove ? (
+          <CancelIcon
+            sx={{
+              fontSize: size === 'small' ? 14 : 16,
+              color: 'rgba(255, 255, 255, 0.8)',
+              '&:hover': { color: '#fff' },
+            }}
+          />
+        ) : undefined
+      }
+      sx={{
+        cursor: 'pointer',
+        fontSize: size === 'small' ? '0.65rem' : '0.75rem',
+        opacity: isTriggered ? 0.6 : 1,
+        textDecoration: isTriggered ? 'line-through' : 'none',
+      }}
+    />
   );
 });
 
