@@ -56,7 +56,7 @@ class FavoriteController extends Controller
                     'event_date' => $auction->event_date->format('Y-m-d'),
                     'status' => $auction->status,
                     'is_past' => in_array($auction->status, ['finished', 'cancelled'], true)
-                        || $auction->event_date->isPast(),
+                        || $auction->event_date->lt(now()->startOfDay()),
                 ] : null,
                 'created_at' => $fav->created_at->toIso8601String(),
             ];

@@ -61,7 +61,6 @@ const SellerDetail           = lazy(() => import('./pages/admin/SellerDetail'));
 const BuyerManagement        = lazy(() => import('./pages/admin/BuyerManagement'));
 const BuyerDetail            = lazy(() => import('./pages/admin/BuyerDetail'));
 const DocumentManagement     = lazy(() => import('./pages/admin/DocumentManagement'));
-const AdminManual            = lazy(() => import('./pages/admin/Manual'));
 const LaneAssignment         = lazy(() => import('./pages/admin/LaneAssignment'));
 const SellerOrderPage        = lazy(() => import('./features/admin/auction-seller-order/pages/SellerOrderPage'));
 const Reports                = lazy(() => import('./pages/admin/Reports'));
@@ -80,7 +79,6 @@ const SellerShipping         = lazy(() => import('./pages/seller/Shipping'));
 const ItemHistory            = lazy(() => import('./pages/seller/ItemHistory'));
 const SellerItemDetail       = lazy(() => import('./pages/seller/ItemDetail'));
 const SalesSettlement        = lazy(() => import('./pages/seller/SalesSettlement'));
-const SellerManual           = lazy(() => import('./pages/seller/Manual'));
 
 // Presentation（認証不要）
 const Presentation           = lazy(() => import('./pages/presentation/Presentation'));
@@ -151,7 +149,6 @@ function App() {
             <Route path="profile" element={<SellerProfile />} />
             <Route path="bank" element={<SellerProfile />} /> {/* 口座情報（プロフィールで代用） */}
             <Route path="settings" element={<SellerProfile />} /> {/* 設定（プロフィールで代用） */}
-            <Route path="manual" element={<SellerManual />} />
           </Route>
 
           {/* 管理者ページ */}
@@ -204,10 +201,7 @@ function App() {
             
             {/* 帳票管理 */}
             <Route path="documents" element={<DocumentManagement />} />
-            
-            {/* マニュアル */}
-            <Route path="manual" element={<AdminManual />} />
-            
+
             {/* AI・分析 */}
             <Route path="ai-analytics" element={<AIAnalytics />} />
             <Route path="ai/image-recognition" element={<AIImageRecognition />} />

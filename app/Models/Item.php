@@ -57,6 +57,19 @@ class Item extends BaseModel
     ];
 
     /**
+     * 動画URLがサムネイルに設定されてしまっている場合は無視する
+     * （`items:fix-video-thumbnails` コマンドで DB クリーンアップ可能）
+     */
+    public function getThumbnailPathAttribute($value): ?string
+    {
+        if (! $value) return null;
+        if (preg_match('/\.(mp4|mov|webm|m4v)(\?|#|$)/i', $value)) {
+            return null;
+        }
+        return $value;
+    }
+
+    /**
      * オークションとのリレーション
      */
     public function auction()

@@ -21,6 +21,11 @@ class UploadMediaAction
         string       $mediaType,
         bool         $isThumbnail = false,
     ): AuctionResultDto {
+        // 動画はサムネイルにしない
+        if ($mediaType !== 'image') {
+            $isThumbnail = false;
+        }
+
         $extension = $file->getClientOriginalExtension();
         $filename  = "items/{$item->auction_id}/{$item->id}/" . Str::uuid() . ".{$extension}";
         $disk      = $this->storage->disk();

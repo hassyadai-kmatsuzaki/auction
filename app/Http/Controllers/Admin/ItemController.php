@@ -486,22 +486,31 @@ class ItemController extends Controller
         $item = Item::where('auction_id', $auctionId)
             ->where('id', $id)
             ->firstOrFail();
-        
+
         $media = ItemMedia::where('item_id', $id)
             ->where('id', $mediaId)
             ->firstOrFail();
-        
+
+        // 動画はサムネイルに指定できない
+        if (str_starts_with((string) $media->media_type, 'video')
+            || str_starts_with((string) $media->mime_type, 'video/')) {
+            return response()->json([
+                'success' => false,
+                'message' => '動画はサムネイルに指定できません。画像を選択してください。',
+            ], 422);
+        }
+
         // 既存のサムネイルを解除
         ItemMedia::where('item_id', $id)->update(['is_thumbnail' => false]);
-        
+
         // 新しいサムネイルを設定
         $media->is_thumbnail = true;
         $media->save();
-        
+
         // アイテムのサムネイルパスを更新
         $item->thumbnail_path = $this->getFileUrl($media->file_path);
         $item->save();
-        
+
         return response()->json([
             'success' => true,
             'message' => 'サムネイルを設定しました。',

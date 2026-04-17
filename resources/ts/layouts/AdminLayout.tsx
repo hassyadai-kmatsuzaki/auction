@@ -30,7 +30,6 @@ import {
   Person as PersonIcon,
   Receipt as ReceiptIcon,
   Psychology as AIIcon,
-  MenuBook as MenuBookIcon,
   Cloud as CloudIcon,
   CameraAlt as CameraIcon,
   Timeline as TimelineIcon,
@@ -90,7 +89,6 @@ export default function AdminLayout() {
   ];
 
   const bottomMenuItems = [
-    { text: 'マニュアル', icon: <MenuBookIcon />, path: '/admin/manual' },
     { text: '設定', icon: <SettingsIcon />, path: '/admin/settings' },
     { text: 'インフラスケーリング', icon: <CloudIcon />, path: '/admin/scaling' },
     { text: '帳票管理', icon: <ReceiptIcon />, path: '/admin/documents' },

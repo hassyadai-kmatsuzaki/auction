@@ -1,6 +1,0 @@
-import React from 'react';
-import ManualViewer from '../../components/ManualViewer';
-
-export default function SellerManual() {
-  return <ManualViewer userRole="seller" />;
-}

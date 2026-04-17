@@ -30,7 +30,6 @@ import {
   Add as AddIcon,
   History as HistoryIcon,
   Person as PersonIcon,
-  MenuBook as MenuBookIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -116,7 +115,6 @@ export default function SellerLayout() {
   ];
 
   const bottomMenuItems = [
-    { text: 'マニュアル', icon: <MenuBookIcon />, path: '/seller/manual' },
     { text: '出品者情報・設定', icon: <SettingsIcon />, path: '/seller/profile' },
   ];
 
