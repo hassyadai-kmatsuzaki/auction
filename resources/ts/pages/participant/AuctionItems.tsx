@@ -1,27 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Container, Box, Typography, Grid, Card, CardMedia, CardContent,
-  Chip, Paper, Tabs, Tab, Dialog, DialogTitle, DialogContent,
-  DialogActions, Button, IconButton, Divider, Table, TableBody,
+  Container, Box, Typography, Grid, Chip, Paper, Tabs, Tab,
+  Button, IconButton, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert,
 } from '@mui/material';
 import {
   ViewModule as ViewModuleIcon, ViewList as ViewListIcon,
-  Close as CloseIcon, Info as InfoIcon, ArrowBack as ArrowBackIcon,
-  ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon,
-  PlayCircleOutline as PlayCircleOutlineIcon,
+  Info as InfoIcon, ArrowBack as ArrowBackIcon,
   FavoriteBorder as FavoriteBorderIcon, Favorite as FavoriteIcon,
-  PriceCheck as PriceCheckIcon,
   MeetingRoom as MeetingRoomIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
+import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
-import { bidLimitApi, type BidLimitData } from '../../api/participant/bidLimitApi';
+import { bidLimitApi } from '../../api/participant/bidLimitApi';
+import type { LaneItem } from '../../types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
   registered: { label: '出品中', color: 'primary' },
@@ -30,31 +28,31 @@ const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary
   unsold:     { label: '不成立', color: 'default' },
 };
 
-// S3/public URLの解決
-const resolveUrl = (url: string, item?: { thumbnail_path?: string; media?: any[] } | null) => {
-  if (!url || url.startsWith('http') || url.startsWith('/')) return url;
-  const thumb = item?.thumbnail_path;
-  if (thumb?.startsWith('http')) {
-    const idx = thumb.indexOf('items/');
-    if (idx > 0) return thumb.substring(0, idx) + url;
-  }
-  return url;
-};
-
-const buildMediaList = (item: ItemData | null) => {
-  if (!item) return [];
-  const list: { type: 'image' | 'video'; url: string }[] = [];
-  if (item.thumbnail_path) list.push({ type: 'image', url: item.thumbnail_path });
-  item.media?.forEach((m: any) => {
-    const rawUrl = m.file_url || m.file_path || m.url;
-    if (!rawUrl || (m.is_thumbnail && item.thumbnail_path)) return;
-    const url = resolveUrl(rawUrl, item);
-    if (url === item.thumbnail_path) return;
-    const isVideo = m.media_type?.includes('video') || m.mime_type?.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(url);
-    list.push({ type: isVideo ? 'video' : 'image', url });
-  });
-  if (list.length === 0) list.push({ type: 'image', url: '/img/noimage.png' });
-  return list;
+// ItemData → ItemDetailDialog が要求する LaneItem 形式に変換
+const toLaneItem = (item: ItemData | null): LaneItem | null => {
+  if (!item) return null;
+  return {
+    id: item.id,
+    item_number: item.item_number,
+    species_name: item.species_name,
+    current_price: item.current_price ?? item.start_price,
+    quantity: item.quantity,
+    quantity_unit: 'fish',
+    active_bidders_count: 0,
+    countdown_seconds: 0,
+    my_bid_status: null,
+    is_premium: item.is_premium,
+    thumbnail_path: item.thumbnail_path ?? '/img/noimage.png',
+    phase: 'bidding',
+    pre_bid_remaining_seconds: 0,
+    freeze_remaining_seconds: 0,
+    freeze_countdown_seconds: 0,
+    my_limit_price: null,
+    my_limit_triggered: false,
+    seller_name: (item as any).seller?.seller_name ?? '',
+    media: item.media as LaneItem['media'],
+    inspection_info: item.inspection_info,
+  } as LaneItem;
 };
 
 export default function AuctionItems() {
@@ -62,16 +60,10 @@ export default function AuctionItems() {
   const navigate      = useNavigate();
 
   // ローカルUIState
-  const [selectedLane, setSelectedLane]         = useState(0);
-  const [viewMode, setViewMode]                 = useState<'grid' | 'list'>('grid');
-  const [statusFilter, setStatusFilter]         = useState<string[]>([]);  // 空配列 = デフォルト
-  const [selectedItem, setSelectedItem]         = useState<ItemData | null>(null);
-  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
-  const [lightboxOpen, setLightboxOpen]         = useState(false);
-  const [lightboxIndex, setLightboxIndex]       = useState(0);
-  const [videoDialogUrl, setVideoDialogUrl]     = useState('');
-  const [videoDialogOpen, setVideoDialogOpen]   = useState(false);
-  const [favoriteIds, setFavoriteIds]           = useState<Set<number>>(new Set());
+  const [selectedLane, setSelectedLane]     = useState(0);
+  const [viewMode, setViewMode]             = useState<'grid' | 'list'>('grid');
+  const [selectedItem, setSelectedItem]     = useState<ItemData | null>(null);
+  const [favoriteIds, setFavoriteIds]       = useState<Set<number>>(new Set());
 
   const queryClient = useQueryClient();
   // 指値モーダル
@@ -152,19 +144,11 @@ export default function AuctionItems() {
     } catch {}
   };
 
-  // ステータスフィルターのデフォルト値（開催中は入札中+出品中のみ）
   const isLiveAuction = auction?.status === 'live';
-  const defaultStatuses = isLiveAuction ? ['registered', 'live'] : [];
-  const activeFilter = statusFilter.length > 0 ? statusFilter : defaultStatuses;
 
-  const allLaneItems: ItemData[] = selectedLane === 0
+  const currentItems: ItemData[] = selectedLane === 0
     ? lanes.flatMap((l: any) => l.items)
     : lanes[selectedLane - 1]?.items ?? [];
-
-  // フィルター適用
-  const currentItems = activeFilter.length > 0
-    ? allLaneItems.filter((item) => activeFilter.includes(item.status))
-    : allLaneItems;
 
   if (isLoading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -179,8 +163,6 @@ export default function AuctionItems() {
     </Container>
   );
 
-  const mediaList = buildMediaList(selectedItem);
-
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
       {/* ヘッダー */}
@@ -191,7 +173,7 @@ export default function AuctionItems() {
             <Box>
               <Typography variant="h5" fontWeight="bold">{auction?.title || '出品一覧'}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {activeFilter.length > 0 ? `${currentItems.length}件表示 / 全${totalItems}点` : `全${totalItems}点の出品`}
+                全{totalItems}点の出品
               </Typography>
             </Box>
           </Box>
@@ -227,47 +209,6 @@ export default function AuctionItems() {
         </Tabs>
       </Paper>
 
-      {/* ステータスフィルター */}
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>表示:</Typography>
-        {[
-          { key: 'all',        label: 'すべて',   color: 'default' as const },
-          { key: 'registered', label: '出品中',   color: 'primary' as const },
-          { key: 'live',       label: '入札中',   color: 'error'   as const },
-          { key: 'sold',       label: '落札済み', color: 'success' as const },
-          { key: 'unsold',     label: '不成立',   color: 'default' as const },
-        ].map(({ key, label, color }) => {
-          const isAll = key === 'all';
-          const isActive = isAll
-            ? statusFilter.length === 0 && !isLiveAuction  // 非開催中のデフォルト
-            : activeFilter.includes(key);
-          const isDefault = isAll && statusFilter.length === 0;
-
-          return (
-            <Chip
-              key={key}
-              label={label}
-              size="small"
-              color={isActive || isDefault ? color : 'default'}
-              variant={isActive || isDefault ? 'filled' : 'outlined'}
-              onClick={() => {
-                if (isAll) {
-                  setStatusFilter([]);
-                } else {
-                  setStatusFilter((prev) => {
-                    const current = prev.length > 0 ? prev : defaultStatuses;
-                    return current.includes(key)
-                      ? current.filter((s) => s !== key)
-                      : [...current, key];
-                  });
-                }
-              }}
-              sx={{ cursor: 'pointer', fontWeight: isActive || isDefault ? 600 : 400 }}
-            />
-          );
-        })}
-      </Box>
-
       {/* アイテム一覧 */}
       {currentItems.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -278,9 +219,13 @@ export default function AuctionItems() {
           {currentItems.map((item) => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
               <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <ItemCard item={item} isFavorited={favoriteIds.has(item.id)}
-                  onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}
-                  onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)} />
+                <ItemCard
+                  item={item}
+                  isFavorited={favoriteIds.has(item.id)}
+                  onFavoriteToggle={(e) => handleFavoriteToggle(e, item.id)}
+                  onInfoClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
+                  hideStatus
+                />
                 {/* 指値バッジ（カード下部に独立して配置・重ならない） */}
                 <Box
                   sx={{
@@ -324,7 +269,7 @@ export default function AuctionItems() {
                 const limit = limitSettings[item.id];
                 return (
                   <TableRow key={item.id} hover sx={{ cursor: 'pointer' }}
-                    onClick={() => { setSelectedItem(item); setSelectedMediaIndex(0); }}>
+                    onClick={() => setSelectedItem(item)}>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.item_number}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -350,7 +295,13 @@ export default function AuctionItems() {
                             ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 18 }} />
                             : <FavoriteBorderIcon sx={{ color: 'grey.500', fontSize: 18 }} />}
                         </IconButton>
-                        <IconButton size="small" color="primary"><InfoIcon /></IconButton>
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
+                        >
+                          <InfoIcon />
+                        </IconButton>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -361,118 +312,12 @@ export default function AuctionItems() {
         </TableContainer>
       )}
 
-      {/* 詳細ダイアログ */}
-      <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6">No.{selectedItem?.item_number} {selectedItem?.species_name}</Typography>
-            <IconButton onClick={() => setSelectedItem(null)}><CloseIcon /></IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ borderRadius: 2, overflow: 'hidden', bgcolor: 'grey.100' }}>
-                {mediaList[selectedMediaIndex]?.type === 'video' ? (
-                  <video src={mediaList[selectedMediaIndex].url} controls style={{ width: '100%', maxHeight: 400, objectFit: 'contain' }} />
-                ) : (
-                  <img src={mediaList[selectedMediaIndex]?.url || '/img/noimage.png'} alt={selectedItem?.species_name}
-                    style={{ width: '100%', maxHeight: 400, objectFit: 'contain', cursor: 'pointer', display: 'block' }}
-                    onClick={() => { setLightboxIndex(selectedMediaIndex); setLightboxOpen(true); }} />
-                )}
-              </Box>
-              {mediaList.length > 1 && (
-                <Box sx={{ display: 'flex', gap: 1, mt: 1.5, overflowX: 'auto', pb: 0.5 }}>
-                  {mediaList.map((m, i) => (
-                    <Box key={i} onClick={() => { if (m.type === 'video') { setVideoDialogUrl(m.url); setVideoDialogOpen(true); } else setSelectedMediaIndex(i); }}
-                      sx={{ width: 64, height: 64, flexShrink: 0, borderRadius: 1, overflow: 'hidden', cursor: 'pointer',
-                        border: i === selectedMediaIndex ? '2px solid' : '2px solid transparent',
-                        borderColor: i === selectedMediaIndex ? 'primary.main' : 'transparent', bgcolor: 'grey.200', position: 'relative' }}>
-                      {m.type === 'video' ? (
-                        <Box sx={{ width: '100%', height: '100%', bgcolor: 'black', position: 'relative' }}>
-                          <video src={m.url} preload="metadata" muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.3)' }}>
-                            <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
-                          </Box>
-                        </Box>
-                      ) : (
-                        <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      )}
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                {selectedItem?.is_premium && <Chip label="プレミアム" color="warning" />}
-                {selectedItem && (() => { const s = STATUS_CONFIG[selectedItem.status] ?? { label: selectedItem.status, color: 'default' as const }; return <Chip label={s.label} color={s.color} />; })()}
-              </Box>
-              <Typography variant="h4" color="primary.main" fontWeight="bold" gutterBottom>
-                ¥{Number(selectedItem?.start_price || 0).toLocaleString()}〜
-              </Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" gutterBottom>匹数</Typography>
-              <Typography variant="body1" gutterBottom>{selectedItem?.quantity}匹セット</Typography>
-              {selectedItem?.inspection_info && (
-                <>
-                  <Typography variant="subtitle2" sx={{ mt: 2, color: 'primary.main' }} gutterBottom>個体情報</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{selectedItem.inspection_info}</Typography>
-                </>
-              )}
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
-          <Box>
-            {selectedItem && (
-              <BidLimitBadge
-                limitPrice={limitSettings[selectedItem.id]?.limit_price ?? null}
-                isTriggered={limitSettings[selectedItem.id]?.is_triggered ?? false}
-                onEdit={() => setLimitModalItem(selectedItem)}
-                onRemove={() => handleRemoveLimit(selectedItem.id)}
-              />
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button onClick={() => setSelectedItem(null)}>閉じる</Button>
-            {auction?.status === 'live' && (
-              <Button variant="contained" onClick={() => { setSelectedItem(null); navigate(`/participant/auctions/${auctionId}/live`); }}>
-                ライブ画面へ
-              </Button>
-            )}
-          </Box>
-        </DialogActions>
-      </Dialog>
-
-      {/* ライトボックス */}
-      <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="xl" fullWidth
-        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', m: 1, maxHeight: '98vh' } }}>
-        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-          <IconButton onClick={() => setLightboxOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}><CloseIcon /></IconButton>
-          {mediaList.length > 1 && (
-            <>
-              <IconButton onClick={() => setLightboxIndex((p) => (p - 1 + mediaList.length) % mediaList.length)} sx={{ position: 'absolute', left: 8, color: 'white', zIndex: 2 }}>
-                <ChevronLeftIcon sx={{ fontSize: 40 }} />
-              </IconButton>
-              <IconButton onClick={() => setLightboxIndex((p) => (p + 1) % mediaList.length)} sx={{ position: 'absolute', right: 8, color: 'white', zIndex: 2 }}>
-                <ChevronRightIcon sx={{ fontSize: 40 }} />
-              </IconButton>
-            </>
-          )}
-          {(() => { const m = mediaList[lightboxIndex]; if (!m) return null; return m.type === 'video' ? <video src={m.url} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} /> : <img src={m.url} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} />; })()}
-        </Box>
-        <Typography variant="caption" sx={{ color: 'grey.500', textAlign: 'center', py: 1 }}>{lightboxIndex + 1} / {mediaList.length}</Typography>
-      </Dialog>
-
-      {/* 動画全画面 */}
-      <Dialog open={videoDialogOpen} onClose={() => setVideoDialogOpen(false)} maxWidth="xl" fullWidth
-        PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', m: 1 } }}>
-        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-          <IconButton onClick={() => setVideoDialogOpen(false)} sx={{ position: 'absolute', top: 8, right: 8, color: 'white', zIndex: 2 }}><CloseIcon /></IconButton>
-          {videoDialogUrl && <video src={videoDialogUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />}
-        </Box>
-      </Dialog>
+      {/* 詳細ダイアログ（デモと同じメディアギャラリー） */}
+      <ItemDetailDialog
+        open={!!selectedItem}
+        item={toLaneItem(selectedItem)}
+        onClose={() => setSelectedItem(null)}
+      />
 
       {/* 指値（上限価格）設定モーダル（開始前） */}
       {limitModalItem && (
