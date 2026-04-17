@@ -33,7 +33,6 @@ import {
   Link,
 } from '@mui/material';
 import {
-  ArrowBack as ArrowBackIcon,
   CheckCircle as CheckCircleIcon,
   LocalShipping as LocalShippingIcon,
   Search as SearchIcon,
@@ -358,29 +357,14 @@ export default function WonItemManagement() {
 
   return (
     <Box>
-      {/* ヘッダー */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/admin/auctions')}>
-            戻る
-          </Button>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              落札者管理
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {auction?.title}
-            </Typography>
-          </Box>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton onClick={fetchWonItems} title="更新">
-            <RefreshIcon />
-          </IconButton>
-          <Button variant="outlined" startIcon={<ExportIcon />}>
-            CSVエクスポート
-          </Button>
-        </Box>
+      {/* アクション */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, mb: 4 }}>
+        <IconButton onClick={fetchWonItems} title="更新">
+          <RefreshIcon />
+        </IconButton>
+        <Button variant="outlined" startIcon={<ExportIcon />}>
+          CSVエクスポート
+        </Button>
       </Box>
 
       {/* KPIカード */}

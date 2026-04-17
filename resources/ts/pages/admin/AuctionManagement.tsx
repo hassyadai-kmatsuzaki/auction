@@ -15,7 +15,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  TextField,
   Select,
   FormControl,
   InputLabel,
@@ -29,6 +28,14 @@ import {
   Alert,
   Stack,
   Snackbar,
+  ToggleButton,
+  ToggleButtonGroup,
+  Grid,
+  Card,
+  CardActionArea,
+  CardContent,
+  LinearProgress,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,15 +44,21 @@ import {
   Delete as DeleteIcon,
   Pets as PetsIcon,
   PlayArrow as PlayArrowIcon,
-  Stop as StopIcon,
-  Cancel as CancelIcon,
   Gavel as GavelIcon,
   Receipt as ReceiptIcon,
+  ViewModule as GridViewIcon,
+  ViewList as ListViewIcon,
+  Event as EventIcon,
+  ViewKanban as LaneIcon,
+  AccessTime as TimeIcon,
 } from '@mui/icons-material';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ja } from 'date-fns/locale';
 import axios from '../../lib/axios';
+import { useUserPreference } from '../../hooks/useUserPreference';
+
+type ViewMode = 'card' | 'list';
 
 interface Auction {
   id: number;
@@ -110,6 +123,9 @@ export default function AuctionManagement() {
   
   // 成功メッセージ
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // 表示モード（ユーザーごとに永続化）
+  const [viewMode, setViewMode] = useUserPreference<ViewMode>('admin.auctions.viewMode', 'card');
 
   useEffect(() => {
     fetchAuctions();
@@ -333,6 +349,27 @@ export default function AuctionManagement() {
             >
               クリア
             </Button>
+
+            <Box sx={{ flex: 1 }} />
+
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              size="small"
+              onChange={(_, v) => v && setViewMode(v)}
+              aria-label="表示モード"
+            >
+              <ToggleButton value="card" aria-label="カード表示">
+                <Tooltip title="カード表示">
+                  <GridViewIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="list" aria-label="一覧表示">
+                <Tooltip title="一覧表示">
+                  <ListViewIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
           </Stack>
         </Paper>
 
@@ -346,34 +383,144 @@ export default function AuctionManagement() {
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
           </Box>
+        ) : auctions.length === 0 ? (
+          <Paper sx={{ py: 8, textAlign: 'center' }}>
+            <EventIcon sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body1" color="text.secondary">
+              オークションがありません
+            </Typography>
+          </Paper>
         ) : (
           <>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>オークション名</TableCell>
-                    <TableCell>開催日</TableCell>
-                    <TableCell>開始時刻</TableCell>
-                    <TableCell align="center">ステータス</TableCell>
-                    <TableCell align="right">生体数</TableCell>
-                    <TableCell align="right">レーン数</TableCell>
-                    <TableCell align="right">操作</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {auctions.length === 0 ? (
+            {viewMode === 'card' ? (
+              <Grid container spacing={2}>
+                {auctions.map((auction) => {
+                  const total = (auction.registered_items_count || 0) + (auction.draft_items_count || 0);
+                  const progress = total > 0 ? (auction.registered_items_count / total) * 100 : 0;
+                  return (
+                    <Grid item xs={12} sm={6} md={4} lg={3} key={auction.id}>
+                      <Card
+                        elevation={0}
+                        sx={{
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          transition: 'all 0.15s ease',
+                          '&:hover': {
+                            borderColor: 'primary.main',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                          },
+                        }}
+                      >
+                        <CardActionArea
+                          onClick={() => navigate(`/admin/auctions/${auction.id}/items`)}
+                          sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                        >
+                          <CardContent sx={{ flex: 1, width: '100%' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                              <Chip
+                                label={getStatusLabel(auction.status)}
+                                size="small"
+                                color={getStatusColor(auction.status)}
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleMenuOpen(e, auction);
+                                }}
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+
+                            <Typography
+                              variant="subtitle1"
+                              sx={{
+                                fontWeight: 700,
+                                mb: 1.5,
+                                lineHeight: 1.4,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                minHeight: '2.8em',
+                              }}
+                            >
+                              {auction.title}
+                            </Typography>
+
+                            <Stack spacing={0.75} sx={{ mb: 1.5, color: 'text.secondary' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                <EventIcon fontSize="inherit" sx={{ fontSize: 16 }} />
+                                <Typography variant="caption">{formatDate(auction.event_date)}</Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                <TimeIcon fontSize="inherit" sx={{ fontSize: 16 }} />
+                                <Typography variant="caption">{formatTime(auction.start_time)}</Typography>
+                              </Box>
+                            </Stack>
+
+                            <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <PetsIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="body2" fontWeight={600}>
+                                  {auction.registered_items_count || 0}
+                                </Typography>
+                                {(auction.draft_items_count || 0) > 0 && (
+                                  <Typography variant="caption" sx={{ color: 'warning.main' }}>
+                                    +{auction.draft_items_count}
+                                  </Typography>
+                                )}
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <LaneIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="body2" fontWeight={600}>
+                                  {auction.lane_count}
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {total > 0 && (
+                              <LinearProgress
+                                variant="determinate"
+                                value={progress}
+                                sx={{ height: 4, borderRadius: 2, mt: 1 }}
+                              />
+                            )}
+                          </CardContent>
+                        </CardActionArea>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            ) : (
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        <Typography variant="body2" color="text.secondary" py={4}>
-                          オークションがありません
-                        </Typography>
-                      </TableCell>
+                      <TableCell>ID</TableCell>
+                      <TableCell>オークション名</TableCell>
+                      <TableCell>開催日</TableCell>
+                      <TableCell>開始時刻</TableCell>
+                      <TableCell align="center">ステータス</TableCell>
+                      <TableCell align="right">生体数</TableCell>
+                      <TableCell align="right">レーン数</TableCell>
+                      <TableCell align="right">操作</TableCell>
                     </TableRow>
-                  ) : (
-                    auctions.map((auction) => (
-                      <TableRow key={auction.id} hover>
+                  </TableHead>
+                  <TableBody>
+                    {auctions.map((auction) => (
+                      <TableRow
+                        key={auction.id}
+                        hover
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => navigate(`/admin/auctions/${auction.id}/items`)}
+                      >
                         <TableCell>{auction.id}</TableCell>
                         <TableCell>
                           <Typography variant="body2" fontWeight={500}>
@@ -402,24 +549,25 @@ export default function AuctionManagement() {
                           </Box>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body2">
-                            {auction.lane_count}
-                          </Typography>
+                          <Typography variant="body2">{auction.lane_count}</Typography>
                         </TableCell>
                         <TableCell align="right">
                           <IconButton
-                            onClick={(e) => handleMenuOpen(e, auction)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMenuOpen(e, auction);
+                            }}
                             size="small"
                           >
                             <MoreVertIcon />
                           </IconButton>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
 
             {/* ページネーション */}
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>

@@ -25,7 +25,11 @@ class ImageAnalysisService
      */
     public function analyzeItem(Item $item): ?AIImageAnalysis
     {
-        $media = $item->media()->where('media_type', 'photo')->first();
+        $media = $item->media()
+            ->where('media_type', 'like', 'photo%')
+            ->orderByDesc('is_thumbnail')
+            ->orderBy('display_order')
+            ->first();
 
         if (!$media) {
             Log::info('AI Image Analysis: No photo found for item', ['item_id' => $item->id]);

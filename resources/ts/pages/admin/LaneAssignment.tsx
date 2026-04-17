@@ -588,31 +588,9 @@ export default function LaneAssignment() {
 
   return (
     <Box>
-      {/* ヘッダー */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(`/admin/auctions/${auctionId}/items`)}>
-            戻る
-          </Button>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              レーン割当
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {auction?.title}
-            </Typography>
-          </Box>
-        </Box>
+      {/* アクション */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button
-            startIcon={<ReorderIcon />}
-            onClick={() => navigate(`/admin/auctions/${auctionId}/seller-order`)}
-            variant="outlined"
-            size="small"
-            disabled={!['preparing', 'scheduled'].includes(auction?.status ?? '')}
-          >
-            出品者順序設定
-          </Button>
           <Button
             startIcon={<RefreshIcon />}
             onClick={fetchData}

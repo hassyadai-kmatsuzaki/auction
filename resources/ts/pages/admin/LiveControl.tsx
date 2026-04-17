@@ -8,7 +8,7 @@ import {
   DialogContent, DialogActions, Divider,
 } from '@mui/material';
 import {
-  ArrowBack as ArrowBackIcon, PlayArrow as PlayArrowIcon,
+  PlayArrow as PlayArrowIcon,
   Pause as PauseIcon, SkipNext as SkipNextIcon, Stop as StopIcon,
   People as PeopleIcon, LiveTv as LiveTvIcon, List as ListIcon,
   FiberManualRecord as RecordIcon, Refresh as RefreshIcon,
@@ -112,25 +112,16 @@ export default function LiveControl() {
 
   return (
     <Box>
-      {/* ヘッダー */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/admin/auctions')}>戻る</Button>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>ライブオークション管理</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>{auction?.title}</Typography>
-          </Box>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={refetch} title="更新"><RefreshIcon /></IconButton>
-          {isLive ? (
-            <Chip label="LIVE 開催中" color="error" icon={<RecordIcon sx={{ fontSize: 12 }} />}
-              sx={{ fontWeight: 600, animation: 'pulse 2s infinite' }} />
-          ) : (
-            <Chip label={auction?.status === 'finished' ? '終了' : '準備中'}
-              color={auction?.status === 'finished' ? 'default' : 'warning'} sx={{ fontWeight: 600 }} />
-          )}
-        </Box>
+      {/* アクション */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, mb: 3 }}>
+        <IconButton onClick={refetch} title="更新"><RefreshIcon /></IconButton>
+        {isLive ? (
+          <Chip label="LIVE 開催中" color="error" icon={<RecordIcon sx={{ fontSize: 12 }} />}
+            sx={{ fontWeight: 600, animation: 'pulse 2s infinite' }} />
+        ) : (
+          <Chip label={auction?.status === 'finished' ? '終了' : '準備中'}
+            color={auction?.status === 'finished' ? 'default' : 'warning'} sx={{ fontWeight: 600 }} />
+        )}
       </Box>
 
       {/* タブ */}

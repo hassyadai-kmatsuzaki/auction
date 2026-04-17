@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -19,6 +19,21 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Switch,
+  ToggleButton,
+  ToggleButtonGroup,
+  Stack,
+  Avatar,
+  Tooltip,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
@@ -27,6 +42,8 @@ import {
   ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
   ArrowBack as ArrowBackIcon,
+  ViewModule as GridViewIcon,
+  ViewList as ListViewIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
@@ -34,6 +51,10 @@ import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { bidLimitApi, type BidLimitData } from '../../api/participant/bidLimitApi';
 import { optimizedImageUrl } from '../../lib/optimizedMedia';
+import { useUserPreference } from '../../hooks/useUserPreference';
+
+type ViewMode = 'grid' | 'list';
+type SortKey = 'created_desc' | 'created_asc' | 'seller' | 'price_asc' | 'price_desc';
 
 interface FavoriteItem {
   id: number;
@@ -49,11 +70,17 @@ interface FavoriteItem {
   thumbnail_path?: string;
   status: string;
   media?: any[];
+  seller: {
+    id: number;
+    seller_code: string;
+    seller_name: string;
+  } | null;
   auction: {
     id: number;
     title: string;
     event_date: string;
     status: string;
+    is_past: boolean;
   } | null;
   created_at: string;
 }
@@ -74,9 +101,18 @@ export default function Favorites() {
   const [isSettingLimit, setIsSettingLimit] = useState(false);
   const queryClient = useQueryClient();
 
+  // ユーザーごとに永続化される表示設定
+  const [viewMode, setViewMode]       = useUserPreference<ViewMode>('participant.favorites.viewMode', 'grid');
+  const [sortKey, setSortKey]         = useUserPreference<SortKey>('participant.favorites.sort', 'created_desc');
+  const [sellerFilter, setSellerFilter] = useUserPreference<string>('participant.favorites.seller', 'all');
+  const [includePast, setIncludePast] = useUserPreference<boolean>('participant.favorites.includePast', false);
+
   const fetchFavorites = useCallback(async () => {
     try {
-      const response = await axios.get('/api/participant/favorites');
+      setLoading(true);
+      const response = await axios.get('/api/participant/favorites', {
+        params: { include_past: includePast ? 1 : 0 },
+      });
       if (response.data.success) {
         setFavorites(response.data.data.favorites);
         setError(null);
@@ -86,11 +122,46 @@ export default function Favorites() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [includePast]);
 
   useEffect(() => {
     fetchFavorites();
   }, [fetchFavorites]);
+
+  // 出品者リスト（フィルター用）
+  const sellerOptions = useMemo(() => {
+    const map = new Map<number, { id: number; name: string }>();
+    favorites.forEach((f) => {
+      if (f.seller) map.set(f.seller.id, { id: f.seller.id, name: f.seller.seller_name });
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  }, [favorites]);
+
+  // フィルター + ソート結果
+  const visibleFavorites = useMemo(() => {
+    let list = [...favorites];
+
+    if (sellerFilter !== 'all') {
+      list = list.filter((f) => String(f.seller?.id ?? '') === sellerFilter);
+    }
+
+    list.sort((a, b) => {
+      switch (sortKey) {
+        case 'created_asc':  return a.created_at.localeCompare(b.created_at);
+        case 'created_desc': return b.created_at.localeCompare(a.created_at);
+        case 'price_asc':    return Number(a.start_price) - Number(b.start_price);
+        case 'price_desc':   return Number(b.start_price) - Number(a.start_price);
+        case 'seller': {
+          const an = a.seller?.seller_name ?? '';
+          const bn = b.seller?.seller_name ?? '';
+          const cmp = an.localeCompare(bn, 'ja');
+          return cmp !== 0 ? cmp : b.created_at.localeCompare(a.created_at);
+        }
+        default: return 0;
+      }
+    });
+    return list;
+  }, [favorites, sellerFilter, sortKey]);
 
   // 指値一括取得
   const allItemIds = favorites.map(f => f.item_id);
@@ -216,20 +287,82 @@ export default function Favorites() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton onClick={() => navigate('/participant/home')}>
             <ArrowBackIcon />
           </IconButton>
-          <Box>
+          <Box sx={{ flex: 1 }}>
             <Typography variant="h5" fontWeight="bold">
               お気に入り
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {favorites.length}件のお気に入り
+              {visibleFavorites.length}件 / 全{favorites.length}件
             </Typography>
           </Box>
         </Box>
+      </Paper>
+
+      {/* フィルター・ソート・表示切替 */}
+      <Paper sx={{ p: 1.5, mb: 2 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>出品者</InputLabel>
+            <Select
+              value={sellerFilter}
+              label="出品者"
+              onChange={(e) => setSellerFilter(String(e.target.value))}
+            >
+              <MenuItem value="all">すべて</MenuItem>
+              {sellerOptions.map((s) => (
+                <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>並び順</InputLabel>
+            <Select
+              value={sortKey}
+              label="並び順"
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+            >
+              <MenuItem value="created_desc">登録日（新しい順）</MenuItem>
+              <MenuItem value="created_asc">登録日(古い順)</MenuItem>
+              <MenuItem value="seller">出品者順</MenuItem>
+              <MenuItem value="price_asc">開始価格（安い順）</MenuItem>
+              <MenuItem value="price_desc">開始価格（高い順）</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={includePast}
+                onChange={(e) => setIncludePast(e.target.checked)}
+                size="small"
+              />
+            }
+            label="過去のオークションも表示"
+          />
+
+          <Box sx={{ flex: 1 }} />
+
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            size="small"
+            onChange={(_, v) => v && setViewMode(v)}
+            aria-label="表示モード"
+          >
+            <ToggleButton value="grid" aria-label="グリッド">
+              <Tooltip title="グリッド表示"><GridViewIcon fontSize="small" /></Tooltip>
+            </ToggleButton>
+            <ToggleButton value="list" aria-label="リスト">
+              <Tooltip title="リスト表示"><ListViewIcon fontSize="small" /></Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -247,9 +380,15 @@ export default function Favorites() {
             オークション一覧へ
           </Button>
         </Paper>
-      ) : (
+      ) : visibleFavorites.length === 0 ? (
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary">
+            条件に一致するお気に入りがありません
+          </Typography>
+        </Paper>
+      ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
-          {favorites.map((item) => (
+          {visibleFavorites.map((item) => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
               <Card
                 sx={{
@@ -297,6 +436,11 @@ export default function Favorites() {
                       {item.auction.title} ({getAuctionStatusLabel(item.auction.status)})
                     </Typography>
                   )}
+                  {item.seller && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }} noWrap>
+                      出品者: {item.seller.seller_name}
+                    </Typography>
+                  )}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
                       No.{item.item_number}
@@ -328,6 +472,85 @@ export default function Favorites() {
             </Grid>
           ))}
         </Grid>
+      ) : (
+        <Paper variant="outlined">
+          <List disablePadding>
+            {visibleFavorites.map((item, idx) => (
+              <React.Fragment key={item.id}>
+                {idx > 0 && <Divider component="li" />}
+                <ListItem
+                  alignItems="flex-start"
+                  sx={{
+                    py: 1.5,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' },
+                    gap: 1,
+                  }}
+                  onClick={() => handleDetailOpen(item)}
+                  secondaryAction={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ minWidth: 160 }}>
+                        <BidLimitBadge
+                          limitPrice={limitSettings[item.item_id]?.limit_price ?? null}
+                          isTriggered={limitSettings[item.item_id]?.is_triggered ?? false}
+                          onEdit={() => setLimitModalItem(item)}
+                          onRemove={() => handleRemoveLimit(item.item_id)}
+                        />
+                      </Box>
+                      <IconButton
+                        edge="end"
+                        onClick={(e) => handleRemoveFavorite(e, item.item_id)}
+                        aria-label="解除"
+                      >
+                        <FavoriteIcon sx={{ color: '#ef4444' }} />
+                      </IconButton>
+                    </Box>
+                  }
+                >
+                  <ListItemAvatar sx={{ mr: 1 }}>
+                    <Avatar
+                      variant="rounded"
+                      src={optimizedImageUrl(item.thumbnail_path, 'small')}
+                      alt={item.species_name}
+                      sx={{ width: 72, height: 72 }}
+                    />
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          No.{item.item_number}
+                        </Typography>
+                        <Typography variant="subtitle1" fontWeight={700}>
+                          {item.species_name}
+                        </Typography>
+                        {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
+                        {getStatusChip(item.status)}
+                      </Box>
+                    }
+                    secondary={
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.25, mt: 0.5 }}>
+                        {item.seller && (
+                          <Typography variant="caption" color="text.secondary">
+                            出品者: {item.seller.seller_name}
+                          </Typography>
+                        )}
+                        {item.auction && (
+                          <Typography variant="caption" color="text.secondary">
+                            {item.auction.title}（{getAuctionStatusLabel(item.auction.status)}）
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="text.secondary">
+                          {item.quantity}匹 / 開始 ¥{Number(item.start_price).toLocaleString()}〜
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </ListItem>
+              </React.Fragment>
+            ))}
+          </List>
+        </Paper>
       )}
 
       {/* 詳細ダイアログ */}

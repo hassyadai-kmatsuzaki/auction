@@ -19,42 +19,57 @@ class FavoriteController extends Controller
     public function index(Request $request)
     {
         $userId = Auth::id();
+        $includePast = $request->boolean('include_past', false);
 
         $favorites = Favorite::where('user_id', $userId)
-            ->with(['item.auction', 'item.media'])
+            ->with(['item.auction', 'item.media', 'item.sellerProfile'])
             ->orderBy('created_at', 'desc')
             ->get();
+
+        $mapped = $favorites->map(function ($fav) {
+            $item = $fav->item;
+            if (!$item) return null;
+            $auction = $item->auction;
+            return [
+                'id' => $fav->id,
+                'item_id' => $item->id,
+                'item_number' => $item->item_number,
+                'species_name' => $item->species_name,
+                'quantity' => $item->quantity,
+                'start_price' => $item->start_price,
+                'current_price' => $item->current_price,
+                'estimated_price' => $item->estimated_price,
+                'inspection_info' => $item->inspection_info,
+                'individual_info' => $item->individual_info,
+                'is_premium' => $item->is_premium,
+                'thumbnail_path' => $item->thumbnail_path,
+                'status' => $item->status,
+                'media' => $this->transformMedia($item->media),
+                'seller' => $item->sellerProfile ? [
+                    'id'          => $item->sellerProfile->id,
+                    'seller_code' => $item->sellerProfile->seller_code,
+                    'seller_name' => $item->sellerProfile->seller_name,
+                ] : null,
+                'auction' => $auction ? [
+                    'id' => $auction->id,
+                    'title' => $auction->title,
+                    'event_date' => $auction->event_date->format('Y-m-d'),
+                    'status' => $auction->status,
+                    'is_past' => in_array($auction->status, ['finished', 'cancelled'], true)
+                        || $auction->event_date->isPast(),
+                ] : null,
+                'created_at' => $fav->created_at->toIso8601String(),
+            ];
+        })->filter();
+
+        if (! $includePast) {
+            $mapped = $mapped->reject(fn ($f) => $f['auction'] && $f['auction']['is_past']);
+        }
 
         return response()->json([
             'success' => true,
             'data' => [
-                'favorites' => $favorites->map(function ($fav) {
-                    $item = $fav->item;
-                    if (!$item) return null;
-                    return [
-                        'id' => $fav->id,
-                        'item_id' => $item->id,
-                        'item_number' => $item->item_number,
-                        'species_name' => $item->species_name,
-                        'quantity' => $item->quantity,
-                        'start_price' => $item->start_price,
-                        'current_price' => $item->current_price,
-                        'estimated_price' => $item->estimated_price,
-                        'inspection_info' => $item->inspection_info,
-                        'individual_info' => $item->individual_info,
-                        'is_premium' => $item->is_premium,
-                        'thumbnail_path' => $item->thumbnail_path,
-                        'status' => $item->status,
-                        'media' => $this->transformMedia($item->media),
-                        'auction' => $item->auction ? [
-                            'id' => $item->auction->id,
-                            'title' => $item->auction->title,
-                            'event_date' => $item->auction->event_date->format('Y-m-d'),
-                            'status' => $item->auction->status,
-                        ] : null,
-                        'created_at' => $fav->created_at->toIso8601String(),
-                    ];
-                })->filter()->values(),
+                'favorites' => $mapped->values(),
             ],
         ]);
     }

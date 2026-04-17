@@ -19,6 +19,7 @@ import GoogleCallback from './pages/auth/GoogleCallback';
 import ParticipantLayout from './layouts/ParticipantLayout';
 import AdminLayout from './layouts/AdminLayout';
 import SellerLayout from './layouts/SellerLayout';
+import AuctionWorkspace from './layouts/AuctionWorkspace';
 
 // Legal（同期ロード）
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
@@ -47,12 +48,9 @@ const AnnouncementForm       = lazy(() => import('./pages/admin/AnnouncementForm
 const AuctionManagement      = lazy(() => import('./pages/admin/AuctionManagement'));
 const AuctionForm            = lazy(() => import('./pages/admin/AuctionForm'));
 const ItemManagement         = lazy(() => import('./pages/admin/ItemManagement'));
-const ItemManagementAuctions = lazy(() => import('./pages/admin/ItemManagementAuctions'));
 const ItemForm               = lazy(() => import('./pages/admin/ItemForm'));
 const LiveControl            = lazy(() => import('./pages/admin/LiveControl'));
-const LiveAuctions           = lazy(() => import('./pages/admin/LiveAuctions'));
 const WonItemManagement      = lazy(() => import('./pages/admin/WonItemManagement'));
-const WonItemAuctions        = lazy(() => import('./pages/admin/WonItemAuctions'));
 const UserManagement         = lazy(() => import('./pages/admin/UserManagement'));
 const UserDetail             = lazy(() => import('./pages/admin/UserDetail'));
 const UserCreate             = lazy(() => import('./pages/admin/UserCreate'));
@@ -174,26 +172,25 @@ function App() {
             <Route path="auctions" element={<AuctionManagement />} />
             <Route path="auctions/create" element={<AuctionForm />} />
             <Route path="auctions/:id/edit" element={<AuctionForm />} />
-            
-            {/* 生体管理 */}
-            <Route path="items" element={<ItemManagementAuctions />} />
-            <Route path="auctions/:auctionId/items" element={<ItemManagement />} />
+
+            {/* 旧入口 → オークション一覧に統合 */}
+            <Route path="items"      element={<Navigate to="/admin/auctions" replace />} />
+            <Route path="live"       element={<Navigate to="/admin/auctions" replace />} />
+            <Route path="won-items"  element={<Navigate to="/admin/auctions" replace />} />
+
+            {/* アイテム作成・編集は従来どおり（ワークスペース外の独立画面） */}
             <Route path="auctions/:auctionId/items/create" element={<ItemForm />} />
             <Route path="auctions/:auctionId/items/:id/edit" element={<ItemForm />} />
-            
-            {/* レーン割当 */}
-            <Route path="auctions/:auctionId/lanes" element={<LaneAssignment />} />
-            
-            {/* 出品者順序管理 */}
-            <Route path="auctions/:auctionId/seller-order" element={<SellerOrderPage />} />
-            
-            {/* ライブ管理 */}
-            <Route path="live" element={<LiveAuctions />} />
-            <Route path="auctions/:auctionId/live" element={<LiveControl />} />
-            
-            {/* 落札者管理 */}
-            <Route path="won-items" element={<WonItemAuctions />} />
-            <Route path="auctions/:auctionId/won-items" element={<WonItemManagement />} />
+
+            {/* オークションごとのワークスペース（タブ式） */}
+            <Route path="auctions/:auctionId" element={<AuctionWorkspace />}>
+              <Route index element={<Navigate to="items" replace />} />
+              <Route path="items"        element={<ItemManagement />} />
+              <Route path="lanes"        element={<LaneAssignment />} />
+              <Route path="seller-order" element={<SellerOrderPage />} />
+              <Route path="live"         element={<LiveControl />} />
+              <Route path="won-items"    element={<WonItemManagement />} />
+            </Route>
             
             {/* 出品者管理 */}
             <Route path="sellers" element={<SellerManagement />} />

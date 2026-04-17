@@ -43,7 +43,6 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   DragIndicator as DragIndicatorIcon,
-  ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
   Pets as PetsIcon,
   Visibility as VisibilityIcon,
@@ -414,62 +413,36 @@ export default function ItemManagement() {
 
   return (
     <Box>
-      {/* ヘッダー */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+      {/* アクション */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap', mb: 3 }}>
         <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/auctions')}
-          sx={{ mr: 2 }}
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={handleDownloadTemplate}
         >
-          戻る
+          テンプレート
         </Button>
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            生体管理
-          </Typography>
-          {auction && (
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {auction.title} ({new Date(auction.event_date).toLocaleDateString('ja-JP')})
-            </Typography>
-          )}
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={handleDownloadTemplate}
-          >
-            テンプレート
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<UploadIcon />}
-            onClick={() => setImportDialogOpen(true)}
-          >
-            一括インポート
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<ImageIcon />}
-            onClick={() => setBulkImageDialogOpen(true)}
-          >
-            画像一括アップロード
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<ViewKanbanIcon />}
-            onClick={() => navigate(`/admin/auctions/${auctionId}/lanes`)}
-          >
-            レーン割当
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate(`/admin/auctions/${auctionId}/items/create`)}
-          >
-            新規登録
-          </Button>
-        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<UploadIcon />}
+          onClick={() => setImportDialogOpen(true)}
+        >
+          一括インポート
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<ImageIcon />}
+          onClick={() => setBulkImageDialogOpen(true)}
+        >
+          画像一括アップロード
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => navigate(`/admin/auctions/${auctionId}/items/create`)}
+        >
+          新規登録
+        </Button>
       </Box>
 
       {error && (

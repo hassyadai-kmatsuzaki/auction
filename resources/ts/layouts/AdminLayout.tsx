@@ -20,16 +20,12 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Campaign as CampaignIcon,
-  Event as EventIcon,
-  Pets as PetsIcon,
   People as PeopleIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   ExpandLess,
   ExpandMore,
   Gavel as GavelIcon,
-  LiveTv as LiveTvIcon,
-  EmojiEvents as TrophyIcon,
   Store as StoreIcon,
   Person as PersonIcon,
   Receipt as ReceiptIcon,
@@ -70,7 +66,6 @@ export default function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [auctionMenuOpen, setAuctionMenuOpen] = React.useState(true);
   const [userMenuOpen, setUserMenuOpen] = React.useState(true);
   const [aiMenuOpen, setAiMenuOpen] = React.useState(false);
 
@@ -87,13 +82,6 @@ export default function AdminLayout() {
   const menuItems = [
     { text: 'ダッシュボード', icon: <DashboardIcon />, path: '/admin/dashboard' },
     { text: 'お知らせ管理', icon: <CampaignIcon />, path: '/admin/announcements' },
-  ];
-
-  const auctionSubItems = [
-    { text: 'オークション一覧', icon: <EventIcon />, path: '/admin/auctions' },
-    { text: '生体管理', icon: <PetsIcon />, path: '/admin/items' },
-    { text: 'ライブ管理', icon: <LiveTvIcon />, path: '/admin/live' },
-    { text: '落札者管理', icon: <TrophyIcon />, path: '/admin/won-items' },
   ];
 
   const userSubItems = [
@@ -181,11 +169,28 @@ export default function AdminLayout() {
             </ListItem>
           ))}
 
-          {/* オークション管理（折りたたみメニュー） */}
+          {/* オークション管理（統合後の唯一の入口） */}
           <ListItem disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
-              onClick={() => setAuctionMenuOpen(!auctionMenuOpen)}
-              sx={{ py: 1.2 }}
+              selected={isPathActive('/admin/auctions')}
+              onClick={() => {
+                navigate('/admin/auctions');
+                setMobileOpen(false);
+              }}
+              sx={{
+                py: 1.2,
+                '&.Mui-selected': {
+                  backgroundColor: '#F0FDF4',
+                  borderRight: '3px solid #059669',
+                  '& .MuiListItemIcon-root': {
+                    color: '#059669',
+                  },
+                  '& .MuiListItemText-primary': {
+                    color: '#059669',
+                    fontWeight: 600,
+                  },
+                },
+              }}
             >
               <ListItemIcon sx={{ minWidth: 36 }}>
                 <GavelIcon />
@@ -194,52 +199,8 @@ export default function AdminLayout() {
                 primary="オークション管理"
                 primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
               />
-              {auctionMenuOpen ? (
-                <ExpandLess sx={{ fontSize: 18, color: 'text.secondary' }} />
-              ) : (
-                <ExpandMore sx={{ fontSize: 18, color: 'text.secondary' }} />
-              )}
             </ListItemButton>
           </ListItem>
-          <Collapse in={auctionMenuOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {auctionSubItems.map((item) => (
-                <ListItemButton
-                  key={item.path}
-                  sx={{
-                    pl: 5.5,
-                    py: 1,
-                    ml: 1,
-                    mr: 1,
-                    borderRadius: 2,
-                    '&.Mui-selected': {
-                      backgroundColor: '#F0FDF4',
-                      '& .MuiListItemIcon-root': {
-                        color: '#059669',
-                      },
-                      '& .MuiListItemText-primary': {
-                        color: '#059669',
-                        fontWeight: 600,
-                      },
-                    },
-                  }}
-                  selected={location.pathname === item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    setMobileOpen(false);
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 18 } }}>
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.text}
-                    primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: 500 }}
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          </Collapse>
 
           {/* ユーザー管理（折りたたみメニュー） */}
           <ListItem disablePadding sx={{ mb: 0.5 }}>

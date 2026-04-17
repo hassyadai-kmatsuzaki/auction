@@ -26,6 +26,7 @@ export function optimizedImageUrl(
 ): string {
   if (!originalUrl) return '/img/noimage.png';
   if (originalUrl.includes('noimage.png')) return originalUrl;
+  if (originalUrl.startsWith('/img/')) return originalUrl;
   if (/\.(mp4|mov|webm)$/i.test(originalUrl)) return originalUrl;
 
   return `/api/media/optimized-by-path?path=${encodeURIComponent(originalUrl)}&preset=${preset}`;

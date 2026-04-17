@@ -21,11 +21,34 @@ class AIController extends Controller
     public function analyzeImage(int $itemId, ImageAnalysisService $service): JsonResponse
     {
         $item = Item::with('media')->findOrFail($itemId);
+
+        $hasPhoto = $item->media->contains(fn ($m) => str_starts_with((string) $m->media_type, 'photo'));
+        if (! $hasPhoto) {
+            return response()->json([
+                'success' => false,
+                'message' => '商品に画像が登録されていません。画像を登録してから再度お試しください。',
+            ], 422);
+        }
+
+        if (empty(config('services.openai.api_key'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI解析APIの設定が未完了です。管理者にお問い合わせください。',
+            ], 503);
+        }
+
         $result = $service->analyzeItem($item);
 
+        if (! $result) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI解析に失敗しました。時間をおいて再度お試しください。',
+            ], 502);
+        }
+
         return response()->json([
-            'success' => (bool) $result,
-            'data' => $result,
+            'success' => true,
+            'data'    => $result,
         ]);
     }
 

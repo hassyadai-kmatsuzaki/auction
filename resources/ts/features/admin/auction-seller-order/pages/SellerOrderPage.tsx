@@ -7,11 +7,8 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Breadcrumbs,
-  Link,
 } from '@mui/material';
 import {
-  ArrowBack as ArrowBackIcon,
   AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import { useState } from 'react';
@@ -62,39 +59,7 @@ export default function SellerOrderPage() {
     <Box sx={{ p: 3 }}>
       {/* ヘッダー */}
       <Box sx={{ mb: 3 }}>
-        <Breadcrumbs sx={{ mb: 2 }}>
-          <Link
-            component="button"
-            variant="body2"
-            onClick={() => navigate('/admin/auctions')}
-            sx={{ textDecoration: 'none', cursor: 'pointer' }}
-          >
-            オークション管理
-          </Link>
-          <Link
-            component="button"
-            variant="body2"
-            onClick={() => navigate(`/admin/auctions/${auctionId}/items`)}
-            sx={{ textDecoration: 'none', cursor: 'pointer' }}
-          >
-            生体管理
-          </Link>
-          <Typography color="text.primary">出品者順序管理</Typography>
-        </Breadcrumbs>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button
-              startIcon={<ArrowBackIcon />}
-              onClick={() => navigate(`/admin/auctions/${auctionId}/items`)}
-            >
-              戻る
-            </Button>
-            <Typography variant="h4" component="h1">
-              出品者表示順序管理
-            </Typography>
-          </Box>
-
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 2 }}>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <RandomizeButton
               auctionId={Number(auctionId)}

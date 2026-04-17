@@ -382,8 +382,9 @@ export default function SellerProfile() {
         <Grid item xs={12} lg={9}>
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto">
                 <Tab icon={<StoreIcon />} label="基本情報" iconPosition="start" />
+                <Tab icon={<InstagramIcon />} label="任意情報" iconPosition="start" />
                 <Tab icon={<BankIcon />} label="口座情報" iconPosition="start" />
                 <Tab icon={<SettingsIcon />} label="設定" iconPosition="start" />
               </Tabs>
@@ -513,6 +514,48 @@ export default function SellerProfile() {
 
                 <Divider sx={{ my: 4 }} />
 
+                {/* 事業者情報 */}
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                  事業者登録情報
+                </Typography>
+
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  特定商取引法に基づく表記のために必要な情報です。
+                </Alert>
+
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="事業者登録番号"
+                      value={formData.business_registration_number}
+                      onChange={handleChange('business_registration_number')}
+                      helperText="動物取扱業登録番号など"
+                    />
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                    onClick={handleSaveProfile}
+                    disabled={saving}
+                  >
+                    変更を保存
+                  </Button>
+                </Box>
+              </CardContent>
+            </TabPanel>
+
+            {/* 任意情報タブ */}
+            <TabPanel value={tabValue} index={1}>
+              <CardContent sx={{ p: 3 }}>
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  任意入力項目です。入力すると出品者プロフィールに表示されます。
+                </Alert>
+
                 {/* SNS・Web */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <InstagramIcon sx={{ color: '#E4405F' }} />
@@ -571,35 +614,9 @@ export default function SellerProfile() {
 
                 <Divider sx={{ my: 4 }} />
 
-                {/* 事業者情報 */}
+                {/* その他の任意情報 */}
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                  事業者登録情報
-                </Typography>
-
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  特定商取引法に基づく表記のために必要な情報です。
-                </Alert>
-
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="事業者登録番号"
-                      value={formData.business_registration_number}
-                      onChange={handleChange('business_registration_number')}
-                      helperText="動物取扱業登録番号など"
-                    />
-                  </Grid>
-                </Grid>
-
-                <Divider sx={{ my: 4 }} />
-
-                {/* 任意情報 */}
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                  任意情報
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-                  入力すると出品者プロフィールに表示されます
+                  活動・店舗情報
                 </Typography>
 
                 <Grid container spacing={3}>
@@ -666,7 +683,7 @@ export default function SellerProfile() {
             </TabPanel>
 
             {/* 口座情報タブ */}
-            <TabPanel value={tabValue} index={1}>
+            <TabPanel value={tabValue} index={2}>
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                   <BankIcon sx={{ color: '#059669' }} />
@@ -750,7 +767,7 @@ export default function SellerProfile() {
             </TabPanel>
 
             {/* 設定タブ */}
-            <TabPanel value={tabValue} index={2}>
+            <TabPanel value={tabValue} index={3}>
               <CardContent sx={{ p: 3 }}>
                 {/* 通知設定 */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
