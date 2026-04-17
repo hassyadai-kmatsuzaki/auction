@@ -81,6 +81,8 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const [celebration, setCelebration] = useState<{ species_name: string; winning_price: number } | null>(null);
   const [limitModalLaneId, setLimitModalLaneId] = useState<number | null>(null);
   const [detailLane, setDetailLane] = useState<LiveLane | null>(null);
+  // 現在商品のお気に入り状態（詳細モーダルのハート表示用）
+  const [currentFavoriteIds, setCurrentFavoriteIds] = useState<Set<number>>(new Set());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' as 'info' | 'success' | 'warning' | 'error' });
   const [tourActive, setTourActive] = useState(false);
   const [tourStep, setTourStep] = useState(0);
@@ -932,6 +934,17 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
               updateLaneItem(targetLane.lane_id, item => ({ ...item, my_limit_price: null, my_limit_triggered: false }));
               notify('上限設定を解除しました', 'info');
             }
+          }}
+          isFavorited={(() => {
+            const id = detailLane?.current_item?.id;
+            return id ? currentFavoriteIds.has(id) : false;
+          })()}
+          onFavoriteToggle={(itemId) => {
+            setCurrentFavoriteIds(prev => {
+              const next = new Set(prev);
+              next.has(itemId) ? next.delete(itemId) : next.add(itemId);
+              return next;
+            });
           }}
           zIndex={1500}
         />

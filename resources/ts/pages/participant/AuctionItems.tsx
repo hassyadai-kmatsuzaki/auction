@@ -383,6 +383,8 @@ export default function AuctionItems() {
         onLimitRemove={() => {
           if (selectedItem) handleRemoveLimit(selectedItem.id);
         }}
+        isFavorited={selectedItem ? favoriteIds.has(selectedItem.id) : false}
+        onFavoriteToggle={(itemId) => handleFavoriteToggle({ stopPropagation: () => {} } as React.MouseEvent, itemId)}
       />
 
       {/* 指値（上限価格）設定モーダル（開始前） */}

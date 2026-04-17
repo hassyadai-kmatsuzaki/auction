@@ -74,6 +74,8 @@ export default function AuctionLive() {
   const [celebration, setCelebration] = useState<CelebrationItem | null>(null);
   // 指値モーダル
   const [limitModalItemId, setLimitModalItemId] = useState<number | null>(null);
+  // 現在商品のお気に入り状態（詳細モーダルのハートボタン用）
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
 
   // WebSocket切断時の自動復旧
   useSocketReconnect(auctionId);
@@ -210,6 +212,33 @@ export default function AuctionLive() {
       queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
     },
   });
+
+  // 現在商品のお気に入り状態を取得（詳細モーダルのハート表示用）
+  useEffect(() => {
+    if (!liveState?.lanes) return;
+    const itemIds = liveState.lanes
+      .map(l => l.current_item?.id)
+      .filter((id): id is number => typeof id === 'number');
+    if (itemIds.length === 0) return;
+    axios.post('/api/participant/favorites/check', { item_ids: itemIds })
+      .then((r) => { if (r.data.success) setFavoriteIds(new Set(r.data.data.favorite_item_ids)); })
+      .catch(() => {});
+  }, [liveState?.lanes]);
+
+  const handleCurrentItemFavoriteToggle = async (itemId: number) => {
+    try {
+      const r = await axios.post('/api/participant/favorites/toggle', { item_id: itemId });
+      if (r.data.success) {
+        setFavoriteIds((prev) => {
+          const next = new Set(prev);
+          r.data.is_favorited ? next.add(itemId) : next.delete(itemId);
+          return next;
+        });
+      }
+    } catch {
+      showSnackbar('お気に入りの更新に失敗しました', 'error');
+    }
+  };
 
   // 次の商品画像をプリフェッチ（商品切替時に即表示するため）
   useEffect(() => {
@@ -594,6 +623,11 @@ export default function AuctionLive() {
         }}
         onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
         onLimitRemove={(itemId) => setLimitModalItemId(itemId)}
+        isFavorited={(() => {
+          const id = detailLane?.current_item?.id;
+          return id ? favoriteIds.has(id) : false;
+        })()}
+        onFavoriteToggle={handleCurrentItemFavoriteToggle}
       />
 
       {/* スナックバー */}

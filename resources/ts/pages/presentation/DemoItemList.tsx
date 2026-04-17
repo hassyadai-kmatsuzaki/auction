@@ -300,6 +300,8 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
         priceLabel="start"
         startPrice={selectedItem?.start_price}
         zIndex={1500}
+        isFavorited={selectedItem ? favoriteIds.has(selectedItem.id) : false}
+        onFavoriteToggle={(itemId) => handleFavoriteToggle({ stopPropagation: () => {} } as React.MouseEvent, itemId)}
       />
 
       {/* BidLimitModal */}

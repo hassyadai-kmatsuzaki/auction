@@ -9,6 +9,8 @@ import {
   ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
   Inventory as InventoryIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
 } from '@mui/icons-material';
 import type { LaneItem } from '@/types';
 import { BidButton } from './BidButton';
@@ -31,6 +33,10 @@ interface Props {
   startPrice?: number;
   /** DialogActions に追加で挿入するボタン等 */
   extraActions?: React.ReactNode;
+  /** お気に入り状態（指値横のハートボタン表示） */
+  isFavorited?: boolean;
+  /** お気に入りトグル */
+  onFavoriteToggle?: (itemId: number) => void;
 }
 
 type MediaEntry = { type: 'image' | 'video'; url: string };
@@ -70,7 +76,7 @@ const buildMediaList = (item: LaneItem | null): MediaEntryWithOriginal[] => {
   return list;
 };
 
-export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex, priceLabel = 'current', startPrice, extraActions }: Props) => {
+export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex, priceLabel = 'current', startPrice, extraActions, isFavorited, onFavoriteToggle }: Props) => {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [videoDialogUrl, setVideoDialogUrl] = useState('');
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
@@ -243,16 +249,29 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 </Box>
               )}
 
-              {/* 指値ボタン */}
-              {item && onLimitEdit && (
-                <Box>
-                  <BidLimitBadge
-                    limitPrice={item.my_limit_price ?? null}
-                    isTriggered={item.my_limit_triggered ?? false}
-                    onEdit={() => onLimitEdit(item.id)}
-                    onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
-                    size="medium"
-                  />
+              {/* 指値ボタン・お気に入り */}
+              {item && (onLimitEdit || onFavoriteToggle) && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {onLimitEdit && (
+                    <BidLimitBadge
+                      limitPrice={item.my_limit_price ?? null}
+                      isTriggered={item.my_limit_triggered ?? false}
+                      onEdit={() => onLimitEdit(item.id)}
+                      onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
+                      size="medium"
+                    />
+                  )}
+                  {onFavoriteToggle && (
+                    <IconButton
+                      onClick={() => onFavoriteToggle(item.id)}
+                      size="small"
+                      sx={{ bgcolor: 'rgba(255,255,255,0.85)', border: '1px solid', borderColor: 'grey.300' }}
+                    >
+                      {isFavorited
+                        ? <FavoriteIcon sx={{ color: '#ef4444', fontSize: 20 }} />
+                        : <FavoriteBorderIcon sx={{ color: 'grey.500', fontSize: 20 }} />}
+                    </IconButton>
+                  )}
                 </Box>
               )}
             </Grid>

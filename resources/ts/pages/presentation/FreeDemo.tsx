@@ -806,6 +806,16 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
               notify('上限設定を解除しました', 'info');
             }
           }}
+          isFavorited={(() => {
+            const laneItemId = detailLane?.current_item?.id;
+            if (!laneItemId) return false;
+            const itemListId = LANE_ITEM_ID_TO_ITEM_ID[laneItemId];
+            return itemListId ? favoriteIds.has(itemListId) : false;
+          })()}
+          onFavoriteToggle={(laneItemId) => {
+            const itemListId = LANE_ITEM_ID_TO_ITEM_ID[laneItemId];
+            if (itemListId) handleFavoriteToggle(itemListId);
+          }}
         />
 
         {/* BidLimitModal */}

@@ -554,6 +554,11 @@ export default function Favorites() {
         startPrice={selectedItem?.start_price}
         onLimitEdit={() => { if (selectedItem) setLimitModalItem(selectedItem); }}
         onLimitRemove={() => { if (selectedItem) handleRemoveLimit(selectedItem.item_id); }}
+        isFavorited={!!selectedItem}
+        onFavoriteToggle={(itemId) => {
+          handleRemoveFavorite({ stopPropagation: () => {} } as React.MouseEvent, itemId);
+          handleDetailClose();
+        }}
         extraActions={
           selectedItem?.auction ? (
             <>

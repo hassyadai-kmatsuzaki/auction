@@ -181,6 +181,11 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSetCallback, blockN
         onClose={() => setSelectedItem(null)}
         priceLabel="start"
         startPrice={selectedItem?.start_price}
+        isFavorited={selectedItem ? favoriteItemIds.has(selectedItem.id) : false}
+        onFavoriteToggle={(itemId) => {
+          handleRemoveFavorite({ stopPropagation: () => {} } as React.MouseEvent, itemId);
+          setSelectedItem(null);
+        }}
       />
 
       {/* BidLimitModal */}
