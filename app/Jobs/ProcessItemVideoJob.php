@@ -22,7 +22,7 @@ class ProcessItemVideoJob implements ShouldQueue
 
     public function __construct(public int $mediaId)
     {
-        $this->onQueue('default');
+        $this->onQueue('media');
     }
 
     public function handle(VideoProcessingService $video, StorageService $storage): void

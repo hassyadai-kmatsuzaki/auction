@@ -68,6 +68,11 @@ export default function AdminLayout() {
   const [userMenuOpen, setUserMenuOpen] = React.useState(true);
   const [aiMenuOpen, setAiMenuOpen] = React.useState(false);
 
+  // ページ遷移時にサイドバーを閉じる
+  React.useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };

@@ -72,6 +72,11 @@ export default function SellerLayout() {
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [profileError, setProfileError] = useState(false);
 
+  // ページ遷移時にサイドバーを閉じる
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   // プロフィール取得（初回のみ）
   useEffect(() => {
     const fetchProfile = async () => {
