@@ -399,9 +399,21 @@ class ItemController extends Controller
         $item = Item::where('auction_id', $auctionId)->where('id', $id)->firstOrFail();
 
         $validator = Validator::make($request->all(), [
-            'file'         => 'required|file|mimes:jpg,jpeg,png,gif,webp,mp4,mov,webm|max:102400',
+            'file'         => [
+                'required',
+                'file',
+                'extensions:jpg,jpeg,png,gif,webp,mp4,mov,webm',
+                'max:102400',
+            ],
             'media_type'   => 'required|in:image,video',
             'is_thumbnail' => 'nullable|string',
+        ], [
+            'file.required'   => 'ファイルを選択してください。',
+            'file.file'       => 'ファイルが正しくアップロードされていません。',
+            'file.extensions' => '対応形式は jpg, jpeg, png, gif, webp, mp4, mov, webm のみです。',
+            'file.max'        => 'ファイルサイズは 100MB 以下にしてください。',
+            'media_type.required' => 'メディア種別を指定してください。',
+            'media_type.in'       => 'メディア種別が不正です。',
         ]);
 
         if ($validator->fails()) {

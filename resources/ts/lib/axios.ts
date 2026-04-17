@@ -1,6 +1,57 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { notifyFromOutsideReact } from '../contexts/SnackbarContext';
 
-// Axiosインスタンスを作成
+type ApiErrorBody = {
+  success?: boolean;
+  message?: string;
+  errors?: Record<string, string[]>;
+};
+
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'リクエストに問題があります。内容をご確認ください。',
+  401: 'ログインが必要です。再度ログインしてください。',
+  403: 'この操作を行う権限がありません。',
+  404: '対象のデータが見つかりませんでした。',
+  405: '許可されていない操作です。',
+  408: 'タイムアウトしました。通信状況をご確認のうえ再度お試しください。',
+  409: '競合が発生しました。画面を更新してから再度お試しください。',
+  413: 'ファイルサイズが大きすぎます。上限を超えない画像・動画を選択してください。',
+  419: 'セッションが切れました。再度ログインしてください。',
+  422: '入力内容に誤りがあります。ご確認ください。',
+  429: 'リクエストが多すぎます。しばらく待ってから再度お試しください。',
+  500: 'サーバーエラーが発生しました。時間をおいて再度お試しください。',
+  502: 'サーバーに接続できませんでした。時間をおいて再度お試しください。',
+  503: 'ただいまメンテナンス中、または混雑しています。時間をおいて再度お試しください。',
+  504: 'サーバーの応答がありません。時間をおいて再度お試しください。',
+};
+
+export function resolveErrorMessage(error: AxiosError): string {
+  if (error.code === 'ERR_NETWORK') {
+    return 'ネットワークに接続できませんでした。通信状況をご確認ください。';
+  }
+  if (error.code === 'ECONNABORTED') {
+    return 'タイムアウトしました。通信状況をご確認のうえ再度お試しください。';
+  }
+
+  const status = error.response?.status;
+  const data = error.response?.data as ApiErrorBody | undefined;
+
+  if (data?.message && typeof data.message === 'string') {
+    return data.message;
+  }
+
+  if (data?.errors) {
+    const first = Object.values(data.errors).flat().find((v) => typeof v === 'string');
+    if (first) return first;
+  }
+
+  if (status && STATUS_MESSAGES[status]) {
+    return STATUS_MESSAGES[status];
+  }
+
+  return 'エラーが発生しました。時間をおいて再度お試しください。';
+}
+
 const api = axios.create({
   baseURL: '',
   headers: {
@@ -10,55 +61,42 @@ const api = axios.create({
   },
 });
 
-// リクエストインターセプター
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // リクエスト時にトークンを動的に設定
     const token = localStorage.getItem('auth_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
+  (error: AxiosError) => Promise.reject(error)
 );
 
-// レスポンスインターセプター
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error: AxiosError) => {
-    // 認証エラー（401）の場合
-    if (error.response?.status === 401) {
-      // 現在のパスがログインページでない場合のみリダイレクト
+    const status = error.response?.status;
+    const silent = (error.config as InternalAxiosRequestConfig & { silent?: boolean })?.silent === true;
+
+    if (status === 401) {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && !currentPath.startsWith('/auth/')) {
-        // トークンをクリア
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-        // ログインページへリダイレクト
+        notifyFromOutsideReact('ログインが必要です。再度ログインしてください。', 'warning');
         window.location.href = '/login';
+        return Promise.reject(error);
       }
     }
-    
-    // 権限エラー（403）の場合
-    if (error.response?.status === 403) {
-      // 必要に応じてエラー処理
+
+    if (!silent) {
+      notifyFromOutsideReact(resolveErrorMessage(error), 'error');
     }
-    
-    // サーバーエラー（500系）の場合
-    if (error.response?.status && error.response.status >= 500) {
-      // 必要に応じてエラーログ送信等
-    }
-    
+
     return Promise.reject(error);
   }
 );
 
-// トークン設定用のユーティリティ関数
 export const setAuthToken = (token: string | null): void => {
   if (token) {
     localStorage.setItem('auth_token', token);
@@ -67,7 +105,6 @@ export const setAuthToken = (token: string | null): void => {
   }
 };
 
-// トークン削除用のユーティリティ関数
 export const clearAuthToken = (): void => {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
