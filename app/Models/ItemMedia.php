@@ -25,6 +25,8 @@ class ItemMedia extends BaseModel
         'item_id',
         'media_type',
         'file_path',
+        'poster_path',
+        'is_processed',
         'file_name',
         'file_size',
         'mime_type',
@@ -47,12 +49,13 @@ class ItemMedia extends BaseModel
         'height' => 'integer',
         'display_order' => 'integer',
         'is_thumbnail' => 'boolean',
+        'is_processed' => 'boolean',
     ];
 
     /**
-     * シリアライズ時にfile_urlを自動追加
+     * シリアライズ時に file_url / poster_url を自動追加
      */
-    protected $appends = ['file_url'];
+    protected $appends = ['file_url', 'poster_url'];
 
     /**
      * file_url アクセサ - file_pathからフルURLを生成
@@ -78,6 +81,29 @@ class ItemMedia extends BaseModel
 
         // publicディスクの場合
         return config('app.url') . '/storage/' . $this->file_path;
+    }
+
+    /**
+     * poster_url アクセサ - poster_path からフルURLを生成（動画ポスター画像用）
+     */
+    public function getPosterUrlAttribute(): ?string
+    {
+        if (!$this->poster_path) {
+            return null;
+        }
+
+        if (str_starts_with($this->poster_path, 'http://') || str_starts_with($this->poster_path, 'https://')) {
+            return $this->poster_path;
+        }
+
+        $key = config('filesystems.disks.s3.key');
+        $bucket = config('filesystems.disks.s3.bucket');
+
+        if (!empty($key) && !empty($bucket) && class_exists(\Aws\S3\S3Client::class)) {
+            return Storage::disk('s3')->url($this->poster_path);
+        }
+
+        return config('app.url') . '/storage/' . $this->poster_path;
     }
 
     /**

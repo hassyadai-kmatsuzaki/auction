@@ -39,7 +39,7 @@ interface Props {
   onFavoriteToggle?: (itemId: number) => void;
 }
 
-type MediaEntry = { type: 'image' | 'video'; url: string };
+type MediaEntry = { type: 'image' | 'video'; url: string; poster?: string };
 
 const resolveUrl = (url: string, item?: LaneItem | null): string => {
   if (!url || url.startsWith('http') || url.startsWith('/')) return url;
@@ -52,6 +52,12 @@ const resolveUrl = (url: string, item?: LaneItem | null): string => {
 };
 
 type MediaEntryWithOriginal = MediaEntry & { originalUrl: string };
+
+const resolvePosterUrl = (m: any, item?: LaneItem | null): string | undefined => {
+  const raw = m?.poster_url || m?.poster_path;
+  if (!raw) return undefined;
+  return resolveUrl(raw, item);
+};
 
 const buildMediaList = (item: LaneItem | null): MediaEntryWithOriginal[] => {
   if (!item) return [];
@@ -70,6 +76,7 @@ const buildMediaList = (item: LaneItem | null): MediaEntryWithOriginal[] => {
       type: isVideo ? 'video' : 'image',
       url: isVideo ? url : optimizedImageUrl(url, 'medium'),
       originalUrl: url,
+      poster: isVideo ? resolvePosterUrl(m, item) : undefined,
     });
   });
   if (list.length === 0) list.push({ type: 'image', url: '/img/noimage.png', originalUrl: '/img/noimage.png' });
@@ -109,7 +116,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
             <Grid item xs={12} md={6}>
               <Box sx={{ position: 'relative', borderRadius: 2, overflow: 'hidden', bgcolor: 'grey.100' }}>
                 {current?.type === 'video' ? (
-                  <video src={current.originalUrl} controls preload="metadata" playsInline style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain' }} />
+                  <video src={current.originalUrl} poster={current.poster} controls preload="none" playsInline style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain' }} />
                 ) : (
                   <img
                     src={current?.url || '/img/noimage.png'}
@@ -137,7 +144,9 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                     >
                       {m.type === 'video' ? (
                         <Box sx={{ width: '100%', height: '100%', bgcolor: 'black', position: 'relative' }}>
-                          <video src={m.originalUrl} preload="none" muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          {m.poster ? (
+                            <img src={m.poster} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                          ) : null}
                           <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.3)' }}>
                             <PlayCircleOutlineIcon sx={{ color: 'white', fontSize: 28 }} />
                           </Box>
@@ -305,7 +314,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
           {(() => {
             const m = mediaList[lightboxIndex];
             if (!m) return null;
-            if (m.type === 'video') return <video src={m.originalUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '90vh' }} />;
+            if (m.type === 'video') return <video src={m.originalUrl} poster={m.poster} controls autoPlay playsInline style={{ maxWidth: '100%', maxHeight: '90vh' }} />;
             // ライトボックスではlargeプリセットを使用
             return <img src={optimizedImageUrl(m.originalUrl, 'large')} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }} />;
           })()}

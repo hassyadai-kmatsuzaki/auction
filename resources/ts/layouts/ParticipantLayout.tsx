@@ -65,6 +65,10 @@ export default function ParticipantLayout() {
     return () => clearInterval(interval);
   }, []);
 
+  const hasMultipleRoles = user
+    ? ['admin', 'seller', 'participant'].filter(name => user.roles.some(r => r.name === name)).length >= 2
+    : false;
+
   const menuItems = [
     { text: 'ホーム', icon: <HomeIcon />, path: '/participant/home' },
     { text: 'オークション', icon: <GavelIcon />, path: '/participant/auctions' },
@@ -106,6 +110,7 @@ export default function ParticipantLayout() {
                 maxWidth: 200,
                 objectFit: 'contain',
                 cursor: 'pointer',
+                display: hasMultipleRoles ? { xs: 'none', sm: 'block' } : 'block',
               }}
             />
             <TutorialGuide role="participant" />
