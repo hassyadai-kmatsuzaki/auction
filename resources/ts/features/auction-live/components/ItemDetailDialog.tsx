@@ -95,9 +95,9 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
   return (
     <>
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth sx={zIndex !== undefined ? { zIndex } : undefined}>
-        <DialogTitle>
+        <DialogTitle sx={{ py: { md: 2.5 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary' } }}>
+            <Typography variant="h6" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: { xs: 'text.primary' } }}>
               No.{item?.item_number} {item?.species_name}
             </Typography>
             <IconButton onClick={handleClose}><CloseIcon /></IconButton>
@@ -161,11 +161,11 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
               )}
 
               {/* 価格 */}
-              <Box sx={{ mb: 1.5 }}>
-                <Typography variant="caption" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
+              <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
+                <Typography variant="caption" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 2 }, display: 'block', color: { xs: 'text.primary', md: 'text.secondary' } }}>
                   {priceLabel === 'start' ? '開始価格' : '現在単価'}
                 </Typography>
-                <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { md: '2.5rem' }, color: { xs: 'text.primary', md: 'primary.main' } }}>
+                <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { md: '2.5rem' }, lineHeight: { md: 1.6 }, color: { xs: 'text.primary', md: 'primary.main' } }}>
                   ¥{(() => {
                     const price = priceLabel === 'start'
                       ? (startPrice ?? item?.current_price ?? 0)
@@ -178,8 +178,8 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 </Typography>
               </Box>
 
-              {/* 出品者・数量 */}
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 1.5 }}>
+              {/* 出品者・数量（縦並び） */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1, md: 2 }, mb: { xs: 1.5, md: 3 } }}>
                 {item?.seller_name && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     <Avatar
@@ -188,7 +188,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                     >
                       {!item.seller_profile_image_url && item.seller_name.charAt(0)}
                     </Avatar>
-                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: 'text.primary' }}>
                       {item.seller_name}
                     </Typography>
                   </Box>
@@ -196,7 +196,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 {item?.quantity != null && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <InventoryIcon sx={{ fontSize: { xs: 18, md: 24 }, color: { xs: 'text.primary', md: 'text.secondary' } }} />
-                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
                       {item.quantity}{unit}
                     </Typography>
                   </Box>
@@ -205,14 +205,14 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
 
               {/* 備考（検査情報・個体情報） */}
               {(item?.inspection_info || item?.individual_info) && (
-                <Box sx={{ mb: 1.5 }}>
+                <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
                   {item?.inspection_info && (
-                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, whiteSpace: 'pre-wrap', color: 'text.primary', mb: item?.individual_info ? 0.75 : 0 }}>
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.9 }, whiteSpace: 'pre-wrap', color: 'text.primary', mb: item?.individual_info ? { xs: 0.75, md: 1.5 } : 0 }}>
                       {item.inspection_info}
                     </Typography>
                   )}
                   {item?.individual_info && (
-                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, whiteSpace: 'pre-wrap', color: { xs: 'text.primary', md: 'text.secondary' } }}>
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.9 }, whiteSpace: 'pre-wrap', color: { xs: 'text.primary', md: 'text.secondary' } }}>
                       {item.individual_info}
                     </Typography>
                   )}

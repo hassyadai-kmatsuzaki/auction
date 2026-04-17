@@ -94,7 +94,7 @@ export default function Favorites() {
   const [viewMode, setViewMode]       = useUserPreference<ViewMode>('participant.favorites.viewMode', 'grid');
   const [sortKey, setSortKey]         = useUserPreference<SortKey>('participant.favorites.sort', 'created_desc');
   const [sellerFilter, setSellerFilter] = useUserPreference<string>('participant.favorites.seller', 'all');
-  const [includePast, setIncludePast] = useUserPreference<boolean>('participant.favorites.includePast', false);
+  const [includePast, setIncludePast] = useUserPreference<boolean>('participant.favorites.includePast', true);
 
   const fetchFavorites = useCallback(async () => {
     try {
@@ -224,14 +224,9 @@ export default function Favorites() {
   };
 
   const getStatusChip = (status: string) => {
-    const config: Record<string, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
-      registered: { label: '出品中', color: 'primary' },
-      live: { label: '入札中', color: 'error' },
-      sold: { label: '落札済', color: 'success' },
-      unsold: { label: '不成立', color: 'default' },
-    };
-    const c = config[status] || { label: status, color: 'default' };
-    return <Chip label={c.label} color={c.color} size="small" />;
+    // 落札済のみタグ表示（開催予定・出品中・入札中・不成立では非表示）
+    if (status !== 'sold') return null;
+    return <Chip label="落札済" color="success" size="small" />;
   };
 
   const getAuctionStatusLabel = (status: string) => {
