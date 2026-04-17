@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\SellerProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class ProfileController extends Controller
 {
@@ -202,6 +204,85 @@ class ProfileController extends Controller
                     'account_holder' => $profile->account_holder,
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * プロフィール画像アップロード
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function uploadProfileImage(Request $request)
+    {
+        $user = Auth::user();
+        $profile = SellerProfile::where('user_id', $user->id)->first();
+
+        if (!$profile) {
+            return response()->json([
+                'success' => false,
+                'message' => 'プロフィールが見つかりません。',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($profile->profile_image_path) {
+            Storage::disk('public')->delete($profile->profile_image_path);
+        }
+
+        $file = $request->file('image');
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs("avatars/seller/{$profile->id}", $filename, 'public');
+
+        $profile->profile_image_path = $path;
+        $profile->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィール画像をアップロードしました。',
+            'data' => [
+                'profile_image_path' => $profile->profile_image_path,
+                'profile_image_url' => $profile->profile_image_url,
+            ],
+        ]);
+    }
+
+    /**
+     * プロフィール画像削除
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deleteProfileImage()
+    {
+        $user = Auth::user();
+        $profile = SellerProfile::where('user_id', $user->id)->first();
+
+        if (!$profile) {
+            return response()->json([
+                'success' => false,
+                'message' => 'プロフィールが見つかりません。',
+            ], 404);
+        }
+
+        if ($profile->profile_image_path) {
+            Storage::disk('public')->delete($profile->profile_image_path);
+            $profile->profile_image_path = null;
+            $profile->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィール画像を削除しました。',
         ]);
     }
 

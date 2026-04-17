@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class SellerProfile extends BaseModel
 {
@@ -26,6 +27,7 @@ class SellerProfile extends BaseModel
         'user_id',
         'seller_code',
         'seller_name',
+        'profile_image_path',
         'corporate_name',
         'business_type',
         'business_registration_number',
@@ -109,11 +111,23 @@ class SellerProfile extends BaseModel
     public function getWithBankInfo(): array
     {
         return array_merge($this->toArray(), [
+            'profile_image_url' => $this->profile_image_url,
             'bank_name' => $this->bank_name,
             'bank_branch' => $this->bank_branch,
             'account_type' => $this->account_type,
             'account_number' => $this->account_number,
             'account_holder' => $this->account_holder,
         ]);
+    }
+
+    /**
+     * プロフィール画像の公開URL
+     */
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        if (empty($this->profile_image_path)) {
+            return null;
+        }
+        return Storage::disk('public')->url($this->profile_image_path);
     }
 }

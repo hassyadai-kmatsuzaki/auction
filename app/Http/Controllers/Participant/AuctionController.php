@@ -253,7 +253,7 @@ class AuctionController extends Controller
                     'media' => function ($query) {
                         $query->orderBy('display_order');
                     },
-                    'sellerProfile:id,seller_name',
+                    'sellerProfile:id,seller_name,profile_image_path',
                 ])
                 ->orderBy('lane_items.sequence_order')
                 ->get();
@@ -278,6 +278,7 @@ class AuctionController extends Controller
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
                         'seller_name' => $item->sellerProfile?->seller_name,
+                        'seller_profile_image_url' => $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),
@@ -318,6 +319,7 @@ class AuctionController extends Controller
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
                         'seller_name' => $item->sellerProfile?->seller_name,
+                        'seller_profile_image_url' => $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),

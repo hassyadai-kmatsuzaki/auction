@@ -31,6 +31,8 @@ import {
   AccountBalance as BankIcon,
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
+  PhotoCamera as PhotoCameraIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import NotificationPreferencesPanel, {
@@ -90,6 +92,8 @@ interface SellerProfile {
   id: number;
   seller_code: string;
   seller_name: string;
+  profile_image_path: string | null;
+  profile_image_url: string | null;
   corporate_name: string | null;
   business_type: string | null;
   business_registration_number: string | null;
@@ -296,6 +300,46 @@ export default function SellerProfile() {
     }
   };
 
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setSnackbar({ open: true, message: '画像サイズは5MB以下にしてください。', severity: 'error' });
+      return;
+    }
+    try {
+      setSaving(true);
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await axios.post('/api/seller/profile/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (response.data.success) {
+        const { profile_image_path, profile_image_url } = response.data.data;
+        setProfile((prev) => prev ? { ...prev, profile_image_path, profile_image_url } : prev);
+        setSnackbar({ open: true, message: 'プロフィール画像をアップロードしました。', severity: 'success' });
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '画像のアップロードに失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleProfileImageDelete = async () => {
+    try {
+      setSaving(true);
+      await axios.delete('/api/seller/profile/image');
+      setProfile((prev) => prev ? { ...prev, profile_image_path: null, profile_image_url: null } : prev);
+      setSnackbar({ open: true, message: 'プロフィール画像を削除しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '削除に失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveDisplay = async () => {
     try {
       setSaving(true);
@@ -333,18 +377,57 @@ export default function SellerProfile() {
         <Grid item xs={12} lg={3}>
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Avatar
-                sx={{
-                  width: 80,
-                  height: 80,
-                  bgcolor: '#059669',
-                  fontSize: '2rem',
-                  mx: 'auto',
-                  mb: 2,
-                }}
-              >
-                {formData.seller_name.charAt(0)}
-              </Avatar>
+              <Box sx={{ position: 'relative', display: 'inline-block', mb: 2 }}>
+                <Avatar
+                  src={profile?.profile_image_url || undefined}
+                  sx={{
+                    width: 96,
+                    height: 96,
+                    bgcolor: '#059669',
+                    fontSize: '2.25rem',
+                    mx: 'auto',
+                  }}
+                >
+                  {!profile?.profile_image_url && formData.seller_name.charAt(0)}
+                </Avatar>
+                <IconButton
+                  component="label"
+                  size="small"
+                  disabled={saving}
+                  sx={{
+                    position: 'absolute',
+                    bottom: -4,
+                    right: -4,
+                    bgcolor: '#059669',
+                    color: 'white',
+                    '&:hover': { bgcolor: '#047857' },
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <PhotoCameraIcon sx={{ fontSize: 18 }} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleProfileImageChange}
+                  />
+                </IconButton>
+              </Box>
+              {profile?.profile_image_url && (
+                <Box sx={{ mb: 1.5 }}>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                    onClick={handleProfileImageDelete}
+                    disabled={saving}
+                    sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+                  >
+                    画像を削除
+                  </Button>
+                </Box>
+              )}
               <Typography variant="h5" sx={{ fontWeight: 600 }}>
                 {formData.seller_name}
               </Typography>

@@ -308,6 +308,8 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     Route::put('/profile/notifications', [SellerProfileController::class, 'updateNotificationSettings']);
     Route::put('/profile/display', [SellerProfileController::class, 'updateDisplaySettings']);
     Route::post('/profile/notifications/test', [NotificationTestController::class, 'sendSellerTest']);
+    Route::post('/profile/image', [SellerProfileController::class, 'uploadProfileImage']);
+    Route::delete('/profile/image', [SellerProfileController::class, 'deleteProfileImage']);
     
     // 出品管理
     Route::get('/items', [SellerItemController::class, 'index']);
@@ -435,6 +437,8 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::put('/settings/profile', [ParticipantSettingsController::class, 'updateProfile']);
     Route::put('/settings/notifications', [ParticipantSettingsController::class, 'updateNotificationSettings']);
     Route::post('/settings/notifications/test', [NotificationTestController::class, 'sendParticipantTest']);
+    Route::post('/settings/profile/image', [ParticipantSettingsController::class, 'uploadProfileImage']);
+    Route::delete('/settings/profile/image', [ParticipantSettingsController::class, 'deleteProfileImage']);
 
     // LINE連携
     Route::get('/settings/line/redirect',       [\App\Http\Controllers\Auth\LineAuthController::class, 'redirect']);

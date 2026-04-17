@@ -74,6 +74,7 @@ interface FavoriteItem {
     id: number;
     seller_code: string;
     seller_name: string;
+    profile_image_url?: string | null;
   } | null;
   auction: {
     id: number;
@@ -436,11 +437,6 @@ export default function Favorites() {
                       {item.auction.title} ({getAuctionStatusLabel(item.auction.status)})
                     </Typography>
                   )}
-                  {item.seller && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }} noWrap>
-                      出品者: {item.seller.seller_name}
-                    </Typography>
-                  )}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
                       No.{item.item_number}
@@ -450,6 +446,24 @@ export default function Favorites() {
                   <Typography variant="subtitle1" fontWeight="bold" noWrap>
                     {item.species_name}
                   </Typography>
+                  {item.seller && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+                      <Avatar
+                        src={item.seller.profile_image_url || undefined}
+                        sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+                      >
+                        {!item.seller.profile_image_url && item.seller.seller_name.charAt(0)}
+                      </Avatar>
+                      <Typography variant="caption" color="text.secondary" noWrap>
+                        {item.seller.seller_name}
+                      </Typography>
+                    </Box>
+                  )}
+                  {item.inspection_info && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }} noWrap>
+                      {item.inspection_info}
+                    </Typography>
+                  )}
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="h6" color="primary.main" fontWeight="bold">
                       ¥{Number(item.start_price).toLocaleString()}〜
@@ -529,11 +543,19 @@ export default function Favorites() {
                       </Box>
                     }
                     secondary={
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.25, mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, mt: 0.5, alignItems: 'center' }}>
                         {item.seller && (
-                          <Typography variant="caption" color="text.secondary">
-                            出品者: {item.seller.seller_name}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Avatar
+                              src={item.seller.profile_image_url || undefined}
+                              sx={{ width: 18, height: 18, fontSize: '0.65rem', bgcolor: 'grey.300' }}
+                            >
+                              {!item.seller.profile_image_url && item.seller.seller_name.charAt(0)}
+                            </Avatar>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.seller.seller_name}
+                            </Typography>
+                          </Box>
                         )}
                         {item.auction && (
                           <Typography variant="caption" color="text.secondary">
@@ -543,6 +565,11 @@ export default function Favorites() {
                         <Typography variant="caption" color="text.secondary">
                           {item.quantity}匹 / 開始 ¥{Number(item.start_price).toLocaleString()}〜
                         </Typography>
+                        {item.inspection_info && (
+                          <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
+                            {item.inspection_info}
+                          </Typography>
+                        )}
                       </Box>
                     }
                   />

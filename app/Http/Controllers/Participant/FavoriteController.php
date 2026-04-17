@@ -46,9 +46,10 @@ class FavoriteController extends Controller
                 'status' => $item->status,
                 'media' => $this->transformMedia($item->media),
                 'seller' => $item->sellerProfile ? [
-                    'id'          => $item->sellerProfile->id,
-                    'seller_code' => $item->sellerProfile->seller_code,
-                    'seller_name' => $item->sellerProfile->seller_name,
+                    'id'                 => $item->sellerProfile->id,
+                    'seller_code'        => $item->sellerProfile->seller_code,
+                    'seller_name'        => $item->sellerProfile->seller_name,
+                    'profile_image_url'  => $item->sellerProfile->profile_image_url,
                 ] : null,
                 'auction' => $auction ? [
                     'id' => $auction->id,

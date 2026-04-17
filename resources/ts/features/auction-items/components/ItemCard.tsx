@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Card, CardMedia, CardContent, Box, Typography, Chip, IconButton,
+  Card, CardMedia, CardContent, Box, Typography, Chip, IconButton, Avatar,
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
@@ -22,6 +22,7 @@ interface ItemData {
   status: string;
   media?: any[];
   seller_name?: string;
+  seller_profile_image_url?: string | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
@@ -89,8 +90,21 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
         </Box>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
         {item.seller_name && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }} noWrap>
-            出品者：{item.seller_name}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+            <Avatar
+              src={item.seller_profile_image_url || undefined}
+              sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+            >
+              {!item.seller_profile_image_url && item.seller_name.charAt(0)}
+            </Avatar>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {item.seller_name}
+            </Typography>
+          </Box>
+        )}
+        {item.inspection_info && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }} noWrap>
+            {item.inspection_info}
           </Typography>
         )}
         <Box sx={{ mt: 1 }}>
@@ -99,11 +113,6 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
           </Typography>
           <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
         </Box>
-        {item.inspection_info && (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }} noWrap>
-            {item.inspection_info}
-          </Typography>
-        )}
         {onInfoClick && (
           <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
             <Chip

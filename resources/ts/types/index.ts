@@ -65,6 +65,7 @@ export interface Item {
   thumbnail_path?: string;
   status: 'registered' | 'live' | 'sold' | 'unsold' | 'cancelled';
   seller_name?: string;
+  seller_profile_image_url?: string | null;
 }
 
 export interface ItemMedia {
@@ -142,6 +143,7 @@ export interface LaneItem {
   item_number: number;
   species_name: string;
   seller_name?: string;
+  seller_profile_image_url?: string | null;
   quantity: number;
   quantity_unit?: string;
   current_price: number;

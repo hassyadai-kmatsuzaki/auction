@@ -23,6 +23,8 @@ import {
   Settings as SettingsIcon,
   Email as EmailIcon,
   Security as SecurityIcon,
+  PhotoCamera as PhotoCameraIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import TwoFactorSettings from '../../features/settings/TwoFactorSettings';
@@ -54,6 +56,8 @@ interface Profile {
   city: string | null;
   address_line1: string | null;
   address_line2: string | null;
+  profile_image_path: string | null;
+  profile_image_url: string | null;
 }
 
 interface NotificationSettings {
@@ -149,6 +153,8 @@ export default function ParticipantSettings() {
     city: '',
     address_line1: '',
     address_line2: '',
+    profile_image_path: null,
+    profile_image_url: null,
   });
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
@@ -194,6 +200,8 @@ export default function ParticipantSettings() {
           city: data.profile.city || '',
           address_line1: data.profile.address_line1 || '',
           address_line2: data.profile.address_line2 || '',
+          profile_image_path: data.profile.profile_image_path || null,
+          profile_image_url: data.profile.profile_image_url || null,
         });
         if (data.notification_settings) {
           setNotificationSettings({
@@ -215,6 +223,46 @@ export default function ParticipantSettings() {
 
   const handleProfileChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile({ ...profile, [field]: e.target.value });
+  };
+
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setSnackbar({ open: true, message: '画像サイズは5MB以下にしてください。', severity: 'error' });
+      return;
+    }
+    try {
+      setSaving(true);
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await axios.post('/api/participant/settings/profile/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (response.data.success) {
+        const { profile_image_path, profile_image_url } = response.data.data;
+        setProfile((prev) => ({ ...prev, profile_image_path, profile_image_url }));
+        setSnackbar({ open: true, message: 'プロフィール画像をアップロードしました。', severity: 'success' });
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '画像のアップロードに失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleProfileImageDelete = async () => {
+    try {
+      setSaving(true);
+      await axios.delete('/api/participant/settings/profile/image');
+      setProfile((prev) => ({ ...prev, profile_image_path: null, profile_image_url: null }));
+      setSnackbar({ open: true, message: 'プロフィール画像を削除しました。', severity: 'success' });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '削除に失敗しました。', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -260,18 +308,57 @@ export default function ParticipantSettings() {
         <Grid item xs={12} md={3}>
           <Card>
             <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Avatar
-                sx={{
-                  width: 80,
-                  height: 80,
-                  bgcolor: '#3B82F6',
-                  fontSize: '2rem',
-                  mx: 'auto',
-                  mb: 2,
-                }}
-              >
-                {profile.name.charAt(0)}
-              </Avatar>
+              <Box sx={{ position: 'relative', display: 'inline-block', mb: 2 }}>
+                <Avatar
+                  src={profile.profile_image_url || undefined}
+                  sx={{
+                    width: 96,
+                    height: 96,
+                    bgcolor: '#3B82F6',
+                    fontSize: '2.25rem',
+                    mx: 'auto',
+                  }}
+                >
+                  {!profile.profile_image_url && profile.name.charAt(0)}
+                </Avatar>
+                <IconButton
+                  component="label"
+                  size="small"
+                  disabled={saving}
+                  sx={{
+                    position: 'absolute',
+                    bottom: -4,
+                    right: -4,
+                    bgcolor: '#3B82F6',
+                    color: 'white',
+                    '&:hover': { bgcolor: '#2563EB' },
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <PhotoCameraIcon sx={{ fontSize: 18 }} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleProfileImageChange}
+                  />
+                </IconButton>
+              </Box>
+              {profile.profile_image_url && (
+                <Box sx={{ mb: 1.5 }}>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                    onClick={handleProfileImageDelete}
+                    disabled={saving}
+                    sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+                  >
+                    画像を削除
+                  </Button>
+                </Box>
+              )}
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 {profile.name}
               </Typography>

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Grid, Typography, Divider, Button, IconButton, Chip,
+  Box, Grid, Typography, Button, IconButton, Chip, Avatar,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
-  Person as PersonIcon,
   Inventory as InventoryIcon,
 } from '@mui/icons-material';
 import type { LaneItem } from '@/types';
@@ -26,6 +25,10 @@ interface Props {
   onLimitEdit?: (itemId: number) => void;
   onLimitRemove?: (itemId: number) => void;
   zIndex?: number;
+  /** 価格ラベル: 'current'=現在単価（ライブ用） / 'start'=開始価格（一覧・お気に入り用） */
+  priceLabel?: 'current' | 'start';
+  /** 開始価格（priceLabel='start' の場合に表示する価格。未指定なら item.current_price を使用） */
+  startPrice?: number;
 }
 
 type MediaEntry = { type: 'image' | 'video'; url: string };
@@ -65,7 +68,7 @@ const buildMediaList = (item: LaneItem | null): MediaEntryWithOriginal[] => {
   return list;
 };
 
-export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex }: Props) => {
+export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, onBidToggle, onLimitEdit, onLimitRemove, zIndex, priceLabel = 'current', startPrice }: Props) => {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [videoDialogUrl, setVideoDialogUrl] = useState('');
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
@@ -149,11 +152,18 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 </Box>
               )}
 
-              {/* 現在単価 */}
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="caption" color="text.secondary">現在単価</Typography>
+              {/* 価格 */}
+              <Box sx={{ mb: 1.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {priceLabel === 'start' ? '開始価格' : '現在単価'}
+                </Typography>
                 <Typography variant="h4" color="primary.main" fontWeight="bold">
-                  ¥{item?.current_price ? Math.floor(item.current_price).toLocaleString() : '0'}
+                  ¥{(() => {
+                    const price = priceLabel === 'start'
+                      ? (startPrice ?? item?.current_price ?? 0)
+                      : (item?.current_price ?? 0);
+                    return Math.floor(Number(price)).toLocaleString();
+                  })()}
                   <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
                     /1{unit}
                   </Typography>
@@ -161,18 +171,23 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
               </Box>
 
               {/* 出品者・数量 */}
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 1.5 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 1.5 }}>
                 {item?.seller_name && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                    <Typography variant="body2" color="text.secondary">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Avatar
+                      src={item.seller_profile_image_url || undefined}
+                      sx={{ width: 28, height: 28, fontSize: '0.85rem', bgcolor: 'grey.300' }}
+                    >
+                      {!item.seller_profile_image_url && item.seller_name.charAt(0)}
+                    </Avatar>
+                    <Typography variant="body2" color="text.primary">
                       {item.seller_name}
                     </Typography>
                   </Box>
                 )}
                 {item?.quantity != null && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <InventoryIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <InventoryIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                     <Typography variant="body2" color="text.secondary">
                       {item.quantity}{unit}
                     </Typography>
@@ -180,8 +195,24 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 )}
               </Box>
 
+              {/* 備考（検査情報・個体情報） */}
+              {(item?.inspection_info || item?.individual_info) && (
+                <Box sx={{ mb: 1.5 }}>
+                  {item?.inspection_info && (
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.primary', mb: item?.individual_info ? 0.75 : 0 }}>
+                      {item.inspection_info}
+                    </Typography>
+                  )}
+                  {item?.individual_info && (
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                      {item.individual_info}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
               {/* カウントダウン */}
-              {item && item.phase !== 'pre_bid' && (
+              {item && onBidToggle && item.phase !== 'pre_bid' && (
                 <Box sx={{ mb: 1.5 }}>
                   <CountdownChip
                     seconds={item.countdown_seconds}
@@ -210,9 +241,9 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 </Box>
               )}
 
-              {/* 指値バッジ */}
+              {/* 指値ボタン */}
               {item && onLimitEdit && (
-                <Box sx={{ mb: 1.5 }}>
+                <Box>
                   <BidLimitBadge
                     limitPrice={item.my_limit_price ?? null}
                     isTriggered={item.my_limit_triggered ?? false}
@@ -221,25 +252,6 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                     size="medium"
                   />
                 </Box>
-              )}
-
-              {/* 個体情報 */}
-              {(item?.inspection_info || item?.individual_info) && (
-                <>
-                  <Divider sx={{ my: 1.5 }} />
-                  {item?.inspection_info && (
-                    <Box sx={{ mb: 1 }}>
-                      <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>検査情報</Typography>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{item.inspection_info}</Typography>
-                    </Box>
-                  )}
-                  {item?.individual_info && (
-                    <Box>
-                      <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>個体情報</Typography>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{item.individual_info}</Typography>
-                    </Box>
-                  )}
-                </>
               )}
             </Grid>
           </Grid>

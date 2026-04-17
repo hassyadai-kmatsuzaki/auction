@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class SettingsController extends Controller
 {
@@ -28,6 +30,8 @@ class SettingsController extends Controller
                     'city' => $user->city,
                     'address_line1' => $user->address_line1,
                     'address_line2' => $user->address_line2,
+                    'profile_image_path' => $user->profile_image_path,
+                    'profile_image_url' => $user->profile_image_url,
                 ],
                 'notification_settings' => $user->notification_settings,
             ],
@@ -81,8 +85,68 @@ class SettingsController extends Controller
                     'city' => $user->city,
                     'address_line1' => $user->address_line1,
                     'address_line2' => $user->address_line2,
+                    'profile_image_path' => $user->profile_image_path,
+                    'profile_image_url' => $user->profile_image_url,
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * プロフィール画像アップロード
+     */
+    public function uploadProfileImage(Request $request)
+    {
+        $user = Auth::user();
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($user->profile_image_path) {
+            Storage::disk('public')->delete($user->profile_image_path);
+        }
+
+        $file = $request->file('image');
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs("avatars/user/{$user->id}", $filename, 'public');
+
+        $user->profile_image_path = $path;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィール画像をアップロードしました。',
+            'data' => [
+                'profile_image_path' => $user->profile_image_path,
+                'profile_image_url' => $user->profile_image_url,
+            ],
+        ]);
+    }
+
+    /**
+     * プロフィール画像削除
+     */
+    public function deleteProfileImage()
+    {
+        $user = Auth::user();
+
+        if ($user->profile_image_path) {
+            Storage::disk('public')->delete($user->profile_image_path);
+            $user->profile_image_path = null;
+            $user->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィール画像を削除しました。',
         ]);
     }
 

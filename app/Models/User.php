@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -26,6 +27,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'profile_image_path',
         'phone',
         'postal_code',
         'prefecture',
@@ -87,6 +89,17 @@ class User extends Authenticatable
     protected function serializeDate(DateTimeInterface $date): string
     {
         return $date->format('Y-m-d\TH:i:s');
+    }
+
+    /**
+     * プロフィール画像の公開URL
+     */
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        if (empty($this->profile_image_path)) {
+            return null;
+        }
+        return Storage::disk('public')->url($this->profile_image_path);
     }
 
     /**

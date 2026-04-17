@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Card, CardMedia, CardContent, CardActions,
-  Box, Typography, Chip, IconButton,
+  Box, Typography, Chip, IconButton, Avatar,
 } from '@mui/material';
 import { Info as InfoIcon } from '@mui/icons-material';
 import type { LiveLane } from '@/types';
@@ -162,11 +162,31 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         <Typography variant="h6" sx={{ lineHeight: 1.3 }}>
           {item.species_name}
         </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          {item.seller_name ? `出品者：${item.seller_name}` : ''}
-          {item.seller_name && item.quantity ? ' / ' : ''}
-          {item.quantity ? `数量：${item.quantity}${item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}` : ''}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, mt: 0.5, mb: 0.5 }}>
+          {item.seller_name && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Avatar
+                src={item.seller_profile_image_url || undefined}
+                sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+              >
+                {!item.seller_profile_image_url && item.seller_name.charAt(0)}
+              </Avatar>
+              <Typography variant="caption" color="text.secondary">
+                {item.seller_name}
+              </Typography>
+            </Box>
+          )}
+          {item.quantity != null && (
+            <Typography variant="caption" color="text.secondary">
+              {item.seller_name ? '/ ' : ''}数量：{item.quantity}{item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}
+            </Typography>
+          )}
+        </Box>
+        {item.inspection_info && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }} noWrap>
+            {item.inspection_info}
+          </Typography>
+        )}
 
         {/* 現在単価 */}
         <Box sx={{ mb: 2 }}>

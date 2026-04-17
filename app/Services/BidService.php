@@ -130,6 +130,7 @@ class BidService
                     'item_number'              => $item->item_number,
                     'species_name'             => $item->species_name,
                     'seller_name'              => $item->sellerProfile?->seller_name,
+                    'seller_profile_image_url' => $item->sellerProfile?->profile_image_url,
                     'quantity'                 => $item->quantity,
                     'quantity_unit'            => $item->quantity_unit ?? 'fish',
                     'current_price'            => $item->current_price,
