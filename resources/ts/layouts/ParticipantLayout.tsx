@@ -81,7 +81,16 @@ export default function ParticipantLayout() {
   const handleLogout = async () => {
     setDrawerOpen(false);
     await logout();
-    navigate('/login');
+    window.location.href = '/login';
+  };
+
+  const handleMenuClick = (path: string) => {
+    if (path === '/presentation') {
+      window.open(path, '_blank', 'noopener,noreferrer');
+      setDrawerOpen(false);
+      return;
+    }
+    window.location.href = path;
   };
 
   return (
@@ -103,7 +112,7 @@ export default function ParticipantLayout() {
               component="img"
               src="/img/logo.png?v=1"
               alt="MEDAKA AUCTION PORT"
-              onClick={() => { setDrawerOpen(false); navigate('/participant/home'); }}
+              onClick={() => { window.location.href = '/participant/home'; }}
               sx={{
                 height: 48,
                 width: '100%',
@@ -123,7 +132,13 @@ export default function ParticipantLayout() {
               <Button
                 key={item.path}
                 color="inherit"
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  if (item.path === '/presentation') {
+                    window.open(item.path, '_blank', 'noopener,noreferrer');
+                    return;
+                  }
+                  navigate(item.path);
+                }}
                 sx={{
                   borderBottom: location.pathname === item.path ? 2 : 0,
                   borderRadius: 0,
@@ -151,10 +166,7 @@ export default function ParticipantLayout() {
               <ListItem key={item.path} disablePadding>
                 <ListItemButton
                   selected={location.pathname === item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    setDrawerOpen(false);
-                  }}
+                  onClick={() => handleMenuClick(item.path)}
                 >
                   <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />

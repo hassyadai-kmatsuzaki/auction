@@ -108,7 +108,11 @@ export default function SellerLayout() {
   const handleLogout = async () => {
     setMobileOpen(false);
     await logout();
-    navigate('/login');
+    window.location.href = '/login';
+  };
+
+  const handleMenuNavigate = (path: string) => {
+    window.location.href = path;
   };
 
   const menuItems = [
@@ -205,10 +209,7 @@ export default function SellerLayout() {
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={isPathActive(item.path)}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileOpen(false);
-                }}
+                onClick={() => handleMenuNavigate(item.path)}
                 sx={{
                   py: 1.2,
                   '&.Mui-selected': {
@@ -257,10 +258,7 @@ export default function SellerLayout() {
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={isPathActive(item.path)}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileOpen(false);
-                }}
+                onClick={() => handleMenuNavigate(item.path)}
                 sx={{
                   py: 1.2,
                   '&.Mui-selected': {

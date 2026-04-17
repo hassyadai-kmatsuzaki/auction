@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -61,7 +61,6 @@ function Logo() {
 }
 
 export default function AdminLayout() {
-  const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -80,7 +79,11 @@ export default function AdminLayout() {
   const handleLogout = async () => {
     setMobileOpen(false);
     await logout();
-    navigate('/login');
+    window.location.href = '/login';
+  };
+
+  const handleMenuNavigate = (path: string) => {
+    window.location.href = path;
   };
 
   const menuItems = [
@@ -144,10 +147,7 @@ export default function AdminLayout() {
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={location.pathname === item.path}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileOpen(false);
-                }}
+                onClick={() => handleMenuNavigate(item.path)}
                 sx={{
                   py: 1.2,
                   '&.Mui-selected': {
@@ -176,10 +176,7 @@ export default function AdminLayout() {
           <ListItem disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
               selected={isPathActive('/admin/auctions')}
-              onClick={() => {
-                navigate('/admin/auctions');
-                setMobileOpen(false);
-              }}
+              onClick={() => handleMenuNavigate('/admin/auctions')}
               sx={{
                 py: 1.2,
                 '&.Mui-selected': {
@@ -248,10 +245,7 @@ export default function AdminLayout() {
                     },
                   }}
                   selected={isPathActive(item.path)}
-                  onClick={() => {
-                    navigate(item.path);
-                    setMobileOpen(false);
-                  }}
+                  onClick={() => handleMenuNavigate(item.path)}
                 >
                   <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 18 } }}>
                     {item.icon}
@@ -290,10 +284,7 @@ export default function AdminLayout() {
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={location.pathname === item.path}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileOpen(false);
-                }}
+                onClick={() => handleMenuNavigate(item.path)}
                 sx={{
                   py: 1.2,
                   '&.Mui-selected': {
@@ -367,10 +358,7 @@ export default function AdminLayout() {
                     },
                   }}
                   selected={location.pathname === item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    setMobileOpen(false);
-                  }}
+                  onClick={() => handleMenuNavigate(item.path)}
                 >
                   <ListItemIcon sx={{ minWidth: 28, '& svg': { fontSize: 18 } }}>
                     {item.icon}
