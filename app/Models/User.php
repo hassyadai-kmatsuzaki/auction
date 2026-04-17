@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -92,14 +91,14 @@ class User extends Authenticatable
     }
 
     /**
-     * プロフィール画像の公開URL
+     * プロフィール画像の公開URL（相対パスで返す。フロントは現在のホストで解決する）
      */
     public function getProfileImageUrlAttribute(): ?string
     {
         if (empty($this->profile_image_path)) {
             return null;
         }
-        return Storage::disk('public')->url($this->profile_image_path);
+        return '/storage/' . ltrim($this->profile_image_path, '/');
     }
 
     /**

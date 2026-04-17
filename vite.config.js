@@ -29,6 +29,11 @@ export default defineConfig({
         target: 'http://localhost:8430',
         changeOrigin: true,
         secure: false
+      },
+      '/storage': {
+        target: 'http://localhost:8430',
+        changeOrigin: true,
+        secure: false
       }
     }
   },

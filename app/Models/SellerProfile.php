@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 class SellerProfile extends BaseModel
 {
@@ -121,13 +120,13 @@ class SellerProfile extends BaseModel
     }
 
     /**
-     * プロフィール画像の公開URL
+     * プロフィール画像の公開URL（相対パスで返す。フロントは現在のホストで解決する）
      */
     public function getProfileImageUrlAttribute(): ?string
     {
         if (empty($this->profile_image_path)) {
             return null;
         }
-        return Storage::disk('public')->url($this->profile_image_path);
+        return '/storage/' . ltrim($this->profile_image_path, '/');
     }
 }

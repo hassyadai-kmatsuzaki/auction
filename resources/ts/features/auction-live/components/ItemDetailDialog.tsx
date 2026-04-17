@@ -91,7 +91,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth sx={zIndex !== undefined ? { zIndex } : undefined}>
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6">
+            <Typography variant="h6" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary' } }}>
               No.{item?.item_number} {item?.species_name}
             </Typography>
             <IconButton onClick={handleClose}><CloseIcon /></IconButton>
@@ -156,17 +156,17 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
 
               {/* 価格 */}
               <Box sx={{ mb: 1.5 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
                   {priceLabel === 'start' ? '開始価格' : '現在単価'}
                 </Typography>
-                <Typography variant="h4" color="primary.main" fontWeight="bold">
+                <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { md: '2.5rem' }, color: { xs: 'text.primary', md: 'primary.main' } }}>
                   ¥{(() => {
                     const price = priceLabel === 'start'
                       ? (startPrice ?? item?.current_price ?? 0)
                       : (item?.current_price ?? 0);
                     return Math.floor(Number(price)).toLocaleString();
                   })()}
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                  <Typography component="span" variant="body2" sx={{ ml: 1, fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
                     /1{unit}
                   </Typography>
                 </Typography>
@@ -178,19 +178,19 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     <Avatar
                       src={item.seller_profile_image_url || undefined}
-                      sx={{ width: 28, height: 28, fontSize: '0.85rem', bgcolor: 'grey.300' }}
+                      sx={{ width: { xs: 28, md: 36 }, height: { xs: 28, md: 36 }, fontSize: '0.85rem', bgcolor: 'grey.300' }}
                     >
                       {!item.seller_profile_image_url && item.seller_name.charAt(0)}
                     </Avatar>
-                    <Typography variant="body2" color="text.primary">
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, color: 'text.primary' }}>
                       {item.seller_name}
                     </Typography>
                   </Box>
                 )}
                 {item?.quantity != null && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <InventoryIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                    <Typography variant="body2" color="text.secondary">
+                    <InventoryIcon sx={{ fontSize: { xs: 18, md: 24 }, color: { xs: 'text.primary', md: 'text.secondary' } }} />
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
                       {item.quantity}{unit}
                     </Typography>
                   </Box>
@@ -201,12 +201,12 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
               {(item?.inspection_info || item?.individual_info) && (
                 <Box sx={{ mb: 1.5 }}>
                   {item?.inspection_info && (
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.primary', mb: item?.individual_info ? 0.75 : 0 }}>
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, whiteSpace: 'pre-wrap', color: 'text.primary', mb: item?.individual_info ? 0.75 : 0 }}>
                       {item.inspection_info}
                     </Typography>
                   )}
                   {item?.individual_info && (
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, whiteSpace: 'pre-wrap', color: { xs: 'text.primary', md: 'text.secondary' } }}>
                       {item.individual_info}
                     </Typography>
                   )}
@@ -259,7 +259,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>閉じる</Button>
+          <Button onClick={handleClose} sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary' } }}>閉じる</Button>
           {extraActions}
         </DialogActions>
       </Dialog>

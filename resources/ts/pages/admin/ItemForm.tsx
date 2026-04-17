@@ -38,6 +38,8 @@ import {
   Star as StarIcon,
   Delete as DeleteIcon,
   PlayCircleOutline as PlayCircleOutlineIcon,
+  CheckCircle as CheckCircleIcon,
+  ErrorOutline as ErrorOutlineIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -59,11 +61,14 @@ interface MediaItem {
   display_order: number;
 }
 
+type UploadStatus = 'uploading' | 'processing' | 'success' | 'error';
+
 interface UploadingFile {
+  id: string;
   file: File;
   preview: string;
   progress: number;
-  uploading: boolean;
+  status: UploadStatus;
   error?: string;
 }
 
@@ -226,19 +231,20 @@ export default function ItemForm() {
     if (!files || !id) return;
 
     const newUploadingFiles: UploadingFile[] = [];
-    
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       newUploadingFiles.push({
+        id: `${Date.now()}-${i}-${file.name}`,
         file,
         preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
         progress: 0,
-        uploading: true,
+        status: 'uploading',
       });
     }
-    
+
     setUploadingFiles(prev => [...prev, ...newUploadingFiles]);
-    
+
     // 各ファイルをアップロード
     for (let i = 0; i < newUploadingFiles.length; i++) {
       const uploadFile = newUploadingFiles[i];
@@ -246,7 +252,7 @@ export default function ItemForm() {
       formDataUpload.append('file', uploadFile.file);
       formDataUpload.append('media_type', mediaType);
       formDataUpload.append('is_thumbnail', (existingMedia.length === 0 && i === 0).toString());
-      
+
       try {
         const response = await axios.post(
           `/api/admin/auctions/${auctionId}/items/${id}/media`,
@@ -254,34 +260,71 @@ export default function ItemForm() {
           {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: (progressEvent) => {
-              const progress = progressEvent.total 
+              const progress = progressEvent.total
                 ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
                 : 0;
-              setUploadingFiles(prev => 
-                prev.map((f, idx) => 
-                  f === uploadFile ? { ...f, progress } : f
+              setUploadingFiles(prev =>
+                prev.map(f =>
+                  f.id === uploadFile.id
+                    ? {
+                        ...f,
+                        progress,
+                        // 送信完了後、サーバー応答待ちの「処理中」状態へ遷移
+                        status: progress >= 100 ? 'processing' : 'uploading',
+                      }
+                    : f
                 )
               );
             },
           }
         );
-        
+
         if (response.data.success) {
           setExistingMedia(prev => [...prev, response.data.data.media]);
+          setUploadingFiles(prev =>
+            prev.map(f =>
+              f.id === uploadFile.id
+                ? { ...f, status: 'success', progress: 100 }
+                : f
+            )
+          );
+        } else {
+          setUploadingFiles(prev =>
+            prev.map(f =>
+              f.id === uploadFile.id
+                ? { ...f, status: 'error', error: response.data.message || 'アップロードに失敗しました' }
+                : f
+            )
+          );
         }
       } catch (err: any) {
         console.error('アップロードエラー:', err);
-        setUploadingFiles(prev => 
-          prev.map(f => 
-            f === uploadFile ? { ...f, uploading: false, error: 'アップロード失敗' } : f
+        const message =
+          err.response?.data?.message ||
+          (err.code === 'ECONNABORTED' ? 'タイムアウトしました' : 'アップロードに失敗しました');
+        setUploadingFiles(prev =>
+          prev.map(f =>
+            f.id === uploadFile.id
+              ? { ...f, status: 'error', error: message }
+              : f
           )
         );
       }
     }
-    
-    // アップロード完了後にクリア
-    setUploadingFiles(prev => prev.filter(f => f.uploading && !f.error));
+
+    // 成功したファイルは少し見せてから自動で消す。エラーは閉じるまで残す。
+    const successIds = newUploadingFiles.map(f => f.id);
+    setTimeout(() => {
+      setUploadingFiles(prev =>
+        prev.filter(f => !(successIds.includes(f.id) && f.status === 'success'))
+      );
+    }, 2500);
+
     e.target.value = '';
+  };
+
+  const dismissUploadingFile = (fileId: string) => {
+    setUploadingFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
   const handleDeleteMedia = async (mediaId: number) => {
@@ -632,12 +675,66 @@ export default function ItemForm() {
                     </Button>
 
                     {/* アップロード中のファイル */}
-                    {uploadingFiles.map((file, index) => (
-                      <Box key={index} sx={{ mb: 1 }}>
-                        <Typography variant="caption">{file.file.name}</Typography>
-                        <LinearProgress variant="determinate" value={file.progress} />
-                      </Box>
-                    ))}
+                    {uploadingFiles.map((file) => {
+                      const isError = file.status === 'error';
+                      const isSuccess = file.status === 'success';
+                      const isProcessing = file.status === 'processing';
+                      const statusLabel = isError
+                        ? (file.error || 'アップロード失敗')
+                        : isSuccess
+                          ? 'アップロード完了'
+                          : isProcessing
+                            ? 'サーバーで処理中...'
+                            : `アップロード中 ${file.progress}%`;
+                      return (
+                        <Box
+                          key={file.id}
+                          sx={{
+                            mb: 1,
+                            p: 1,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: isError ? 'error.light' : isSuccess ? 'success.light' : 'grey.200',
+                            bgcolor: isError ? 'error.lighter' : isSuccess ? 'success.lighter' : 'transparent',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            {isSuccess && <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />}
+                            {isError && <ErrorOutlineIcon sx={{ fontSize: 16, color: 'error.main' }} />}
+                            {(file.status === 'uploading' || isProcessing) && (
+                              <CircularProgress size={14} />
+                            )}
+                            <Typography
+                              variant="caption"
+                              sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            >
+                              {file.file.name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: isError ? 'error.main' : isSuccess ? 'success.main' : 'text.secondary',
+                                fontWeight: isError || isSuccess ? 600 : 400,
+                              }}
+                            >
+                              {statusLabel}
+                            </Typography>
+                            {isError && (
+                              <IconButton size="small" onClick={() => dismissUploadingFile(file.id)}>
+                                <CloseIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            )}
+                          </Box>
+                          {!isSuccess && !isError && (
+                            <LinearProgress
+                              variant={isProcessing ? 'indeterminate' : 'determinate'}
+                              value={file.progress}
+                              color={isProcessing ? 'warning' : 'primary'}
+                            />
+                          )}
+                        </Box>
+                      );
+                    })}
 
                     {/* 既存メディア */}
                     {existingMedia.length > 0 && (
