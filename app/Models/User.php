@@ -114,6 +114,7 @@ class User extends Authenticatable
             'email_shipping' => true,
             'email_new_auction' => true,
             'email_auction_start' => true,
+            'email_bid_limit_reached' => true,
         ];
     }
 

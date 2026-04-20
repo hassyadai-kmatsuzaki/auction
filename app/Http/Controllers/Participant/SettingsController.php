@@ -171,6 +171,7 @@ class SettingsController extends Controller
             'email_shipping' => 'boolean',
             'email_new_auction' => 'boolean',
             'email_auction_start' => 'boolean',
+            'email_bid_limit_reached' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -187,6 +188,7 @@ class SettingsController extends Controller
             'email_shipping',
             'email_new_auction',
             'email_auction_start',
+            'email_bid_limit_reached',
         ]));
 
         $user->notification_settings = $newSettings;

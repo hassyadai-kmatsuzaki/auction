@@ -69,6 +69,7 @@ interface NotificationSettings {
   email_shipping: boolean;
   email_new_auction: boolean;
   email_auction_start: boolean;
+  email_bid_limit_reached: boolean;
 }
 
 const NOTIFICATION_ROWS: NotificationRow[] = [
@@ -121,6 +122,8 @@ const NOTIFICATION_ROWS: NotificationRow[] = [
     category: 'reminder',
     label: '指値発動通知',
     description: '指値が発動・更新された際にお知らせ',
+    emailKey: 'email_bid_limit_reached',
+    emailTestType: 'bid_limit_reached',
     lineType: 'bid_limit_reached',
   },
   {
@@ -168,6 +171,7 @@ export default function ParticipantSettings() {
     email_shipping: true,
     email_new_auction: true,
     email_auction_start: true,
+    email_bid_limit_reached: true,
   });
 
   useEffect(() => {
@@ -217,6 +221,7 @@ export default function ParticipantSettings() {
             email_shipping: data.notification_settings.email_shipping ?? true,
             email_new_auction: data.notification_settings.email_new_auction ?? true,
             email_auction_start: data.notification_settings.email_auction_start ?? true,
+            email_bid_limit_reached: data.notification_settings.email_bid_limit_reached ?? true,
           });
         }
       }

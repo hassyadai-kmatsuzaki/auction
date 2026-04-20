@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\AuctionStartNotificationMail;
+use App\Mail\BidLimitReachedMail;
 use App\Mail\ItemSoldNotificationMail;
 use App\Mail\NewAuctionNotificationMail;
 use App\Mail\PaymentConfirmedMail;
@@ -50,6 +51,9 @@ class NotificationTestController extends Controller
                     break;
                 case 'auction_start':
                     $this->sendTestAuctionStartMail($user);
+                    break;
+                case 'bid_limit_reached':
+                    $this->sendTestBidLimitReachedMail($user);
                     break;
                 default:
                     return response()->json([
@@ -170,6 +174,19 @@ class NotificationTestController extends Controller
     {
         $auction = $this->createMockAuction();
         Mail::to($user->email)->send(new AuctionStartNotificationMail($auction, $user));
+    }
+
+    /**
+     * テスト用の指値発動通知メール送信
+     */
+    private function sendTestBidLimitReachedMail($user)
+    {
+        Mail::to($user->email)->send(new BidLimitReachedMail(
+            '【テスト】三色ラメ体外光',
+            10000,
+            10500,
+            $user->name ?? ''
+        ));
     }
 
     /**
