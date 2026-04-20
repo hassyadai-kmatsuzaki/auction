@@ -124,11 +124,11 @@ export default function Register() {
             borderRadius: 4,
             p: { xs: 4, sm: 5 },
             textAlign: 'center',
-            background: 'rgba(15, 23, 42, 0.35)',
+            background: 'rgba(255, 255, 255, 0.65)',
             backdropFilter: 'blur(10px) saturate(160%)',
             WebkitBackdropFilter: 'blur(10px) saturate(160%)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.5)',
+            boxShadow: '0 30px 60px -15px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.6)',
             color: '#000',
           }}
         >
@@ -178,7 +178,7 @@ export default function Register() {
               py: 1.5,
               px: 4,
               bgcolor: 'rgba(15, 23, 42, 0.95)',
-              color: '#000',
+              color: '#fff',
               border: '1px solid rgba(255,255,255,0.12)',
               '&:hover': { bgcolor: 'rgba(30, 41, 59, 0.95)' },
             }}
@@ -217,11 +217,11 @@ export default function Register() {
           zIndex: 1,
           borderRadius: 4,
           p: { xs: 3.5, sm: 5 },
-          background: 'rgba(15, 23, 42, 0.35)',
+          background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(10px) saturate(160%)',
           WebkitBackdropFilter: 'blur(10px) saturate(160%)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.5)',
+          boxShadow: '0 30px 60px -15px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.6)',
           color: '#000',
         }}
       >
@@ -487,7 +487,7 @@ export default function Register() {
               fontSize: '0.9375rem',
               fontWeight: 600,
               bgcolor: 'rgba(15, 23, 42, 0.95)',
-              color: '#000',
+              color: '#fff',
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)',
               '&:hover': {
@@ -496,11 +496,11 @@ export default function Register() {
               },
               '&.Mui-disabled': {
                 bgcolor: 'rgba(15, 23, 42, 0.6)',
-                color: '#000',
+                color: 'rgba(255,255,255,0.5)',
               },
             }}
           >
-            {loading ? <CircularProgress size={22} sx={{ color: '#000' }} /> : '登録を申請する'}
+            {loading ? <CircularProgress size={22} sx={{ color: '#fff' }} /> : '登録を申請する'}
           </Button>
 
           <Typography
