@@ -131,8 +131,8 @@ class ShippingPatternsSeeder extends Seeder
             $extra = $this->createAuction($admin, 'EXTRA', now()->subDay(), '100箱S×2 / KA+S / L+S / M×4 / S×10');
 
             // --- Pattern 1: 小ロット単発 (10匹) → 80箱 ---
-            $i1 = $this->createItem($small, $sellerA, 1, '紅白メダカ(小ロット)', 10, 4000, '/img/medaka/紅白ラメ.jpg');
-            $this->persistGroup([$this->buildWonItem($i1, $winners[0], 8000)], $winners[0], $shipping, [
+            $i1 = $this->createItem($small, $sellerA, 1, '紅白メダカ(小ロット)', 10, 200, '/img/medaka/紅白ラメ.jpg');
+            $this->persistGroup([$this->buildWonItem($i1, $winners[0], 300)], $winners[0], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'completed',
                 'paid_at' => now()->subDays(4),
@@ -145,8 +145,8 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 2: M単独 (100匹) → 100箱 ---
-            $i2 = $this->createItem($small, $sellerA, 2, '幹之フルボディ(M単独)', 100, 50000, '/img/medaka/幹之フルボディ.jpg');
-            $this->persistGroup([$this->buildWonItem($i2, $winners[1], 80000)], $winners[1], $shipping, [
+            $i2 = $this->createItem($small, $sellerA, 2, '幹之フルボディ(M単独)', 100, 500, '/img/medaka/幹之フルボディ.jpg');
+            $this->persistGroup([$this->buildWonItem($i2, $winners[1], 700)], $winners[1], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'shipped',
                 'paid_at' => now()->subDays(4),
@@ -158,13 +158,13 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 3: S×3 (30匹×3品) → 140箱 (S×3) ---
-            $i3a = $this->createItem($mix, $sellerA, 1, '楊貴妃S-1', 30, 12000, '/img/medaka/楊貴妃ダルマ.jpeg');
-            $i3b = $this->createItem($mix, $sellerA, 2, '楊貴妃S-2', 30, 12500, '/img/medaka/楊貴妃ダルマ.jpeg');
-            $i3c = $this->createItem($mix, $sellerA, 3, '楊貴妃S-3', 30, 11000, '/img/medaka/楊貴妃ダルマ.jpeg');
+            $i3a = $this->createItem($mix, $sellerA, 1, '楊貴妃S-1', 30, 250, '/img/medaka/楊貴妃ダルマ.jpeg');
+            $i3b = $this->createItem($mix, $sellerA, 2, '楊貴妃S-2', 30, 250, '/img/medaka/楊貴妃ダルマ.jpeg');
+            $i3c = $this->createItem($mix, $sellerA, 3, '楊貴妃S-3', 30, 200, '/img/medaka/楊貴妃ダルマ.jpeg');
             $this->persistGroup([
-                $this->buildWonItem($i3a, $winners[2], 15000),
-                $this->buildWonItem($i3b, $winners[2], 14500),
-                $this->buildWonItem($i3c, $winners[2], 13500),
+                $this->buildWonItem($i3a, $winners[2], 400),
+                $this->buildWonItem($i3b, $winners[2], 380),
+                $this->buildWonItem($i3c, $winners[2], 350),
             ], $winners[2], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'preparing',
@@ -174,11 +174,11 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 4: S+M 混載 (30匹 + 100匹) → 140箱 ---
-            $i4a = $this->createItem($mix, $sellerB, 4, '三色ラメ(S)', 30, 18000, '/img/medaka/三色ラメ.jpeg');
-            $i4b = $this->createItem($mix, $sellerB, 5, '夜桜ゴールド(M)', 100, 40000, '/img/medaka/夜桜ゴールド.jpg');
+            $i4a = $this->createItem($mix, $sellerB, 4, '三色ラメ(S)', 30, 350, '/img/medaka/三色ラメ.jpeg');
+            $i4b = $this->createItem($mix, $sellerB, 5, '夜桜ゴールド(M)', 100, 500, '/img/medaka/夜桜ゴールド.jpg');
             $this->persistGroup([
-                $this->buildWonItem($i4a, $winners[3], 22000),
-                $this->buildWonItem($i4b, $winners[3], 55000),
+                $this->buildWonItem($i4a, $winners[3], 500),
+                $this->buildWonItem($i4b, $winners[3], 700),
             ], $winners[3], $shipping, [
                 'payment_status' => 'paid',
                 'delivery_status' => 'pending',
@@ -187,16 +187,16 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 5: L単発 (300匹) → 140箱 (L×1) ---
-            $i5 = $this->createItem($large, $sellerA, 1, 'オロチ(L単発)', 300, 90000, '/img/medaka/オロチ.jpg');
-            $this->persistGroup([$this->buildWonItem($i5, $winners[0], 120000)], $winners[0], $shipping, [
+            $i5 = $this->createItem($large, $sellerA, 1, 'オロチ(L単発)', 300, 500, '/img/medaka/オロチ.jpg');
+            $this->persistGroup([$this->buildWonItem($i5, $winners[0], 800)], $winners[0], $shipping, [
                 'payment_status' => 'pending',
                 'delivery_status' => 'pending',
                 'payment_deadline' => now()->addDays(2),
             ]);
 
             // --- Pattern 6: KA単発 (800匹) → 140箱 (KA×1) ---
-            $i6 = $this->createItem($large, $sellerA, 2, '出目(KA単発/大量)', 800, 150000, '/img/medaka/オロチ.jpg');
-            $this->persistGroup([$this->buildWonItem($i6, $winners[4], 220000)], $winners[4], $shipping, [
+            $i6 = $this->createItem($large, $sellerA, 2, '出目(KA単発/大量)', 800, 200, '/img/medaka/オロチ.jpg');
+            $this->persistGroup([$this->buildWonItem($i6, $winners[4], 300)], $winners[4], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'shipped',
                 'paid_at' => now()->subDays(2),
@@ -208,13 +208,13 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 7: L×3 (300匹×3品) → 140箱 ×複数 ---
-            $i7a = $this->createItem($large, $sellerB, 3, '三色L-1', 300, 80000, '/img/medaka/三色ラメ.jpeg');
-            $i7b = $this->createItem($large, $sellerB, 4, '三色L-2', 300, 82000, '/img/medaka/三色ラメ.jpeg');
-            $i7c = $this->createItem($large, $sellerB, 5, '三色L-3', 300, 78000, '/img/medaka/三色ラメ.jpeg');
+            $i7a = $this->createItem($large, $sellerB, 3, '三色L-1', 300, 500, '/img/medaka/三色ラメ.jpeg');
+            $i7b = $this->createItem($large, $sellerB, 4, '三色L-2', 300, 520, '/img/medaka/三色ラメ.jpeg');
+            $i7c = $this->createItem($large, $sellerB, 5, '三色L-3', 300, 480, '/img/medaka/三色ラメ.jpeg');
             $this->persistGroup([
-                $this->buildWonItem($i7a, $winners[1], 100000),
-                $this->buildWonItem($i7b, $winners[1], 105000),
-                $this->buildWonItem($i7c, $winners[1], 98000),
+                $this->buildWonItem($i7a, $winners[1], 800),
+                $this->buildWonItem($i7b, $winners[1], 850),
+                $this->buildWonItem($i7c, $winners[1], 780),
             ], $winners[1], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'preparing',
@@ -224,19 +224,19 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 8: 6品 按分 ---
-            $i8a = $this->createItem($app, $sellerB, 1, '按分T-1', 10, 3000, '/img/medaka/01.png');
-            $i8b = $this->createItem($app, $sellerB, 2, '按分T-2', 15, 3500, '/img/medaka/02.png');
-            $i8c = $this->createItem($app, $sellerB, 3, '按分T-3', 20, 4000, '/img/medaka/01.png');
-            $i8d = $this->createItem($app, $sellerB, 4, '按分T-4', 25, 4500, '/img/medaka/02.png');
-            $i8e = $this->createItem($app, $sellerB, 5, '按分T-5', 30, 5000, '/img/medaka/01.png');
-            $i8f = $this->createItem($app, $sellerB, 6, '按分T-6', 20, 4800, '/img/medaka/02.png');
+            $i8a = $this->createItem($app, $sellerB, 1, '按分T-1', 10, 150, '/img/medaka/01.png');
+            $i8b = $this->createItem($app, $sellerB, 2, '按分T-2', 15, 180, '/img/medaka/02.png');
+            $i8c = $this->createItem($app, $sellerB, 3, '按分T-3', 20, 200, '/img/medaka/01.png');
+            $i8d = $this->createItem($app, $sellerB, 4, '按分T-4', 25, 220, '/img/medaka/02.png');
+            $i8e = $this->createItem($app, $sellerB, 5, '按分T-5', 30, 250, '/img/medaka/01.png');
+            $i8f = $this->createItem($app, $sellerB, 6, '按分T-6', 20, 240, '/img/medaka/02.png');
             $this->persistGroup([
-                $this->buildWonItem($i8a, $winners[2], 4500),
-                $this->buildWonItem($i8b, $winners[2], 5000),
-                $this->buildWonItem($i8c, $winners[2], 6000),
-                $this->buildWonItem($i8d, $winners[2], 7000),
-                $this->buildWonItem($i8e, $winners[2], 8000),
-                $this->buildWonItem($i8f, $winners[2], 7500),
+                $this->buildWonItem($i8a, $winners[2], 250),
+                $this->buildWonItem($i8b, $winners[2], 280),
+                $this->buildWonItem($i8c, $winners[2], 300),
+                $this->buildWonItem($i8d, $winners[2], 350),
+                $this->buildWonItem($i8e, $winners[2], 400),
+                $this->buildWonItem($i8f, $winners[2], 380),
             ], $winners[2], $shipping, [
                 'payment_status' => 'pending',
                 'delivery_status' => 'pending',
@@ -244,11 +244,11 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 9: S×2 (10匹×2品) → 100箱 (S×2) ---
-            $i9a = $this->createItem($extra, $sellerA, 1, 'S×2 T-1', 10, 3000, '/img/medaka/01.png');
-            $i9b = $this->createItem($extra, $sellerA, 2, 'S×2 T-2', 10, 3200, '/img/medaka/02.png');
+            $i9a = $this->createItem($extra, $sellerA, 1, 'S×2 T-1', 10, 150, '/img/medaka/01.png');
+            $i9b = $this->createItem($extra, $sellerA, 2, 'S×2 T-2', 10, 160, '/img/medaka/02.png');
             $this->persistGroup([
-                $this->buildWonItem($i9a, $winners[0], 5000),
-                $this->buildWonItem($i9b, $winners[0], 5500),
+                $this->buildWonItem($i9a, $winners[0], 250),
+                $this->buildWonItem($i9b, $winners[0], 280),
             ], $winners[0], $shipping, [
                 'payment_status' => 'pending',
                 'delivery_status' => 'pending',
@@ -256,11 +256,11 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 10: KA+S 同梱 (800 + 10) → 140箱 (KA×1, S×1) ---
-            $i10a = $this->createItem($extra, $sellerA, 3, 'KA+S KA側(800)', 800, 150000, '/img/medaka/オロチ.jpg');
-            $i10b = $this->createItem($extra, $sellerA, 4, 'KA+S S側(10)', 10, 3500, '/img/medaka/01.png');
+            $i10a = $this->createItem($extra, $sellerA, 3, 'KA+S KA側(800)', 800, 200, '/img/medaka/オロチ.jpg');
+            $i10b = $this->createItem($extra, $sellerA, 4, 'KA+S S側(10)', 10, 150, '/img/medaka/01.png');
             $this->persistGroup([
-                $this->buildWonItem($i10a, $winners[1], 200000),
-                $this->buildWonItem($i10b, $winners[1], 5000),
+                $this->buildWonItem($i10a, $winners[1], 300),
+                $this->buildWonItem($i10b, $winners[1], 250),
             ], $winners[1], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'shipped',
@@ -273,11 +273,11 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 11: L+S 同梱 (300 + 10) → 140箱 (L×1, S×1) ---
-            $i11a = $this->createItem($extra, $sellerB, 5, 'L+S L側(300)', 300, 80000, '/img/medaka/三色ラメ.jpeg');
-            $i11b = $this->createItem($extra, $sellerB, 6, 'L+S S側(10)', 10, 3500, '/img/medaka/02.png');
+            $i11a = $this->createItem($extra, $sellerB, 5, 'L+S L側(300)', 300, 500, '/img/medaka/三色ラメ.jpeg');
+            $i11b = $this->createItem($extra, $sellerB, 6, 'L+S S側(10)', 10, 150, '/img/medaka/02.png');
             $this->persistGroup([
-                $this->buildWonItem($i11a, $winners[2], 110000),
-                $this->buildWonItem($i11b, $winners[2], 5000),
+                $this->buildWonItem($i11a, $winners[2], 900),
+                $this->buildWonItem($i11b, $winners[2], 250),
             ], $winners[2], $shipping, [
                 'payment_status' => 'paid',
                 'delivery_status' => 'pending',
@@ -286,15 +286,15 @@ class ShippingPatternsSeeder extends Seeder
             ]);
 
             // --- Pattern 12: M×4 (100匹×4品) → 複数箱 140(M×3) + 100(M×1) ---
-            $i12a = $this->createItem($extra, $sellerB, 7,  'M×4 T-1', 100, 45000, '/img/medaka/幹之フルボディ.jpg');
-            $i12b = $this->createItem($extra, $sellerB, 8,  'M×4 T-2', 100, 46000, '/img/medaka/幹之フルボディ.jpg');
-            $i12c = $this->createItem($extra, $sellerB, 9,  'M×4 T-3', 100, 47000, '/img/medaka/幹之フルボディ.jpg');
-            $i12d = $this->createItem($extra, $sellerB, 10, 'M×4 T-4', 100, 48000, '/img/medaka/幹之フルボディ.jpg');
+            $i12a = $this->createItem($extra, $sellerB, 7,  'M×4 T-1', 100, 500, '/img/medaka/幹之フルボディ.jpg');
+            $i12b = $this->createItem($extra, $sellerB, 8,  'M×4 T-2', 100, 520, '/img/medaka/幹之フルボディ.jpg');
+            $i12c = $this->createItem($extra, $sellerB, 9,  'M×4 T-3', 100, 540, '/img/medaka/幹之フルボディ.jpg');
+            $i12d = $this->createItem($extra, $sellerB, 10, 'M×4 T-4', 100, 560, '/img/medaka/幹之フルボディ.jpg');
             $this->persistGroup([
-                $this->buildWonItem($i12a, $winners[3], 60000),
-                $this->buildWonItem($i12b, $winners[3], 62000),
-                $this->buildWonItem($i12c, $winners[3], 64000),
-                $this->buildWonItem($i12d, $winners[3], 65000),
+                $this->buildWonItem($i12a, $winners[3], 700),
+                $this->buildWonItem($i12b, $winners[3], 720),
+                $this->buildWonItem($i12c, $winners[3], 740),
+                $this->buildWonItem($i12d, $winners[3], 760),
             ], $winners[3], $shipping, [
                 'payment_status' => 'confirmed',
                 'delivery_status' => 'preparing',
@@ -312,12 +312,12 @@ class ShippingPatternsSeeder extends Seeder
                     10 + $n,
                     sprintf('S×10 T-%d', $n),
                     10,
-                    3000 + $n * 100,
+                    150 + $n * 5,
                     '/img/medaka/01.png'
                 );
             }
             $this->persistGroup(array_map(
-                fn ($item, $idx) => $this->buildWonItem($item, $winners[4], 4000 + $idx * 100),
+                fn ($item, $idx) => $this->buildWonItem($item, $winners[4], 200 + $idx * 10),
                 $i13,
                 array_keys($i13)
             ), $winners[4], $shipping, [
@@ -502,7 +502,8 @@ class ShippingPatternsSeeder extends Seeder
     private function buildWonItem(Item $item, User $winner, int $winningPrice, array $overrides = []): array
     {
         $commissionRate = 10;
-        $commissionAmount = (int) round($winningPrice * $commissionRate / 100);
+        $totalBase = $winningPrice * $item->quantity;
+        $commissionAmount = (int) round($totalBase * $commissionRate / 100);
 
         $base = [
             'item_id' => $item->id,
@@ -511,7 +512,7 @@ class ShippingPatternsSeeder extends Seeder
             'quantity' => $item->quantity,
             'commission_rate' => $commissionRate,
             'commission_amount' => $commissionAmount,
-            'seller_amount' => $winningPrice - $commissionAmount,
+            'seller_amount' => $totalBase - $commissionAmount,
             'shipping_fee' => 0,
             'shipping_breakdown' => null,
             'payment_status' => 'pending',
