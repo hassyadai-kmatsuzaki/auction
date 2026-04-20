@@ -104,7 +104,7 @@ export default function ParticipantLayout() {
             edge="start"
             color="inherit"
             onClick={() => setDrawerOpen(true)}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ mr: 2, display: { lg: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
@@ -121,7 +121,7 @@ export default function ParticipantLayout() {
                 maxWidth: 200,
                 objectFit: 'contain',
                 cursor: 'pointer',
-                display: hasMultipleRoles ? { xs: 'none', sm: 'block' } : 'block',
+                display: hasMultipleRoles ? { xs: 'none', lg: 'block' } : 'block',
               }}
             />
             <TutorialGuide role="participant" />
@@ -129,7 +129,7 @@ export default function ParticipantLayout() {
           </Box>
 
           {/* デスクトップメニュー */}
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+          <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, flexShrink: 0 }}>
             {menuItems.map((item) => (
               <Button
                 key={item.path}
@@ -144,12 +144,19 @@ export default function ParticipantLayout() {
                 sx={{
                   borderBottom: location.pathname === item.path ? 2 : 0,
                   borderRadius: 0,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
               >
                 {item.text}
               </Button>
             ))}
-            <Button color="inherit" onClick={handleLogout} startIcon={<LogoutIcon />}>
+            <Button
+              color="inherit"
+              onClick={handleLogout}
+              startIcon={<LogoutIcon />}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
               ログアウト
             </Button>
           </Box>
