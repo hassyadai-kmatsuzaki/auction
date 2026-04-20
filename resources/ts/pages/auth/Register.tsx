@@ -8,35 +8,51 @@ import {
   Alert,
   Grid,
   CircularProgress,
-  InputAdornment,
-  Stack,
-  Chip,
-  Divider,
 } from '@mui/material';
-import {
-  PersonOutline,
-  BusinessOutlined,
-  StorefrontOutlined,
-  EmailOutlined,
-  LockOutlined,
-  PhoneOutlined,
-  MarkunreadMailboxOutlined,
-  LocationCityOutlined,
-  HomeOutlined,
-  ApartmentOutlined,
-  ArrowForwardRounded,
-  CheckCircleRounded,
-  VerifiedUserRounded,
-  BoltRounded,
-  ShieldOutlined,
-} from '@mui/icons-material';
+import { CheckCircleOutlined } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
-const STEPS = [
-  { n: 1, label: 'フォーム入力' },
-  { n: 2, label: '管理者承認' },
-  { n: 3, label: '利用開始' },
-];
+type FieldProps = {
+  label: string;
+  required?: boolean;
+  helper?: string;
+  error?: string;
+  children: React.ReactNode;
+};
+
+function Field({ label, required, helper, error, children }: FieldProps) {
+  return (
+    <Box>
+      <Typography
+        sx={{
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          color: 'text.primary',
+          mb: 0.75,
+        }}
+      >
+        {label}
+        {!required && (
+          <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.75rem', ml: 0.75 }}>
+            (任意)
+          </Typography>
+        )}
+      </Typography>
+      {children}
+      {(error || helper) && (
+        <Typography
+          sx={{
+            fontSize: '0.75rem',
+            color: error ? 'error.main' : 'text.secondary',
+            mt: 0.5,
+          }}
+        >
+          {error || helper}
+        </Typography>
+      )}
+    </Box>
+  );
+}
 
 export default function Register() {
   const navigate = useNavigate();
@@ -96,78 +112,43 @@ export default function Register() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: '#F8FAFC',
+          bgcolor: '#fff',
           px: 3,
           py: 6,
-          position: 'relative',
-          overflow: 'hidden',
         }}
       >
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            top: '-20%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 800,
-            height: 600,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(16,185,129,0.18), rgba(16,185,129,0) 70%)',
-            filter: 'blur(40px)',
-            pointerEvents: 'none',
-          }}
-        />
-        <Box
-          sx={{
-            position: 'relative',
-            maxWidth: 520,
-            width: '100%',
-            bgcolor: '#fff',
-            borderRadius: 4,
-            p: { xs: 4, sm: 6 },
-            textAlign: 'center',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0px 25px 50px -12px rgba(15, 23, 42, 0.1)',
-          }}
-        >
+        <Box sx={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
           <Box
             sx={{
-              width: 80,
-              height: 80,
+              width: 64,
+              height: 64,
               mx: 'auto',
               mb: 3,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              bgcolor: 'rgba(16,185,129,0.1)',
-              color: 'secondary.main',
+              bgcolor: '#F0FDF4',
+              color: '#059669',
             }}
           >
-            <CheckCircleRounded sx={{ fontSize: 48 }} />
+            <CheckCircleOutlined sx={{ fontSize: 36 }} />
           </Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, letterSpacing: '-0.02em' }}>
-            登録申請を受け付けました
+            申請を受け付けました
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.7 }}>
-            ご登録ありがとうございます。<br />
-            管理者の承認が完了次第、<br />
-            ご登録のメールアドレスに通知が届きます。
+          <Typography sx={{ color: 'text.secondary', mb: 4, lineHeight: 1.7 }}>
+            管理者の承認が完了次第、ご登録のメールアドレスに通知をお送りします。
           </Typography>
           <Button
             variant="contained"
             size="large"
-            endIcon={<ArrowForwardRounded />}
             onClick={() => navigate('/login')}
             sx={{
               py: 1.5,
               px: 4,
-              background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-              boxShadow: '0px 10px 30px -10px rgba(15, 23, 42, 0.5)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)',
-              },
+              bgcolor: '#0F172A',
+              '&:hover': { bgcolor: '#1E293B' },
             }}
           >
             ログイン画面へ戻る
@@ -178,187 +159,81 @@ export default function Register() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', bgcolor: '#F8FAFC' }}>
-      {/* 左パネル：ブランド */}
+    <Box sx={{ minHeight: '100vh', display: 'flex', bgcolor: '#fff' }}>
+      {/* 左：ビジュアル（sticky） */}
       <Box
         sx={{
           flex: { lg: '0 0 42%' },
-          display: { xs: 'none', lg: 'flex' },
+          display: { xs: 'none', lg: 'block' },
           position: 'sticky',
           top: 0,
           height: '100vh',
           overflow: 'hidden',
-          background: 'linear-gradient(160deg, #020617 0%, #0F172A 50%, #064E3B 100%)',
-          color: '#fff',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          p: 6,
         }}
       >
         <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            top: '-15%',
-            right: '-20%',
-            width: 560,
-            height: 560,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(16,185,129,0.35), rgba(16,185,129,0) 70%)',
-            filter: 'blur(20px)',
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            position: 'absolute',
-            bottom: '-25%',
-            left: '-20%',
-            width: 520,
-            height: 520,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(59,130,246,0.25), rgba(59,130,246,0) 70%)',
-            filter: 'blur(20px)',
-          }}
-        />
-        <Box
-          aria-hidden
           sx={{
             position: 'absolute',
             inset: 0,
-            opacity: 0.08,
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 75%)',
+            backgroundImage: 'url(/img/medaka/03.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
         />
-
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              component="img"
-              src="/img/logo.png?v=1"
-              alt="logo"
-              sx={{
-                height: 48,
-                width: 48,
-                borderRadius: 2,
-                objectFit: 'cover',
-                bgcolor: 'rgba(255,255,255,0.08)',
-                p: 0.5,
-                border: '1px solid rgba(255,255,255,0.15)',
-              }}
-            />
-            <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', letterSpacing: '-0.01em' }}>
-                Medaka Live
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', opacity: 0.7, letterSpacing: '0.08em' }}>
-                AUCTION PLATFORM
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
-
-        <Box sx={{ position: 'relative', zIndex: 1, maxWidth: 440 }}>
-          <Chip
-            label="START YOUR JOURNEY"
-            size="small"
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(15,23,42,0.25) 0%, rgba(15,23,42,0.1) 40%, rgba(15,23,42,0.65) 100%)',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 40,
+            left: 40,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            color: '#fff',
+          }}
+        >
+          <Box
+            component="img"
+            src="/img/logo.png?v=1"
+            alt="logo"
             sx={{
-              bgcolor: 'rgba(16,185,129,0.18)',
-              color: '#6EE7B7',
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              border: '1px solid rgba(16,185,129,0.3)',
-              mb: 3,
+              height: 40,
+              width: 40,
+              borderRadius: 1.5,
+              objectFit: 'cover',
+              bgcolor: 'rgba(255,255,255,0.15)',
+              backdropFilter: 'blur(10px)',
+              p: 0.25,
             }}
           />
+          <Typography sx={{ fontWeight: 600, fontSize: '1rem', letterSpacing: '-0.01em' }}>
+            Medaka Live Auction
+          </Typography>
+        </Box>
+        <Box sx={{ position: 'absolute', bottom: 56, left: 48, right: 48, color: '#fff' }}>
           <Typography
             sx={{
-              fontSize: '2.25rem',
               fontWeight: 700,
-              letterSpacing: '-0.03em',
+              fontSize: { lg: '2.25rem' },
+              letterSpacing: '-0.02em',
               lineHeight: 1.2,
-              mb: 2,
+              textShadow: '0 2px 20px rgba(0,0,0,0.3)',
             }}
           >
-            3ステップで、<br />
-            ライブ入札デビュー。
-          </Typography>
-          <Typography sx={{ fontSize: '0.95rem', opacity: 0.75, lineHeight: 1.7, mb: 4 }}>
-            申請は数分で完了。管理者の承認後、すぐにオークションにご参加いただけます。
-          </Typography>
-
-          <Stack spacing={2.5}>
-            {STEPS.map((s, i) => (
-              <Box key={s.n} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box
-                  sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    bgcolor: i === 0 ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)',
-                    color: i === 0 ? '#6EE7B7' : 'rgba(255,255,255,0.6)',
-                    border: `1px solid ${i === 0 ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                  }}
-                >
-                  {s.n}
-                </Box>
-                <Typography
-                  sx={{
-                    fontSize: '1rem',
-                    fontWeight: i === 0 ? 600 : 400,
-                    color: i === 0 ? '#fff' : 'rgba(255,255,255,0.7)',
-                  }}
-                >
-                  {s.label}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-
-          <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
-
-          <Stack direction="row" spacing={3} sx={{ flexWrap: 'wrap', rowGap: 2 }}>
-            {[
-              { icon: <ShieldOutlined />, label: '承認制' },
-              { icon: <VerifiedUserRounded />, label: '安全な取引' },
-              { icon: <BoltRounded />, label: '即時参加' },
-            ].map((item) => (
-              <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 1.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'rgba(255,255,255,0.08)',
-                    color: '#6EE7B7',
-                  }}
-                >
-                  {item.icon}
-                </Box>
-                <Typography sx={{ fontSize: '0.8125rem', opacity: 0.85 }}>{item.label}</Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <Typography sx={{ fontSize: '0.75rem', opacity: 0.5 }}>
-            © {new Date().getFullYear()} Medaka Live Auction. All rights reserved.
+            全国のブリーダーと、<br />
+            ライブでつながる。
           </Typography>
         </Box>
       </Box>
 
-      {/* 右パネル：フォーム */}
+      {/* 右：フォーム */}
       <Box
         sx={{
           flex: 1,
@@ -366,16 +241,15 @@ export default function Register() {
           flexDirection: 'column',
           alignItems: 'center',
           px: { xs: 3, sm: 6, lg: 8 },
-          py: { xs: 4, md: 6 },
+          py: { xs: 5, md: 6, lg: 8 },
         }}
       >
-        {/* モバイル/タブレット用ロゴヘッダー */}
         <Box
           sx={{
             display: { xs: 'flex', lg: 'none' },
             alignItems: 'center',
             gap: 1.5,
-            mb: 4,
+            mb: 5,
             alignSelf: 'flex-start',
           }}
         >
@@ -383,33 +257,27 @@ export default function Register() {
             component="img"
             src="/img/logo.png?v=1"
             alt="logo"
-            sx={{ height: 44, width: 44, borderRadius: 1.5, objectFit: 'cover' }}
+            sx={{ height: 36, width: 36, borderRadius: 1, objectFit: 'cover' }}
           />
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>Medaka Live</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', letterSpacing: '0.08em' }}>
-              AUCTION PLATFORM
-            </Typography>
-          </Box>
+          <Typography sx={{ fontWeight: 600, fontSize: '0.95rem' }}>
+            Medaka Live Auction
+          </Typography>
         </Box>
 
-        <Box sx={{ width: '100%', maxWidth: 640 }}>
-          <Chip
-            label="新規登録申請"
-            size="small"
+        <Box sx={{ width: '100%', maxWidth: 560 }}>
+          <Typography
+            variant="h3"
             sx={{
-              bgcolor: 'rgba(16,185,129,0.1)',
-              color: 'secondary.dark',
-              fontWeight: 600,
-              letterSpacing: '0.05em',
-              mb: 2,
+              fontWeight: 700,
+              letterSpacing: '-0.03em',
+              fontSize: { xs: '1.875rem', md: '2.25rem' },
+              mb: 1.25,
             }}
-          />
-          <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.02em', mb: 1 }}>
+          >
             アカウントを作成
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            必要な情報をご入力ください。登録後、管理者の承認を経てご利用いただけます。
+          <Typography sx={{ color: 'text.secondary', fontSize: '0.9375rem', mb: 5 }}>
+            必要な情報を入力してください。管理者の承認後にご利用いただけます。
           </Typography>
 
           {error && (
@@ -419,269 +287,193 @@ export default function Register() {
           )}
 
           <Box component="form" onSubmit={handleSubmit}>
-            {/* セクション1: アカウント情報 */}
+            {/* セクション1 */}
             <Typography
-              variant="overline"
               sx={{
-                display: 'block',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: 'text.secondary',
-                letterSpacing: '0.1em',
-                mb: 1.5,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                mb: 2,
               }}
             >
               アカウント情報
             </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={2.5} sx={{ mb: 4 }}>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="お名前"
-                  value={formData.name}
-                  onChange={handleChange('name')}
-                  required
-                  error={!!errors.name}
-                  helperText={errors.name?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PersonOutline sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="お名前" required error={errors.name?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.name}
+                    onChange={handleChange('name')}
+                    required
+                    error={!!errors.name}
+                    placeholder="山田 太郎"
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="屋号（任意）"
-                  value={formData.trade_name}
-                  onChange={handleChange('trade_name')}
-                  error={!!errors.trade_name}
-                  helperText={errors.trade_name?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <StorefrontOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="屋号" error={errors.trade_name?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.trade_name}
+                    onChange={handleChange('trade_name')}
+                    error={!!errors.trade_name}
+                    placeholder="めだか工房"
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="法人名（任意）"
-                  value={formData.company_name}
-                  onChange={handleChange('company_name')}
-                  error={!!errors.company_name}
-                  helperText={errors.company_name?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <BusinessOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="法人名" error={errors.company_name?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.company_name}
+                    onChange={handleChange('company_name')}
+                    error={!!errors.company_name}
+                    placeholder="株式会社〇〇"
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="メールアドレス"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange('email')}
-                  required
-                  error={!!errors.email}
-                  helperText={errors.email?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <EmailOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="メールアドレス" required error={errors.email?.[0]}>
+                  <TextField
+                    fullWidth
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange('email')}
+                    required
+                    error={!!errors.email}
+                    placeholder="you@example.com"
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="パスワード"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleChange('password')}
-                  required
-                  error={!!errors.password}
-                  helperText={errors.password?.[0] || '8文字以上'}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LockOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="パスワード" required helper="8文字以上" error={errors.password?.[0]}>
+                  <TextField
+                    fullWidth
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange('password')}
+                    required
+                    error={!!errors.password}
+                    placeholder="••••••••"
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="パスワード（確認）"
-                  type="password"
-                  value={formData.password_confirmation}
-                  onChange={handleChange('password_confirmation')}
-                  required
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LockOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="パスワード(確認)" required>
+                  <TextField
+                    fullWidth
+                    type="password"
+                    value={formData.password_confirmation}
+                    onChange={handleChange('password_confirmation')}
+                    required
+                    placeholder="••••••••"
+                  />
+                </Field>
               </Grid>
             </Grid>
 
-            {/* セクション2: 連絡先 */}
+            {/* セクション2 */}
             <Typography
-              variant="overline"
               sx={{
-                display: 'block',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 color: 'text.secondary',
-                letterSpacing: '0.1em',
-                mb: 1.5,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                mb: 2,
               }}
             >
               連絡先・お届け先
             </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={2.5} sx={{ mb: 4 }}>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="電話番号"
-                  value={formData.phone}
-                  onChange={handleChange('phone')}
-                  placeholder="090-1234-5678"
-                  required
-                  error={!!errors.phone}
-                  helperText={errors.phone?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PhoneOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="電話番号" required error={errors.phone?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.phone}
+                    onChange={handleChange('phone')}
+                    placeholder="090-1234-5678"
+                    required
+                    error={!!errors.phone}
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="郵便番号"
-                  value={formData.postal_code}
-                  onChange={handleChange('postal_code')}
-                  placeholder="123-4567"
-                  required
-                  error={!!errors.postal_code}
-                  helperText={errors.postal_code?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <MarkunreadMailboxOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="郵便番号" required error={errors.postal_code?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.postal_code}
+                    onChange={handleChange('postal_code')}
+                    placeholder="123-4567"
+                    required
+                    error={!!errors.postal_code}
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="都道府県"
-                  value={formData.prefecture}
-                  onChange={handleChange('prefecture')}
-                  placeholder="東京都"
-                  required
-                  error={!!errors.prefecture}
-                  helperText={errors.prefecture?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocationCityOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="都道府県" required error={errors.prefecture?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.prefecture}
+                    onChange={handleChange('prefecture')}
+                    placeholder="東京都"
+                    required
+                    error={!!errors.prefecture}
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="市区町村"
-                  value={formData.city}
-                  onChange={handleChange('city')}
-                  placeholder="渋谷区"
-                  required
-                  error={!!errors.city}
-                  helperText={errors.city?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LocationCityOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="市区町村" required error={errors.city?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.city}
+                    onChange={handleChange('city')}
+                    placeholder="渋谷区"
+                    required
+                    error={!!errors.city}
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="番地"
-                  value={formData.address_line1}
-                  onChange={handleChange('address_line1')}
-                  placeholder="1-2-3"
-                  required
-                  error={!!errors.address_line1}
-                  helperText={errors.address_line1?.[0]}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <HomeOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="番地" required error={errors.address_line1?.[0]}>
+                  <TextField
+                    fullWidth
+                    value={formData.address_line1}
+                    onChange={handleChange('address_line1')}
+                    placeholder="1-2-3"
+                    required
+                    error={!!errors.address_line1}
+                  />
+                </Field>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="建物名・部屋番号（任意）"
-                  value={formData.address_line2}
-                  onChange={handleChange('address_line2')}
-                  placeholder="メダカハイツ101号室"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <ApartmentOutlined sx={{ color: 'text.secondary', fontSize: 20 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <Field label="建物名・部屋番号">
+                  <TextField
+                    fullWidth
+                    value={formData.address_line2}
+                    onChange={handleChange('address_line2')}
+                    placeholder="〇〇マンション 101号室"
+                  />
+                </Field>
               </Grid>
             </Grid>
 
-            <Alert
-              severity="info"
-              icon={<ShieldOutlined />}
+            <Box
               sx={{
+                p: 2,
                 mb: 3,
                 borderRadius: 2,
-                bgcolor: 'rgba(59,130,246,0.06)',
-                border: '1px solid rgba(59,130,246,0.15)',
-                '& .MuiAlert-icon': { color: 'info.main' },
+                bgcolor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
               }}
             >
-              登録後、管理者の承認が必要です。承認完了までログインはできません。
-            </Alert>
+              <Typography sx={{ fontSize: '0.8125rem', color: 'text.secondary', lineHeight: 1.6 }}>
+                登録後、管理者の承認が必要です。承認完了までログインはできません。
+              </Typography>
+            </Box>
 
             <Button
               type="submit"
@@ -689,39 +481,41 @@ export default function Register() {
               variant="contained"
               size="large"
               disabled={loading}
-              endIcon={!loading && <ArrowForwardRounded />}
               sx={{
                 py: 1.5,
-                fontSize: '1rem',
+                fontSize: '0.9375rem',
                 fontWeight: 600,
-                background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-                boxShadow: '0px 10px 30px -10px rgba(15, 23, 42, 0.5)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)',
-                  boxShadow: '0px 15px 35px -10px rgba(15, 23, 42, 0.6)',
-                },
+                bgcolor: '#0F172A',
+                '&:hover': { bgcolor: '#1E293B' },
               }}
             >
-              {loading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : '登録を申請する'}
+              {loading ? <CircularProgress size={22} sx={{ color: '#fff' }} /> : '登録を申請する'}
             </Button>
 
-            <Box sx={{ textAlign: 'center', mt: 3 }}>
-              <Typography variant="body2" color="text.secondary">
-                すでにアカウントをお持ちですか？{' '}
-                <Typography
-                  component="span"
-                  onClick={() => navigate('/login')}
-                  sx={{
-                    cursor: 'pointer',
-                    color: 'secondary.main',
-                    fontWeight: 600,
-                    '&:hover': { textDecoration: 'underline' },
-                  }}
-                >
-                  ログイン
-                </Typography>
+            <Typography
+              sx={{
+                textAlign: 'center',
+                mt: 3,
+                fontSize: '0.875rem',
+                color: 'text.secondary',
+              }}
+            >
+              すでにアカウントをお持ちですか？{' '}
+              <Typography
+                component="span"
+                onClick={() => navigate('/login')}
+                sx={{
+                  cursor: 'pointer',
+                  color: 'text.primary',
+                  fontWeight: 600,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                  '&:hover': { color: 'primary.main' },
+                }}
+              >
+                ログイン
               </Typography>
-            </Box>
+            </Typography>
           </Box>
         </Box>
       </Box>
