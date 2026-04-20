@@ -20,22 +20,12 @@ import {
   MenuItem,
   FormControlLabel,
   Switch,
-  ToggleButton,
-  ToggleButtonGroup,
   Stack,
   Avatar,
-  Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
   ArrowBack as ArrowBackIcon,
-  ViewModule as GridViewIcon,
-  ViewList as ListViewIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -48,7 +38,6 @@ import { useUserPreference } from '../../hooks/useUserPreference';
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import type { LaneItem } from '../../types';
 
-type ViewMode = 'grid' | 'list';
 type SortKey = 'created_desc' | 'created_asc' | 'seller' | 'price_asc' | 'price_desc';
 
 interface FavoriteItem {
@@ -92,7 +81,6 @@ export default function Favorites() {
   const queryClient = useQueryClient();
 
   // ユーザーごとに永続化される表示設定
-  const [viewMode, setViewMode]       = useUserPreference<ViewMode>('participant.favorites.viewMode', 'grid');
   const [sortKey, setSortKey]         = useUserPreference<SortKey>('participant.favorites.sort', 'created_desc');
   const [sellerFilter, setSellerFilter] = useUserPreference<string>('participant.favorites.seller', 'all');
   const [includePast, setIncludePast] = useUserPreference<boolean>('participant.favorites.includePast', true);
@@ -307,23 +295,6 @@ export default function Favorites() {
             }
             label="過去のオークションも表示"
           />
-
-          <Box sx={{ flex: 1 }} />
-
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            size="small"
-            onChange={(_, v) => v && setViewMode(v)}
-            aria-label="表示モード"
-          >
-            <ToggleButton value="grid" aria-label="グリッド">
-              <Tooltip title="グリッド表示"><GridViewIcon fontSize="small" /></Tooltip>
-            </ToggleButton>
-            <ToggleButton value="list" aria-label="リスト">
-              <Tooltip title="リスト表示"><ListViewIcon fontSize="small" /></Tooltip>
-            </ToggleButton>
-          </ToggleButtonGroup>
         </Stack>
       </Paper>
 
@@ -348,7 +319,7 @@ export default function Favorites() {
             条件に一致するお気に入りがありません
           </Typography>
         </Paper>
-      ) : viewMode === 'grid' ? (
+      ) : (
         <Grid container spacing={2}>
           {visibleFavorites.map((item) => (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
@@ -458,98 +429,6 @@ export default function Favorites() {
             </Grid>
           ))}
         </Grid>
-      ) : (
-        <Paper variant="outlined">
-          <List disablePadding>
-            {visibleFavorites.map((item, idx) => (
-              <React.Fragment key={item.id}>
-                {idx > 0 && <Divider component="li" />}
-                <ListItem
-                  alignItems="flex-start"
-                  sx={{
-                    py: 1.5,
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' },
-                    gap: 1,
-                  }}
-                  onClick={() => handleDetailOpen(item)}
-                  secondaryAction={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ minWidth: 160 }}>
-                        <BidLimitBadge
-                          limitPrice={limitSettings[item.item_id]?.limit_price ?? null}
-                          isTriggered={limitSettings[item.item_id]?.is_triggered ?? false}
-                          onEdit={() => setLimitModalItem(item)}
-                          onRemove={() => handleRemoveLimit(item.item_id)}
-                        />
-                      </Box>
-                      <IconButton
-                        edge="end"
-                        onClick={(e) => handleRemoveFavorite(e, item.item_id)}
-                        aria-label="解除"
-                      >
-                        <FavoriteIcon sx={{ color: '#ef4444' }} />
-                      </IconButton>
-                    </Box>
-                  }
-                >
-                  <ListItemAvatar sx={{ mr: 1 }}>
-                    <Avatar
-                      variant="rounded"
-                      src={optimizedImageUrl(item.thumbnail_path, 'small')}
-                      alt={item.species_name}
-                      sx={{ width: 72, height: 72 }}
-                    />
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography variant="caption" color="text.secondary">
-                          No.{item.item_number}
-                        </Typography>
-                        <Typography variant="subtitle1" fontWeight={700}>
-                          {item.species_name}
-                        </Typography>
-                        {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
-                        {getStatusChip(item.status)}
-                      </Box>
-                    }
-                    secondary={
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, mt: 0.5, alignItems: 'center' }}>
-                        {item.seller && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Avatar
-                              src={item.seller.profile_image_url || undefined}
-                              sx={{ width: 18, height: 18, fontSize: '0.65rem', bgcolor: 'grey.300' }}
-                            >
-                              {!item.seller.profile_image_url && item.seller.seller_name.charAt(0)}
-                            </Avatar>
-                            <Typography variant="caption" color="text.secondary">
-                              {item.seller.seller_name}
-                            </Typography>
-                          </Box>
-                        )}
-                        {item.auction && (
-                          <Typography variant="caption" color="text.secondary">
-                            {item.auction.title}（{getAuctionStatusLabel(item.auction.status)}）
-                          </Typography>
-                        )}
-                        <Typography variant="caption" color="text.secondary">
-                          {item.quantity}匹 / 開始 ¥{Number(item.start_price).toLocaleString()}〜
-                        </Typography>
-                        {item.inspection_info && (
-                          <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
-                            {item.inspection_info}
-                          </Typography>
-                        )}
-                      </Box>
-                    }
-                  />
-                </ListItem>
-              </React.Fragment>
-            ))}
-          </List>
-        </Paper>
       )}
 
       {/* 詳細ダイアログ */}

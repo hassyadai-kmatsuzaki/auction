@@ -22,6 +22,8 @@ class RegisterController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
+            'trade_name' => 'nullable|string|max:255',
+            'company_name' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'phone' => 'required|string|max:20',
@@ -33,6 +35,8 @@ class RegisterController extends Controller
         ], [
             'name.required' => 'お名前は必須です。',
             'name.max' => 'お名前は255文字以内で入力してください。',
+            'trade_name.max' => '屋号は255文字以内で入力してください。',
+            'company_name.max' => '法人名は255文字以内で入力してください。',
             'email.required' => 'メールアドレスは必須です。',
             'email.email' => '有効なメールアドレスを入力してください。',
             'email.unique' => 'このメールアドレスは既に登録されています。',
@@ -58,6 +62,8 @@ class RegisterController extends Controller
             // ユーザーを作成（承認待ちステータス）
             $user = User::create([
                 'name' => $request->name,
+                'trade_name' => $request->trade_name,
+                'company_name' => $request->company_name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,

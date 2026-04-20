@@ -53,11 +53,10 @@ export function DemoItemList({ onGoToWaitingRoom, onFavoriteAdded, onLimitSetCal
   const [selectedItem, setSelectedItem] = useState<typeof MOCK_ITEMS[0] | null>(null);
   const [sellerFilter, setSellerFilter] = useState<string>('all');
 
-  const totalItems = MOCK_ITEMS.length;
-
   const allLaneItems = selectedLane === 0
     ? MOCK_LANES_LIST.flatMap((l) => l.items)
     : MOCK_LANES_LIST[selectedLane - 1]?.items ?? [];
+  const totalItems = MOCK_LANES_LIST.reduce((sum, l) => sum + l.items.length, 0);
 
   const mapItem = (item: typeof MOCK_ITEMS[0]): ItemData => ({
     id: item.id,

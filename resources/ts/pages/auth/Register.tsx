@@ -19,6 +19,8 @@ export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
+    trade_name: '',
+    company_name: '',
     email: '',
     password: '',
     password_confirmation: '',
@@ -128,6 +130,26 @@ export default function Register() {
                   required
                   error={!!errors.name}
                   helperText={errors.name?.[0]}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="屋号（任意）"
+                  value={formData.trade_name}
+                  onChange={handleChange('trade_name')}
+                  error={!!errors.trade_name}
+                  helperText={errors.trade_name?.[0]}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="法人名（任意）"
+                  value={formData.company_name}
+                  onChange={handleChange('company_name')}
+                  error={!!errors.company_name}
+                  helperText={errors.company_name?.[0]}
                 />
               </Grid>
               <Grid item xs={12}>

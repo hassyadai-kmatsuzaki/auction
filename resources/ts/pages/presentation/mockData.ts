@@ -262,10 +262,6 @@ export const MOCK_ITEMS: ItemData[] = [
 export const MOCK_LANES_LIST = [
   { lane_name: 'レーン 1', items: MOCK_ITEMS.filter(i => i.id === 1) },
   { lane_name: 'レーン 2', items: MOCK_ITEMS.filter(i => i.id === 2) },
-  { lane_name: 'レーン 3', items: MOCK_ITEMS.filter(i => i.id === 3) },
-  { lane_name: 'レーン 4', items: MOCK_ITEMS.filter(i => i.id === 4) },
-  { lane_name: 'レーン 5', items: MOCK_ITEMS.filter(i => i.id === 5) },
-  { lane_name: 'レーン 6', items: MOCK_ITEMS.filter(i => i.id === 6) },
 ];
 
 // ====================================================================

@@ -379,6 +379,9 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       setTimeout(() => setCelebration(null), 3000);
     }
 
+    // 落札/不成立が確定したら、同レーンを表示中の詳細モーダルを閉じる
+    setDetailLane(prev => (prev?.lane_id === laneId ? null : prev));
+
     // Move to next item after a brief delay
     setTimeout(() => advanceToNextItem(laneId), 1500);
   }, [advanceToNextItem]);
