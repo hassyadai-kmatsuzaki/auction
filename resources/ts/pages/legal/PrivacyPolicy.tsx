@@ -19,7 +19,7 @@ export default function PrivacyPolicy() {
               1. 個人情報の収集について
             </Typography>
             <Typography variant="body2" paragraph sx={{ lineHeight: 1.8 }}>
-              メダカオークション運営事務局（以下「当社」）は、本サービスの提供にあたり、以下の個人情報を収集することがあります。
+              日本メダカオンライン市場運営事務局（以下「当社」）は、本サービスの提供にあたり、以下の個人情報を収集することがあります。
             </Typography>
             <Typography component="ul" variant="body2" sx={{ pl: 2, lineHeight: 2 }}>
               <li>氏名、住所、電話番号、メールアドレス等の連絡先情報</li>
@@ -107,7 +107,7 @@ export default function PrivacyPolicy() {
               お問い合わせ先
             </Typography>
             <Typography variant="body2" sx={{ lineHeight: 2 }}>
-              メダカオークション運営事務局<br />
+              日本メダカオンライン市場運営事務局<br />
               〒104-0061<br />
               東京都中央区銀座1-12-4 N&E BLD.7階<br />
               TEL: 03-1234-5678

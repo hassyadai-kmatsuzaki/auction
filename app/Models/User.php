@@ -160,6 +160,55 @@ class User extends Authenticatable
     }
 
     /**
+     * 年会費サブスクリプション
+     */
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class);
+    }
+
+    /**
+     * 決済履歴
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * 有効なサブスクが存在するか
+     */
+    public function hasActiveSubscription(): bool
+    {
+        $subscription = $this->subscription()->with('plan')->first();
+        return $subscription !== null && $subscription->isActive();
+    }
+
+    /**
+     * 落札（入札）が許可されているか（プラン allows_bid + active）
+     */
+    public function canBid(): bool
+    {
+        $subscription = $this->subscription()->with('plan')->first();
+        return $subscription !== null
+            && $subscription->isActive()
+            && $subscription->plan
+            && $subscription->plan->allows_bid;
+    }
+
+    /**
+     * 出品が許可されているか（プラン allows_sell + active）
+     */
+    public function canSell(): bool
+    {
+        $subscription = $this->subscription()->with('plan')->first();
+        return $subscription !== null
+            && $subscription->isActive()
+            && $subscription->plan
+            && $subscription->plan->allows_sell;
+    }
+
+    /**
      * お気に入りの商品とのリレーション
      *
      * @return BelongsToMany

@@ -286,7 +286,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" align="center">
-            © 2025 メダカオークション運営事務局
+            © 2025 日本メダカオンライン市場運営事務局
           </Typography>
         </Container>
       </Box>

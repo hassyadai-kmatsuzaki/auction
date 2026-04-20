@@ -57,7 +57,7 @@ class TutorialController extends Controller
     private function getParticipantTutorial(): array
     {
         return [
-            ['id' => 'p_welcome', 'title' => 'メダカオークションへようこそ', 'description' => 'オークションの基本的な流れを確認しましょう', 'target' => '/participant/home'],
+            ['id' => 'p_welcome', 'title' => '日本メダカオンライン市場へようこそ', 'description' => 'オークションの基本的な流れを確認しましょう', 'target' => '/participant/home'],
             ['id' => 'p_auction_list', 'title' => 'オークション一覧', 'description' => '開催予定・開催中のオークションを確認できます', 'target' => '/participant/auctions'],
             ['id' => 'p_favorites', 'title' => 'お気に入り機能', 'description' => '気になる商品をお気に入りに登録すると通知が届きます', 'target' => '/participant/favorites'],
             ['id' => 'p_live', 'title' => 'ライブ入札の方法', 'description' => '入札ボタンの使い方、指値（上限価格）の設定方法を学びましょう', 'target' => null],

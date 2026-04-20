@@ -21,7 +21,7 @@ class TwoFactorService
             'two_factor_confirmed_at' => null,
         ]);
 
-        $appName = config('app.name', 'メダカオークション');
+        $appName = config('app.name', '日本メダカオンライン市場');
         $qrCodeUrl = $this->getTotpUri($secret, $user->email, $appName);
 
         return [

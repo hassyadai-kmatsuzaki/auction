@@ -29,7 +29,7 @@ export function DemoModeSelector({ onSelectGuided, onSelectFree }: DemoModeSelec
       }}>
         <Container maxWidth="md">
           <Typography variant="h3" fontWeight="bold" sx={{ mb: 2, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
-            メダカオークション デモ体験
+            日本メダカオンライン市場 デモ体験
           </Typography>
           <Typography variant="h6" sx={{ opacity: 0.9, mb: 1, fontSize: { xs: '0.95rem', md: '1.15rem' } }}>
             ログイン不要でオークションの全機能を体験できます

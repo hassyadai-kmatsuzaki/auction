@@ -70,7 +70,7 @@ class InvoiceService
         $firstItem = $wonItems->first();
 
         // 会社情報をシステム設定から取得
-        $companyName = SystemSetting::get('company_name', 'メダカオークション運営事務局');
+        $companyName = SystemSetting::get('company_name', '日本メダカオンライン市場運営事務局');
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
@@ -171,7 +171,7 @@ class InvoiceService
 
         $documentNumber = sprintf('DLV-%s-A%05d-W%05d', Carbon::now()->format('Ymd'), $auction->id, $winner->id);
 
-        $companyName = SystemSetting::get('company_name', 'メダカオークション運営事務局');
+        $companyName = SystemSetting::get('company_name', '日本メダカオンライン市場運営事務局');
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
@@ -250,7 +250,7 @@ class InvoiceService
         $documentNumber = sprintf('PAY-%s-A%05d-S%05d', Carbon::now()->format('Ymd'), $auction->id, $seller->id);
 
         // 会社情報
-        $companyName = SystemSetting::get('company_name', 'メダカオークション運営事務局');
+        $companyName = SystemSetting::get('company_name', '日本メダカオンライン市場運営事務局');
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');

@@ -224,7 +224,7 @@ class SystemSettingsSeeder extends Seeder
             // ==================== 帳票設定 ====================
             [
                 'key' => 'company_name',
-                'value' => '株式会社メダカオークション',
+                'value' => '株式会社日本メダカオンライン市場',
                 'type' => 'string',
                 'category' => 'document',
                 'label' => '会社名・屋号',
@@ -288,7 +288,7 @@ class SystemSettingsSeeder extends Seeder
             ],
             [
                 'key' => 'bank_account_holder',
-                'value' => 'カ）メダカオークション',
+                'value' => 'カ）ニホンメダカオンラインイチバ',
                 'type' => 'string',
                 'category' => 'document',
                 'label' => '口座名義',

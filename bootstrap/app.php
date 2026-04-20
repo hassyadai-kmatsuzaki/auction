@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.role' => \App\Http\Middleware\CheckRole::class,
             'rate.limit' => \App\Http\Middleware\RateLimitByIp::class,
             'audit' => \App\Http\Middleware\AuditLog::class,
+            'check.subscription' => \App\Http\Middleware\CheckSubscription::class,
         ]);
 
         // ALB（HTTPS終端）配下での X-Forwarded-* を信頼
@@ -58,6 +59,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 月次レポート自動生成（毎月1日 9:00）
         $schedule->command('reports:generate monthly')->monthlyOn(1, '09:00')
+            ->withoutOverlapping();
+
+        // 年会費サブスクの自動更新（毎日 3:00 に期限切れを再課金）
+        $schedule->command('subscriptions:renew')->dailyAt('03:00')
             ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

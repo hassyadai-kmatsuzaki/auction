@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import SubscriptionGate from '../components/SubscriptionGate';
 import {
   Box,
   Typography,
@@ -416,7 +417,9 @@ export default function SellerLayout() {
 
         {/* コンテンツエリア */}
         <Box sx={{ flex: 1, p: 3 }}>
-          <Outlet />
+          <SubscriptionGate>
+            <Outlet />
+          </SubscriptionGate>
         </Box>
 
         {/* フッター */}
@@ -486,7 +489,7 @@ export default function SellerLayout() {
             </Typography>
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-            © 2025 メダカオークション運営事務局
+            © 2025 日本メダカオンライン市場運営事務局
           </Typography>
         </Box>
       </Box>

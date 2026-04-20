@@ -36,6 +36,9 @@ import {
   Warning as WarningIcon,
   Recommend as RecommendIcon,
   Assessment as AssessmentIcon,
+  CreditCard as CreditCardIcon,
+  Subscriptions as SubscriptionsIcon,
+  WorkspacePremium as PlanIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -101,6 +104,12 @@ export default function AdminLayout() {
     { text: 'インフラスケーリング', icon: <CloudIcon />, path: '/admin/scaling' },
     { text: '帳票管理', icon: <ReceiptIcon />, path: '/admin/documents' },
     { text: 'レポート', icon: <AssessmentIcon />, path: '/admin/reports' },
+  ];
+
+  const billingMenuItems = [
+    { text: 'プラン管理', icon: <PlanIcon />, path: '/admin/plans' },
+    { text: 'サブスクリプション', icon: <SubscriptionsIcon />, path: '/admin/subscriptions' },
+    { text: '決済管理', icon: <CreditCardIcon />, path: '/admin/payments' },
   ];
 
   const aiSubItems = [
@@ -259,6 +268,50 @@ export default function AdminLayout() {
             </List>
           </Collapse>
 
+        </List>
+
+        <Divider sx={{ mx: 2, my: 2 }} />
+
+        <Typography
+          variant="caption"
+          sx={{
+            px: 3,
+            py: 1,
+            display: 'block',
+            color: 'text.secondary',
+            fontWeight: 600,
+            fontSize: '0.7rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
+          年会費・決済
+        </Typography>
+
+        <List sx={{ px: 1 }}>
+          {billingMenuItems.map((item) => (
+            <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                selected={location.pathname === item.path}
+                onClick={() => handleMenuNavigate(item.path)}
+                sx={{
+                  py: 1.2,
+                  '&.Mui-selected': {
+                    backgroundColor: '#F0FDF4',
+                    borderRight: '3px solid #059669',
+                    '& .MuiListItemIcon-root': { color: '#059669' },
+                    '& .MuiListItemText-primary': { color: '#059669', fontWeight: 600 },
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                <ListItemText
+                  primary={item.text}
+                  primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
         </List>
 
         <Divider sx={{ mx: 2, my: 2 }} />

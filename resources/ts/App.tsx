@@ -70,6 +70,9 @@ const AIImageRecognition     = lazy(() => import('./pages/admin/AIImageRecogniti
 const AIPricePrediction      = lazy(() => import('./pages/admin/AIPricePrediction'));
 const AIFraudDetection       = lazy(() => import('./pages/admin/AIFraudDetection'));
 const AIRecommendations      = lazy(() => import('./pages/admin/AIRecommendations'));
+const PlanManagement         = lazy(() => import('./pages/admin/PlanManagement'));
+const SubscriptionManagement = lazy(() => import('./pages/admin/SubscriptionManagement'));
+const PaymentManagement      = lazy(() => import('./pages/admin/PaymentManagement'));
 
 // Seller
 const SellerDashboard        = lazy(() => import('./pages/seller/Dashboard'));
@@ -214,6 +217,11 @@ function App() {
             <Route path="users" element={<UserManagement />} />
             <Route path="users/create" element={<UserCreate />} />
             <Route path="users/:id" element={<UserDetail />} />
+
+            {/* 年会費プラン・決済管理 */}
+            <Route path="plans" element={<PlanManagement />} />
+            <Route path="subscriptions" element={<SubscriptionManagement />} />
+            <Route path="payments" element={<PaymentManagement />} />
             
             {/* 設定 */}
             <Route path="settings" element={<Settings />} />

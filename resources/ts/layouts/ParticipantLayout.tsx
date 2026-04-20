@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import SubscriptionGate from '../components/SubscriptionGate';
 import {
   AppBar,
   Box,
@@ -313,7 +314,9 @@ export default function ParticipantLayout() {
 
       {/* メインコンテンツ */}
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
-        <Outlet />
+        <SubscriptionGate>
+          <Outlet />
+        </SubscriptionGate>
       </Box>
 
       {/* フッター */}
@@ -385,7 +388,7 @@ export default function ParticipantLayout() {
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" align="center">
-            © 2025 メダカオークション運営事務局
+            © 2025 日本メダカオンライン市場運営事務局
           </Typography>
         </Container>
       </Box>

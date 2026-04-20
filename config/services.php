@@ -63,4 +63,15 @@ return [
         'messaging_token'      => env('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN', ''),
     ],
 
+    'square' => [
+        'environment'        => env('SQUARE_ENVIRONMENT', 'sandbox'),
+        'access_token'       => env('SQUARE_ACCESS_TOKEN', ''),
+        'application_id'     => env('SQUARE_APPLICATION_ID', ''),
+        'location_id'        => env('SQUARE_LOCATION_ID', ''),
+        'webhook_signature_key' => env('SQUARE_WEBHOOK_SIGNATURE_KEY', ''),
+        'webhook_url'        => env('SQUARE_WEBHOOK_URL', ''),
+        'currency'           => env('SQUARE_CURRENCY', 'JPY'),
+        'api_version'        => env('SQUARE_API_VERSION', '2024-10-17'),
+    ],
+
 ];

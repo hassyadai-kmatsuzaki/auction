@@ -3,7 +3,7 @@ import { Box, Container, Typography, Paper, Divider, Table, TableBody, TableCell
 
 export default function SpecifiedCommercialTransaction() {
   const tableData = [
-    { label: '販売業者', value: 'メダカオークション運営事務局' },
+    { label: '販売業者', value: '日本メダカオンライン市場運営事務局' },
     { label: '運営統括責任者', value: '代表者名（例：山田太郎）' },
     { label: '所在地', value: '〒104-0061\n東京都中央区銀座1-12-4 N&E BLD.7階' },
     { label: '電話番号', value: '03-1234-5678\n（お問い合わせはメールにてお願いいたします）' },
@@ -65,7 +65,7 @@ export default function SpecifiedCommercialTransaction() {
             お問い合わせ先
           </Typography>
           <Typography variant="body2" sx={{ lineHeight: 2 }}>
-            メダカオークション運営事務局<br />
+            日本メダカオンライン市場運営事務局<br />
             〒104-0061<br />
             東京都中央区銀座1-12-4 N&E BLD.7階<br />
             TEL: 03-1234-5678

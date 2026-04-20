@@ -61,6 +61,10 @@ Route::get('/health', function () {
 // LINE Login コールバック（ブラウザからリダイレクトされる。認証はController内で手動チェック）
 Route::get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController::class, 'callback']);
 
+// Square Webhook（認証不要。HMAC署名で検証）
+Route::post('/webhooks/square', [\App\Http\Controllers\Webhook\SquareWebhookController::class, 'handle'])
+    ->name('webhooks.square');
+
 // 認証API（ゲスト・レート制限付き）
 Route::middleware('rate.limit:10,1')->prefix('auth')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
@@ -107,6 +111,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/confirm', [TwoFactorController::class, 'confirm']);
         Route::delete('/disable', [TwoFactorController::class, 'disable']);
         Route::post('/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes']);
+    });
+
+    // 年会費サブスクリプション（ロール問わず利用可）
+    Route::prefix('me/subscription')->group(function () {
+        Route::get('/', [\App\Http\Controllers\User\SubscriptionController::class, 'show']);
+        Route::post('/', [\App\Http\Controllers\User\SubscriptionController::class, 'store']);
+        Route::put('/card', [\App\Http\Controllers\User\SubscriptionController::class, 'replaceCard']);
+        Route::delete('/', [\App\Http\Controllers\User\SubscriptionController::class, 'cancel']);
     });
 
     // LINE連携（ロール問わず利用可）
@@ -281,6 +293,20 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::post('/{id}/dispute', [\App\Http\Controllers\Admin\EscrowController::class, 'dispute']);
     });
 
+    // プラン管理（年会費）
+    Route::apiResource('plans', \App\Http\Controllers\Admin\PlanController::class);
+
+    // サブスクリプション管理
+    Route::get('subscriptions', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index']);
+    Route::get('subscriptions/{id}', [\App\Http\Controllers\Admin\SubscriptionController::class, 'show']);
+    Route::post('subscriptions/{id}/cancel', [\App\Http\Controllers\Admin\SubscriptionController::class, 'cancel']);
+    Route::post('subscriptions/{id}/retry', [\App\Http\Controllers\Admin\SubscriptionController::class, 'retry']);
+
+    // 決済履歴管理
+    Route::get('payments', [\App\Http\Controllers\Admin\PaymentController::class, 'index']);
+    Route::get('payments/{id}', [\App\Http\Controllers\Admin\PaymentController::class, 'show']);
+    Route::post('payments/{id}/refund', [\App\Http\Controllers\Admin\PaymentController::class, 'refund']);
+
     // インフラスケーリング
     Route::prefix('scaling')->group(function () {
         Route::get('/status', [\App\Http\Controllers\Admin\ScalingController::class, 'status']);
@@ -311,14 +337,16 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     Route::post('/profile/image', [SellerProfileController::class, 'uploadProfileImage']);
     Route::delete('/profile/image', [SellerProfileController::class, 'deleteProfileImage']);
     
-    // 出品管理
+    // 出品管理（参照は非課金可／作成・編集・削除は allows_sell が必要）
     Route::get('/items', [SellerItemController::class, 'index']);
     Route::get('/items/stats', [SellerItemController::class, 'stats']);
     Route::get('/items/auctions', [SellerItemController::class, 'getAvailableAuctions']);
-    Route::post('/items', [SellerItemController::class, 'store']);
     Route::get('/items/{id}', [SellerItemController::class, 'show']);
-    Route::put('/items/{id}', [SellerItemController::class, 'update']);
-    Route::delete('/items/{id}', [SellerItemController::class, 'destroy']);
+    Route::middleware('check.subscription:sell')->group(function () {
+        Route::post('/items', [SellerItemController::class, 'store']);
+        Route::put('/items/{id}', [SellerItemController::class, 'update']);
+        Route::delete('/items/{id}', [SellerItemController::class, 'destroy']);
+    });
     
     // 発送管理
     Route::get('/shipping', [SellerShippingController::class, 'index']);
@@ -340,15 +368,17 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/auctions/{id}/my-won-items', [ParticipantAuctionController::class, 'myWonItems']);
     Route::get('/auctions/{id}/items', [ParticipantAuctionController::class, 'items']);
     
-    // 入札
-    Route::post('/bids', [ParticipantBidController::class, 'toggle']);
+    // 入札（プランの allows_bid が必要）
+    Route::middleware('check.subscription:bid')->group(function () {
+        Route::post('/bids', [ParticipantBidController::class, 'toggle']);
+        Route::post('/bid-limits', [ParticipantBidLimitController::class, 'store']);
+        Route::delete('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'destroy']);
+    });
     Route::get('/bids/my-active', [ParticipantBidController::class, 'myActive']);
 
-    // 指値（上限価格）
+    // 指値参照は非課金でも可
     Route::get('/bid-limits',          [ParticipantBidLimitController::class, 'index']);
-    Route::post('/bid-limits',         [ParticipantBidLimitController::class, 'store']);
     Route::get('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'show']);
-    Route::delete('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'destroy']);
     
     // 落札商品
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);

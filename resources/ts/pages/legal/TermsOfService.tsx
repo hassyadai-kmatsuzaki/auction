@@ -19,7 +19,7 @@ export default function TermsOfService() {
               第1条（適用）
             </Typography>
             <Typography variant="body2" paragraph sx={{ lineHeight: 1.8 }}>
-              本規約は、メダカオークション運営事務局（以下「当社」）が運営するメダカオークションサービス（以下「本サービス」）の利用に関する条件を、本サービスを利用するすべてのユーザー（以下「ユーザー」）と当社との間で定めるものです。
+              本規約は、日本メダカオンライン市場運営事務局（以下「当社」）が運営する日本メダカオンライン市場（以下「本サービス」）の利用に関する条件を、本サービスを利用するすべてのユーザー（以下「ユーザー」）と当社との間で定めるものです。
             </Typography>
           </section>
 
@@ -178,7 +178,7 @@ export default function TermsOfService() {
               お問い合わせ先
             </Typography>
             <Typography variant="body2" sx={{ lineHeight: 2 }}>
-              メダカオークション運営事務局<br />
+              日本メダカオンライン市場運営事務局<br />
               〒104-0061<br />
               東京都中央区銀座1-12-4 N&E BLD.7階<br />
               TEL: 03-1234-5678

@@ -193,7 +193,7 @@ return new class extends Migration
             // 帳票設定
             [
                 'setting_key' => 'company_name',
-                'setting_value' => '株式会社メダカオークション',
+                'setting_value' => '株式会社日本メダカオンライン市場',
                 'value_type' => 'string',
                 'category' => 'document',
                 'display_name' => '会社名・屋号',
@@ -281,7 +281,7 @@ return new class extends Migration
             ],
             [
                 'setting_key' => 'bank_account_holder',
-                'setting_value' => 'カ）メダカオークション',
+                'setting_value' => 'カ）ニホンメダカオンラインイチバ',
                 'value_type' => 'string',
                 'category' => 'document',
                 'display_name' => '口座名義',
