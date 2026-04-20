@@ -65,32 +65,32 @@ export default function Register() {
 
   const inputSx = {
     '& .MuiInput-root': {
-      color: '#fff',
+      color: '#000',
       fontSize: '0.9375rem',
-      '&:before': { borderBottomColor: 'rgba(255,255,255,0.3)' },
-      '&:hover:not(.Mui-disabled):before': { borderBottomColor: 'rgba(255,255,255,0.55)' },
-      '&.Mui-focused:after': { borderBottomColor: '#fff' },
+      '&:before': { borderBottomColor: 'rgba(0,0,0,0.3)' },
+      '&:hover:not(.Mui-disabled):before': { borderBottomColor: 'rgba(0,0,0,0.55)' },
+      '&.Mui-focused:after': { borderBottomColor: '#000' },
       '&.Mui-error:after': { borderBottomColor: '#FCA5A5' },
     },
     '& .MuiInputLabel-root': {
-      color: 'rgba(255,255,255,0.7)',
+      color: '#000',
       fontSize: '0.9375rem',
-      '&.Mui-focused': { color: '#fff' },
+      '&.Mui-focused': { color: '#000' },
       '&.Mui-error': { color: '#FCA5A5' },
     },
     '& .MuiFormHelperText-root': {
-      color: 'rgba(255,255,255,0.55)',
+      color: '#000',
       fontSize: '0.75rem',
       '&.Mui-error': { color: '#FCA5A5' },
     },
     '& input:-webkit-autofill': {
-      WebkitTextFillColor: '#fff',
+      WebkitTextFillColor: '#000',
       WebkitBoxShadow: '0 0 0 1000px transparent inset',
       transition: 'background-color 5000s ease-in-out 0s',
-      caretColor: '#fff',
+      caretColor: '#000',
     },
     '& input::placeholder, & textarea::placeholder': {
-      color: 'rgba(255,255,255,0.4)',
+      color: 'rgba(0,0,0,0.4)',
       opacity: 1,
     },
   };
@@ -113,14 +113,6 @@ export default function Register() {
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundAttachment: 'fixed',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            inset: 0,
-            background:
-              'linear-gradient(180deg, rgba(2,6,23,0.5) 0%, rgba(2,6,23,0.6) 100%)',
-            zIndex: 0,
-          },
         }}
       >
         <Box
@@ -137,7 +129,7 @@ export default function Register() {
             WebkitBackdropFilter: 'blur(10px) saturate(160%)',
             border: '1px solid rgba(255,255,255,0.18)',
             boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
-            color: '#fff',
+            color: '#000',
           }}
         >
           <Box
@@ -148,9 +140,8 @@ export default function Register() {
               display: 'block',
               mx: 'auto',
               mb: 2.5,
-              height: 96,
-              width: 'auto',
-              maxWidth: '80%',
+              width: 200,
+              height: 'auto',
               objectFit: 'contain',
               filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
             }}
@@ -175,7 +166,7 @@ export default function Register() {
           <Typography sx={{ fontWeight: 700, fontSize: '1.625rem', letterSpacing: '-0.02em', mb: 1.5 }}>
             申請を受け付けました
           </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 4, lineHeight: 1.7, fontSize: '0.9375rem' }}>
+          <Typography sx={{ color: '#000', mb: 4, lineHeight: 1.7, fontSize: '0.9375rem' }}>
             管理者の承認が完了次第、<br />
             ご登録のメールアドレスに通知をお送りします。
           </Typography>
@@ -187,6 +178,7 @@ export default function Register() {
               py: 1.5,
               px: 4,
               bgcolor: 'rgba(15, 23, 42, 0.95)',
+              color: '#000',
               border: '1px solid rgba(255,255,255,0.12)',
               '&:hover': { bgcolor: 'rgba(30, 41, 59, 0.95)' },
             }}
@@ -214,14 +206,6 @@ export default function Register() {
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         backgroundAttachment: 'fixed',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          background:
-            'linear-gradient(180deg, rgba(2,6,23,0.45) 0%, rgba(2,6,23,0.55) 50%, rgba(2,6,23,0.7) 100%)',
-          zIndex: 0,
-        },
       }}
     >
       {/* ガラスカード */}
@@ -238,7 +222,7 @@ export default function Register() {
           WebkitBackdropFilter: 'blur(10px) saturate(160%)',
           border: '1px solid rgba(255,255,255,0.18)',
           boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
-          color: '#fff',
+          color: '#000',
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 4 }}>
@@ -250,9 +234,8 @@ export default function Register() {
               display: 'block',
               mx: 'auto',
               mb: 2.5,
-              height: { xs: 96, sm: 120 },
-              width: 'auto',
-              maxWidth: '80%',
+              width: 200,
+              height: 'auto',
               objectFit: 'contain',
               filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
             }}
@@ -267,7 +250,7 @@ export default function Register() {
           >
             新規登録
           </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem' }}>
+          <Typography sx={{ color: '#000', fontSize: '0.875rem' }}>
             必要な情報を入力してください (承認制)
           </Typography>
         </Box>
@@ -279,7 +262,7 @@ export default function Register() {
               mb: 3,
               borderRadius: 2,
               bgcolor: 'rgba(239, 68, 68, 0.15)',
-              color: '#FECACA',
+              color: '#000',
               border: '1px solid rgba(239, 68, 68, 0.3)',
               '& .MuiAlert-icon': { color: '#FCA5A5' },
             }}
@@ -294,7 +277,7 @@ export default function Register() {
             sx={{
               fontSize: '0.6875rem',
               fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
+              color: '#000',
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
               mb: 2.5,
@@ -387,7 +370,7 @@ export default function Register() {
             sx={{
               fontSize: '0.6875rem',
               fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
+              color: '#000',
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
               mb: 2.5,
@@ -488,7 +471,7 @@ export default function Register() {
               border: '1px solid rgba(255,255,255,0.12)',
             }}
           >
-            <Typography sx={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>
+            <Typography sx={{ fontSize: '0.8125rem', color: '#000', lineHeight: 1.6 }}>
               登録後、管理者の承認が必要です。承認完了までログインはできません。
             </Typography>
           </Box>
@@ -504,7 +487,7 @@ export default function Register() {
               fontSize: '0.9375rem',
               fontWeight: 600,
               bgcolor: 'rgba(15, 23, 42, 0.95)',
-              color: '#fff',
+              color: '#000',
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)',
               '&:hover': {
@@ -513,11 +496,11 @@ export default function Register() {
               },
               '&.Mui-disabled': {
                 bgcolor: 'rgba(15, 23, 42, 0.6)',
-                color: 'rgba(255,255,255,0.5)',
+                color: '#000',
               },
             }}
           >
-            {loading ? <CircularProgress size={22} sx={{ color: '#fff' }} /> : '登録を申請する'}
+            {loading ? <CircularProgress size={22} sx={{ color: '#000' }} /> : '登録を申請する'}
           </Button>
 
           <Typography
@@ -525,7 +508,7 @@ export default function Register() {
               textAlign: 'center',
               mt: 3,
               fontSize: '0.875rem',
-              color: 'rgba(255,255,255,0.7)',
+              color: '#000',
             }}
           >
             すでにアカウントをお持ちの方は{' '}
@@ -534,7 +517,7 @@ export default function Register() {
               onClick={() => navigate('/login')}
               sx={{
                 cursor: 'pointer',
-                color: '#fff',
+                color: '#000',
                 fontWeight: 600,
                 textDecoration: 'underline',
                 textUnderlineOffset: '3px',

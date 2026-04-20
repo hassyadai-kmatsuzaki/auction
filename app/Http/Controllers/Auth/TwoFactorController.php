@@ -174,6 +174,12 @@ class TwoFactorController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'status' => $user->status,
+                    'phone' => $user->phone,
+                    'postal_code' => $user->postal_code,
+                    'prefecture' => $user->prefecture,
+                    'city' => $user->city,
+                    'address_line1' => $user->address_line1,
+                    'address_line2' => $user->address_line2,
                     'roles' => $user->roles->map(fn($role) => [
                         'id' => $role->id,
                         'name' => $role->name,

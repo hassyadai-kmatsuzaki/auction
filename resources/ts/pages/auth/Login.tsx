@@ -73,21 +73,21 @@ export default function Login() {
 
   const inputSx = {
     '& .MuiInput-root': {
-      color: '#fff',
+      color: '#000',
       fontSize: '1rem',
-      '&:before': { borderBottomColor: 'rgba(255,255,255,0.35)' },
-      '&:hover:not(.Mui-disabled):before': { borderBottomColor: 'rgba(255,255,255,0.6)' },
-      '&.Mui-focused:after': { borderBottomColor: '#fff' },
+      '&:before': { borderBottomColor: 'rgba(0,0,0,0.35)' },
+      '&:hover:not(.Mui-disabled):before': { borderBottomColor: 'rgba(0,0,0,0.6)' },
+      '&.Mui-focused:after': { borderBottomColor: '#000' },
     },
     '& .MuiInputLabel-root': {
-      color: 'rgba(255,255,255,0.75)',
-      '&.Mui-focused': { color: '#fff' },
+      color: '#000',
+      '&.Mui-focused': { color: '#000' },
     },
     '& input:-webkit-autofill': {
-      WebkitTextFillColor: '#fff',
+      WebkitTextFillColor: '#000',
       WebkitBoxShadow: '0 0 0 1000px transparent inset',
       transition: 'background-color 5000s ease-in-out 0s',
-      caretColor: '#fff',
+      caretColor: '#000',
     },
   };
 
@@ -108,14 +108,6 @@ export default function Login() {
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         backgroundAttachment: 'fixed',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          background:
-            'linear-gradient(180deg, rgba(2,6,23,0.45) 0%, rgba(2,6,23,0.55) 50%, rgba(2,6,23,0.7) 100%)',
-          zIndex: 0,
-        },
       }}
     >
       {/* ガラスカード */}
@@ -132,7 +124,7 @@ export default function Login() {
           WebkitBackdropFilter: 'blur(10px) saturate(160%)',
           border: '1px solid rgba(255,255,255,0.18)',
           boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
-          color: '#fff',
+          color: '#000',
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 4 }}>
@@ -144,9 +136,8 @@ export default function Login() {
               display: 'block',
               mx: 'auto',
               mb: 2.5,
-              height: { xs: 96, sm: 120 },
-              width: 'auto',
-              maxWidth: '80%',
+              width: 200,
+              height: 'auto',
               objectFit: 'contain',
               filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
             }}
@@ -161,7 +152,7 @@ export default function Login() {
           >
             ログイン
           </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem' }}>
+          <Typography sx={{ color: '#000', fontSize: '0.875rem' }}>
             アカウントにサインインして参加する
           </Typography>
         </Box>
@@ -173,7 +164,7 @@ export default function Login() {
               mb: 2.5,
               borderRadius: 2,
               bgcolor: 'rgba(239, 68, 68, 0.15)',
-              color: '#FECACA',
+              color: '#000',
               border: '1px solid rgba(239, 68, 68, 0.3)',
               '& .MuiAlert-icon': { color: '#FCA5A5' },
             }}
@@ -195,7 +186,7 @@ export default function Login() {
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <EmailOutlined sx={{ color: 'rgba(255,255,255,0.65)', fontSize: 20 }} />
+                  <EmailOutlined sx={{ color: '#000', fontSize: 20 }} />
                 </InputAdornment>
               ),
             }}
@@ -219,7 +210,7 @@ export default function Login() {
                     edge="end"
                     size="small"
                     aria-label="toggle password visibility"
-                    sx={{ color: 'rgba(255,255,255,0.65)', mr: -0.5 }}
+                    sx={{ color: '#000', mr: -0.5 }}
                   >
                     {showPassword ? <VisibilityOff fontSize="small" /> : <LockOutlined fontSize="small" />}
                   </IconButton>
@@ -235,9 +226,9 @@ export default function Login() {
               onClick={() => navigate('/auth/forgot-password')}
               sx={{
                 fontSize: '0.8125rem',
-                color: 'rgba(255,255,255,0.75)',
+                color: '#000',
                 cursor: 'pointer',
-                '&:hover': { color: '#fff' },
+                '&:hover': { color: '#000' },
               }}
             >
               パスワードをお忘れですか？
@@ -255,7 +246,7 @@ export default function Login() {
               fontSize: '0.9375rem',
               fontWeight: 600,
               bgcolor: 'rgba(15, 23, 42, 0.95)',
-              color: '#fff',
+              color: '#000',
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)',
               '&:hover': {
@@ -264,7 +255,7 @@ export default function Login() {
               },
               '&.Mui-disabled': {
                 bgcolor: 'rgba(15, 23, 42, 0.6)',
-                color: 'rgba(255,255,255,0.5)',
+                color: '#000',
               },
             }}
           >
@@ -274,7 +265,7 @@ export default function Login() {
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2.5 }}>
           <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.18)' }} />
-          <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)' }}>
+          <Typography sx={{ fontSize: '0.75rem', color: '#000' }}>
             OR
           </Typography>
           <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.18)' }} />
@@ -284,7 +275,7 @@ export default function Login() {
           sx={{
             '& .MuiButton-root': {
               bgcolor: 'rgba(255,255,255,0.95)',
-              color: '#0F172A',
+              color: '#000',
               borderColor: 'transparent',
               '&:hover': {
                 bgcolor: '#fff',
@@ -301,7 +292,7 @@ export default function Login() {
             textAlign: 'center',
             mt: 3,
             fontSize: '0.875rem',
-            color: 'rgba(255,255,255,0.7)',
+            color: '#000',
           }}
         >
           アカウントをお持ちでない方は{' '}
@@ -311,7 +302,7 @@ export default function Login() {
             onClick={() => navigate('/register')}
             sx={{
               cursor: 'pointer',
-              color: '#fff',
+              color: '#000',
               fontWeight: 600,
               textDecoration: 'underline',
               textUnderlineOffset: '3px',
