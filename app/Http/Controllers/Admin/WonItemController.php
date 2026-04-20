@@ -419,15 +419,16 @@ class WonItemController extends Controller
                 return response()->json(['success' => false, 'message' => '配送先地域を特定できません。'], 400);
             }
 
-            $items = $wonItems->map(fn ($w) => ['quantity' => $w->item->quantity])->values()->toArray();
+            $wonItems = $wonItems->values();
+            $items = $wonItems->map(fn ($w) => ['quantity' => $w->item->quantity])->toArray();
             $result = $calculator->calculate($items, $region);
             $totalShippingFee = $result['total_shipping_fee'];
 
-            $totalQuantity = $wonItems->sum(fn ($w) => $w->item->quantity);
-            foreach ($wonItems as $wonItem) {
-                $ratio = $wonItem->item->quantity / $totalQuantity;
+            $quantities = $wonItems->map(fn ($w) => $w->item->quantity)->toArray();
+            $apportioned = \App\Services\ShippingCalculatorService::apportionFee($totalShippingFee, $quantities);
+            foreach ($wonItems as $i => $wonItem) {
                 $wonItem->update([
-                    'shipping_fee' => (int) round($totalShippingFee * $ratio),
+                    'shipping_fee' => $apportioned[$i],
                     'shipping_breakdown' => $result,
                     'shipping_calculated_at' => now(),
                 ]);

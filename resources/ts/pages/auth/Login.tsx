@@ -10,11 +10,14 @@ import {
   IconButton,
 } from '@mui/material';
 import {
-  Visibility,
+  EmailOutlined,
+  LockOutlined,
   VisibilityOff,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import GoogleLoginButton from '../../features/auth/GoogleLoginButton';
+
+const BG_IMAGE = '/img/medaka/04.png';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -68,272 +71,281 @@ export default function Login() {
     }
   };
 
+  const inputSx = {
+    '& .MuiInput-root': {
+      color: '#fff',
+      fontSize: '1rem',
+      '&:before': { borderBottomColor: 'rgba(255,255,255,0.35)' },
+      '&:hover:not(.Mui-disabled):before': { borderBottomColor: 'rgba(255,255,255,0.6)' },
+      '&.Mui-focused:after': { borderBottomColor: '#fff' },
+    },
+    '& .MuiInputLabel-root': {
+      color: 'rgba(255,255,255,0.75)',
+      '&.Mui-focused': { color: '#fff' },
+    },
+    '& input:-webkit-autofill': {
+      WebkitTextFillColor: '#fff',
+      WebkitBoxShadow: '0 0 0 1000px transparent inset',
+      transition: 'background-color 5000s ease-in-out 0s',
+      caretColor: '#fff',
+    },
+  };
+
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', bgcolor: '#fff' }}>
-      {/* 左：ビジュアル */}
+    <Box
+      sx={{
+        minHeight: '100vh',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        px: 2,
+        py: { xs: 4, md: 6 },
+      }}
+    >
+      {/* 背景画像 */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          backgroundImage: `url(${BG_IMAGE})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          zIndex: -2,
+        }}
+      />
+      {/* 暗転オーバーレイ */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          background:
+            'linear-gradient(180deg, rgba(2,6,23,0.45) 0%, rgba(2,6,23,0.55) 50%, rgba(2,6,23,0.7) 100%)',
+          zIndex: -1,
+        }}
+      />
+
+      {/* 上部ロゴ */}
       <Box
         sx={{
-          flex: { md: '1 1 50%' },
-          display: { xs: 'none', md: 'block' },
-          position: 'relative',
-          overflow: 'hidden',
+          position: 'absolute',
+          top: { xs: 24, md: 40 },
+          left: { xs: 24, md: 48 },
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          zIndex: 2,
         }}
       >
         <Box
+          component="img"
+          src="/img/logo.png?v=1"
+          alt="logo"
           sx={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: 'url(/img/medaka/04.png)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            height: 40,
+            width: 40,
+            borderRadius: 1.5,
+            objectFit: 'cover',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(10px)',
+            p: 0.25,
           }}
         />
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'linear-gradient(180deg, rgba(15,23,42,0.25) 0%, rgba(15,23,42,0.1) 40%, rgba(15,23,42,0.65) 100%)',
-          }}
-        />
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 40,
-            left: 40,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            color: '#fff',
-          }}
-        >
-          <Box
-            component="img"
-            src="/img/logo.png?v=1"
-            alt="logo"
-            sx={{
-              height: 40,
-              width: 40,
-              borderRadius: 1.5,
-              objectFit: 'cover',
-              bgcolor: 'rgba(255,255,255,0.15)',
-              backdropFilter: 'blur(10px)',
-              p: 0.25,
-            }}
-          />
-          <Typography sx={{ fontWeight: 600, fontSize: '1rem', letterSpacing: '-0.01em' }}>
-            Medaka Live Auction
-          </Typography>
-        </Box>
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 56,
-            left: 48,
-            right: 48,
-            color: '#fff',
-          }}
-        >
-          <Typography
-            sx={{
-              fontWeight: 700,
-              fontSize: { md: '2rem', lg: '2.5rem' },
-              letterSpacing: '-0.02em',
-              lineHeight: 1.2,
-              textShadow: '0 2px 20px rgba(0,0,0,0.3)',
-            }}
-          >
-            一匹との出会いを、<br />
-            もっと鮮やかに。
-          </Typography>
-        </Box>
+        <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '1rem', letterSpacing: '-0.01em' }}>
+          Medaka Live Auction
+        </Typography>
       </Box>
 
-      {/* 右：フォーム */}
+      {/* ガラスカード */}
       <Box
         sx={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          px: { xs: 3, sm: 6 },
-          py: { xs: 5, md: 6 },
+          width: '100%',
+          maxWidth: 440,
           position: 'relative',
+          borderRadius: 4,
+          p: { xs: 3.5, sm: 5 },
+          background: 'rgba(15, 23, 42, 0.35)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
+          color: '#fff',
         }}
       >
-        {/* モバイル用ロゴ */}
-        <Box
-          sx={{
-            display: { xs: 'flex', md: 'none' },
-            alignItems: 'center',
-            gap: 1.5,
-            mb: 5,
-            alignSelf: 'flex-start',
-          }}
-        >
-          <Box
-            component="img"
-            src="/img/logo.png?v=1"
-            alt="logo"
-            sx={{ height: 36, width: 36, borderRadius: 1, objectFit: 'cover' }}
-          />
-          <Typography sx={{ fontWeight: 600, fontSize: '0.95rem' }}>
-            Medaka Live Auction
-          </Typography>
-        </Box>
-
-        <Box sx={{ width: '100%', maxWidth: 400 }}>
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography
-            variant="h3"
             sx={{
               fontWeight: 700,
+              fontSize: { xs: '1.875rem', sm: '2.25rem' },
               letterSpacing: '-0.03em',
-              fontSize: { xs: '1.875rem', md: '2.25rem' },
-              mb: 1.25,
+              mb: 0.75,
             }}
           >
-            おかえりなさい
+            ログイン
           </Typography>
-          <Typography sx={{ color: 'text.secondary', fontSize: '0.9375rem', mb: 4 }}>
-            メールアドレスとパスワードでサインイン
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit}>
-            <Box sx={{ mb: 2.5 }}>
-              <Typography
-                sx={{
-                  fontSize: '0.8125rem',
-                  fontWeight: 500,
-                  color: 'text.primary',
-                  mb: 0.75,
-                }}
-              >
-                メールアドレス
-              </Typography>
-              <TextField
-                fullWidth
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                placeholder="you@example.com"
-                size="medium"
-              />
-            </Box>
-
-            <Box sx={{ mb: 1.5 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  mb: 0.75,
-                }}
-              >
-                <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500 }}>
-                  パスワード
-                </Typography>
-                <Typography
-                  data-testid="link-forgot-password"
-                  onClick={() => navigate('/auth/forgot-password')}
-                  sx={{
-                    fontSize: '0.8125rem',
-                    color: 'text.secondary',
-                    cursor: 'pointer',
-                    '&:hover': { color: 'primary.main' },
-                  }}
-                >
-                  パスワードをお忘れですか？
-                </Typography>
-              </Box>
-              <TextField
-                fullWidth
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                placeholder="••••••••"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword((v) => !v)}
-                        edge="end"
-                        size="small"
-                        aria-label="toggle password visibility"
-                      >
-                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={loading}
-              sx={{
-                py: 1.5,
-                mt: 2,
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                bgcolor: '#0F172A',
-                '&:hover': { bgcolor: '#1E293B' },
-              }}
-            >
-              {loading ? 'サインイン中...' : 'サインイン'}
-            </Button>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 3 }}>
-            <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
-            <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-              または
-            </Typography>
-            <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
-          </Box>
-
-          <GoogleLoginButton />
-
-          <Typography
-            sx={{
-              textAlign: 'center',
-              mt: 4,
-              fontSize: '0.875rem',
-              color: 'text.secondary',
-            }}
-          >
-            アカウントをお持ちでないですか？{' '}
-            <Typography
-              component="span"
-              data-testid="link-register"
-              onClick={() => navigate('/register')}
-              sx={{
-                cursor: 'pointer',
-                color: 'text.primary',
-                fontWeight: 600,
-                textDecoration: 'underline',
-                textUnderlineOffset: '3px',
-                '&:hover': { color: 'primary.main' },
-              }}
-            >
-              新規登録
-            </Typography>
+          <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem' }}>
+            アカウントにサインインして参加する
           </Typography>
         </Box>
+
+        {error && (
+          <Alert
+            severity="error"
+            sx={{
+              mb: 2.5,
+              borderRadius: 2,
+              bgcolor: 'rgba(239, 68, 68, 0.15)',
+              color: '#FECACA',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              '& .MuiAlert-icon': { color: '#FCA5A5' },
+            }}
+          >
+            {error}
+          </Alert>
+        )}
+
+        <Box component="form" onSubmit={handleSubmit}>
+          <TextField
+            fullWidth
+            variant="standard"
+            label="メールアドレス"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <EmailOutlined sx={{ color: 'rgba(255,255,255,0.65)', fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ ...inputSx, mb: 3 }}
+          />
+
+          <TextField
+            fullWidth
+            variant="standard"
+            label="パスワード"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword((v) => !v)}
+                    edge="end"
+                    size="small"
+                    aria-label="toggle password visibility"
+                    sx={{ color: 'rgba(255,255,255,0.65)', mr: -0.5 }}
+                  >
+                    {showPassword ? <VisibilityOff fontSize="small" /> : <LockOutlined fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{ ...inputSx, mb: 2 }}
+          />
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Typography
+              data-testid="link-forgot-password"
+              onClick={() => navigate('/auth/forgot-password')}
+              sx={{
+                fontSize: '0.8125rem',
+                color: 'rgba(255,255,255,0.75)',
+                cursor: 'pointer',
+                '&:hover': { color: '#fff' },
+              }}
+            >
+              パスワードをお忘れですか？
+            </Typography>
+          </Box>
+
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            size="large"
+            disabled={loading}
+            sx={{
+              py: 1.5,
+              fontSize: '0.9375rem',
+              fontWeight: 600,
+              bgcolor: 'rgba(15, 23, 42, 0.95)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)',
+              '&:hover': {
+                bgcolor: 'rgba(30, 41, 59, 0.95)',
+                boxShadow: '0 10px 28px -8px rgba(0,0,0,0.7)',
+              },
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(15, 23, 42, 0.6)',
+                color: 'rgba(255,255,255,0.5)',
+              },
+            }}
+          >
+            {loading ? 'サインイン中...' : 'ログイン'}
+          </Button>
+        </Box>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2.5 }}>
+          <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.18)' }} />
+          <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)' }}>
+            OR
+          </Typography>
+          <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.18)' }} />
+        </Box>
+
+        <Box
+          sx={{
+            '& .MuiButton-root': {
+              bgcolor: 'rgba(255,255,255,0.95)',
+              color: '#0F172A',
+              borderColor: 'transparent',
+              '&:hover': {
+                bgcolor: '#fff',
+                borderColor: 'transparent',
+              },
+            },
+          }}
+        >
+          <GoogleLoginButton />
+        </Box>
+
+        <Typography
+          sx={{
+            textAlign: 'center',
+            mt: 3,
+            fontSize: '0.875rem',
+            color: 'rgba(255,255,255,0.7)',
+          }}
+        >
+          アカウントをお持ちでない方は{' '}
+          <Typography
+            component="span"
+            data-testid="link-register"
+            onClick={() => navigate('/register')}
+            sx={{
+              cursor: 'pointer',
+              color: '#fff',
+              fontWeight: 600,
+              textDecoration: 'underline',
+              textUnderlineOffset: '3px',
+              '&:hover': { opacity: 0.85 },
+            }}
+          >
+            新規登録
+          </Typography>
+        </Typography>
       </Box>
     </Box>
   );

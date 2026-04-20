@@ -138,13 +138,16 @@ class ShippingCalculatorService
     }
 
     /**
-     * Greedy Bin-Packing: 袋を箱に詰める（120不採用・5フェーズ）
+     * Greedy Bin-Packing: 袋を箱に詰める
      *
      * Phase 0: 全袋が1箱に収まるか試行 (80→100→140)
-     * Phase 1: KA袋 → 140に1個ずつ割当（S袋との同梱を試みる）
-     * Phase 2: L袋 → 140に割当（M/S袋との同梱を試みる）
-     * Phase 3: M袋 → 最小適合箱に割当（100に1個 / 140に2-3個）
-     * Phase 4: S袋 → 残りスペースに詰め、溢れは新箱に割当
+     * Phase 1: KA袋 → 140に1個ずつ割当（残容量にSを同梱）
+     * Phase 2: L袋 → 140に割当（残容量にM/Sを同梱）
+     * Phase 3: M袋 → 最小適合箱に割当
+     * Phase 4: S袋 → 最小適合箱に割当
+     *
+     * 各フェーズでの「同梱可能数」は box_capacities マスタと box_specs.max_weight_kg
+     * から都度算出する（fitsInBox 経由）。マジックナンバーは持たない。
      */
     private function packBags(array $bags): array
     {
@@ -162,85 +165,133 @@ class ShippingCalculatorService
 
         $boxes = [];
 
-        // Phase 1: KA → 140 (1個/箱、S袋との同梱を試みる)
+        // Phase 1: KA → 140 (1個/箱、Sのみ同梱可)
         while ($ka > 0) {
-            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 1]];
+            $box = ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 1];
             $ka--;
-            // KA(15kg) + S×n → 15 + n*2.2 ≤ 20 → n ≤ 2
-            $sFit = min($s, 2);
-            $boxes[count($boxes) - 1]['bags']['S'] = $sFit;
+            $sFit = $this->maxAdditional($box, 'S', 140, $s);
+            $box['S'] = $sFit;
             $s -= $sFit;
+            $boxes[] = ['box_size' => 140, 'bags' => $box];
         }
 
         // Phase 2: L → 140
         while ($l > 0) {
-            $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0]];
-            $idx = count($boxes) - 1;
-            if ($l >= 2) {
-                // L×2 = 16kg → 残り4kg → S×1(2.2kg)のみ可
-                $boxes[$idx]['bags']['L'] = 2;
-                $l -= 2;
-                $sFit = min($s, 1);
-                $boxes[$idx]['bags']['S'] = $sFit;
-                $s -= $sFit;
-            } else {
-                // L×1 = 8kg → M/Sとの同梱を試みる
-                $boxes[$idx]['bags']['L'] = 1;
-                $l--;
-                // L×1 + M×n: 8+5.5n ≤ 20 → n ≤ 2
-                $mFit = min($m, 2);
-                $boxes[$idx]['bags']['M'] = $mFit;
-                $m -= $mFit;
-                // 残り重量でSを詰める
-                $remainingWeight = 20.0 - 8.0 - ($mFit * 5.5);
-                $sFit = min($s, (int) floor($remainingWeight / 2.2));
-                $boxes[$idx]['bags']['S'] = $sFit;
-                $s -= $sFit;
-            }
+            $box = ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0];
+            $lFit = $this->maxAdditional($box, 'L', 140, $l);
+            $box['L'] = $lFit;
+            $l -= $lFit;
+            $mFit = $this->maxAdditional($box, 'M', 140, $m);
+            $box['M'] = $mFit;
+            $m -= $mFit;
+            $sFit = $this->maxAdditional($box, 'S', 140, $s);
+            $box['S'] = $sFit;
+            $s -= $sFit;
+            $boxes[] = ['box_size' => 140, 'bags' => $box];
         }
 
         // Phase 3: M → 100(1個) or 140(2-3個)
         while ($m > 0) {
-            if ($m === 1 && $s === 0) {
-                // M単独 → 100
-                $boxes[] = ['box_size' => 100, 'bags' => ['S' => 0, 'M' => 1, 'L' => 0, 'KA' => 0]];
-                $m--;
-            } elseif ($m >= 2) {
-                // M×2-3 → 140
-                $mFit = min($m, 3);
-                $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => $mFit, 'L' => 0, 'KA' => 0]];
-                $m -= $mFit;
-                $remainingWeight = 20.0 - ($mFit * 5.5);
-                $sFit = min($s, 9, (int) floor($remainingWeight / 2.2));
-                $boxes[count($boxes) - 1]['bags']['S'] = $sFit;
-                $s -= $sFit;
-            } else {
-                // M×1 + S → 140 (100ではS+M混載不可)
-                $boxes[] = ['box_size' => 140, 'bags' => ['S' => 0, 'M' => 1, 'L' => 0, 'KA' => 0]];
-                $m--;
-                $remainingWeight = 20.0 - 5.5;
-                $sFit = min($s, 9, (int) floor($remainingWeight / 2.2));
-                $boxes[count($boxes) - 1]['bags']['S'] = $sFit;
-                $s -= $sFit;
+            // M単独 + 同梱S=0 なら 100 を試す
+            if ($s === 0 && $this->fitsInBox(0, $m, 0, 0, 100) && $m <= ($this->boxCapacities[100]['M'] ?? 0)) {
+                $boxes[] = ['box_size' => 100, 'bags' => ['S' => 0, 'M' => $m, 'L' => 0, 'KA' => 0]];
+                $m = 0;
+                break;
             }
+            // 100 で M+S 混載は禁止 → 140 に詰める
+            $box = ['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0];
+            $mFit = $this->maxAdditional($box, 'M', 140, $m);
+            $box['M'] = $mFit;
+            $m -= $mFit;
+            $sFit = $this->maxAdditional($box, 'S', 140, $s);
+            $box['S'] = $sFit;
+            $s -= $sFit;
+            $boxes[] = ['box_size' => 140, 'bags' => $box];
         }
 
-        // Phase 4: S → 80(1個) / 100(2個) / 140(3-9個)
+        // Phase 4: S → 残りの S を最小適合箱で
         while ($s > 0) {
-            if ($s === 1) {
-                $boxes[] = ['box_size' => 80, 'bags' => ['S' => 1, 'M' => 0, 'L' => 0, 'KA' => 0]];
-                $s--;
-            } elseif ($s === 2) {
-                $boxes[] = ['box_size' => 100, 'bags' => ['S' => 2, 'M' => 0, 'L' => 0, 'KA' => 0]];
-                $s -= 2;
-            } else {
-                $fit = min($s, 9);
-                $boxes[] = ['box_size' => 140, 'bags' => ['S' => $fit, 'M' => 0, 'L' => 0, 'KA' => 0]];
-                $s -= $fit;
+            $placed = false;
+            foreach (self::BOX_SIZES as $boxSize) {
+                $sFit = $this->maxAdditional(['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0], 'S', $boxSize, $s);
+                if ($sFit <= 0) continue;
+                // 最小サイズで s を消化できるならそれを採用、そうでなければ最大容量まで詰めて次へ
+                if ($sFit >= $s) {
+                    $boxes[] = ['box_size' => $boxSize, 'bags' => ['S' => $s, 'M' => 0, 'L' => 0, 'KA' => 0]];
+                    $s = 0;
+                    $placed = true;
+                    break;
+                }
             }
+            if ($placed) break;
+
+            // どの最小箱にも収まらない → 最大箱に上限まで詰めて繰り返す
+            $maxBox = max(self::BOX_SIZES);
+            $sFit = $this->maxAdditional(['S' => 0, 'M' => 0, 'L' => 0, 'KA' => 0], 'S', $maxBox, $s);
+            if ($sFit <= 0) {
+                throw new \RuntimeException("S袋を箱に詰められません（マスタ設定を確認してください）");
+            }
+            $boxes[] = ['box_size' => $maxBox, 'bags' => ['S' => $sFit, 'M' => 0, 'L' => 0, 'KA' => 0]];
+            $s -= $sFit;
         }
 
         return $boxes;
+    }
+
+    /**
+     * 既に詰めた箱内容($box) に対して、指定 bag をあと何個入れられるか
+     * (box_capacities + 重量上限 + 混載制約 を fitsInBox 経由で参照)
+     */
+    private function maxAdditional(array $box, string $bag, int $boxSize, int $available): int
+    {
+        if ($available <= 0) return 0;
+        $count = 0;
+        while ($count < $available) {
+            $trial = $box;
+            $trial[$bag] = ($trial[$bag] ?? 0) + $count + 1;
+            if (!$this->fitsInBox($trial['S'], $trial['M'], $trial['L'], $trial['KA'], $boxSize)) {
+                break;
+            }
+            $count++;
+        }
+        return $count;
+    }
+
+    /**
+     * 配送料を各落札品に按分する（残差は最後の要素で吸収し、合計が必ず $totalFee と一致）
+     *
+     * @param int $totalFee 総送料（円）
+     * @param int[] $quantities 落札品ごとの数量（順序保持）
+     * @return int[] 入力と同じ順序・件数の按分後送料
+     */
+    public static function apportionFee(int $totalFee, array $quantities): array
+    {
+        $count = count($quantities);
+        if ($count === 0) return [];
+
+        $totalQty = array_sum($quantities);
+        if ($totalQty <= 0) {
+            // 全件0数量の異常系：均等割（残差は末尾で吸収）
+            $base = intdiv($totalFee, $count);
+            $result = array_fill(0, $count, $base);
+            $result[$count - 1] = $totalFee - $base * ($count - 1);
+            return $result;
+        }
+
+        $assigned = 0;
+        $result = [];
+        $i = 0;
+        foreach ($quantities as $qty) {
+            if ($i === $count - 1) {
+                $result[] = $totalFee - $assigned;
+            } else {
+                $fee = (int) round($totalFee * ($qty / $totalQty));
+                $result[] = $fee;
+                $assigned += $fee;
+            }
+            $i++;
+        }
+        return $result;
     }
 
     /**

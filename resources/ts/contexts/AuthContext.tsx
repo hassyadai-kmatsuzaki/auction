@@ -12,6 +12,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<{ twoFactorRequired?: boolean; userId?: number } | void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   hasRole: (roleName: string) => boolean;
 }
@@ -94,11 +95,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return user?.roles.some(role => role.name === roleName) || false;
   };
 
+  const refreshUser = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+    try {
+      const response = await axios.get('/api/auth/me');
+      const fresh = response.data.data.user;
+      setUser(fresh);
+      localStorage.setItem('user', JSON.stringify(fresh));
+    } catch {
+      // 失敗時は既存 state を維持
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     logout,
+    refreshUser,
     isAuthenticated: !!user,
     hasRole,
   };
