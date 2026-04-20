@@ -29,19 +29,26 @@ class WonItemController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // 合計金額を計算
-        $totalAmount = $wonItems->sum('total_amount');
-        $pendingAmount = $wonItems->where('payment_status', 'pending')->sum('total_amount');
-        $paidAmount = $wonItems->whereIn('payment_status', ['paid', 'confirmed'])->sum('total_amount');
-        $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
+        // 合計金額を計算（小計 = 単価×数量、手数料/配送料は別集計）
+        $computeLineAmount = fn ($w) => ((int) $w->winning_price * (int) $w->quantity)
+            + (int) ($w->commission_amount ?? 0)
+            + (int) ($w->shipping_fee ?? 0);
+        $subtotalAll = $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+        $commissionAll = $wonItems->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
+        $totalShippingFee = $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+        $grandTotalAll = $subtotalAll + $commissionAll + $totalShippingFee;
+        $pendingAmount = $wonItems->where('payment_status', 'pending')->sum($computeLineAmount);
+        $paidAmount = $wonItems->whereIn('payment_status', ['paid', 'confirmed'])->sum($computeLineAmount);
 
         // オークション別にグルーピング
         $grouped = $wonItems->groupBy(fn ($wonItem) => $wonItem->item?->auction?->id ?? 0);
 
         $auctions = $grouped->map(function ($items, $auctionId) {
             $auction = $items->first()->item?->auction;
-            $auctionTotalAmount = $items->sum('total_amount');
-            $auctionShippingFee = $items->sum(fn ($w) => $w->shipping_fee ?? 0);
+            $auctionSubtotal = $items->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+            $auctionCommission = $items->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
+            $auctionShippingFee = $items->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+            $auctionGrandTotal = $auctionSubtotal + $auctionCommission + $auctionShippingFee;
             $allPaid = $items->every(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));
             $anyPending = $items->contains(fn ($w) => $w->payment_status === 'pending');
             $canUpdateAddress = $items->every(fn ($w) => $w->canUpdateShippingAddress());
@@ -59,9 +66,10 @@ class WonItemController extends Controller
                 ] : null,
                 'summary' => [
                     'item_count' => $items->count(),
-                    'total_amount' => $auctionTotalAmount,
+                    'subtotal' => $auctionSubtotal,
+                    'commission_total' => $auctionCommission,
                     'shipping_fee' => $auctionShippingFee,
-                    'grand_total' => $auctionTotalAmount + $auctionShippingFee,
+                    'grand_total' => $auctionGrandTotal,
                     'all_paid' => $allPaid,
                     'any_pending' => $anyPending,
                 ],
@@ -107,10 +115,12 @@ class WonItemController extends Controller
             'data' => [
                 'auctions' => $auctions,
                 'summary' => [
-                    'total_amount' => $totalAmount,
+                    'subtotal' => $subtotalAll,
+                    'commission_total' => $commissionAll,
+                    'shipping_fee' => $totalShippingFee,
+                    'grand_total' => $grandTotalAll,
                     'pending_amount' => $pendingAmount,
                     'paid_amount' => $paidAmount,
-                    'shipping_fee' => $totalShippingFee,
                     'item_count' => $wonItems->count(),
                     'auction_count' => $auctions->count(),
                 ],

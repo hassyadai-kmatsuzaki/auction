@@ -77,7 +77,8 @@ interface AuctionGroup {
   } | null;
   summary: {
     item_count: number;
-    total_amount: number;
+    subtotal: number;
+    commission_total: number;
     shipping_fee: number;
     grand_total: number;
     all_paid: boolean;
@@ -93,10 +94,12 @@ interface AuctionGroup {
 }
 
 interface Summary {
-  total_amount: number;
+  subtotal: number;
+  commission_total: number;
+  shipping_fee: number;
+  grand_total: number;
   pending_amount: number;
   paid_amount: number;
-  shipping_fee: number;
   item_count: number;
   auction_count: number;
 }
@@ -336,7 +339,7 @@ export default function WonItems() {
                 合計落札金額
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                ¥{(summary.total_amount + summary.shipping_fee).toLocaleString()}
+                ¥{summary.grand_total.toLocaleString()}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {summary.auction_count}件のオークション / {summary.item_count}品
@@ -528,13 +531,8 @@ export default function WonItems() {
                           <Box sx={{ display: 'flex', gap: 3, mb: 1, flexWrap: 'wrap' }}>
                             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                               ¥{Number(wonItem.winning_price).toLocaleString()} × {wonItem.quantity}匹
-                              = <strong>¥{Number(wonItem.total_amount).toLocaleString()}</strong>
+                              = <strong>¥{(Number(wonItem.winning_price) * Number(wonItem.quantity)).toLocaleString()}</strong>
                             </Typography>
-                            {wonItem.shipping_fee > 0 && (
-                              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                配送料: ¥{Number(wonItem.shipping_fee).toLocaleString()}
-                              </Typography>
-                            )}
                             {wonItem.payment_deadline && wonItem.payment_status === 'pending' && (
                               <Typography variant="body2" sx={{ color: 'error.main' }}>
                                 支払期限: {new Date(wonItem.payment_deadline).toLocaleDateString('ja-JP')}
@@ -581,10 +579,15 @@ export default function WonItems() {
                 ))}
 
                 {/* オークション合計 */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 3, pt: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 3, pt: 1, flexWrap: 'wrap' }}>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    商品小計: ¥{group.summary.total_amount.toLocaleString()}
+                    商品小計: ¥{group.summary.subtotal.toLocaleString()}
                   </Typography>
+                  {group.summary.commission_total > 0 && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      落札手数料: ¥{group.summary.commission_total.toLocaleString()}
+                    </Typography>
+                  )}
                   {group.summary.shipping_fee > 0 && (
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       配送料合計: ¥{group.summary.shipping_fee.toLocaleString()}
