@@ -11,7 +11,6 @@ const isMissing = (v?: string | null) => !v || !v.trim();
 /**
  * 参加者ログイン中で配送先住所が未登録なら登録モーダルを強制表示する。
  * - 登録完了まで閉じられない（背景はブラー）
- * - admin ロールは対象外（自分で落札しないため）
  */
 export default function ShippingAddressGate({ children }: Props) {
   const { user, hasRole, refreshUser } = useAuth();
@@ -19,7 +18,6 @@ export default function ShippingAddressGate({ children }: Props) {
 
   const requiresRegistration = useMemo(() => {
     if (!user) return false;
-    if (hasRole('admin')) return false;
     if (!hasRole('participant')) return false;
     return (
       isMissing(user.name) ||

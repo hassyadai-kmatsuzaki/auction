@@ -17,7 +17,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import GoogleLoginButton from '../../features/auth/GoogleLoginButton';
 
-const BG_IMAGE = '/img/medaka/04.png';
+const BG_IMAGE = '/img/regist-bg.avif';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -96,86 +96,61 @@ export default function Login() {
       sx={{
         minHeight: '100vh',
         position: 'relative',
+        isolation: 'isolate',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
         px: 2,
         py: { xs: 4, md: 6 },
-      }}
-    >
-      {/* 背景画像 */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'fixed',
-          inset: 0,
-          backgroundImage: `url(${BG_IMAGE})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          zIndex: -2,
-        }}
-      />
-      {/* 暗転オーバーレイ */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'fixed',
+        backgroundImage: `url(${BG_IMAGE})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
           inset: 0,
           background:
             'linear-gradient(180deg, rgba(2,6,23,0.45) 0%, rgba(2,6,23,0.55) 50%, rgba(2,6,23,0.7) 100%)',
-          zIndex: -1,
-        }}
-      />
-
-      {/* 上部ロゴ */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: { xs: 24, md: 40 },
-          left: { xs: 24, md: 48 },
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          zIndex: 2,
-        }}
-      >
-        <Box
-          component="img"
-          src="/img/logo.png?v=1"
-          alt="logo"
-          sx={{
-            height: 40,
-            width: 40,
-            borderRadius: 1.5,
-            objectFit: 'cover',
-            bgcolor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(10px)',
-            p: 0.25,
-          }}
-        />
-        <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '1rem', letterSpacing: '-0.01em' }}>
-          Medaka Live Auction
-        </Typography>
-      </Box>
-
+          zIndex: 0,
+        },
+      }}
+    >
       {/* ガラスカード */}
       <Box
         sx={{
           width: '100%',
           maxWidth: 440,
           position: 'relative',
+          zIndex: 1,
           borderRadius: 4,
           p: { xs: 3.5, sm: 5 },
           background: 'rgba(15, 23, 42, 0.35)',
-          backdropFilter: 'blur(24px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          backdropFilter: 'blur(10px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(10px) saturate(160%)',
           border: '1px solid rgba(255,255,255,0.18)',
           boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
           color: '#fff',
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box
+            component="img"
+            src="/img/logo.png?v=1"
+            alt="MEDAICHI"
+            sx={{
+              display: 'block',
+              mx: 'auto',
+              mb: 2.5,
+              height: { xs: 96, sm: 120 },
+              width: 'auto',
+              maxWidth: '80%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
+            }}
+          />
           <Typography
             sx={{
               fontWeight: 700,

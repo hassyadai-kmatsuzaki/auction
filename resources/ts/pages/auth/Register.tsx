@@ -12,7 +12,7 @@ import {
 import { CheckCircleOutlined } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
-const BG_IMAGE = '/img/medaka/03.png';
+const BG_IMAGE = '/img/regist-bg.avif';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -102,55 +102,65 @@ export default function Register() {
         sx={{
           minHeight: '100vh',
           position: 'relative',
+          isolation: 'isolate',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           px: 2,
           py: 6,
-        }}
-      >
-        <Box
-          aria-hidden
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            backgroundImage: `url(${BG_IMAGE})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            zIndex: -2,
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            position: 'fixed',
+          backgroundImage: `url(${BG_IMAGE})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
             inset: 0,
             background:
               'linear-gradient(180deg, rgba(2,6,23,0.5) 0%, rgba(2,6,23,0.6) 100%)',
-            zIndex: -1,
-          }}
-        />
+            zIndex: 0,
+          },
+        }}
+      >
         <Box
           sx={{
             maxWidth: 480,
             width: '100%',
+            position: 'relative',
+            zIndex: 1,
             borderRadius: 4,
             p: { xs: 4, sm: 5 },
             textAlign: 'center',
             background: 'rgba(15, 23, 42, 0.35)',
-            backdropFilter: 'blur(24px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+            backdropFilter: 'blur(10px) saturate(160%)',
+            WebkitBackdropFilter: 'blur(10px) saturate(160%)',
             border: '1px solid rgba(255,255,255,0.18)',
             boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
             color: '#fff',
           }}
         >
           <Box
+            component="img"
+            src="/img/logo.png?v=1"
+            alt="MEDAICHI"
             sx={{
-              width: 72,
-              height: 72,
+              display: 'block',
               mx: 'auto',
-              mb: 3,
+              mb: 2.5,
+              height: 96,
+              width: 'auto',
+              maxWidth: '80%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
+            }}
+          />
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              mx: 'auto',
+              mb: 2.5,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -160,7 +170,7 @@ export default function Register() {
               border: '1px solid rgba(16,185,129,0.35)',
             }}
           >
-            <CheckCircleOutlined sx={{ fontSize: 40 }} />
+            <CheckCircleOutlined sx={{ fontSize: 32 }} />
           </Box>
           <Typography sx={{ fontWeight: 700, fontSize: '1.625rem', letterSpacing: '-0.02em', mb: 1.5 }}>
             申請を受け付けました
@@ -193,83 +203,60 @@ export default function Register() {
       sx={{
         minHeight: '100vh',
         position: 'relative',
+        isolation: 'isolate',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
         px: 2,
         py: { xs: 4, md: 6 },
-        pt: { xs: 12, md: 14 },
-      }}
-    >
-      <Box
-        aria-hidden
-        sx={{
-          position: 'fixed',
-          inset: 0,
-          backgroundImage: `url(${BG_IMAGE})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          zIndex: -2,
-        }}
-      />
-      <Box
-        aria-hidden
-        sx={{
-          position: 'fixed',
+        backgroundImage: `url(${BG_IMAGE})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
           inset: 0,
           background:
             'linear-gradient(180deg, rgba(2,6,23,0.45) 0%, rgba(2,6,23,0.55) 50%, rgba(2,6,23,0.7) 100%)',
-          zIndex: -1,
-        }}
-      />
-
-      {/* 上部ロゴ */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: { xs: 24, md: 40 },
-          left: { xs: 24, md: 48 },
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          zIndex: 2,
-        }}
-      >
-        <Box
-          component="img"
-          src="/img/logo.png?v=1"
-          alt="logo"
-          sx={{
-            height: 40,
-            width: 40,
-            borderRadius: 1.5,
-            objectFit: 'cover',
-            bgcolor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(10px)',
-            p: 0.25,
-          }}
-        />
-        <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '1rem', letterSpacing: '-0.01em' }}>
-          Medaka Live Auction
-        </Typography>
-      </Box>
-
+          zIndex: 0,
+        },
+      }}
+    >
       {/* ガラスカード */}
       <Box
         sx={{
           width: '100%',
           maxWidth: 620,
+          position: 'relative',
+          zIndex: 1,
           borderRadius: 4,
           p: { xs: 3.5, sm: 5 },
           background: 'rgba(15, 23, 42, 0.35)',
-          backdropFilter: 'blur(24px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          backdropFilter: 'blur(10px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(10px) saturate(160%)',
           border: '1px solid rgba(255,255,255,0.18)',
           boxShadow: '0 30px 60px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)',
           color: '#fff',
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box
+            component="img"
+            src="/img/logo.png?v=1"
+            alt="MEDAICHI"
+            sx={{
+              display: 'block',
+              mx: 'auto',
+              mb: 2.5,
+              height: { xs: 96, sm: 120 },
+              width: 'auto',
+              maxWidth: '80%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))',
+            }}
+          />
           <Typography
             sx={{
               fontWeight: 700,
