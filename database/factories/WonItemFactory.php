@@ -14,18 +14,20 @@ class WonItemFactory extends Factory
     public function definition(): array
     {
         $winningPrice = fake()->numberBetween(10000, 100000);
+        $quantity = 1;
+        $totalBase = $winningPrice * $quantity;
         $commissionRate = 5;
-        $commissionAmount = max(300, $winningPrice * $commissionRate / 100);
+        $commissionAmount = max(300, (int)($totalBase * $commissionRate / 100));
 
         return [
             'item_id' => Item::factory()->sold(),
             'winner_id' => User::factory(),
             'winning_price' => $winningPrice,
-            'quantity' => 1,
-            'total_amount' => $winningPrice + $commissionAmount + 800,
+            'quantity' => $quantity,
+            'total_amount' => $totalBase + $commissionAmount,
             'commission_rate' => $commissionRate,
             'commission_amount' => $commissionAmount,
-            'seller_amount' => $winningPrice - ($winningPrice * 10 / 100),
+            'seller_amount' => $totalBase - (int)($totalBase * 10 / 100),
             'payment_status' => 'pending',
             'payment_method' => null,
             'paid_at' => null,

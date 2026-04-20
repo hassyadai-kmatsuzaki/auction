@@ -92,26 +92,29 @@ class InvoiceService
             $bankInfo = implode("\n", $parts);
         }
 
-        // 明細行を構築
+        // 明細行を構築（小計は単価×数量で明示計算）
         $items = $wonItems->map(function ($wonItem) {
             $item = $wonItem->item;
+            $winningPrice = (int) $wonItem->winning_price;
+            $quantity = (int) $wonItem->quantity;
             return [
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
-                'quantity' => $wonItem->quantity,
+                'quantity' => $quantity,
                 'quantity_unit' => $this->formatQuantityUnit($item->quantity_unit ?? 'fish'),
-                'winning_price' => (int) $wonItem->winning_price,
-                'total_amount' => (int) $wonItem->total_amount,
-                'shipping_fee' => $wonItem->shipping_fee ?? 0,
+                'winning_price' => $winningPrice,
+                'line_subtotal' => $winningPrice * $quantity,
+                'shipping_fee' => (int) ($wonItem->shipping_fee ?? 0),
             ];
         })->values()->toArray();
 
         // 合計計算（winning_price は税抜）
-        $subtotal = $wonItems->sum(fn ($w) => (int) $w->total_amount);
-        $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
+        $subtotal = $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+        $commissionTotal = $wonItems->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
+        $totalShippingFee = $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
         $taxRate = (float) SystemSetting::get('tax_rate', 10);
-        $taxAmount = (int) floor(($subtotal + $totalShippingFee) * $taxRate / 100);
-        $grandTotal = $subtotal + $totalShippingFee + $taxAmount;
+        $taxAmount = (int) floor(($subtotal + $commissionTotal + $totalShippingFee) * $taxRate / 100);
+        $grandTotal = $subtotal + $commissionTotal + $totalShippingFee + $taxAmount;
 
         // 支払い期限（最も早いもの）
         $paymentDeadline = $wonItems
@@ -150,6 +153,7 @@ class InvoiceService
             // 明細（複数品）
             'items' => $items,
             'subtotal' => $subtotal,
+            'commission_total' => $commissionTotal,
             'total_shipping_fee' => $totalShippingFee,
             'tax_rate' => $taxRate,
             'tax_amount' => $taxAmount,
@@ -185,23 +189,26 @@ class InvoiceService
 
         $items = $wonItems->map(function ($wonItem) {
             $item = $wonItem->item;
+            $winningPrice = (int) $wonItem->winning_price;
+            $quantity = (int) $wonItem->quantity;
             return [
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
-                'quantity' => $wonItem->quantity,
+                'quantity' => $quantity,
                 'quantity_unit' => $this->formatQuantityUnit($item->quantity_unit ?? 'fish'),
-                'winning_price' => (int) $wonItem->winning_price,
-                'total_amount' => (int) $wonItem->total_amount,
-                'shipping_fee' => $wonItem->shipping_fee ?? 0,
+                'winning_price' => $winningPrice,
+                'line_subtotal' => $winningPrice * $quantity,
+                'shipping_fee' => (int) ($wonItem->shipping_fee ?? 0),
             ];
         })->values()->toArray();
 
         // 合計計算（請求書と同じロジック）
-        $subtotal = $wonItems->sum(fn ($w) => (int) $w->total_amount);
-        $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
+        $subtotal = $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+        $commissionTotal = $wonItems->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
+        $totalShippingFee = $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
         $taxRate = (float) SystemSetting::get('tax_rate', 10);
-        $taxAmount = (int) floor(($subtotal + $totalShippingFee) * $taxRate / 100);
-        $grandTotal = $subtotal + $totalShippingFee + $taxAmount;
+        $taxAmount = (int) floor(($subtotal + $commissionTotal + $totalShippingFee) * $taxRate / 100);
+        $grandTotal = $subtotal + $commissionTotal + $totalShippingFee + $taxAmount;
 
         // 配送業者・追跡番号は納品書単位で共通の想定。異なる値があれば連結表示
         $shippingCompany = $wonItems->pluck('shipping_company')->filter()->unique()->values()->implode('、');
@@ -227,6 +234,7 @@ class InvoiceService
             'auction_date' => $auction->event_date?->format('Y年m月d日') ?? '',
             'items' => $items,
             'subtotal' => $subtotal,
+            'commission_total' => $commissionTotal,
             'total_shipping_fee' => $totalShippingFee,
             'tax_rate' => $taxRate,
             'tax_amount' => $taxAmount,

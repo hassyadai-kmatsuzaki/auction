@@ -332,7 +332,7 @@ class PostAuctionE2ESeeder extends Seeder
             $shippingFee = $apportioned[$i];
             $row['shipping_fee'] = $shippingFee;
             $row['shipping_breakdown'] = $result;
-            $row['total_amount'] = $row['winning_price'] + $row['commission_amount'] + $shippingFee;
+            $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
             $row['shipping_calculated_at'] = now();
 
             $wonItem = new WonItem();
@@ -346,7 +346,7 @@ class PostAuctionE2ESeeder extends Seeder
     private function persistWithoutShipping(array $wonItemRows, User $winner): void
     {
         foreach ($wonItemRows as $row) {
-            $row['total_amount'] = $row['winning_price'] + $row['commission_amount'];
+            $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
             $wonItem = new WonItem();
             $wonItem->forceFill($row)->save();
         }

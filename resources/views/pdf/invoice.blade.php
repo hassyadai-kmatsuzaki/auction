@@ -176,7 +176,7 @@
                 <td>{{ $item['species_name'] }}</td>
                 <td style="text-align: center">{{ $item['quantity'] }}{{ $item['quantity_unit'] }}</td>
                 <td class="right">¥{{ number_format($item['winning_price']) }}</td>
-                <td class="right">¥{{ number_format($item['total_amount']) }}</td>
+                <td class="right">¥{{ number_format($item['line_subtotal']) }}</td>
                 <td class="right">
                     @if($item['shipping_fee'] > 0)
                         ¥{{ number_format($item['shipping_fee']) }}
@@ -190,6 +190,12 @@
                 <td colspan="5" style="text-align: right;"><strong>商品小計</strong></td>
                 <td class="right"><strong>¥{{ number_format($subtotal) }}</strong></td>
             </tr>
+            @if($commission_total > 0)
+            <tr class="shipping-row">
+                <td colspan="5" style="text-align: right;">落札手数料</td>
+                <td class="right">¥{{ number_format($commission_total) }}</td>
+            </tr>
+            @endif
             <tr class="shipping-row">
                 <td colspan="5" style="text-align: right;">配送料</td>
                 <td class="right">¥{{ number_format($total_shipping_fee) }}</td>

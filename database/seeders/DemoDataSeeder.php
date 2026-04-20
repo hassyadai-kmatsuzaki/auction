@@ -569,15 +569,16 @@ class DemoDataSeeder extends Seeder
 
             $prefecture = $prefectures[array_rand($prefectures)];
 
+            $totalBase = $winningPrice * $item->quantity;
             $wonItemsToInsert[] = [
                 'item_id' => $item->id,
                 'winner_id' => $participant->id,
                 'winning_price' => $winningPrice,
                 'quantity' => $item->quantity,
-                'total_amount' => $winningPrice + $commissionAmount + 800,
+                'total_amount' => $totalBase + $commissionAmount,
                 'commission_rate' => $commissionRate,
                 'commission_amount' => $commissionAmount,
-                'seller_amount' => $winningPrice - (int)($winningPrice * 10 / 100),
+                'seller_amount' => $totalBase - (int)($totalBase * 10 / 100),
                 'payment_status' => $paymentStatus,
                 'payment_method' => $paymentStatus !== 'pending' ? 'bank_transfer' : null,
                 'paid_at' => $paymentStatus !== 'pending' ? $now->copy()->subDays(rand(1, 5)) : null,

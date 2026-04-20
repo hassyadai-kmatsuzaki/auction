@@ -548,7 +548,7 @@ class ShippingPatternsSeeder extends Seeder
             ));
             foreach ($wonItemRows as $row) {
                 $row = array_merge($row, $statusOverrides);
-                $row['total_amount'] = $row['winning_price'] + $row['commission_amount'];
+                $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
                 (new WonItem())->forceFill($row)->save();
             }
             return;
@@ -565,7 +565,7 @@ class ShippingPatternsSeeder extends Seeder
             $row['shipping_fee'] = $shippingFee;
             $row['shipping_breakdown'] = $result;
             $row['shipping_calculated_at'] = now();
-            $row['total_amount'] = $row['winning_price'] + $row['commission_amount'] + $shippingFee;
+            $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
 
             (new WonItem())->forceFill($row)->save();
         }

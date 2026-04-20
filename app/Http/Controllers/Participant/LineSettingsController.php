@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
+use App\Models\Auction;
+use App\Models\Item;
 use App\Models\LineAccount;
 use App\Models\LineNotificationSetting;
+use App\Models\WonItem;
+use App\Services\LineFlexBuilder;
 use App\Services\LineService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +17,10 @@ use Illuminate\Support\Facades\Log;
 
 class LineSettingsController extends Controller
 {
-    public function __construct(private readonly LineService $lineService) {}
+    public function __construct(
+        private readonly LineService $lineService,
+        private readonly LineFlexBuilder $flex,
+    ) {}
 
     /** 通知種別の定義 */
     private const NOTIFICATION_TYPES = [
@@ -105,9 +112,16 @@ class LineSettingsController extends Controller
         }
 
         $message = self::TEST_MESSAGES[$type] ?? "[テスト] " . (self::NOTIFICATION_TYPES[$type] ?? '通知');
+        $flex    = $this->buildTestFlex($type);
 
         try {
-            $success = $this->lineService->pushText($lineAccount->line_user_id, $message);
+            $success = $flex
+                ? $this->lineService->pushFlex(
+                    $lineAccount->line_user_id,
+                    mb_substr($message, 0, 200),
+                    $flex,
+                  )
+                : $this->lineService->pushText($lineAccount->line_user_id, $message);
             if (!$success) {
                 return response()->json([
                     'success' => false,
@@ -128,5 +142,58 @@ class LineSettingsController extends Controller
                 'message' => 'LINEテスト通知の送信に失敗しました。',
             ], 500);
         }
+    }
+
+    /**
+     * テスト通知用のダミー Flex を生成する。
+     * DB保存しないモデルインスタンスを組み立てて LineFlexBuilder に通すことで、
+     * 本番と同一の見た目を保ちつつ依存関係を最小化する。
+     */
+    private function buildTestFlex(string $type): ?array
+    {
+        $item = new Item();
+        $item->id = 0;
+        $item->species_name = '【テスト】三色ラメ体外光';
+        $item->thumbnail_path = null;
+
+        $wonItem = new WonItem();
+        $wonItem->id = 0;
+        $wonItem->winner_id = (int) Auth::id();
+        $wonItem->winning_price = 15000;
+        $wonItem->quantity = 1;
+        $wonItem->total_amount = 16500;
+        $wonItem->seller_amount = 12000;
+        $wonItem->shipping_fee = 1500;
+        $wonItem->shipping_name = '山田 太郎';
+        $wonItem->shipping_prefecture = '東京都';
+        $wonItem->shipping_city = '渋谷区';
+        $wonItem->shipping_company = 'ヤマト運輸';
+        $wonItem->tracking_number = '1234-5678-9012';
+        $wonItem->payment_deadline = now()->addHours(24);
+        $wonItem->setRelation('item', $item);
+
+        $auction = new Auction();
+        $auction->id = 0;
+        $auction->title = '【テスト】第99回メダカライブオークション';
+        $auction->event_date = now()->addDays(7);
+
+        return match ($type) {
+            'won_item'             => $this->flex->wonItem($wonItem),
+            'payment_reminder'     => $this->flex->paymentReminder($wonItem, '24時間'),
+            'shipping_completed'   => $this->flex->shippingCompleted($wonItem),
+            'bid_limit_reached'    => $this->flex->bidLimitReached('【テスト】三色ラメ体外光', 10000, 10500),
+            'auction_start'        => $this->flex->auctionStart($auction),
+            'auction_preview'      => $this->flex->newAuction($auction, 'participant'),
+            'new_auction'          => $this->flex->newAuction($auction, 'participant'),
+            'favorite_approaching' => $this->flex->favoriteApproaching(0, '【テスト】三色ラメ体外光', 3, 'レーン1', $auction->title),
+            'invoice_ready'        => $this->flex->invoiceReady(
+                $auction,
+                16500,
+                (string) config('app.url'),
+            ),
+            'item_sold'            => $this->flex->itemSold($wonItem),
+            'payment_received'     => $this->flex->sellerPaymentReceived($wonItem),
+            default                => null,
+        };
     }
 }
