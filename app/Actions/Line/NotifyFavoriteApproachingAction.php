@@ -12,11 +12,11 @@ use Illuminate\Support\Facades\Log;
 /**
  * お気に入り順番接近通知
  *
- * 商品が切り替わった時、同一レーンで5個後の商品をお気に入りしているユーザーに通知する
+ * 商品が切り替わった時、同一レーンでちょうど3個後の商品をお気に入りしているユーザーに通知する
  */
 class NotifyFavoriteApproachingAction
 {
-    private const NOTIFY_AHEAD_COUNT = 5;
+    private const NOTIFY_AHEAD_COUNT = 3;
 
     public function execute(Lane $lane, Item $currentItem): void
     {
@@ -32,12 +32,11 @@ class NotifyFavoriteApproachingAction
 
             if ($currentSequence === null) return;
 
-            // 5個先までの商品IDを取得
+            // ちょうどNOTIFY_AHEAD_COUNT個先の商品IDを取得（ピンポイント発火で多重送信を防ぐ）
             $upcomingItemIds = DB::table('lane_items')
                 ->join('items', 'lane_items.item_id', '=', 'items.id')
                 ->where('lane_items.lane_id', $lane->id)
-                ->where('lane_items.sequence_order', '>', $currentSequence)
-                ->where('lane_items.sequence_order', '<=', $currentSequence + self::NOTIFY_AHEAD_COUNT)
+                ->where('lane_items.sequence_order', '=', $currentSequence + self::NOTIFY_AHEAD_COUNT)
                 ->where('items.status', 'registered')
                 ->pluck('items.id')
                 ->toArray();

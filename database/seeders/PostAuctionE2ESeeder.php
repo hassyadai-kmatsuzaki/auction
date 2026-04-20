@@ -70,23 +70,29 @@ class PostAuctionE2ESeeder extends Seeder
         DB::transaction(function () use ($admin, $winnerX, $sellerA, $sellerB, $shipping) {
             $this->cleanupExisting();
 
-            $past1 = $this->createAuction($admin, 'PAST-1', now()->subDays(3));
-            $past2 = $this->createAuction($admin, 'PAST-2', now()->subDay());
-            $past3 = $this->createAuction($admin, 'PAST-3', now()->subHours(12));
+            // 仕様: 同一 (auction × winner) 内ではステータスを統一する。
+            // PAST-1 で 4 状態を網羅する必要があるため、各状態を別オークションに分割する。
+            $past1a = $this->createAuction($admin, 'PAST-1A', now()->subDays(3), '入金済み・確認待ち');
+            $past1b = $this->createAuction($admin, 'PAST-1B', now()->subDays(3), '入金確認済み・発送準備中');
+            $past1c = $this->createAuction($admin, 'PAST-1C', now()->subDays(3), '発送済み');
+            $past1d = $this->createAuction($admin, 'PAST-1D', now()->subDays(3), '配達完了');
+            $past2  = $this->createAuction($admin, 'PAST-2',  now()->subDay(),   '送料未計算');
+            $past3  = $this->createAuction($admin, 'PAST-3',  now()->subHours(12), '催促対象');
 
-            // PAST-1: 各状態を 1 件ずつ網羅（paid / confirmed-preparing / shipped / completed）。
-            $p1a = $this->createItem($past1, $sellerA, 1, '紅白ラメ ペア', 2, 5000, '/img/medaka/紅白ラメ.jpg', 'sold');
-            $p1b = $this->createItem($past1, $sellerA, 2, '幹之フルボディ', 1, 3000, '/img/medaka/幹之フルボディ.jpg', 'sold');
-            $p1c = $this->createItem($past1, $sellerB, 3, '楊貴妃ダルマ', 1, 2500, '/img/medaka/楊貴妃ダルマ.jpeg', 'sold');
-            $p1d = $this->createItem($past1, $sellerB, 4, '三色ラメ', 3, 4000, '/img/medaka/三色ラメ.jpeg', 'sold');
-
-            $wx1 = [
+            // PAST-1A: paid / pending
+            $p1a = $this->createItem($past1a, $sellerA, 1, '紅白ラメ ペア', 2, 5000, '/img/medaka/紅白ラメ.jpg', 'sold');
+            $this->persistWithCalculatedShipping([
                 $this->buildWonItem($p1a, $winnerX, 8500, [
                     'payment_status' => 'paid',
                     'delivery_status' => 'pending',
                     'paid_at' => now()->subDays(1),
                     'payment_deadline' => now()->addDays(1),
                 ]),
+            ], $winnerX, $shipping);
+
+            // PAST-1B: confirmed / preparing
+            $p1b = $this->createItem($past1b, $sellerA, 1, '幹之フルボディ', 1, 3000, '/img/medaka/幹之フルボディ.jpg', 'sold');
+            $this->persistWithCalculatedShipping([
                 $this->buildWonItem($p1b, $winnerX, 4500, [
                     'payment_status' => 'confirmed',
                     'delivery_status' => 'preparing',
@@ -95,6 +101,11 @@ class PostAuctionE2ESeeder extends Seeder
                     'payment_deadline' => now()->subDays(1),
                     'shipping_locked_at' => now()->subDays(1),
                 ]),
+            ], $winnerX, $shipping);
+
+            // PAST-1C: confirmed / shipped
+            $p1c = $this->createItem($past1c, $sellerB, 1, '楊貴妃ダルマ', 1, 2500, '/img/medaka/楊貴妃ダルマ.jpeg', 'sold');
+            $this->persistWithCalculatedShipping([
                 $this->buildWonItem($p1c, $winnerX, 3200, [
                     'payment_status' => 'confirmed',
                     'delivery_status' => 'shipped',
@@ -106,6 +117,11 @@ class PostAuctionE2ESeeder extends Seeder
                     'shipping_company' => 'ヤマト運輸',
                     'tracking_number' => '1234-5678-9012',
                 ]),
+            ], $winnerX, $shipping);
+
+            // PAST-1D: confirmed / completed
+            $p1d = $this->createItem($past1d, $sellerB, 1, '三色ラメ', 3, 4000, '/img/medaka/三色ラメ.jpeg', 'sold');
+            $this->persistWithCalculatedShipping([
                 $this->buildWonItem($p1d, $winnerX, 6000, [
                     'payment_status' => 'confirmed',
                     'delivery_status' => 'completed',
@@ -118,10 +134,9 @@ class PostAuctionE2ESeeder extends Seeder
                     'shipping_company' => '佐川急便',
                     'tracking_number' => '9876-5432-1098',
                 ]),
-            ];
-            $this->persistWithCalculatedShipping($wx1, $winnerX, $shipping);
+            ], $winnerX, $shipping);
 
-            // PAST-2: X の送料未計算ケース。shipping_fee=0 / shipping_calculated_at=null のまま残す。
+            // PAST-2: 送料未計算ケース（shipping_fee=0 / shipping_calculated_at=null のまま残す）
             $p2a = $this->createItem($past2, $sellerA, 1, '夜桜ゴールド', 2, 3500, '/img/medaka/夜桜ゴールド.jpg', 'sold');
             $this->createItem($past2, $sellerA, 2, 'オロチ（流札）', 1, 8000, '/img/medaka/オロチ.jpg', 'unsold');
             $this->persistWithoutShipping([
@@ -132,14 +147,14 @@ class PostAuctionE2ESeeder extends Seeder
                 ]),
             ], $winnerX);
 
-            // PAST-3: 催促対象。24h 以内 / 1h 以内の両方をカバー。
+            // PAST-3: 催促対象（24h 以内 / 1h 以内の両方）。落札者単位でステータスは統一。
             $p3a = $this->createItem($past3, $sellerB, 1, '01 メダカ', 5, 1000, '/img/medaka/01.png', 'sold');
             $p3b = $this->createItem($past3, $sellerB, 2, '02 メダカ', 3, 1500, '/img/medaka/02.png', 'sold');
             $wx3 = [
                 $this->buildWonItem($p3a, $winnerX, 1800, [
                     'payment_status' => 'pending',
                     'delivery_status' => 'pending',
-                    'payment_deadline' => now()->addHours(2),
+                    'payment_deadline' => now()->addMinutes(30),
                 ]),
                 $this->buildWonItem($p3b, $winnerX, 2200, [
                     'payment_status' => 'pending',
@@ -182,10 +197,14 @@ class PostAuctionE2ESeeder extends Seeder
         Auction::whereIn('id', $auctionIds)->delete();
     }
 
-    private function createAuction(User $admin, string $label, Carbon $eventDate): Auction
+    private function createAuction(User $admin, string $label, Carbon $eventDate, ?string $subtitle = null): Auction
     {
+        $titleCore = $subtitle
+            ? sprintf('%s #%s %s', self::TITLE_PREFIX, $label, $subtitle)
+            : sprintf('%s #%s E2E検証用オークション', self::TITLE_PREFIX, $label);
+
         $auction = Auction::create([
-            'title' => sprintf('%s #%s E2E検証用オークション', self::TITLE_PREFIX, $label),
+            'title' => $titleCore,
             'event_date' => $eventDate->toDateString(),
             'start_time' => $eventDate->format('H:i:s'),
             'end_time' => $eventDate->copy()->addHour()->format('H:i:s'),

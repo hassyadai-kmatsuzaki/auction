@@ -244,51 +244,54 @@ class WonItemController extends Controller
     }
 
     /**
-     * 入金確認
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
+     * 入金確認（同一オークション×同一落札者の全 WonItem にまとめて適用）
      */
     public function confirmPayment($id)
     {
-        $wonItem = WonItem::findOrFail($id);
+        $wonItem = WonItem::with('item')->findOrFail($id);
+        $group = $this->findGroupItems($wonItem);
 
-        if (!in_array($wonItem->payment_status, ['pending', 'paid'])) {
+        $targets = $group->whereIn('payment_status', ['pending', 'paid']);
+        if ($targets->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => '入金確認できない状態です。',
+                'message' => '入金確認できる商品がこの落札者にありません。',
             ], 400);
         }
 
-        $wonItem->update([
+        $now = now();
+        WonItem::whereIn('id', $targets->pluck('id'))->update([
             'payment_status' => 'confirmed',
-            'payment_confirmed_at' => now(),
-            'shipping_locked_at' => now(),
+            'payment_confirmed_at' => $now,
+            'shipping_locked_at' => $now,
             'delivery_status' => 'preparing',
         ]);
 
-        // 通知を送信
-        $wonItem->load(['item.seller', 'user']);
-        $this->notificationService->sendPaymentConfirmedNotification($wonItem);
-        $this->notificationService->sendSellerPaymentReceivedNotification($wonItem);
+        // 落札者通知は代表1件で1回、出品者通知は出品者ごとに1回。
+        $representative = WonItem::with(['item.seller', 'user'])->find($wonItem->id);
+        $this->notificationService->sendPaymentConfirmedNotification($representative);
+
+        $bySeller = WonItem::with(['item.seller', 'user'])
+            ->whereIn('id', $targets->pluck('id'))
+            ->get()
+            ->groupBy(fn ($w) => $w->item->seller_profile_id);
+        foreach ($bySeller as $items) {
+            $this->notificationService->sendSellerPaymentReceivedNotification($items->first());
+        }
 
         return response()->json([
             'success' => true,
             'message' => '入金を確認しました。',
             'data' => [
-                'won_item_id' => $wonItem->id,
+                'affected_count' => $targets->count(),
                 'payment_status' => 'confirmed',
-                'payment_confirmed_at' => $wonItem->payment_confirmed_at->toIso8601String(),
+                'payment_confirmed_at' => $now->toIso8601String(),
             ],
         ]);
     }
 
     /**
-     * 発送完了
-     *
-     * @param Request $request
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
+     * 発送登録（同一オークション×同一落札者の全 WonItem に同じ伝票番号を適用）
      */
     public function ship(Request $request, $id)
     {
@@ -307,69 +310,80 @@ class WonItemController extends Controller
             ], 422);
         }
 
-        $wonItem = WonItem::findOrFail($id);
+        $wonItem = WonItem::with('item')->findOrFail($id);
+        $group = $this->findGroupItems($wonItem);
 
-        if ($wonItem->payment_status !== 'confirmed') {
+        if ($group->contains(fn ($w) => $w->payment_status !== 'confirmed')) {
             return response()->json([
                 'success' => false,
                 'message' => '入金確認後に発送してください。',
             ], 400);
         }
 
-        $wonItem->update([
+        $now = now();
+        WonItem::whereIn('id', $group->pluck('id'))->update([
             'delivery_status' => 'shipped',
             'shipping_company' => $request->shipping_company,
             'tracking_number' => $request->tracking_number,
-            'shipped_at' => now(),
+            'shipped_at' => $now,
         ]);
 
-        // 発送通知を送信
-        $wonItem->load('user');
-        $this->notificationService->sendShippingNotification($wonItem);
+        $representative = WonItem::with('user')->find($wonItem->id);
+        $this->notificationService->sendShippingNotification($representative);
 
         return response()->json([
             'success' => true,
             'message' => '発送完了を登録しました。',
             'data' => [
-                'won_item_id' => $wonItem->id,
+                'affected_count' => $group->count(),
                 'delivery_status' => 'shipped',
-                'tracking_number' => $wonItem->tracking_number,
-                'shipped_at' => $wonItem->shipped_at->toIso8601String(),
+                'tracking_number' => $request->tracking_number,
+                'shipped_at' => $now->toIso8601String(),
             ],
         ]);
     }
 
     /**
-     * 配達完了
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
+     * 配達完了（同一オークション×同一落札者の全 WonItem にまとめて適用）
      */
     public function complete($id)
     {
-        $wonItem = WonItem::findOrFail($id);
+        $wonItem = WonItem::with('item')->findOrFail($id);
+        $group = $this->findGroupItems($wonItem);
 
-        if ($wonItem->delivery_status !== 'shipped') {
+        if ($group->contains(fn ($w) => $w->delivery_status !== 'shipped')) {
             return response()->json([
                 'success' => false,
                 'message' => '発送済みの商品のみ配達完了にできます。',
             ], 400);
         }
 
-        $wonItem->update([
+        $now = now();
+        WonItem::whereIn('id', $group->pluck('id'))->update([
             'delivery_status' => 'completed',
-            'delivered_at' => now(),
+            'delivered_at' => $now,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => '配達完了を登録しました。',
             'data' => [
-                'won_item_id' => $wonItem->id,
+                'affected_count' => $group->count(),
                 'delivery_status' => 'completed',
-                'delivered_at' => $wonItem->delivered_at->toIso8601String(),
+                'delivered_at' => $now->toIso8601String(),
             ],
         ]);
+    }
+
+    /**
+     * 同一 (auction, winner) に属する WonItem を取得する。
+     */
+    private function findGroupItems(WonItem $wonItem)
+    {
+        return WonItem::with('item')
+            ->where('winner_id', $wonItem->winner_id)
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $wonItem->item->auction_id))
+            ->get();
     }
 
     /**
