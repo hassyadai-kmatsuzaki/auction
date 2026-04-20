@@ -91,6 +91,11 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('/media/{mediaId}/optimized', [OptimizedMediaController::class, 'show']);
 Route::get('/media/optimized-by-path', [OptimizedMediaController::class, 'showByPath']);
 
+// LINE 通知からアクセスされる請求書PDF（signed URL で保護、有効期限付き）
+Route::get('/line/invoices/{auctionId}/{winnerId}', [InvoiceController::class, 'lineDownloadInvoice'])
+    ->middleware('signed')
+    ->name('line.invoice.download');
+
 // 認証API（認証必須）
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [LoginController::class, 'logout']);

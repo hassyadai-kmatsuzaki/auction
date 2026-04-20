@@ -131,16 +131,6 @@ export default function DocumentManagement() {
     return <Chip size="small" label={c.label} sx={{ bgcolor: c.bgcolor, color: c.color, fontWeight: 600 }} />;
   };
 
-  const getDeliveryStatusChip = (status: string) => {
-    const config: Record<string, { label: string; color: string; bgcolor: string }> = {
-      preparing: { label: '準備中', color: '#64748B', bgcolor: '#F1F5F9' },
-      shipped: { label: '発送済み', color: '#3B82F6', bgcolor: '#DBEAFE' },
-      completed: { label: '配達完了', color: '#059669', bgcolor: '#ECFDF5' },
-    };
-    const c = config[status] || { label: status, color: '#64748B', bgcolor: '#F1F5F9' };
-    return <Chip size="small" label={c.label} sx={{ bgcolor: c.bgcolor, color: c.color, fontWeight: 600 }} />;
-  };
-
   const formatDate = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString('ja-JP') : '-';
 
@@ -373,7 +363,6 @@ export default function DocumentManagement() {
                   <TableCell>オークション</TableCell>
                   <TableCell align="center">点数</TableCell>
                   <TableCell align="center">合計数量</TableCell>
-                  <TableCell align="center">配送状況</TableCell>
                   <TableCell>発送日</TableCell>
                   <TableCell align="center">操作</TableCell>
                 </TableRow>
@@ -402,7 +391,6 @@ export default function DocumentManagement() {
                       <TableCell>{row.auction}</TableCell>
                       <TableCell align="center">{row.items_count}点</TableCell>
                       <TableCell align="center">{row.total_quantity}匹</TableCell>
-                      <TableCell align="center">{getDeliveryStatusChip(row.status)}</TableCell>
                       <TableCell>{formatDate(row.shipped_at)}</TableCell>
                       <TableCell align="center">
                         <Tooltip title="PDFダウンロード">
@@ -430,7 +418,7 @@ export default function DocumentManagement() {
                 })}
                 {filteredDeliveryNotes.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                       データがありません
                     </TableCell>
                   </TableRow>

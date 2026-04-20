@@ -47,13 +47,13 @@
             color: #666;
             margin-bottom: 10px;
         }
-        .summary-box {
+        .total-box {
             background-color: #059669;
             color: #fff;
             padding: 12px 20px;
             text-align: center;
             margin: 15px 0;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
         }
         table.detail {
@@ -74,8 +74,34 @@
             border-bottom: 1px solid #ddd;
             font-size: 11px;
         }
-        table.detail .center {
-            text-align: center;
+        table.detail .right {
+            text-align: right;
+        }
+        table.detail .subtotal-row td {
+            border-top: 2px solid #333;
+            border-bottom: none;
+            padding-top: 10px;
+        }
+        table.detail .shipping-row td {
+            border-bottom: 1px solid #ddd;
+        }
+        table.detail .total-row td {
+            font-weight: bold;
+            font-size: 12px;
+            border-top: 2px solid #333;
+            border-bottom: none;
+            padding-top: 10px;
+        }
+        .shipping-info {
+            border: 1px solid #059669;
+            padding: 12px 15px;
+            margin: 15px 0;
+        }
+        .shipping-info-title {
+            color: #059669;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 8px;
         }
         .issuer {
             margin-top: 25px;
@@ -127,8 +153,8 @@
 
     <p>下記の通り納品いたしましたのでご確認ください。</p>
 
-    <div class="summary-box">
-        納品点数: {{ $total_items_count }}点 / 合計 {{ $total_quantity }}匹
+    <div class="total-box">
+        納品金額: ¥{{ number_format($grand_total) }}
     </div>
 
     <table class="detail">
@@ -137,9 +163,9 @@
                 <th style="width: 8%">No.</th>
                 <th style="width: 32%">品種</th>
                 <th style="width: 10%; text-align: center">数量</th>
-                <th style="width: 15%">配送業者</th>
-                <th style="width: 20%">追跡番号</th>
-                <th style="width: 15%; text-align: center">状態</th>
+                <th style="width: 20%; text-align: right">単価</th>
+                <th style="width: 15%; text-align: right">小計</th>
+                <th style="width: 15%; text-align: right">配送料</th>
             </tr>
         </thead>
         <tbody>
@@ -147,14 +173,60 @@
             <tr>
                 <td>{{ $item['item_number'] }}</td>
                 <td>{{ $item['species_name'] }}</td>
-                <td class="center">{{ $item['quantity'] }}匹</td>
-                <td>{{ $item['shipping_company'] ?: '-' }}</td>
-                <td style="font-family: monospace; font-size: 10px">{{ $item['tracking_number'] ?: '-' }}</td>
-                <td class="center">{{ $item['delivery_status'] }}</td>
+                <td style="text-align: center">{{ $item['quantity'] }}{{ $item['quantity_unit'] }}</td>
+                <td class="right">¥{{ number_format($item['winning_price']) }}</td>
+                <td class="right">¥{{ number_format($item['total_amount']) }}</td>
+                <td class="right">
+                    @if($item['shipping_fee'] > 0)
+                        ¥{{ number_format($item['shipping_fee']) }}
+                    @else
+                        -
+                    @endif
+                </td>
             </tr>
             @endforeach
+            <tr class="subtotal-row">
+                <td colspan="5" style="text-align: right;"><strong>商品小計</strong></td>
+                <td class="right"><strong>¥{{ number_format($subtotal) }}</strong></td>
+            </tr>
+            <tr class="shipping-row">
+                <td colspan="5" style="text-align: right;">配送料</td>
+                <td class="right">¥{{ number_format($total_shipping_fee) }}</td>
+            </tr>
+            <tr class="shipping-row">
+                <td colspan="5" style="text-align: right;">消費税（{{ rtrim(rtrim(number_format($tax_rate, 1), '0'), '.') }}%）</td>
+                <td class="right">¥{{ number_format($tax_amount) }}</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="5" style="text-align: right;"><strong>合計金額</strong></td>
+                <td class="right"><strong>¥{{ number_format($grand_total) }}</strong></td>
+            </tr>
         </tbody>
     </table>
+
+    @if($shipping_company || $tracking_number)
+    <div class="shipping-info">
+        <div class="shipping-info-title">配送情報</div>
+        <table style="width: 100%; border: none;">
+            @if($shipping_company)
+            <tr>
+                <td style="width: 120px; border: none; padding: 3px 0; font-weight: bold;">配送業者</td>
+                <td style="border: none; padding: 3px 0;">{{ $shipping_company }}</td>
+            </tr>
+            @endif
+            @if($tracking_number)
+            <tr>
+                <td style="border: none; padding: 3px 0; font-weight: bold;">追跡番号</td>
+                <td style="border: none; padding: 3px 0; font-family: monospace;">{{ $tracking_number }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td style="border: none; padding: 3px 0; font-weight: bold;">配送状態</td>
+                <td style="border: none; padding: 3px 0;">{{ $delivery_status }}</td>
+            </tr>
+        </table>
+    </div>
+    @endif
 
     <div class="issuer">
         <div class="company-name">{{ $company_name }}</div>

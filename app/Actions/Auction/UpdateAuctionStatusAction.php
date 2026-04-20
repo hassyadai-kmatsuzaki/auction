@@ -192,6 +192,14 @@ class UpdateAuctionStatusAction
         if (!$auction->finish()) {
             return ['error' => 'オークションを終了できません。'];
         }
+
+        try {
+            $sentCount = $this->notificationService->sendInvoiceReadyNotification($auction);
+            Log::info("請求書発行LINE通知: {$sentCount}件", ['auction_id' => $auction->id]);
+        } catch (\Exception $e) {
+            Log::warning('請求書発行LINE通知でエラー', ['auction_id' => $auction->id, 'error' => $e->getMessage()]);
+        }
+
         return 'オークションを終了しました。';
     }
 

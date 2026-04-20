@@ -14,6 +14,7 @@ use App\Mail\SellerPaymentReceivedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
 use App\Jobs\SendLineNotificationJob;
+use App\Services\LineFlexBuilder;
 use App\Models\Auction;
 use App\Models\SellerProfile;
 use App\Models\User;
@@ -23,14 +24,21 @@ use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
+    private LineFlexBuilder $flex;
+
+    public function __construct(?LineFlexBuilder $flex = null)
+    {
+        $this->flex = $flex ?? app(LineFlexBuilder::class);
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // LINE通知ヘルパー
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private function sendLine(int $userId, string $type, string $text): void
+    private function sendLine(int $userId, string $type, string $text, ?array $flexContent = null): void
     {
         try {
-            SendLineNotificationJob::dispatch($userId, $type, $text);
+            SendLineNotificationJob::dispatch($userId, $type, $text, $flexContent);
         } catch (\Exception $e) {
             Log::warning("LINE notification dispatch failed: {$type} user={$userId} - " . $e->getMessage());
         }
@@ -64,7 +72,8 @@ class NotificationService
                 "🎉 落札おめでとうございます！\n"
                 . ($item ? $item->species_name : '商品') . "\n"
                 . "¥" . number_format($wonItem->winning_price) . "/匹\n"
-                . "合計: ¥" . number_format($wonItem->total_amount) . "（税込）"
+                . "合計: ¥" . number_format($wonItem->total_amount) . "（税込）",
+                $this->flex->wonItem($wonItem),
             );
 
             Log::info('落札通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
@@ -88,7 +97,8 @@ class NotificationService
             $this->sendLine($user->id, 'payment_reminder',
                 "✅ 入金が確認されました\n"
                 . ($wonItem->item ? $wonItem->item->species_name : '商品') . "\n"
-                . "発送をお待ちください。"
+                . "発送をお待ちください。",
+                $this->flex->paymentConfirmed($wonItem),
             );
 
             Log::info('入金確認通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
@@ -113,7 +123,8 @@ class NotificationService
             $this->sendLine($user->id, 'shipping_completed',
                 "📦 発送が完了しました\n"
                 . ($wonItem->item ? $wonItem->item->species_name : '商品')
-                . $trackingInfo
+                . $trackingInfo,
+                $this->flex->shippingCompleted($wonItem),
             );
 
             Log::info('発送通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
@@ -143,7 +154,8 @@ class NotificationService
             . "{$speciesName}\n"
             . "上限: ¥" . number_format($limitPrice) . "\n"
             . "現在価格: ¥" . number_format($currentPrice) . "\n"
-            . "自動的に入札オフになりました"
+            . "自動的に入札オフになりました",
+            $this->flex->bidLimitReached($speciesName, $limitPrice, $currentPrice),
         );
     }
 
@@ -164,7 +176,8 @@ class NotificationService
                 $this->sendLine($participant->id, 'auction_start',
                     "🔔 オークションが開始されました！\n"
                     . $auction->title . "\n"
-                    . "今すぐ参加しましょう！"
+                    . "今すぐ参加しましょう！",
+                    $this->flex->auctionStart($auction),
                 );
             }
 
@@ -188,7 +201,8 @@ class NotificationService
                     $sentCount++;
                 }
                 $this->sendLine($seller->id, 'new_auction',
-                    "📢 新しいオークションが追加されました\n" . $auction->title
+                    "📢 新しいオークションが追加されました\n" . $auction->title,
+                    $this->flex->newAuction($auction, 'seller'),
                 );
             }
 
@@ -202,7 +216,8 @@ class NotificationService
                 $this->sendLine($participant->id, 'new_auction',
                     "📢 新しいオークションが追加されました\n"
                     . $auction->title . "\n"
-                    . "開催日: " . ($auction->event_date ? $auction->event_date->format('Y/m/d') : '未定')
+                    . "開催日: " . ($auction->event_date ? $auction->event_date->format('Y/m/d') : '未定'),
+                    $this->flex->newAuction($auction, 'participant'),
                 );
             }
 
@@ -214,7 +229,7 @@ class NotificationService
     }
 
     /** ⑦ お気に入り順番接近通知（参加者向け） */
-    public function sendFavoriteApproachingNotification(int $userId, string $speciesName, int $aheadCount, string $laneName, string $auctionTitle): void
+    public function sendFavoriteApproachingNotification(int $userId, string $speciesName, int $aheadCount, string $laneName, string $auctionTitle, ?int $auctionId = null): void
     {
         try {
             $user = User::find($userId);
@@ -230,7 +245,8 @@ class NotificationService
         $this->sendLine($userId, 'favorite_approaching',
             "⏰ お気に入りの{$speciesName}の出番まであと{$aheadCount}つです！\n"
             . "{$laneName} / {$auctionTitle}\n"
-            . "準備してください！"
+            . "準備してください！",
+            $this->flex->favoriteApproaching($auctionId ?? 0, $speciesName, $aheadCount, $laneName, $auctionTitle),
         );
     }
 
@@ -251,13 +267,63 @@ class NotificationService
                 "⚠️ 入金期限が近づいています\n"
                 . ($wonItem->item ? $wonItem->item->species_name : '商品') . "\n"
                 . "期限まで{$urgency}\n"
-                . "期限: " . ($wonItem->payment_deadline ? $wonItem->payment_deadline->format('m/d H:i') : '未定')
+                . "期限: " . ($wonItem->payment_deadline ? $wonItem->payment_deadline->format('m/d H:i') : '未定'),
+                $this->flex->paymentReminder($wonItem, $urgency),
             );
 
             Log::info('入金催促通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
         } catch (\Exception $e) {
             Log::warning("入金催促通知エラー: " . $e->getMessage());
         }
+    }
+
+    /**
+     * ⑨ 請求書発行通知（オークション終了時、落札者全員に送信）
+     *
+     * 落札者単位で集約し、LINE Flex に PDF ダウンロード用 signed URL（30日有効）を添付する。
+     */
+    public function sendInvoiceReadyNotification(Auction $auction): int
+    {
+        $sentCount = 0;
+
+        try {
+            // このオークションで発生した落札を落札者単位に集約
+            $winners = WonItem::query()
+                ->whereHas('item', fn ($q) => $q->where('auction_id', $auction->id))
+                ->with(['winner', 'item'])
+                ->get()
+                ->groupBy('winner_id');
+
+            foreach ($winners as $winnerId => $items) {
+                $winner = $items->first()->winner;
+                if (!$winner) continue;
+
+                $totalAmount = (int) $items->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0));
+
+                $pdfUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                    'line.invoice.download',
+                    now()->addDays(30),
+                    ['auctionId' => $auction->id, 'winnerId' => (int) $winnerId],
+                );
+
+                $this->sendLine((int) $winnerId, 'invoice_ready',
+                    "🧾 請求書が発行されました\n"
+                    . ($auction->title ?? '') . "\n"
+                    . "請求金額: ¥" . number_format($totalAmount) . "（税込）\n"
+                    . "下記リンクからPDFをダウンロードできます。\n"
+                    . $pdfUrl,
+                    $this->flex->invoiceReady($auction, $totalAmount, $pdfUrl),
+                );
+
+                $sentCount++;
+            }
+
+            Log::info('請求書発行LINE通知', ['auction_id' => $auction->id, 'winners' => $sentCount]);
+        } catch (\Exception $e) {
+            Log::error('請求書発行LINE通知エラー', ['auction_id' => $auction->id, 'error' => $e->getMessage()]);
+        }
+
+        return $sentCount;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -282,7 +348,8 @@ class NotificationService
                 $this->sendLine($sellerUserId, 'item_sold',
                     "🎉 出品した生体が落札されました！\n"
                     . $item->species_name . "\n"
-                    . "落札価格: ¥" . number_format($wonItem->winning_price) . "/匹"
+                    . "落札価格: ¥" . number_format($wonItem->winning_price) . "/匹",
+                    $this->flex->itemSold($wonItem),
                 );
             }
 
@@ -311,7 +378,8 @@ class NotificationService
                 $this->sendLine($sellerUserId, 'payment_received',
                     "💰 入金が確認されました\n"
                     . $item->species_name . "\n"
-                    . "発送をお願いします。"
+                    . "発送をお願いします。",
+                    $this->flex->sellerPaymentReceived($wonItem),
                 );
             }
 
@@ -336,7 +404,8 @@ class NotificationService
                 }
                 // LINE
                 $this->sendLine($seller->id, 'auction_start',
-                    "🔔 出品した生体のオークションが開始されました\n" . $auction->title
+                    "🔔 出品した生体のオークションが開始されました\n" . $auction->title,
+                    $this->flex->sellerAuctionStart($auction),
                 );
             }
         } catch (\Exception $e) {

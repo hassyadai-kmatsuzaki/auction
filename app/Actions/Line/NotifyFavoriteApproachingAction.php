@@ -73,7 +73,8 @@ class NotifyFavoriteApproachingAction
                         $item->species_name,
                         $ahead,
                         "レーン{$lane->lane_number}",
-                        $lane->auction->title
+                        $lane->auction->title,
+                        (int) $lane->auction_id,
                     );
                 } catch (\Exception $e) {
                     Log::warning("Favorite notification error: user={$favorite->user_id} - " . $e->getMessage());

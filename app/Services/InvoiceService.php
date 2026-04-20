@@ -99,16 +99,19 @@ class InvoiceService
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
                 'quantity' => $wonItem->quantity,
+                'quantity_unit' => $this->formatQuantityUnit($item->quantity_unit ?? 'fish'),
                 'winning_price' => (int) $wonItem->winning_price,
                 'total_amount' => (int) $wonItem->total_amount,
                 'shipping_fee' => $wonItem->shipping_fee ?? 0,
             ];
         })->values()->toArray();
 
-        // 合計計算
+        // 合計計算（winning_price は税抜）
         $subtotal = $wonItems->sum(fn ($w) => (int) $w->total_amount);
         $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
-        $grandTotal = $subtotal + $totalShippingFee;
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+        $taxAmount = (int) floor(($subtotal + $totalShippingFee) * $taxRate / 100);
+        $grandTotal = $subtotal + $totalShippingFee + $taxAmount;
 
         // 支払い期限（最も早いもの）
         $paymentDeadline = $wonItems
@@ -148,6 +151,8 @@ class InvoiceService
             'items' => $items,
             'subtotal' => $subtotal,
             'total_shipping_fee' => $totalShippingFee,
+            'tax_rate' => $taxRate,
+            'tax_amount' => $taxAmount,
             'grand_total' => $grandTotal,
             // 支払い情報
             'payment_method' => $paymentMethod,
@@ -184,14 +189,27 @@ class InvoiceService
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
                 'quantity' => $wonItem->quantity,
-                'shipping_company' => $wonItem->shipping_company ?? '',
-                'tracking_number' => $wonItem->tracking_number ?? '',
-                'delivery_status' => $this->formatDeliveryStatus($wonItem->delivery_status),
-                'shipped_at' => $wonItem->shipped_at?->format('Y年m月d日') ?? '',
+                'quantity_unit' => $this->formatQuantityUnit($item->quantity_unit ?? 'fish'),
+                'winning_price' => (int) $wonItem->winning_price,
+                'total_amount' => (int) $wonItem->total_amount,
+                'shipping_fee' => $wonItem->shipping_fee ?? 0,
             ];
         })->values()->toArray();
 
-        $totalQuantity = $wonItems->sum('quantity');
+        // 合計計算（請求書と同じロジック）
+        $subtotal = $wonItems->sum(fn ($w) => (int) $w->total_amount);
+        $totalShippingFee = $wonItems->sum(fn ($w) => $w->shipping_fee ?? 0);
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+        $taxAmount = (int) floor(($subtotal + $totalShippingFee) * $taxRate / 100);
+        $grandTotal = $subtotal + $totalShippingFee + $taxAmount;
+
+        // 配送業者・追跡番号は納品書単位で共通の想定。異なる値があれば連結表示
+        $shippingCompany = $wonItems->pluck('shipping_company')->filter()->unique()->values()->implode('、');
+        $trackingNumber = $wonItems->pluck('tracking_number')->filter()->unique()->values()->implode('、');
+        $deliveryStatuses = $wonItems->pluck('delivery_status')->unique()->values();
+        $deliveryStatus = $deliveryStatuses->count() === 1
+            ? $this->formatDeliveryStatus($deliveryStatuses->first())
+            : '一部発送済み';
 
         $data = [
             'document_number' => $documentNumber,
@@ -208,8 +226,15 @@ class InvoiceService
             'auction_title' => $auction->title ?? '',
             'auction_date' => $auction->event_date?->format('Y年m月d日') ?? '',
             'items' => $items,
-            'total_quantity' => $totalQuantity,
+            'subtotal' => $subtotal,
+            'total_shipping_fee' => $totalShippingFee,
+            'tax_rate' => $taxRate,
+            'tax_amount' => $taxAmount,
+            'grand_total' => $grandTotal,
             'total_items_count' => count($items),
+            'shipping_company' => $shippingCompany,
+            'tracking_number' => $trackingNumber,
+            'delivery_status' => $deliveryStatus,
             'company_name' => $companyName,
             'company_address' => $companyAddress,
             'company_phone' => $companyPhone,
@@ -229,6 +254,15 @@ class InvoiceService
             'shipped' => '発送済み',
             'completed' => '配達完了',
             default => '未発送',
+        };
+    }
+
+    private function formatQuantityUnit(?string $unit): string
+    {
+        return match ($unit) {
+            'kg' => 'kg',
+            'bag' => '袋',
+            default => '匹',
         };
     }
 

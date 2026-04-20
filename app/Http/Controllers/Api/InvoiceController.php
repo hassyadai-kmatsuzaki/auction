@@ -191,6 +191,36 @@ class InvoiceController extends Controller
     }
 
     /**
+     * LINE 通知からアクセスされる請求書 PDF ダウンロード（signed URL で保護）
+     * GET /api/line/invoices/{auctionId}/{winnerId}?expires=...&signature=...
+     *
+     * LINE アプリ内ブラウザは通常セッションが無いため、認証ではなく signed URL で保護する。
+     */
+    public function lineDownloadInvoice(int $auctionId, int $winnerId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $winner = \App\Models\User::findOrFail($winnerId);
+
+        try {
+            $pdf = $this->invoiceService->generateInvoice($auction, $winner);
+            $content = $pdf->output();
+
+            return response($content, 200, [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => "inline; filename=\"invoice_auction_{$auctionId}.pdf\"",
+                'Content-Length'      => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('LINE 請求書PDF生成エラー', [
+                'auction_id' => $auctionId,
+                'winner_id'  => $winnerId,
+                'error'      => $e->getMessage(),
+            ]);
+            return response()->json(['message' => '請求書の生成に失敗しました'], 500);
+        }
+    }
+
+    /**
      * 出品者支払通知書PDFダウンロード（出品者向け）
      * GET /api/seller/settlements/{auctionId}/payment-notice
      */

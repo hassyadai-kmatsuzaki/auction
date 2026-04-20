@@ -29,6 +29,11 @@ use Illuminate\Support\Facades\DB;
  *   - KA 単発 (800匹)                     → 140 箱 (KA×1)
  *   - L×3 (300匹×3品) 複数箱             → 140 箱 ×複数
  *   - 6品の数量按分                       → 按分結果検証
+ *   - S×2 (10匹×2品)                      → 100 箱（80 では S×1 のみのため）
+ *   - KA+S 同梱 (800+10)                  → 140 箱（KA+S）
+ *   - L+S 同梱 (300+10)                   → 140 箱（L+S）
+ *   - M×4 (100匹×4品) 複数箱             → 140(M×3) + 100(M×1)
+ *   - S×10 (10匹×10品) 複数箱            → 140(S×9) + 80(S×1)
  *
  * 落札者の内訳:
  *   - User(id=509)  : 配送料パターン用落札者A
@@ -123,6 +128,7 @@ class ShippingPatternsSeeder extends Seeder
             $mix   = $this->createAuction($admin, 'MIX',   now()->subDays(4), 'S複数 & S+M混載');
             $large = $this->createAuction($admin, 'LARGE', now()->subDays(3), 'L & KA & 複数箱');
             $app   = $this->createAuction($admin, 'APPORTION', now()->subDays(2), '6品按分');
+            $extra = $this->createAuction($admin, 'EXTRA', now()->subDay(), '100箱S×2 / KA+S / L+S / M×4 / S×10');
 
             // --- Pattern 1: 小ロット単発 (10匹) → 80箱 ---
             $i1 = $this->createItem($small, $sellerA, 1, '紅白メダカ(小ロット)', 10, 4000, '/img/medaka/紅白ラメ.jpg');
@@ -235,6 +241,95 @@ class ShippingPatternsSeeder extends Seeder
                 'payment_status' => 'pending',
                 'delivery_status' => 'pending',
                 'payment_deadline' => now()->addDay(),
+            ]);
+
+            // --- Pattern 9: S×2 (10匹×2品) → 100箱 (S×2) ---
+            $i9a = $this->createItem($extra, $sellerA, 1, 'S×2 T-1', 10, 3000, '/img/medaka/01.png');
+            $i9b = $this->createItem($extra, $sellerA, 2, 'S×2 T-2', 10, 3200, '/img/medaka/02.png');
+            $this->persistGroup([
+                $this->buildWonItem($i9a, $winners[0], 5000),
+                $this->buildWonItem($i9b, $winners[0], 5500),
+            ], $winners[0], $shipping, [
+                'payment_status' => 'pending',
+                'delivery_status' => 'pending',
+                'payment_deadline' => now()->addDay(),
+            ]);
+
+            // --- Pattern 10: KA+S 同梱 (800 + 10) → 140箱 (KA×1, S×1) ---
+            $i10a = $this->createItem($extra, $sellerA, 3, 'KA+S KA側(800)', 800, 150000, '/img/medaka/オロチ.jpg');
+            $i10b = $this->createItem($extra, $sellerA, 4, 'KA+S S側(10)', 10, 3500, '/img/medaka/01.png');
+            $this->persistGroup([
+                $this->buildWonItem($i10a, $winners[1], 200000),
+                $this->buildWonItem($i10b, $winners[1], 5000),
+            ], $winners[1], $shipping, [
+                'payment_status' => 'confirmed',
+                'delivery_status' => 'shipped',
+                'paid_at' => now()->subDays(1),
+                'payment_confirmed_at' => now()->subDays(1),
+                'shipping_locked_at' => now()->subDays(1),
+                'shipped_at' => now(),
+                'shipping_company' => 'ヤマト運輸',
+                'tracking_number' => 'SP10-1000-0010',
+            ]);
+
+            // --- Pattern 11: L+S 同梱 (300 + 10) → 140箱 (L×1, S×1) ---
+            $i11a = $this->createItem($extra, $sellerB, 5, 'L+S L側(300)', 300, 80000, '/img/medaka/三色ラメ.jpeg');
+            $i11b = $this->createItem($extra, $sellerB, 6, 'L+S S側(10)', 10, 3500, '/img/medaka/02.png');
+            $this->persistGroup([
+                $this->buildWonItem($i11a, $winners[2], 110000),
+                $this->buildWonItem($i11b, $winners[2], 5000),
+            ], $winners[2], $shipping, [
+                'payment_status' => 'paid',
+                'delivery_status' => 'pending',
+                'paid_at' => now()->subHours(6),
+                'payment_deadline' => now()->addDay(),
+            ]);
+
+            // --- Pattern 12: M×4 (100匹×4品) → 複数箱 140(M×3) + 100(M×1) ---
+            $i12a = $this->createItem($extra, $sellerB, 7,  'M×4 T-1', 100, 45000, '/img/medaka/幹之フルボディ.jpg');
+            $i12b = $this->createItem($extra, $sellerB, 8,  'M×4 T-2', 100, 46000, '/img/medaka/幹之フルボディ.jpg');
+            $i12c = $this->createItem($extra, $sellerB, 9,  'M×4 T-3', 100, 47000, '/img/medaka/幹之フルボディ.jpg');
+            $i12d = $this->createItem($extra, $sellerB, 10, 'M×4 T-4', 100, 48000, '/img/medaka/幹之フルボディ.jpg');
+            $this->persistGroup([
+                $this->buildWonItem($i12a, $winners[3], 60000),
+                $this->buildWonItem($i12b, $winners[3], 62000),
+                $this->buildWonItem($i12c, $winners[3], 64000),
+                $this->buildWonItem($i12d, $winners[3], 65000),
+            ], $winners[3], $shipping, [
+                'payment_status' => 'confirmed',
+                'delivery_status' => 'preparing',
+                'paid_at' => now()->subDays(1),
+                'payment_confirmed_at' => now()->subDays(1),
+                'shipping_locked_at' => now()->subDays(1),
+            ]);
+
+            // --- Pattern 13: S×10 (10匹×10品) → 複数箱 140(S×9) + 80(S×1) ---
+            $i13 = [];
+            for ($n = 1; $n <= 10; $n++) {
+                $i13[] = $this->createItem(
+                    $extra,
+                    $sellerA,
+                    10 + $n,
+                    sprintf('S×10 T-%d', $n),
+                    10,
+                    3000 + $n * 100,
+                    '/img/medaka/01.png'
+                );
+            }
+            $this->persistGroup(array_map(
+                fn ($item, $idx) => $this->buildWonItem($item, $winners[4], 4000 + $idx * 100),
+                $i13,
+                array_keys($i13)
+            ), $winners[4], $shipping, [
+                'payment_status' => 'confirmed',
+                'delivery_status' => 'completed',
+                'paid_at' => now()->subDays(3),
+                'payment_confirmed_at' => now()->subDays(3),
+                'shipping_locked_at' => now()->subDays(3),
+                'shipped_at' => now()->subDays(2),
+                'delivered_at' => now()->subDay(),
+                'shipping_company' => '佐川急便',
+                'tracking_number' => 'SP13-1000-0013',
             ]);
         });
 
