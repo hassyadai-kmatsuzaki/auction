@@ -269,6 +269,8 @@ class PostAuctionE2ESeeder extends Seeder
             'shipping_fee' => 0,
             'shipping_breakdown' => null,
             'payment_status' => 'pending',
+            // 本サービスは口座振込のみ。InvoiceService の payment_method 判定で「未定」にならないよう常にセット。
+            'payment_method' => 'bank_transfer',
             'delivery_status' => 'pending',
             'delivery_method' => 'shipping',
             'payment_deadline' => now()->addDay(),

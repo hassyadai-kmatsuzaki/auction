@@ -45,6 +45,7 @@ import {
   OpenInNew as OpenInNewIcon,
   Calculate as CalculateIcon,
   Description as DescriptionIcon,
+  Inventory2 as Inventory2Icon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -98,12 +99,53 @@ const getTrackingUrl = (trackingNumber: string, company: string) => {
 interface Statistics {
   total_items: number;
   total_sales: number;
+  total_shipping_fees: number;
   pending_count: number;
   pending_amount: number;
   paid_count: number;
   paid_amount: number;
   shipped_count: number;
   completed_count: number;
+}
+
+const REGION_LABELS: Record<string, string> = {
+  hokkaido: '北海道',
+  tohoku: '東北',
+  kanto: '関東',
+  shinetsu: '信越',
+  hokuriku: '北陸',
+  chubu: '中部',
+  kansai: '関西',
+  chugoku: '中国',
+  shikoku: '四国',
+  kyushu: '九州',
+  okinawa: '沖縄',
+};
+
+interface ShippingBoxBreakdown {
+  box_size: number;
+  bags: string[];
+  shipping_cost: number;
+  packing_material_cost: number;
+}
+
+interface ShippingBreakdown {
+  bags: Array<{ size: string; quantity: number }>;
+  boxes: ShippingBoxBreakdown[];
+  shipping_cost: number;
+  packing_material_cost: number;
+  total_shipping_fee: number;
+  destination_region: string;
+}
+
+interface ShippingDetail {
+  wonItemId: number;
+  itemNumber: number;
+  speciesName: string;
+  winnerName?: string;
+  apportionedFee: number;
+  calculatedAt?: string | null;
+  breakdown: ShippingBreakdown;
 }
 
 interface AuctionInfo {
@@ -167,6 +209,9 @@ export default function WonItemManagement() {
   const [selectedItem, setSelectedItem] = useState<WonItem | null>(null);
   const [trackingForm, setTrackingForm] = useState({ tracking_number: '', shipping_company: 'ヤマト運輸' });
   const [actionLoading, setActionLoading] = useState(false);
+  const [shippingDetailOpen, setShippingDetailOpen] = useState(false);
+  const [shippingDetail, setShippingDetail] = useState<ShippingDetail | null>(null);
+  const [shippingDetailLoading, setShippingDetailLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -253,6 +298,38 @@ export default function WonItemManagement() {
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
+  };
+
+  // 送料内訳を取得して表示
+  const handleOpenShippingDetail = async (item: WonItem) => {
+    setShippingDetailOpen(true);
+    setShippingDetail(null);
+    setShippingDetailLoading(true);
+    try {
+      const response = await axios.get(`/api/admin/won-items/${item.id}`);
+      if (response.data.success) {
+        const w = response.data.data.won_item;
+        if (!w.shipping_breakdown) {
+          setSnackbar({ open: true, message: 'この商品の送料はまだ計算されていません', severity: 'error' });
+          setShippingDetailOpen(false);
+          return;
+        }
+        setShippingDetail({
+          wonItemId: w.id,
+          itemNumber: w.item.item_number,
+          speciesName: w.item.species_name,
+          winnerName: w.winner?.name,
+          apportionedFee: Number(w.shipping_fee ?? 0),
+          calculatedAt: item.shipping_calculated_at,
+          breakdown: w.shipping_breakdown,
+        });
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: '送料内訳の取得に失敗しました', severity: 'error' });
+      setShippingDetailOpen(false);
+    } finally {
+      setShippingDetailLoading(false);
+    }
   };
 
   // 送料計算（落札者単位）
@@ -369,7 +446,7 @@ export default function WonItemManagement() {
 
       {/* KPIカード */}
       {statistics && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, mb: 4 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3, mb: 4 }}>
           <StatCard
             title="総売上"
             value={`¥${Number(statistics.total_sales).toLocaleString()}`}
@@ -397,6 +474,13 @@ export default function WonItemManagement() {
             subValue={`完了: ${statistics.completed_count}件`}
             icon={<LocalShippingIcon />}
             color="#8B5CF6"
+          />
+          <StatCard
+            title="合計送料"
+            value={`¥${Number(statistics.total_shipping_fees ?? 0).toLocaleString()}`}
+            subValue="按分後の集計"
+            icon={<Inventory2Icon />}
+            color="#0EA5E9"
           />
         </Box>
       )}
@@ -555,6 +639,17 @@ export default function WonItemManagement() {
                             </IconButton>
                           </Tooltip>
                         )}
+                        {item.shipping_calculated_at && (
+                          <Tooltip title="送料内訳">
+                            <IconButton
+                              size="small"
+                              sx={{ color: 'info.main' }}
+                              onClick={() => handleOpenShippingDetail(item)}
+                            >
+                              <Inventory2Icon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {item.payment_status === 'pending' && (
                           <Tooltip title="入金確認">
                             <IconButton
@@ -669,6 +764,125 @@ export default function WonItemManagement() {
           >
             発送登録
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 送料内訳ダイアログ */}
+      <Dialog open={shippingDetailOpen} onClose={() => setShippingDetailOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>送料内訳</DialogTitle>
+        <DialogContent>
+          {shippingDetailLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : shippingDetail ? (
+            <Box>
+              {/* サマリ */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                  No.{shippingDetail.itemNumber} {shippingDetail.speciesName}
+                </Typography>
+                {shippingDetail.winnerName && (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    落札者: {shippingDetail.winnerName}
+                  </Typography>
+                )}
+                {shippingDetail.calculatedAt && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    計算日時: {new Date(shippingDetail.calculatedAt).toLocaleString('ja-JP')}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* 合計 */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={4}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>配送先地域</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    {REGION_LABELS[shippingDetail.breakdown.destination_region] || shippingDetail.breakdown.destination_region}
+                  </Typography>
+                </Grid>
+                <Grid item xs={4}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札者合計送料（按分前）</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    ¥{Number(shippingDetail.breakdown.total_shipping_fee).toLocaleString()}
+                  </Typography>
+                </Grid>
+                <Grid item xs={4}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>この商品の按分額</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                    ¥{Number(shippingDetail.apportionedFee).toLocaleString()}
+                  </Typography>
+                </Grid>
+              </Grid>
+
+              {/* 袋構成（全体） */}
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>袋構成（落札者合計）</Typography>
+              <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {shippingDetail.breakdown.bags.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">—</Typography>
+                ) : (
+                  shippingDetail.breakdown.bags.map((b) => (
+                    <Chip key={b.size} size="small" label={`${b.size}×${b.quantity}`} />
+                  ))
+                )}
+              </Box>
+
+              {/* 箱ごとの内訳 */}
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>箱ごとの内訳</Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>箱サイズ</TableCell>
+                      <TableCell>袋構成</TableCell>
+                      <TableCell align="right">配送料</TableCell>
+                      <TableCell align="right">梱包資材費</TableCell>
+                      <TableCell align="right">小計</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {shippingDetail.breakdown.boxes.map((box, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{box.box_size}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                            {box.bags.map((b, i) => (
+                              <Chip key={i} size="small" label={b} variant="outlined" />
+                            ))}
+                          </Box>
+                        </TableCell>
+                        <TableCell align="right">¥{Number(box.shipping_cost).toLocaleString()}</TableCell>
+                        <TableCell align="right">¥{Number(box.packing_material_cost).toLocaleString()}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          ¥{Number(box.shipping_cost + box.packing_material_cost).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell colSpan={2} sx={{ fontWeight: 600 }}>合計</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        ¥{Number(shippingDetail.breakdown.shipping_cost).toLocaleString()}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        ¥{Number(shippingDetail.breakdown.packing_material_cost).toLocaleString()}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>
+                        ¥{Number(shippingDetail.breakdown.total_shipping_fee).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              <Alert severity="info" sx={{ mt: 2 }}>
+                同一落札者×同一オークションの全落札品をまとめて計算した内訳です。各商品の送料は数量比で按分されています。
+              </Alert>
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShippingDetailOpen(false)}>閉じる</Button>
         </DialogActions>
       </Dialog>
 
