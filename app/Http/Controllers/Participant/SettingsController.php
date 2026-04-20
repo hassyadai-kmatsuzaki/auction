@@ -23,6 +23,8 @@ class SettingsController extends Controller
             'data' => [
                 'profile' => [
                     'name' => $user->name,
+                    'trade_name' => $user->trade_name,
+                    'company_name' => $user->company_name,
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'postal_code' => $user->postal_code,
@@ -47,6 +49,8 @@ class SettingsController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
+            'trade_name' => 'nullable|string|max:255',
+            'company_name' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
             'postal_code' => 'nullable|string|max:10',
             'prefecture' => 'nullable|string|max:50',
@@ -64,6 +68,8 @@ class SettingsController extends Controller
 
         $user->update($request->only([
             'name',
+            'trade_name',
+            'company_name',
             'phone',
             'postal_code',
             'prefecture',
@@ -78,6 +84,8 @@ class SettingsController extends Controller
             'data' => [
                 'profile' => [
                     'name' => $user->name,
+                    'trade_name' => $user->trade_name,
+                    'company_name' => $user->company_name,
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'postal_code' => $user->postal_code,

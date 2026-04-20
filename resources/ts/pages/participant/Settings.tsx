@@ -50,6 +50,8 @@ function TabPanel(props: TabPanelProps) {
 
 interface Profile {
   name: string;
+  trade_name: string | null;
+  company_name: string | null;
   email: string;
   phone: string | null;
   postal_code: string | null;
@@ -147,6 +149,8 @@ export default function ParticipantSettings() {
 
   const [profile, setProfile] = useState<Profile>({
     name: '',
+    trade_name: '',
+    company_name: '',
     email: '',
     phone: '',
     postal_code: '',
@@ -194,6 +198,8 @@ export default function ParticipantSettings() {
         const data = response.data.data;
         setProfile({
           name: data.profile.name || '',
+          trade_name: data.profile.trade_name || '',
+          company_name: data.profile.company_name || '',
           email: data.profile.email || '',
           phone: data.profile.phone || '',
           postal_code: data.profile.postal_code || '',
@@ -417,6 +423,22 @@ export default function ParticipantSettings() {
                       value={profile.email}
                       disabled
                       helperText="メールアドレスは変更できません"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="屋号（任意）"
+                      value={profile.trade_name || ''}
+                      onChange={handleProfileChange('trade_name')}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="法人名（任意）"
+                      value={profile.company_name || ''}
+                      onChange={handleProfileChange('company_name')}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
