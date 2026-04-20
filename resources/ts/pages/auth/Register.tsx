@@ -12,7 +12,7 @@ import {
 import { CheckCircleOutlined } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
-const BG_IMAGE = '/img/regist-bg.avif';
+const BG_IMAGE = '/img/regist-bg.avif?v=1';
 
 export default function Register() {
   const navigate = useNavigate();

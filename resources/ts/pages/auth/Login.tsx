@@ -17,7 +17,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import GoogleLoginButton from '../../features/auth/GoogleLoginButton';
 
-const BG_IMAGE = '/img/regist-bg.avif';
+const BG_IMAGE = '/img/regist-bg.avif?v=1';
 
 export default function Login() {
   const navigate = useNavigate();
