@@ -85,6 +85,7 @@ interface WonItem {
   shipped_at?: string;
   shipping_calculated_at?: string;
   shipping_approved_at?: string | null;
+  calculation_mode?: 'auto' | 'manual' | 'mixed' | null;
   shipping_fee_auto?: number | null;
   created_at: string;
 }
@@ -916,6 +917,7 @@ export default function WonItemManagement() {
               const allCalculated = calculatedCount === group.items.length;
               const approvedCount = group.items.filter((i) => i.shipping_approved_at).length;
               const allApproved = approvedCount === group.items.length && group.items.length > 0;
+              const hasManual = group.items.some((i) => i.calculation_mode === 'manual');
               const groupKey = group.winner ? `u${group.winner.id}` : 'anonymous';
               return (
                 <Card key={groupKey}>
@@ -1029,7 +1031,7 @@ export default function WonItemManagement() {
                             送料内訳
                           </Button>
                         )}
-                        {allCalculated && !allApproved && group.winner && (
+                        {allCalculated && !allApproved && hasManual && group.winner && (
                           <Button
                             size="small"
                             variant="contained"

@@ -157,6 +157,8 @@ class WonItemController extends Controller
                         'tracking_number' => $wonItem->tracking_number,
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                         'shipping_calculated_at' => $wonItem->shipping_calculated_at ? $wonItem->shipping_calculated_at->toIso8601String() : null,
+                        'shipping_approved_at' => $wonItem->shipping_approved_at ? $wonItem->shipping_approved_at->toIso8601String() : null,
+                        'calculation_mode' => $wonItem->calculation_mode,
                         'created_at' => $wonItem->created_at->toIso8601String(),
                     ];
                 }),
@@ -469,15 +471,26 @@ class WonItemController extends Controller
             $totalShippingFee = $result['total_shipping_fee'];
             $quantities = $wonItems->map(fn ($w) => $w->item->quantity)->toArray();
             $apportioned = \App\Services\ShippingCalculatorService::apportionFee($totalShippingFee, $quantities);
+            $now = now();
+            $adminId = $request->user()->id;
             foreach ($wonItems as $i => $wonItem) {
                 $wonItem->update([
                     'shipping_fee' => $apportioned[$i],
                     'shipping_fee_auto' => $apportioned[$i],
                     'shipping_breakdown' => $result,
                     'calculation_mode' => $mode,
-                    'shipping_calculated_at' => now(),
+                    'shipping_calculated_at' => $now,
+                    // 自動計算種別のみの場合は管理者承認を省略し即時確定
+                    'shipping_approved_at' => $now,
+                    'shipping_approved_by' => $adminId,
+                    'shipping_adjustment_reason' => null,
                 ]);
             }
+
+            // 落札者に送料確定を通知
+            $refreshed = $wonItems->fresh(['user', 'item']);
+            app(\App\Services\NotificationService::class)
+                ->sendShippingFeeFinalizedNotification($refreshed);
 
             return response()->json([
                 'success' => true,
