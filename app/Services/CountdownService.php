@@ -937,7 +937,16 @@ class CountdownService
                 'end_time' => now()->format('H:i:s'),
             ]);
 
-            // 送料計算はボタン方式に移行（自動計算しない）
+            // 送料を自動計算（管理者承認前）
+            try {
+                app(\App\Actions\Auction\FinishAuctionAction::class)
+                    ->calculateShippingForAuction($auction);
+            } catch (\Exception $e) {
+                Log::warning('自動終了時の送料計算に失敗', [
+                    'auction_id' => $auction->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // ステータス変更イベントをブロードキャスト
             try {

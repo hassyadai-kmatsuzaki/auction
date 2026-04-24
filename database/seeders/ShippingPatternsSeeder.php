@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\Lane;
 use App\Models\Role;
 use App\Models\SellerProfile;
+use App\Models\SpeciesType;
 use App\Models\User;
 use App\Models\WonItem;
 use App\Services\ShippingCalculatorService;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\DB;
  * 箱容量: 80(S×1) / 100(S×2 or M×1) / 140(S×9, M×3, L×2, KA×1)
  *
  * 網羅するパターン（(auction × winner) グループ単位で 1 パターン）:
+ *   [メダカ単独 / auto 戦略]
  *   - 小ロット単発(10匹)                 → 80 箱
  *   - M単独(100匹)                        → 100 箱
  *   - S×3 (30匹×3品)                      → 140 箱 (S×3)
@@ -34,6 +36,12 @@ use Illuminate\Support\Facades\DB;
  *   - L+S 同梱 (300+10)                   → 140 箱（L+S）
  *   - M×4 (100匹×4品) 複数箱             → 140(M×3) + 100(M×1)
  *   - S×10 (10匹×10品) 複数箱            → 140(S×9) + 80(S×1)
+ *
+ *   [種別拡張パターン]
+ *   - Pattern 14: 「その他」(manual) 単独       → 手動送料入力待ち
+ *   - Pattern 15: メダカ + 「その他」の混在      → 全体が manual に倒れる
+ *   - Pattern 16: メダカ + 水草（複数 auto 種別） → mixed 戦略で自動計算
+ *      ※ 水草マスタが未投入の環境では skip する
  *
  * 落札者の内訳:
  *   - User(id=509)  : 配送料パターン用落札者A
@@ -124,11 +132,11 @@ class ShippingPatternsSeeder extends Seeder
         DB::transaction(function () use ($admin, $sellerA, $sellerB, $winners, $shipping) {
             $this->cleanupExisting();
 
-            $small = $this->createAuction($admin, 'SMALL', now()->subDays(5), '小ロット & M単独');
-            $mix   = $this->createAuction($admin, 'MIX',   now()->subDays(4), 'S複数 & S+M混載');
-            $large = $this->createAuction($admin, 'LARGE', now()->subDays(3), 'L & KA & 複数箱');
-            $app   = $this->createAuction($admin, 'APPORTION', now()->subDays(2), '6品按分');
-            $extra = $this->createAuction($admin, 'EXTRA', now()->subDay(), '100箱S×2 / KA+S / L+S / M×4 / S×10');
+            $small = $this->createAuction($admin, 'SMALL', now()->subDays(6), '小ロット & M単独');
+            $mix   = $this->createAuction($admin, 'MIX',   now()->subDays(5), 'S複数 & S+M混載');
+            $large = $this->createAuction($admin, 'LARGE', now()->subDays(4), 'L & KA & 複数箱');
+            $app   = $this->createAuction($admin, 'APPORTION', now()->subDays(3), '6品按分');
+            $extra = $this->createAuction($admin, 'EXTRA', now()->subDays(2), '100箱S×2 / KA+S / L+S / M×4 / S×10');
 
             // --- Pattern 1: 小ロット単発 (10匹) → 80箱 ---
             $i1 = $this->createItem($small, $sellerA, 1, '紅白メダカ(小ロット)', 10, 200, '/img/medaka/紅白ラメ.jpg');
@@ -331,9 +339,58 @@ class ShippingPatternsSeeder extends Seeder
                 'shipping_company' => '佐川急便',
                 'tracking_number' => 'SP13-1000-0013',
             ]);
+
+            // --- Pattern 14: 「その他」(manual) 単独 → 手動送料入力待ち ---
+            $species = $this->createAuction($admin, 'SPECIES', now()->subHours(12), '種別拡張（その他 / 混在）');
+            $i14 = $this->createItem($species, $sellerA, 1, '特殊エビ 5kg パック', 5, 3000, '/img/medaka/01.png', 'other', 'kg');
+            $this->persistGroup([$this->buildWonItem($i14, $winners[0], 3500)], $winners[0], $shipping, [
+                'payment_status' => 'pending',
+                'delivery_status' => 'pending',
+                'payment_deadline' => now()->addDays(2),
+            ]);
+
+            // --- Pattern 15: メダカ + 「その他」 → manual に倒れる ---
+            $i15a = $this->createItem($species, $sellerA, 2, '楊貴妃(メダカ)', 30, 300, '/img/medaka/楊貴妃ダルマ.jpeg', 'medaka', 'fish');
+            $i15b = $this->createItem($species, $sellerA, 3, '流木 1 袋(その他)', 1, 1500, '/img/medaka/01.png', 'other', 'bag');
+            $this->persistGroup([
+                $this->buildWonItem($i15a, $winners[1], 450),
+                $this->buildWonItem($i15b, $winners[1], 1800),
+            ], $winners[1], $shipping, [
+                'payment_status' => 'pending',
+                'delivery_status' => 'pending',
+                'payment_deadline' => now()->addDays(2),
+            ]);
+
+            // --- Pattern 16: メダカ + 水草 (複数 auto 種別) → mixed 戦略（水草マスタがあれば自動計算） ---
+            if ($this->isSpeciesReady('aquatic_plant')) {
+                $i16a = $this->createItem($species, $sellerB, 4, '幹之(メダカ)', 20, 350, '/img/medaka/幹之フルボディ.jpg', 'medaka', 'fish');
+                $i16b = $this->createItem($species, $sellerB, 5, 'アナカリス(水草)', 10, 200, '/img/medaka/01.png', 'aquatic_plant', 'fish');
+                $this->persistGroup([
+                    $this->buildWonItem($i16a, $winners[2], 500),
+                    $this->buildWonItem($i16b, $winners[2], 300),
+                ], $winners[2], $shipping, [
+                    'payment_status' => 'confirmed',
+                    'delivery_status' => 'preparing',
+                    'paid_at' => now()->subHours(6),
+                    'payment_confirmed_at' => now()->subHours(6),
+                    'shipping_locked_at' => now()->subHours(6),
+                ]);
+            } else {
+                $this->command->warn('Pattern 16 (メダカ+水草 mixed) は水草マスタ未投入のためスキップしました。');
+            }
         });
 
         $this->report();
+    }
+
+    /**
+     * 指定 code の種別が auto 運用可能か（is_active=true かつ袋マスタが存在するか）を判定。
+     */
+    private function isSpeciesReady(string $code): bool
+    {
+        $species = SpeciesType::where('code', $code)->where('is_active', true)->first();
+        if (!$species) return false;
+        return \App\Models\BagSpec::where('species_type_id', $species->id)->exists();
     }
 
     /**
@@ -457,15 +514,31 @@ class ShippingPatternsSeeder extends Seeder
         return $auction;
     }
 
-    private function createItem(Auction $auction, SellerProfile $seller, int $no, string $species, int $qty, int $startPrice, string $thumbnailPath): Item
-    {
+    private function createItem(
+        Auction $auction,
+        SellerProfile $seller,
+        int $no,
+        string $species,
+        int $qty,
+        int $startPrice,
+        string $thumbnailPath,
+        string $speciesCode = 'medaka',
+        string $quantityUnit = 'fish'
+    ): Item {
+        $speciesType = SpeciesType::where('code', $speciesCode)->first();
+        if (!$speciesType) {
+            throw new \RuntimeException("SpeciesType code={$speciesCode} が見つかりません。マイグレーション＆シードを確認してください。");
+        }
+
         $item = Item::create([
             'auction_id' => $auction->id,
             'seller_profile_id' => $seller->id,
             'item_number' => $no,
             'seller_display_order' => $no,
             'species_name' => $species,
+            'species_type_id' => $speciesType->id,
             'quantity' => $qty,
+            'quantity_unit' => $quantityUnit,
             'start_price' => $startPrice,
             'current_price' => $startPrice,
             'reserve_price' => (int) ($startPrice * 0.8),
@@ -556,15 +629,44 @@ class ShippingPatternsSeeder extends Seeder
         }
 
         $quantities = array_map(fn ($row) => (int) $row['quantity'], $wonItemRows);
-        $items = array_map(fn ($q) => ['quantity' => $q], $quantities);
+        // WonItem に紐づく Item の species_type_id を同じ順序で取得
+        $itemIds = array_map(fn ($row) => (int) $row['item_id'], $wonItemRows);
+        $speciesMap = Item::whereIn('id', $itemIds)->pluck('species_type_id', 'id')->toArray();
+        $items = [];
+        foreach ($wonItemRows as $row) {
+            $items[] = [
+                'quantity' => (int) $row['quantity'],
+                'species_type_id' => $speciesMap[$row['item_id']] ?? null,
+            ];
+        }
+
         $result = $shipping->calculate($items, $region);
+        $mode = $result['calculation_mode'] ?? 'auto';
+
+        // manual の場合は送料を確定せず、管理者手動入力待ちの状態で保存
+        if ($mode === 'manual') {
+            foreach ($wonItemRows as $row) {
+                $row = array_merge($row, $statusOverrides);
+                $row['shipping_fee'] = 0;
+                $row['shipping_fee_auto'] = null;
+                $row['shipping_breakdown'] = $result;
+                $row['calculation_mode'] = 'manual';
+                $row['shipping_calculated_at'] = now();
+                $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
+                (new WonItem())->forceFill($row)->save();
+            }
+            return;
+        }
+
         $apportioned = ShippingCalculatorService::apportionFee($result['total_shipping_fee'], $quantities);
 
         foreach ($wonItemRows as $i => $row) {
             $row = array_merge($row, $statusOverrides);
             $shippingFee = $apportioned[$i];
             $row['shipping_fee'] = $shippingFee;
+            $row['shipping_fee_auto'] = $shippingFee;
             $row['shipping_breakdown'] = $result;
+            $row['calculation_mode'] = $mode;
             $row['shipping_calculated_at'] = now();
             $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
 

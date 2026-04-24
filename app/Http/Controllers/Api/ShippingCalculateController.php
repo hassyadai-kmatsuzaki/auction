@@ -22,6 +22,7 @@ class ShippingCalculateController extends Controller
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.species_type_id' => 'nullable|integer|exists:species_types,id',
             'destination_region' => 'required_without:destination_prefecture|string',
             'destination_prefecture' => 'required_without:destination_region|string',
         ]);

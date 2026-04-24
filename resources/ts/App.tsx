@@ -55,6 +55,7 @@ const UserManagement         = lazy(() => import('./pages/admin/UserManagement')
 const UserDetail             = lazy(() => import('./pages/admin/UserDetail'));
 const UserCreate             = lazy(() => import('./pages/admin/UserCreate'));
 const Settings               = lazy(() => import('./pages/admin/Settings'));
+const SpeciesTypeManagement  = lazy(() => import('./pages/admin/SpeciesTypeManagement'));
 const Scaling                = lazy(() => import('./pages/admin/Scaling'));
 const SellerManagement       = lazy(() => import('./pages/admin/SellerManagement'));
 const SellerDetail           = lazy(() => import('./pages/admin/SellerDetail'));
@@ -225,6 +226,7 @@ function App() {
             
             {/* 設定 */}
             <Route path="settings" element={<Settings />} />
+            <Route path="masters/species-types" element={<SpeciesTypeManagement />} />
 
             {/* インフラスケーリング */}
             <Route path="scaling" element={<Scaling />} />

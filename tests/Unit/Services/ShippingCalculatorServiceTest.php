@@ -1,0 +1,153 @@
+<?php
+
+namespace Tests\Unit\Services;
+
+use App\Models\SpeciesType;
+use App\Services\ShippingCalculatorService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+/**
+ * ShippingCalculatorService のリグレッションテスト。
+ *
+ * マイグレーションと初期シードで投入された「メダカ」マスタを使い、
+ * 旧ロジック相当の計算結果が得られること、および種別分岐（auto/manual/mixed）
+ * の挙動を検証する。
+ */
+class ShippingCalculatorServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private int $medakaId;
+    private int $otherId;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Cache::flush();
+        $this->medakaId = (int) DB::table('species_types')->where('code', 'medaka')->value('id');
+        $this->otherId = (int) DB::table('species_types')->where('code', 'other')->value('id');
+    }
+
+    /** @test */
+    public function 都道府県から地域への変換が動く(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $this->assertSame('関東', $calculator->getRegionByPrefecture('東京都'));
+        $this->assertSame('関西', $calculator->getRegionByPrefecture('大阪府'));
+    }
+
+    /** @test */
+    public function メダカ単独_少量_関東_S袋1個80号箱(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [['quantity' => 10, 'species_type_id' => $this->medakaId]],
+            '関東'
+        );
+
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertCount(1, $result['boxes']);
+        $this->assertSame(80, $result['boxes'][0]['box_size']);
+        // 関東80号 = 704, 資材(80号) = 250+50 = 300 → 合計 1004
+        $this->assertSame(704, $result['shipping_cost']);
+        $this->assertSame(300, $result['packing_material_cost']);
+        $this->assertSame(1004, $result['total_shipping_fee']);
+    }
+
+    /** @test */
+    public function メダカ単独_中量_関東_M袋1個100号箱(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [['quantity' => 50, 'species_type_id' => $this->medakaId]],
+            '関東'
+        );
+
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertSame(100, $result['boxes'][0]['box_size']);
+        // 関東100号 = 847, 資材(100号) = 350 → 1197
+        $this->assertSame(847, $result['shipping_cost']);
+        $this->assertSame(350, $result['packing_material_cost']);
+        $this->assertSame(1197, $result['total_shipping_fee']);
+    }
+
+    /** @test */
+    public function メダカ単独_大量_関東_L袋1個140号箱(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [['quantity' => 250, 'species_type_id' => $this->medakaId]],
+            '関東'
+        );
+
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertSame(140, $result['boxes'][0]['box_size']);
+        // 関東140号 = 1320, 資材(140号) = 450 → 1770
+        $this->assertSame(1320, $result['shipping_cost']);
+        $this->assertSame(450, $result['packing_material_cost']);
+        $this->assertSame(1770, $result['total_shipping_fee']);
+    }
+
+    /** @test */
+    public function メダカ_100号ではS袋Mを混載しない(): void
+    {
+        // S×1 + M×1 → 100 で混載不可 → 140 に詰める
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [
+                ['quantity' => 10, 'species_type_id' => $this->medakaId],  // S×1
+                ['quantity' => 50, 'species_type_id' => $this->medakaId],  // M×1
+            ],
+            '関東'
+        );
+
+        $this->assertSame(1, count($result['boxes']));
+        $this->assertSame(140, $result['boxes'][0]['box_size']);
+    }
+
+    /** @test */
+    public function その他を含むと_manual_モードで返る(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [
+                ['quantity' => 10, 'species_type_id' => $this->medakaId],
+                ['quantity' => 1,  'species_type_id' => $this->otherId],
+            ],
+            '関東'
+        );
+
+        $this->assertSame('manual', $result['calculation_mode']);
+        $this->assertNull($result['total_shipping_fee']);
+        $this->assertEmpty($result['boxes']);
+        $this->assertNotEmpty($result['species_breakdown']);
+    }
+
+    /** @test */
+    public function species_type_id未指定ならデフォルト_メダカ_で計算される(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate([['quantity' => 10]], '関東');
+
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertSame(1004, $result['total_shipping_fee']);
+    }
+
+    /** @test */
+    public function 按分_端数は末尾要素で吸収され合計が一致する(): void
+    {
+        $apportioned = ShippingCalculatorService::apportionFee(1000, [1, 1, 1]);
+        $this->assertSame(1000, array_sum($apportioned));
+        $this->assertCount(3, $apportioned);
+    }
+
+    /** @test */
+    public function 按分_数量ゼロ配列でも合計が一致する(): void
+    {
+        $apportioned = ShippingCalculatorService::apportionFee(500, [0, 0, 0]);
+        $this->assertSame(500, array_sum($apportioned));
+    }
+}

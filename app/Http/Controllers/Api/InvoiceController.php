@@ -34,9 +34,9 @@ class InvoiceController extends Controller
             return response()->json(['message' => '該当する落札品がありません'], 404);
         }
 
-        // 送料計算済みチェック
-        if ($wonItems->contains(fn ($w) => $w->shipping_calculated_at === null)) {
-            return response()->json(['message' => '送料計算後にダウンロードできます'], 400);
+        // 管理者による送料承認チェック（承認前は落札者に開示しない）
+        if ($wonItems->contains(fn ($w) => $w->shipping_approved_at === null)) {
+            return response()->json(['message' => '送料の確定後にダウンロードできます'], 400);
         }
 
         try {
@@ -78,9 +78,9 @@ class InvoiceController extends Controller
             return response()->json(['message' => '入金確認済みの落札品がありません'], 404);
         }
 
-        // 送料計算済みチェック
-        if ($wonItems->contains(fn ($w) => $w->shipping_calculated_at === null)) {
-            return response()->json(['message' => '送料計算後にダウンロードできます'], 400);
+        // 管理者による送料承認チェック
+        if ($wonItems->contains(fn ($w) => $w->shipping_approved_at === null)) {
+            return response()->json(['message' => '送料の確定後にダウンロードできます'], 400);
         }
 
         try {

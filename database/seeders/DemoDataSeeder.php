@@ -469,6 +469,13 @@ class DemoDataSeeder extends Seeder
         $speciesCount = count($speciesData);
         $now = now();
 
+        // デモ用種別 ID（デフォルト＝メダカ）。マイグレーション直後なら species_types に
+        // medaka が必ず存在する前提。
+        $defaultSpeciesTypeId = (int) DB::table('species_types')
+            ->where('is_default', true)
+            ->orWhere('code', 'medaka')
+            ->value('id');
+
         foreach ($auctions as $auctionIndex => $auction) {
             $itemCount = $this->itemsPerAuction;
             $itemsToInsert = [];
@@ -496,7 +503,9 @@ class DemoDataSeeder extends Seeder
                     'seller_profile_id' => $sellers[$sellerIndex]['profile']->id,
                     'item_number' => $i,
                     'species_name' => $species['name'],
+                    'species_type_id' => $defaultSpeciesTypeId,
                     'quantity' => rand(1, 3),
+                    'quantity_unit' => 'fish',
                     'start_price' => $species['price'],
                     'current_price' => $species['price'],
                     'reserve_price' => (int)($species['price'] * 0.8),

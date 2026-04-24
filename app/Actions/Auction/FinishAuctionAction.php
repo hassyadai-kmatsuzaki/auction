@@ -29,7 +29,8 @@ class FinishAuctionAction
             throw $e;
         }
 
-        // 送料計算はボタン方式に移行（自動計算しない）
+        // 送料を自動計算（管理者承認前なので shipping_approved_at は未セット）
+        $this->calculateShippingForAuction($auction);
 
         broadcast(new AuctionStatusChanged($auction->id, 'finished', 'オークションが終了しました'));
 
@@ -67,20 +68,48 @@ class FinishAuctionAction
 
                 // 全落札商品の数量をまとめて計算
                 $items = $winnerItems->map(function ($wonItem) {
-                    return ['quantity' => $wonItem->item->quantity];
+                    return [
+                        'quantity' => $wonItem->item->quantity,
+                        'species_type_id' => $wonItem->item->species_type_id,
+                    ];
                 })->values()->toArray();
 
                 $result = $calculator->calculate($items, $region);
-                $totalFee = $result['total_shipping_fee'];
+                $mode = $result['calculation_mode'] ?? 'auto';
 
-                // 配送料を数量比で按分
+                // manual の場合はここでは金額を入れず、管理者の手動入力待ちにする
+                if ($mode === 'manual') {
+                    foreach ($winnerItems as $wonItem) {
+                        if ($wonItem->shipping_approved_at !== null) {
+                            continue;
+                        }
+                        $wonItem->update([
+                            'shipping_fee' => 0,
+                            'shipping_fee_auto' => null,
+                            'shipping_breakdown' => $result,
+                            'calculation_mode' => 'manual',
+                            'shipping_calculated_at' => now(),
+                        ]);
+                    }
+                    continue;
+                }
+
+                $totalFee = $result['total_shipping_fee'];
                 $totalQuantity = $winnerItems->sum(fn($wi) => $wi->item->quantity);
 
                 foreach ($winnerItems as $wonItem) {
-                    $ratio = $wonItem->item->quantity / $totalQuantity;
+                    if ($wonItem->shipping_approved_at !== null) {
+                        continue;
+                    }
+
+                    $ratio = $wonItem->item->quantity / max($totalQuantity, 1);
+                    $fee = (int) round($totalFee * $ratio);
                     $wonItem->update([
-                        'shipping_fee' => (int) round($totalFee * $ratio),
+                        'shipping_fee' => $fee,
+                        'shipping_fee_auto' => $fee,
                         'shipping_breakdown' => $result,
+                        'calculation_mode' => $mode,
+                        'shipping_calculated_at' => now(),
                     ]);
                 }
             }

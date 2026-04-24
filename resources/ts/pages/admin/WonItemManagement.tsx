@@ -84,6 +84,8 @@ interface WonItem {
   shipping_company?: string;
   shipped_at?: string;
   shipping_calculated_at?: string;
+  shipping_approved_at?: string | null;
+  shipping_fee_auto?: number | null;
   created_at: string;
 }
 
@@ -217,6 +219,11 @@ export default function WonItemManagement() {
   const [shippingDetailOpen, setShippingDetailOpen] = useState(false);
   const [shippingDetail, setShippingDetail] = useState<ShippingDetail | null>(null);
   const [shippingDetailLoading, setShippingDetailLoading] = useState(false);
+  const [approveShippingOpen, setApproveShippingOpen] = useState(false);
+  const [approveShippingWinnerId, setApproveShippingWinnerId] = useState<number | null>(null);
+  const [approveShippingAutoFee, setApproveShippingAutoFee] = useState<number>(0);
+  const [approveShippingOverride, setApproveShippingOverride] = useState<string>('');
+  const [approveShippingReason, setApproveShippingReason] = useState<string>('');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -352,6 +359,47 @@ export default function WonItemManagement() {
       setShippingDetailOpen(false);
     } finally {
       setShippingDetailLoading(false);
+    }
+  };
+
+  // 送料承認モーダルを開く
+  const handleOpenApproveShipping = (winnerId: number, autoFee: number) => {
+    setApproveShippingWinnerId(winnerId);
+    setApproveShippingAutoFee(autoFee);
+    setApproveShippingOverride(String(autoFee));
+    setApproveShippingReason('');
+    setApproveShippingOpen(true);
+  };
+
+  // 送料承認を実行
+  const handleSubmitApproveShipping = async () => {
+    if (approveShippingWinnerId === null) return;
+    const overrideNum = Number(approveShippingOverride);
+    const isOverridden = !Number.isNaN(overrideNum) && overrideNum !== approveShippingAutoFee;
+    if (isOverridden && !approveShippingReason.trim()) {
+      setSnackbar({ open: true, message: '金額を変更する場合は理由を入力してください', severity: 'error' });
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const payload: Record<string, any> = {};
+      if (isOverridden) {
+        payload.shipping_fee = overrideNum;
+        payload.adjustment_reason = approveShippingReason.trim();
+      }
+      const response = await axios.post(
+        `/api/admin/auctions/${auctionId}/winners/${approveShippingWinnerId}/approve-shipping`,
+        payload,
+      );
+      if (response.data.success) {
+        setSnackbar({ open: true, message: response.data.message || '送料を承認しました', severity: 'success' });
+        setApproveShippingOpen(false);
+        fetchWonItems();
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '送料の承認に失敗しました', severity: 'error' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -866,6 +914,8 @@ export default function WonItemManagement() {
               const totalShippingFee = group.items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
               const calculatedCount = group.items.filter((i) => i.shipping_calculated_at).length;
               const allCalculated = calculatedCount === group.items.length;
+              const approvedCount = group.items.filter((i) => i.shipping_approved_at).length;
+              const allApproved = approvedCount === group.items.length && group.items.length > 0;
               const groupKey = group.winner ? `u${group.winner.id}` : 'anonymous';
               return (
                 <Card key={groupKey}>
@@ -931,9 +981,22 @@ export default function WonItemManagement() {
                       <Box>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>送料</Typography>
                         {allCalculated ? (
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: 'info.main' }}>
-                            ¥{totalShippingFee.toLocaleString()}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: allApproved ? 'success.main' : 'info.main' }}>
+                              ¥{totalShippingFee.toLocaleString()}
+                            </Typography>
+                            <Chip
+                              size="small"
+                              label={allApproved ? '承認済' : '未承認'}
+                              sx={{
+                                height: 20,
+                                fontSize: '0.65rem',
+                                bgcolor: allApproved ? '#ECFDF5' : '#FEF3C7',
+                                color: allApproved ? '#059669' : '#B45309',
+                                fontWeight: 700,
+                              }}
+                            />
+                          </Box>
                         ) : (
                           <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 600 }}>
                             未計算（{group.items.length - calculatedCount}件）
@@ -964,6 +1027,17 @@ export default function WonItemManagement() {
                             onClick={() => handleOpenShippingDetail(group.items)}
                           >
                             送料内訳
+                          </Button>
+                        )}
+                        {allCalculated && !allApproved && group.winner && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() => handleOpenApproveShipping(group.winner!.id, totalShippingFee)}
+                            disabled={actionLoading}
+                          >
+                            送料承認
                           </Button>
                         )}
                       </Box>
@@ -1112,6 +1186,58 @@ export default function WonItemManagement() {
             disabled={actionLoading || !trackingForm.tracking_number}
           >
             発送登録
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 送料承認ダイアログ */}
+      <Dialog open={approveShippingOpen} onClose={() => setApproveShippingOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>送料の承認</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              承認すると落札者に送料が開示され、請求書が発行可能になります。
+              自動計算値と異なる金額を入力すると、手動調整として記録されます。
+            </Typography>
+            <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>自動計算された送料</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                ¥{approveShippingAutoFee.toLocaleString()}
+              </Typography>
+            </Box>
+            <TextField
+              fullWidth
+              label="承認する送料（円）"
+              type="number"
+              value={approveShippingOverride}
+              onChange={(e) => setApproveShippingOverride(e.target.value)}
+              sx={{ mb: 2 }}
+              inputProps={{ min: 0 }}
+            />
+            {Number(approveShippingOverride) !== approveShippingAutoFee && (
+              <TextField
+                fullWidth
+                label="変更理由（手動調整時のみ必須）"
+                value={approveShippingReason}
+                onChange={(e) => setApproveShippingReason(e.target.value)}
+                multiline
+                rows={2}
+                required
+              />
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApproveShippingOpen(false)} disabled={actionLoading}>
+            キャンセル
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleSubmitApproveShipping}
+            disabled={actionLoading || approveShippingOverride === ''}
+          >
+            {actionLoading ? <CircularProgress size={20} /> : '承認する'}
           </Button>
         </DialogActions>
       </Dialog>

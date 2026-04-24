@@ -55,6 +55,7 @@ interface AvailableAuction {
 
 interface ItemFormData {
   species_name: string;
+  species_type_id: number | '';
   quantity: string;
   quantity_unit: string;
   is_premium: boolean;
@@ -62,10 +63,21 @@ interface ItemFormData {
   age_months: string;
 }
 
-const createEmptyItem = (): ItemFormData => ({
+interface SellerSpeciesType {
+  id: number;
+  code: string;
+  name: string;
+  calculation_mode: 'auto' | 'manual';
+  allowed_quantity_units: ('fish' | 'kg' | 'bag')[];
+  is_default: boolean;
+  sort_order: number;
+}
+
+const createEmptyItem = (defaults?: { species_type_id?: number; quantity_unit?: string }): ItemFormData => ({
   species_name: '',
+  species_type_id: defaults?.species_type_id ?? '',
   quantity: '',
-  quantity_unit: 'fish',
+  quantity_unit: defaults?.quantity_unit ?? 'fish',
   is_premium: false,
   individual_info: '',
   age_months: '',
@@ -81,10 +93,33 @@ export default function SubmitItem() {
   
   const [auctionId, setAuctionId] = useState('');
   const [items, setItems] = useState<ItemFormData[]>([createEmptyItem()]);
+  const [speciesTypes, setSpeciesTypes] = useState<SellerSpeciesType[]>([]);
 
   useEffect(() => {
     fetchAvailableAuctions();
+    fetchSpeciesTypes();
   }, []);
+
+  const fetchSpeciesTypes = async () => {
+    try {
+      const res = await axios.get('/api/seller/species-types');
+      const types: SellerSpeciesType[] = res.data.data ?? [];
+      setSpeciesTypes(types);
+      const def = types.find((t) => t.is_default) ?? types[0];
+      if (def) {
+        setItems((prev) => prev.map((it) => it.species_type_id === '' ? {
+          ...it,
+          species_type_id: def.id,
+          quantity_unit: def.allowed_quantity_units[0] ?? 'fish',
+        } : it));
+      }
+    } catch (err) {
+      console.error('種別一覧取得エラー:', err);
+    }
+  };
+
+  const getSpeciesById = (id: number | '') => speciesTypes.find((t) => t.id === id);
+  const unitLabel = (u: string) => (u === 'fish' ? '匹' : u === 'kg' ? 'kg' : '袋');
 
   const fetchAvailableAuctions = async () => {
     try {
@@ -106,7 +141,11 @@ export default function SubmitItem() {
   };
 
   const addItem = () => {
-    setItems(prev => [...prev, createEmptyItem()]);
+    const def = speciesTypes.find((t) => t.is_default) ?? speciesTypes[0];
+    setItems(prev => [...prev, createEmptyItem({
+      species_type_id: def?.id,
+      quantity_unit: def?.allowed_quantity_units[0] ?? 'fish',
+    })]);
   };
 
   const duplicateItem = (index: number) => {
@@ -131,7 +170,7 @@ export default function SubmitItem() {
 
   const isFormValid = () => {
     if (!auctionId) return false;
-    return items.every(item => item.species_name && item.quantity);
+    return items.every(item => item.species_name && item.quantity && item.species_type_id !== '');
   };
 
   const handleSubmit = async () => {
@@ -147,6 +186,7 @@ export default function SubmitItem() {
         return axios.post('/api/seller/items', {
           auction_id: parseInt(auctionId),
           species_name: item.species_name,
+          species_type_id: item.species_type_id || null,
           quantity: parseInt(item.quantity),
           quantity_unit: item.quantity_unit,
           start_price: 100,
@@ -300,7 +340,32 @@ export default function SubmitItem() {
                     </Box>
 
                     <Grid container spacing={2}>
-                      <Grid item xs={12}>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth required size="small">
+                          <InputLabel>種別</InputLabel>
+                          <Select
+                            value={item.species_type_id}
+                            label="種別"
+                            onChange={(e) => {
+                              const newId = e.target.value as number;
+                              const sp = speciesTypes.find((t) => t.id === newId);
+                              const current = item.quantity_unit;
+                              const unit = sp && !sp.allowed_quantity_units.includes(current as 'fish' | 'kg' | 'bag')
+                                ? sp.allowed_quantity_units[0] ?? 'fish'
+                                : current;
+                              setItems(prev => prev.map((it, i) => i === index ? { ...it, species_type_id: newId, quantity_unit: unit } : it));
+                            }}
+                          >
+                            {speciesTypes.map((t) => (
+                              <MenuItem key={t.id} value={t.id}>
+                                {t.name}{t.calculation_mode === 'manual' ? '（送料手動）' : ''}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item xs={12} md={8}>
                         <TextField
                           fullWidth
                           required
@@ -332,9 +397,9 @@ export default function SubmitItem() {
                             label="単位"
                             onChange={(e) => updateItem(index, 'quantity_unit', e.target.value)}
                           >
-                            <MenuItem value="fish">匹</MenuItem>
-                            <MenuItem value="kg">kg</MenuItem>
-                            <MenuItem value="bag">袋</MenuItem>
+                            {(getSpeciesById(item.species_type_id)?.allowed_quantity_units ?? ['fish']).map((u) => (
+                              <MenuItem key={u} value={u}>{unitLabel(u)}</MenuItem>
+                            ))}
                           </Select>
                         </FormControl>
                       </Grid>
@@ -448,6 +513,7 @@ export default function SubmitItem() {
                         <TableHead>
                           <TableRow sx={{ bgcolor: 'grey.50' }}>
                             <TableCell sx={{ fontWeight: 600 }}>No.</TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>種別</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>品種名</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>数量</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>月数</TableCell>
@@ -458,10 +524,11 @@ export default function SubmitItem() {
                           {items.map((item, index) => (
                             <TableRow key={index}>
                               <TableCell>{index + 1}</TableCell>
+                              <TableCell>{getSpeciesById(item.species_type_id)?.name ?? '—'}</TableCell>
                               <TableCell sx={{ fontWeight: 500 }}>{item.species_name}</TableCell>
                               <TableCell>
                                 {item.quantity}
-                                {item.quantity_unit === 'fish' ? '匹' : item.quantity_unit === 'kg' ? 'kg' : '袋'}
+                                {unitLabel(item.quantity_unit)}
                               </TableCell>
                               <TableCell>{item.age_months || '—'}</TableCell>
                               <TableCell>

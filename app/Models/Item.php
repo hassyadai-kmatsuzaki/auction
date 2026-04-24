@@ -19,7 +19,9 @@ class Item extends BaseModel
         'item_number',
         'seller_display_order',
         'species_name',
+        'species_type_id',
         'quantity',
+        'quantity_unit',
         'sex',
         'parent_fish_info',
         'breeding_environment',
@@ -75,6 +77,11 @@ class Item extends BaseModel
     public function auction()
     {
         return $this->belongsTo(Auction::class);
+    }
+
+    public function speciesType()
+    {
+        return $this->belongsTo(SpeciesType::class);
     }
 
     /**

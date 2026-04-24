@@ -11,6 +11,7 @@ use App\Mail\PaymentConfirmedMail;
 use App\Mail\PaymentReminderMail;
 use App\Mail\SellerAuctionStartMail;
 use App\Mail\SellerPaymentReceivedMail;
+use App\Mail\ShippingFeeFinalizedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
 use App\Jobs\SendLineNotificationJob;
@@ -131,6 +132,48 @@ class NotificationService
             return true;
         } catch (\Exception $e) {
             Log::error('発送通知送信エラー', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /**
+     * ③-2 送料確定通知（参加者向け）
+     *
+     * 管理者が送料を承認（手動/自動問わず）したタイミングで送信する。
+     * 同一発送単位（オークション×落札者）の全 WonItem をまとめて 1 通で通知する。
+     *
+     * @param \Illuminate\Support\Collection<int, WonItem> $wonItems
+     */
+    public function sendShippingFeeFinalizedNotification($wonItems): bool
+    {
+        try {
+            if (!$wonItems || $wonItems->isEmpty()) return false;
+
+            $first = $wonItems->first();
+            $user = $first->user;
+            if (!$user || !$user->email) return false;
+            // 既存の email_shipping 設定で配送関連通知をまとめて制御する
+            if (!$this->shouldSendParticipantNotification($user, 'email_shipping')) return false;
+
+            Mail::to($user->email)->queue(new ShippingFeeFinalizedMail($wonItems));
+
+            $totalFee = (int) $wonItems->sum('shipping_fee');
+            $itemsLine = $wonItems->map(fn ($wi) => ($wi->item->species_name ?? '商品'))->unique()->implode('、');
+            $this->sendLine($user->id, 'shipping_fee_finalized',
+                "💡 送料が確定しました\n"
+                . "商品: {$itemsLine}\n"
+                . "送料合計: ¥" . number_format($totalFee),
+                null,
+            );
+
+            Log::info('送料確定通知送信', [
+                'winner_id' => $user->id,
+                'won_item_ids' => $wonItems->pluck('id')->toArray(),
+                'total_shipping_fee' => $totalFee,
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            Log::error('送料確定通知送信エラー', ['error' => $e->getMessage()]);
             return false;
         }
     }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\ItemMedia;
+use App\Models\SpeciesType;
 use App\Actions\Item\DeleteMediaAction;
 use App\Actions\Item\UploadMediaAction;
 use App\Services\ItemImportService;
@@ -41,7 +42,12 @@ class ItemController extends Controller
         $search = $request->input('search');
         
         $query = Item::where('auction_id', $auctionId)
-            ->with(['sellerProfile:id,seller_name,user_id', 'media']);
+            ->with(['sellerProfile:id,seller_name,user_id', 'media', 'speciesType:id,code,name']);
+
+        // 種別フィルタ
+        if ($request->filled('species_type_id')) {
+            $query->where('species_type_id', $request->input('species_type_id'));
+        }
         
         // ステータスフィルター
         if ($status && $status !== 'all') {
@@ -72,7 +78,13 @@ class ItemController extends Controller
                         'id' => $item->id,
                         'item_number' => $item->item_number,
                         'species_name' => $item->species_name,
+                        'species_type' => $item->speciesType ? [
+                            'id' => $item->speciesType->id,
+                            'code' => $item->speciesType->code,
+                            'name' => $item->speciesType->name,
+                        ] : null,
                         'quantity' => $item->quantity,
+                        'quantity_unit' => $item->quantity_unit ?? 'fish',
                         'start_price' => $item->start_price,
                         'current_price' => $item->current_price,
                         'is_premium' => $item->is_premium,
@@ -109,7 +121,9 @@ class ItemController extends Controller
         
         $validator = Validator::make($request->all(), [
             'species_name' => 'required|string|max:255',
+            'species_type_id' => 'nullable|integer|exists:species_types,id',
             'quantity' => 'required|integer|min:1',
+            'quantity_unit' => 'nullable|string|in:fish,kg,bag',
             'start_price' => 'required|numeric|min:1',
             // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'reserve_price' => 'nullable|numeric|min:1',
@@ -129,7 +143,16 @@ class ItemController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
-        
+
+        $speciesType = $this->resolveSpeciesType($request->input('species_type_id'));
+        $quantityUnit = $request->input('quantity_unit', SpeciesType::UNIT_FISH);
+        if (!$speciesType->allowsQuantityUnit($quantityUnit)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['quantity_unit' => ["「{$speciesType->name}」では単位「{$quantityUnit}」は使用できません。"]],
+            ], 422);
+        }
+
         // トランザクションと行ロックで生体番号の重複を防ぐ
         \DB::beginTransaction();
         try {
@@ -144,7 +167,9 @@ class ItemController extends Controller
                 'seller_profile_id' => $request->seller_profile_id,
                 'item_number' => $itemNumber,
                 'species_name' => $request->species_name,
+                'species_type_id' => $speciesType->id,
                 'quantity' => $request->quantity,
+                'quantity_unit' => $quantityUnit,
                 'start_price' => $request->start_price,
                 'current_price' => $request->start_price,
                 // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
@@ -189,7 +214,7 @@ class ItemController extends Controller
     {
         $item = Item::where('auction_id', $auctionId)
             ->where('id', $id)
-            ->with(['auction:id,title,event_date,status', 'sellerProfile:id,seller_name,user_id', 'media', 'wonItem'])
+            ->with(['auction:id,title,event_date,status', 'sellerProfile:id,seller_name,user_id', 'media', 'wonItem', 'speciesType'])
             ->firstOrFail();
         
         return response()->json([
@@ -199,7 +224,15 @@ class ItemController extends Controller
                     'id' => $item->id,
                     'item_number' => $item->item_number,
                     'species_name' => $item->species_name,
+                    'species_type' => $item->speciesType ? [
+                        'id' => $item->speciesType->id,
+                        'code' => $item->speciesType->code,
+                        'name' => $item->speciesType->name,
+                        'calculation_mode' => $item->speciesType->calculation_mode,
+                        'allowed_quantity_units' => $item->speciesType->allowed_quantity_units,
+                    ] : null,
                     'quantity' => $item->quantity,
+                    'quantity_unit' => $item->quantity_unit ?? 'fish',
                     'start_price' => $item->start_price,
                     'current_price' => $item->current_price,
                     'reserve_price' => $item->reserve_price,
@@ -271,7 +304,9 @@ class ItemController extends Controller
         
         $validator = Validator::make($request->all(), [
             'species_name' => 'string|max:255',
+            'species_type_id' => 'nullable|integer|exists:species_types,id',
             'quantity' => 'integer|min:1',
+            'quantity_unit' => 'nullable|string|in:fish,kg,bag',
             'start_price' => 'numeric|min:1',
             // @deprecated reserve_price, estimated_price, bid_increment はフロントエンドで未使用。DB互換のため残存。
             'reserve_price' => 'nullable|numeric|min:1',
@@ -292,12 +327,39 @@ class ItemController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
-        
+
+        // 種別変更 or 単位変更時は single source of truth としてバリデート
+        $changingSpecies = $request->has('species_type_id');
+        $changingUnit = $request->has('quantity_unit');
+        if ($changingSpecies || $changingUnit) {
+            $speciesType = $this->resolveSpeciesType(
+                $changingSpecies ? $request->input('species_type_id') : $item->species_type_id
+            );
+            $unit = $changingUnit ? $request->input('quantity_unit') : ($item->quantity_unit ?? SpeciesType::UNIT_FISH);
+            if (!$speciesType->allowsQuantityUnit($unit)) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => ['quantity_unit' => ["「{$speciesType->name}」では単位「{$unit}」は使用できません。"]],
+                ], 422);
+            }
+
+            // 送料承認済みは種別変更を拒否
+            if ($changingSpecies && $item->wonItem && $item->wonItem->shipping_approved_at !== null
+                && (int) $item->species_type_id !== (int) $request->input('species_type_id')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => '送料が承認済みのため種別を変更できません。承認を取り消してから変更してください。',
+                ], 409);
+            }
+        }
+
         $oldStatus = $item->status;
 
         $item->update($request->only([
             'species_name',
+            'species_type_id',
             'quantity',
+            'quantity_unit',
             'start_price',
             'reserve_price',
             'estimated_price',
@@ -310,6 +372,17 @@ class ItemController extends Controller
             'unsold_action',
             'status',
         ]));
+
+        // 種別が変わったら未承認の送料計算結果をリセットして再計算を促す
+        if ($changingSpecies && $item->wonItem && $item->wonItem->shipping_approved_at === null) {
+            $item->wonItem->update([
+                'shipping_fee' => 0,
+                'shipping_fee_auto' => null,
+                'shipping_breakdown' => null,
+                'shipping_calculated_at' => null,
+                'calculation_mode' => null,
+            ]);
+        }
 
         // 開始価格が変更された場合は現在価格も更新
         if ($request->has('start_price')) {
@@ -333,6 +406,23 @@ class ItemController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * species_type_id → SpeciesType を解決（null/未登録ならデフォルト種別＝メダカ）
+     */
+    private function resolveSpeciesType(?int $speciesTypeId): SpeciesType
+    {
+        if ($speciesTypeId) {
+            $type = SpeciesType::find($speciesTypeId);
+            if ($type) return $type;
+        }
+        $default = SpeciesType::where('is_default', true)->first()
+            ?? SpeciesType::where('code', 'medaka')->first();
+        if (!$default) {
+            throw new \RuntimeException('デフォルト種別（メダカ）が定義されていません。');
+        }
+        return $default;
     }
 
     /**

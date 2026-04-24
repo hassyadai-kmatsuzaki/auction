@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\Lane;
 use App\Models\Role;
 use App\Models\SellerProfile;
+use App\Models\SpeciesType;
 use App\Models\User;
 use App\Models\WonItem;
 use App\Services\ShippingCalculatorService;
@@ -229,15 +230,32 @@ class PostAuctionE2ESeeder extends Seeder
         return $auction;
     }
 
-    private function createItem(Auction $auction, SellerProfile $seller, int $no, string $species, int $qty, int $startPrice, string $thumbnailPath, string $status): Item
-    {
+    private function createItem(
+        Auction $auction,
+        SellerProfile $seller,
+        int $no,
+        string $species,
+        int $qty,
+        int $startPrice,
+        string $thumbnailPath,
+        string $status,
+        string $speciesCode = 'medaka',
+        string $quantityUnit = 'fish'
+    ): Item {
+        $speciesType = SpeciesType::where('code', $speciesCode)->first();
+        if (!$speciesType) {
+            throw new \RuntimeException("SpeciesType code={$speciesCode} が見つかりません。");
+        }
+
         $item = Item::create([
             'auction_id' => $auction->id,
             'seller_profile_id' => $seller->id,
             'item_number' => $no,
             'seller_display_order' => $no,
             'species_name' => $species,
+            'species_type_id' => $speciesType->id,
             'quantity' => $qty,
+            'quantity_unit' => $quantityUnit,
             'start_price' => $startPrice,
             'current_price' => $startPrice,
             'reserve_price' => (int) ($startPrice * 0.8),
@@ -324,19 +342,44 @@ class PostAuctionE2ESeeder extends Seeder
         }
 
         $quantities = array_map(fn ($row) => (int) $row['quantity'], $wonItemRows);
-        $items = array_map(fn ($q) => ['quantity' => $q], $quantities);
+        $itemIds = array_map(fn ($row) => (int) $row['item_id'], $wonItemRows);
+        $speciesMap = Item::whereIn('id', $itemIds)->pluck('species_type_id', 'id')->toArray();
+        $items = [];
+        foreach ($wonItemRows as $row) {
+            $items[] = [
+                'quantity' => (int) $row['quantity'],
+                'species_type_id' => $speciesMap[$row['item_id']] ?? null,
+            ];
+        }
+
         $result = $shipping->calculate($items, $region);
+        $mode = $result['calculation_mode'] ?? 'auto';
+
+        if ($mode === 'manual') {
+            foreach ($wonItemRows as $row) {
+                $row['shipping_fee'] = 0;
+                $row['shipping_fee_auto'] = null;
+                $row['shipping_breakdown'] = $result;
+                $row['calculation_mode'] = 'manual';
+                $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
+                $row['shipping_calculated_at'] = now();
+                (new WonItem())->forceFill($row)->save();
+            }
+            return;
+        }
+
         $apportioned = ShippingCalculatorService::apportionFee($result['total_shipping_fee'], $quantities);
 
         foreach ($wonItemRows as $i => $row) {
             $shippingFee = $apportioned[$i];
             $row['shipping_fee'] = $shippingFee;
+            $row['shipping_fee_auto'] = $shippingFee;
             $row['shipping_breakdown'] = $result;
+            $row['calculation_mode'] = $mode;
             $row['total_amount'] = ($row['winning_price'] * $row['quantity']) + $row['commission_amount'];
             $row['shipping_calculated_at'] = now();
 
-            $wonItem = new WonItem();
-            $wonItem->forceFill($row)->save();
+            (new WonItem())->forceFill($row)->save();
         }
     }
 

@@ -53,7 +53,9 @@ export default function SubscriptionGate({ children }: Props) {
       {children}
       <SubscriptionRegisterModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          // 登録完了まで閉じさせない（承認済みユーザーへの強制ゲート）
+        }}
         onCompleted={() => {
           setModalOpen(false);
           check();

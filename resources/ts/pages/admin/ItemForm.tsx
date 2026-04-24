@@ -90,7 +90,9 @@ export default function ItemForm() {
 
   const [formData, setFormData] = useState({
     species_name: '',
+    species_type_id: '' as string | number,
     quantity: '',
+    quantity_unit: 'fish' as 'fish' | 'kg' | 'bag',
     start_price: '',
     inspection_info: '',
     individual_info: '',
@@ -99,15 +101,31 @@ export default function ItemForm() {
     unsold_action: 'return',
     status: 'registered',
   });
+  const [speciesTypes, setSpeciesTypes] = useState<Array<{ id: number; code: string; name: string; calculation_mode: 'auto' | 'manual'; allowed_quantity_units: ('fish'|'kg'|'bag')[]; is_default: boolean }>>([]);
 
   const MAX_IMAGES = 20;
 
   useEffect(() => {
     fetchSellers();
+    fetchSpeciesTypes();
     if (isEdit) {
       fetchItem();
     }
   }, [auctionId, id]);
+
+  const fetchSpeciesTypes = async () => {
+    try {
+      const res = await axios.get('/api/admin/masters/species-types');
+      const active = (res.data.data || []).filter((t: { is_active: boolean }) => t.is_active);
+      setSpeciesTypes(active);
+      if (!isEdit) {
+        const def = active.find((t: { is_default: boolean }) => t.is_default);
+        if (def) setFormData((prev) => ({ ...prev, species_type_id: def.id, quantity_unit: def.allowed_quantity_units[0] ?? 'fish' }));
+      }
+    } catch {
+      // noop - セレクトは空のまま
+    }
+  };
 
   const fetchSellers = async () => {
     try {
@@ -143,7 +161,9 @@ export default function ItemForm() {
         const item = response.data.data.item;
         setFormData({
           species_name: item.species_name || '',
+          species_type_id: item.species_type?.id ?? '',
           quantity: item.quantity?.toString() || '',
+          quantity_unit: item.quantity_unit || 'fish',
           start_price: item.start_price?.toString() || '',
           inspection_info: item.inspection_info || '',
           individual_info: item.individual_info || '',
@@ -190,7 +210,9 @@ export default function ItemForm() {
       
       const payload = {
         species_name: formData.species_name,
+        species_type_id: formData.species_type_id || null,
         quantity: parseInt(formData.quantity),
+        quantity_unit: formData.quantity_unit,
         start_price: parseFloat(formData.start_price),
         inspection_info: formData.inspection_info || null,
         individual_info: formData.individual_info || null,
@@ -460,7 +482,34 @@ export default function ItemForm() {
 
               <Box component="form" onSubmit={handleSubmit}>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={3}>
+                    <FormControl fullWidth required>
+                      <InputLabel>種別</InputLabel>
+                      <Select
+                        value={formData.species_type_id}
+                        label="種別"
+                        onChange={(e) => {
+                          const newId = e.target.value as number;
+                          const selected = speciesTypes.find((t) => t.id === newId);
+                          setFormData((prev) => ({
+                            ...prev,
+                            species_type_id: newId,
+                            quantity_unit: selected && !selected.allowed_quantity_units.includes(prev.quantity_unit)
+                              ? (selected.allowed_quantity_units[0] ?? 'fish')
+                              : prev.quantity_unit,
+                          }));
+                        }}
+                      >
+                        {speciesTypes.map((t) => (
+                          <MenuItem key={t.id} value={t.id}>
+                            {t.name}{t.calculation_mode === 'manual' ? '（送料手動）' : ''}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
                       required
@@ -471,16 +520,31 @@ export default function ItemForm() {
                     />
                   </Grid>
 
-                  <Grid item xs={12} md={3}>
+                  <Grid item xs={6} md={2}>
                     <TextField
                       fullWidth
                       required
                       type="number"
-                      label="匹数"
+                      label="数量"
                       value={formData.quantity}
                       onChange={handleChange('quantity')}
                       inputProps={{ min: 1 }}
                     />
+                  </Grid>
+
+                  <Grid item xs={6} md={2}>
+                    <FormControl fullWidth>
+                      <InputLabel>単位</InputLabel>
+                      <Select
+                        value={formData.quantity_unit}
+                        label="単位"
+                        onChange={handleChange('quantity_unit')}
+                      >
+                        {(speciesTypes.find((t) => t.id === formData.species_type_id)?.allowed_quantity_units ?? ['fish']).map((u) => (
+                          <MenuItem key={u} value={u}>{u === 'fish' ? '匹' : u === 'kg' ? 'kg' : '袋'}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Grid>
 
                   <Grid item xs={12} md={3}>

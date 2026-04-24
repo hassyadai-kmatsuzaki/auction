@@ -43,6 +43,8 @@ interface User {
   name: string;
   email: string;
   phone: string | null;
+  trade_name: string | null;
+  company_name: string | null;
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   is_active: boolean;
   roles: Role[];
@@ -259,6 +261,8 @@ export default function UserManagement() {
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>名前</TableCell>
+                  <TableCell>屋号</TableCell>
+                  <TableCell>会社名</TableCell>
                   <TableCell>メールアドレス</TableCell>
                   <TableCell>ロール</TableCell>
                   <TableCell align="center">ステータス</TableCell>
@@ -270,7 +274,7 @@ export default function UserManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">
                         ユーザーが見つかりませんでした
                       </Typography>
@@ -283,6 +287,16 @@ export default function UserManagement() {
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
                           {user.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.trade_name || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.company_name || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>

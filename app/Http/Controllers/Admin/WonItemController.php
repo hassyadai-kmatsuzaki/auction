@@ -433,17 +433,48 @@ class WonItemController extends Controller
                 return response()->json(['success' => false, 'message' => '配送先地域を特定できません。'], 400);
             }
 
-            $wonItems = $wonItems->values();
-            $items = $wonItems->map(fn ($w) => ['quantity' => $w->item->quantity])->toArray();
-            $result = $calculator->calculate($items, $region);
-            $totalShippingFee = $result['total_shipping_fee'];
+            // 既に管理者承認済みの場合は再計算を拒否（誤って上書きさせない）
+            if ($wonItems->contains(fn ($w) => $w->shipping_approved_at !== null)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'この落札者の送料は既に承認済みです。再計算するには先に承認を取り消してください。',
+                ], 409);
+            }
 
+            $wonItems = $wonItems->values();
+            $items = $wonItems->map(fn ($w) => [
+                'quantity' => $w->item->quantity,
+                'species_type_id' => $w->item->species_type_id,
+            ])->toArray();
+            $result = $calculator->calculate($items, $region);
+            $mode = $result['calculation_mode'] ?? 'auto';
+
+            if ($mode === 'manual') {
+                foreach ($wonItems as $wonItem) {
+                    $wonItem->update([
+                        'shipping_fee' => 0,
+                        'shipping_fee_auto' => null,
+                        'shipping_breakdown' => $result,
+                        'calculation_mode' => 'manual',
+                        'shipping_calculated_at' => now(),
+                    ]);
+                }
+                return response()->json([
+                    'success' => true,
+                    'message' => '「その他」種別を含むため、送料の手動入力が必要です。承認画面で金額を確定してください。',
+                    'data' => ['calculation_mode' => 'manual', 'total_shipping_fee' => null],
+                ]);
+            }
+
+            $totalShippingFee = $result['total_shipping_fee'];
             $quantities = $wonItems->map(fn ($w) => $w->item->quantity)->toArray();
             $apportioned = \App\Services\ShippingCalculatorService::apportionFee($totalShippingFee, $quantities);
             foreach ($wonItems as $i => $wonItem) {
                 $wonItem->update([
                     'shipping_fee' => $apportioned[$i],
+                    'shipping_fee_auto' => $apportioned[$i],
                     'shipping_breakdown' => $result,
+                    'calculation_mode' => $mode,
                     'shipping_calculated_at' => now(),
                 ]);
             }
@@ -451,12 +482,147 @@ class WonItemController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => '送料を計算しました。',
-                'data' => ['total_shipping_fee' => $totalShippingFee],
+                'data' => ['calculation_mode' => $mode, 'total_shipping_fee' => $totalShippingFee],
             ]);
         } catch (\Exception $e) {
             \Log::error('管理者送料計算エラー', ['auction_id' => $auctionId, 'winner_id' => $winnerId, 'error' => $e->getMessage()]);
             return response()->json(['success' => false, 'message' => '送料の計算���失敗しました。'], 500);
         }
+    }
+
+    /**
+     * 管理者による送料承認（手動調整可）
+     *
+     * 承認すると shipping_approved_at がセットされ、落札者側に送料と請求書が開示される。
+     * shipping_fee を指定すると自動計算値を上書きする。
+     */
+    public function approveShipping(Request $request, $auctionId, $winnerId)
+    {
+        $validator = Validator::make($request->all(), [
+            'shipping_fee' => 'nullable|integer|min:0|max:1000000',
+            'adjustment_reason' => 'nullable|string|max:500',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $wonItems = WonItem::where('winner_id', $winnerId)
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->get();
+
+        if ($wonItems->isEmpty()) {
+            return response()->json(['success' => false, 'message' => '該当する落札品がありません。'], 404);
+        }
+
+        if ($wonItems->contains(fn ($w) => $w->shipping_calculated_at === null)) {
+            return response()->json(['success' => false, 'message' => '送料が未計算です。先に送料計算を実行してください。'], 409);
+        }
+
+        $overrideFee = $request->input('shipping_fee');
+        $reason = $request->input('adjustment_reason');
+        $adminId = $request->user()->id;
+
+        \DB::transaction(function () use ($wonItems, $overrideFee, $reason, $adminId) {
+            if ($overrideFee !== null) {
+                // 手動調整: 落札者間の数量比で按分
+                $quantities = $wonItems->map(fn ($w) => $w->item->quantity ?? 1)->toArray();
+                $apportioned = \App\Services\ShippingCalculatorService::apportionFee((int) $overrideFee, $quantities);
+                foreach ($wonItems->values() as $i => $w) {
+                    $w->update([
+                        'shipping_fee' => $apportioned[$i],
+                        'shipping_approved_at' => now(),
+                        'shipping_approved_by' => $adminId,
+                        'shipping_adjustment_reason' => $reason,
+                    ]);
+                }
+            } else {
+                foreach ($wonItems as $w) {
+                    $w->update([
+                        'shipping_approved_at' => now(),
+                        'shipping_approved_by' => $adminId,
+                        'shipping_adjustment_reason' => null,
+                    ]);
+                }
+            }
+        });
+
+        // 落札者に送料確定を通知（Mail + LINE、通知設定でゲート）
+        $refreshed = $wonItems->fresh(['user', 'item']);
+        app(\App\Services\NotificationService::class)
+            ->sendShippingFeeFinalizedNotification($refreshed);
+
+        return response()->json([
+            'success' => true,
+            'message' => $overrideFee !== null
+                ? '送料を手動調整して承認しました。'
+                : '送料を承認しました。',
+        ]);
+    }
+
+    /**
+     * 「その他」等 manual 種別の送料を管理者が手動入力して確定する。
+     *
+     * POST /admin/auctions/{auctionId}/winners/{winnerId}/manual-shipping-fee
+     * body: { shipping_fee: int, adjustment_reason?: string }
+     *
+     * shipping_calculated_at がセットされ、shipping_approved_at も即時セット、
+     * 落札者へ送料確定通知が送信される。
+     */
+    public function setManualShippingFee(Request $request, $auctionId, $winnerId)
+    {
+        $validator = Validator::make($request->all(), [
+            'shipping_fee' => 'required|integer|min:0|max:1000000',
+            'adjustment_reason' => 'nullable|string|max:500',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $wonItems = WonItem::where('winner_id', $winnerId)
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->with('item')
+            ->get();
+
+        if ($wonItems->isEmpty()) {
+            return response()->json(['success' => false, 'message' => '該当する落札品がありません。'], 404);
+        }
+
+        if ($wonItems->contains(fn ($w) => $w->shipping_approved_at !== null)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'この落札者の送料は既に承認済みです。',
+            ], 409);
+        }
+
+        $totalFee = (int) $request->input('shipping_fee');
+        $reason = $request->input('adjustment_reason');
+        $adminId = $request->user()->id;
+        $quantities = $wonItems->map(fn ($w) => $w->item->quantity ?? 1)->toArray();
+        $apportioned = \App\Services\ShippingCalculatorService::apportionFee($totalFee, $quantities);
+
+        \DB::transaction(function () use ($wonItems, $apportioned, $reason, $adminId) {
+            foreach ($wonItems->values() as $i => $w) {
+                $w->update([
+                    'shipping_fee' => $apportioned[$i],
+                    'shipping_fee_auto' => null,
+                    'calculation_mode' => 'manual',
+                    'shipping_calculated_at' => now(),
+                    'shipping_approved_at' => now(),
+                    'shipping_approved_by' => $adminId,
+                    'shipping_adjustment_reason' => $reason,
+                ]);
+            }
+        });
+
+        $refreshed = $wonItems->fresh(['user', 'item']);
+        app(\App\Services\NotificationService::class)
+            ->sendShippingFeeFinalizedNotification($refreshed);
+
+        return response()->json([
+            'success' => true,
+            'message' => '手動送料を確定し、落札者に通知しました。',
+            'data' => ['total_shipping_fee' => $totalFee],
+        ]);
     }
 
     /**

@@ -231,6 +231,8 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::post('won-items/{id}/complete', [AdminWonItemController::class, 'complete']);
     Route::patch('won-items/{id}/notes', [AdminWonItemController::class, 'updateNotes']);
     Route::post('auctions/{auctionId}/winners/{winnerId}/calculate-shipping', [AdminWonItemController::class, 'calculateShipping']);
+    Route::post('auctions/{auctionId}/winners/{winnerId}/approve-shipping', [AdminWonItemController::class, 'approveShipping']);
+    Route::post('auctions/{auctionId}/winners/{winnerId}/manual-shipping-fee', [AdminWonItemController::class, 'setManualShippingFee']);
     Route::get('auctions/{auctionId}/winners/{winnerId}/invoice', [InvoiceController::class, 'adminDownloadInvoice']);
     Route::get('auctions/{auctionId}/winners/{winnerId}/delivery-note', [InvoiceController::class, 'adminDownloadDeliveryNote']);
     Route::get('auctions/{auctionId}/sellers/{sellerId}/payment-notice', [InvoiceController::class, 'adminDownloadPaymentNotice']);
@@ -244,6 +246,32 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::get('shipping-master', [ShippingRateController::class, 'index']);
     Route::put('shipping-master/rates', [ShippingRateController::class, 'updateRates']);
     Route::put('shipping-master/packing-materials', [ShippingRateController::class, 'updatePackingMaterials']);
+
+    // 種別マスタ管理（メダカ / 水草 / 金魚 / その他 …）
+    Route::prefix('masters/species-types')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'store']);
+        Route::post('/reorder', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'reorder']);
+        Route::get('/{id}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'show']);
+        Route::patch('/{id}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'destroy']);
+
+        // 袋マスタ（種別配下）
+        Route::get('/{id}/bag-specs', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'bagSpecsIndex']);
+        Route::post('/{id}/bag-specs', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'bagSpecsStore']);
+        Route::patch('/{id}/bag-specs/{specId}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'bagSpecsUpdate']);
+        Route::delete('/{id}/bag-specs/{specId}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'bagSpecsDestroy']);
+
+        // 箱入数マスタ
+        Route::get('/{id}/box-capacities', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'boxCapacitiesIndex']);
+        Route::put('/{id}/box-capacities', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'boxCapacitiesUpsert']);
+        Route::delete('/{id}/box-capacities/{capId}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'boxCapacitiesDestroy']);
+
+        // 混載制約
+        Route::get('/{id}/mix-restrictions', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'mixRestrictionsIndex']);
+        Route::post('/{id}/mix-restrictions', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'mixRestrictionsStore']);
+        Route::delete('/{id}/mix-restrictions/{rowId}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'mixRestrictionsDestroy']);
+    });
 
     // 出品者精算管理
     Route::get('settlements', [AdminSettlementController::class, 'index']);
@@ -342,6 +370,9 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     Route::post('/profile/image', [SellerProfileController::class, 'uploadProfileImage']);
     Route::delete('/profile/image', [SellerProfileController::class, 'deleteProfileImage']);
     
+    // 種別マスタ（読み取り専用 - 出品フォームのセレクト用）
+    Route::get('/species-types', [\App\Http\Controllers\Seller\SpeciesTypeController::class, 'index']);
+
     // 出品管理（参照は非課金可／作成・編集・削除は allows_sell が必要）
     Route::get('/items', [SellerItemController::class, 'index']);
     Route::get('/items/stats', [SellerItemController::class, 'stats']);

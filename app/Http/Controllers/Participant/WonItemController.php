@@ -29,13 +29,16 @@ class WonItemController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // 送料は管理者承認済みのもののみ集計対象にする
+        $visibleFee = fn ($w) => $w->shipping_approved_at !== null ? (int) ($w->shipping_fee ?? 0) : 0;
+
         // 合計金額を計算（小計 = 単価×数量、手数料/配送料は別集計）
         $computeLineAmount = fn ($w) => ((int) $w->winning_price * (int) $w->quantity)
             + (int) ($w->commission_amount ?? 0)
-            + (int) ($w->shipping_fee ?? 0);
+            + $visibleFee($w);
         $subtotalAll = $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
         $commissionAll = $wonItems->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
-        $totalShippingFee = $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+        $totalShippingFee = $wonItems->sum($visibleFee);
         $grandTotalAll = $subtotalAll + $commissionAll + $totalShippingFee;
         $pendingAmount = $wonItems->where('payment_status', 'pending')->sum($computeLineAmount);
         $paidAmount = $wonItems->whereIn('payment_status', ['paid', 'confirmed'])->sum($computeLineAmount);
@@ -47,13 +50,18 @@ class WonItemController extends Controller
             $auction = $items->first()->item?->auction;
             $auctionSubtotal = $items->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
             $auctionCommission = $items->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
-            $auctionShippingFee = $items->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+            $auctionShippingFee = $items->sum($visibleFee);
             $auctionGrandTotal = $auctionSubtotal + $auctionCommission + $auctionShippingFee;
             $allPaid = $items->every(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));
             $anyPending = $items->contains(fn ($w) => $w->payment_status === 'pending');
             $canUpdateAddress = $items->every(fn ($w) => $w->canUpdateShippingAddress());
-            $shippingCalculated = $items->every(fn ($w) => $w->shipping_calculated_at !== null);
+            $shippingApproved = $items->every(fn ($w) => $w->shipping_approved_at !== null);
             $hasAddress = (bool) $items->first()->shipping_postal_code;
+
+            // 発送単位の計算モード判定: items 内のどれか 1 件でも manual なら unit 全体を manual 扱い
+            $anyManual = $items->contains(fn ($w) => ($w->calculation_mode ?? null) === 'manual');
+            $anyCalculated = $items->contains(fn ($w) => $w->shipping_calculated_at !== null);
+            $unitCalculationMode = $anyManual ? 'manual' : ($anyCalculated ? ($items->first()->calculation_mode ?? 'auto') : null);
 
             // 代表の配送先（最初の落札品から）
             $first = $items->first();
@@ -76,8 +84,11 @@ class WonItemController extends Controller
                 'shipping' => [
                     'address' => $this->formatShippingAddress($first),
                     'can_update' => $canUpdateAddress,
-                    'calculated' => $shippingCalculated,
-                    'can_calculate' => $hasAddress && !$shippingCalculated,
+                    'approved' => $shippingApproved,
+                    'calculated' => $shippingApproved,
+                    'can_calculate' => false,
+                    'calculation_mode' => $unitCalculationMode,
+                    'pending_manual_approval' => $anyManual && !$shippingApproved,
                 ],
                 'won_items' => $items->map(function ($wonItem) {
                     $item = $wonItem->item;
@@ -95,7 +106,8 @@ class WonItemController extends Controller
                         'quantity' => $wonItem->quantity,
                         'total_amount' => $wonItem->total_amount,
                         'commission_amount' => $wonItem->commission_amount,
-                        'shipping_fee' => $wonItem->shipping_fee ?? 0,
+                        'shipping_fee' => $wonItem->shipping_approved_at !== null ? ($wonItem->shipping_fee ?? 0) : null,
+                        'shipping_approved' => $wonItem->shipping_approved_at !== null,
                         'payment_status' => $wonItem->payment_status,
                         'payment_deadline' => $wonItem->payment_deadline ? $wonItem->payment_deadline->toIso8601String() : null,
                         'delivery_status' => $wonItem->delivery_status,
@@ -171,8 +183,9 @@ class WonItemController extends Controller
                     'total_amount' => $wonItem->total_amount,
                     'commission_rate' => $wonItem->commission_rate,
                     'commission_amount' => $wonItem->commission_amount,
-                    'shipping_fee' => $wonItem->shipping_fee ?? 0,
-                    'shipping_breakdown' => $wonItem->shipping_breakdown,
+                    'shipping_fee' => $wonItem->shipping_approved_at !== null ? ($wonItem->shipping_fee ?? 0) : null,
+                    'shipping_approved' => $wonItem->shipping_approved_at !== null,
+                    'shipping_breakdown' => $wonItem->shipping_approved_at !== null ? $wonItem->shipping_breakdown : null,
                     'payment_status' => $wonItem->payment_status,
                     'payment_method' => $wonItem->payment_method,
                     'payment_deadline' => $wonItem->payment_deadline ? $wonItem->payment_deadline->toIso8601String() : null,
@@ -305,9 +318,14 @@ class WonItemController extends Controller
             return response()->json(['success' => false, 'message' => '該当する落札品がありません。'], 404);
         }
 
+        // 既に管理者が承認済みの送料がある場合は再計算不可
+        if ($wonItems->contains(fn ($w) => $w->shipping_approved_at !== null)) {
+            return response()->json(['success' => false, 'message' => '送料は既に確定済みです。'], 400);
+        }
+
         // 既に全品計算済みの場合
         if ($wonItems->every(fn ($w) => $w->shipping_calculated_at !== null)) {
-            return response()->json(['success' => false, 'message' => '送料は既に計算済みです。'], 400);
+            return response()->json(['success' => false, 'message' => '送料は既に計算済みです。管理者の承認をお待ちください。'], 400);
         }
 
         $first = $wonItems->first();
@@ -323,16 +341,45 @@ class WonItemController extends Controller
             }
 
             $wonItems = $wonItems->values();
-            $items = $wonItems->map(fn ($w) => ['quantity' => $w->item->quantity])->toArray();
+            $items = $wonItems->map(fn ($w) => [
+                'quantity' => $w->item->quantity,
+                'species_type_id' => $w->item->species_type_id,
+            ])->toArray();
             $result = $calculator->calculate($items, $region);
-            $totalShippingFee = $result['total_shipping_fee'];
+            $mode = $result['calculation_mode'] ?? 'auto';
 
+            // manual は落札者側から確定不可。管理者の手動入力待ちにする。
+            if ($mode === 'manual') {
+                foreach ($wonItems as $wonItem) {
+                    $wonItem->update([
+                        'shipping_fee' => 0,
+                        'shipping_fee_auto' => null,
+                        'shipping_breakdown' => $result,
+                        'calculation_mode' => 'manual',
+                        'shipping_calculated_at' => now(),
+                    ]);
+                }
+                return response()->json([
+                    'success' => true,
+                    'message' => '「その他」種別を含むため、送料は管理者が確定します。',
+                    'data' => [
+                        'calculation_mode' => 'manual',
+                        'total_shipping_fee' => null,
+                        'region' => $region,
+                        'species_breakdown' => $result['species_breakdown'] ?? [],
+                    ],
+                ]);
+            }
+
+            $totalShippingFee = $result['total_shipping_fee'];
             $quantities = $wonItems->map(fn ($w) => $w->item->quantity)->toArray();
             $apportioned = ShippingCalculatorService::apportionFee($totalShippingFee, $quantities);
             foreach ($wonItems as $i => $wonItem) {
                 $wonItem->update([
                     'shipping_fee' => $apportioned[$i],
+                    'shipping_fee_auto' => $apportioned[$i],
                     'shipping_breakdown' => $result,
+                    'calculation_mode' => $mode,
                     'shipping_calculated_at' => now(),
                 ]);
             }
@@ -341,9 +388,11 @@ class WonItemController extends Controller
                 'success' => true,
                 'message' => '送料を計算しました。',
                 'data' => [
+                    'calculation_mode' => $mode,
                     'total_shipping_fee' => $totalShippingFee,
                     'box_summary' => collect($result['boxes'])->pluck('box_size')->countBy()->map(fn ($count, $size) => $count > 1 ? "{$size}×{$count}" : (string) $size)->values()->implode('+'),
                     'region' => $region,
+                    'species_breakdown' => $result['species_breakdown'] ?? [],
                 ],
             ]);
         } catch (\Exception $e) {

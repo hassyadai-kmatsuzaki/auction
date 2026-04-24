@@ -25,7 +25,13 @@ class WonItem extends BaseModel
         'seller_amount',
         // 配送料金
         'shipping_fee',
+        'shipping_fee_auto',
         'shipping_breakdown',
+        'calculation_mode',
+        'shipping_calculated_at',
+        'shipping_approved_at',
+        'shipping_approved_by',
+        'shipping_adjustment_reason',
         // 支払い情報
         'payment_status',
         'payment_method',
@@ -62,7 +68,9 @@ class WonItem extends BaseModel
      */
     protected $casts = [
         'shipping_fee' => 'integer',
+        'shipping_fee_auto' => 'integer',
         'shipping_breakdown' => 'array',
+        'shipping_approved_at' => 'datetime',
         'winning_price' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'commission_rate' => 'decimal:2',
@@ -186,6 +194,22 @@ class WonItem extends BaseModel
     public function scopePending($query)
     {
         return $query->where('payment_status', 'pending');
+    }
+
+    /**
+     * 送料承認済みか（落札者側への送料/請求書開示条件）
+     */
+    public function isShippingApproved(): bool
+    {
+        return !is_null($this->shipping_approved_at);
+    }
+
+    /**
+     * 送料を承認した管理者
+     */
+    public function shippingApprover()
+    {
+        return $this->belongsTo(User::class, 'shipping_approved_by');
     }
 
     /**

@@ -147,7 +147,9 @@ class ItemController extends Controller
         $validator = Validator::make($request->all(), [
             'auction_id' => 'required|exists:auctions,id',
             'species_name' => 'required|string|max:255',
+            'species_type_id' => 'nullable|integer|exists:species_types,id',
             'quantity' => 'required|integer|min:1',
+            'quantity_unit' => 'nullable|string|in:fish,kg,bag',
             'start_price' => 'nullable|numeric|min:0',
             'estimated_price' => 'nullable|numeric|min:1',
             'inspection_info' => 'nullable|string',
@@ -161,6 +163,16 @@ class ItemController extends Controller
             return response()->json([
                 'success' => false,
                 'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // 種別と単位の整合性チェック（メダカ=匹のみ、その他=匹/kg/袋）
+        $speciesType = $this->resolveSpeciesType($request->input('species_type_id'));
+        $quantityUnit = $request->input('quantity_unit', \App\Models\SpeciesType::UNIT_FISH);
+        if (!$speciesType->allowsQuantityUnit($quantityUnit)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['quantity_unit' => ["「{$speciesType->name}」では単位「{$quantityUnit}」は使用できません。"]],
             ], 422);
         }
 
@@ -204,7 +216,9 @@ class ItemController extends Controller
                 'seller_profile_id' => $sellerProfile->id,
                 'item_number' => $itemNumber,
                 'species_name' => $request->species_name,
+                'species_type_id' => $speciesType->id,
                 'quantity' => $request->quantity,
+                'quantity_unit' => $quantityUnit,
                 'start_price' => $startPrice,
                 'current_price' => $startPrice,
                 'estimated_price' => $request->estimated_price,
@@ -355,7 +369,9 @@ class ItemController extends Controller
         
         $validator = Validator::make($request->all(), [
             'species_name' => 'string|max:255',
+            'species_type_id' => 'nullable|integer|exists:species_types,id',
             'quantity' => 'integer|min:1',
+            'quantity_unit' => 'nullable|string|in:fish,kg,bag',
             'start_price' => 'nullable|numeric|min:0',
             'estimated_price' => 'nullable|numeric|min:1',
             'inspection_info' => 'nullable|string',
@@ -371,11 +387,27 @@ class ItemController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
-        
+
+        // 種別/単位が変更される場合は整合性チェック
+        if ($request->has('species_type_id') || $request->has('quantity_unit')) {
+            $speciesType = $this->resolveSpeciesType(
+                $request->input('species_type_id', $item->species_type_id)
+            );
+            $unit = $request->input('quantity_unit', $item->quantity_unit ?? \App\Models\SpeciesType::UNIT_FISH);
+            if (!$speciesType->allowsQuantityUnit($unit)) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => ['quantity_unit' => ["「{$speciesType->name}」では単位「{$unit}」は使用できません。"]],
+                ], 422);
+            }
+        }
+
         // 開始価格の処理
         $updateData = $request->only([
             'species_name',
+            'species_type_id',
             'quantity',
+            'quantity_unit',
             'estimated_price',
             'inspection_info',
             'individual_info',
@@ -580,6 +612,23 @@ class ItemController extends Controller
     protected function getFileUrl(?string $path): ?string
     {
         return $this->storage->url($path);
+    }
+
+    /**
+     * species_type_id → SpeciesType を解決（null ならデフォルト種別＝メダカ）
+     */
+    private function resolveSpeciesType(?int $speciesTypeId): \App\Models\SpeciesType
+    {
+        if ($speciesTypeId) {
+            $type = \App\Models\SpeciesType::find($speciesTypeId);
+            if ($type) return $type;
+        }
+        $default = \App\Models\SpeciesType::where('is_default', true)->first()
+            ?? \App\Models\SpeciesType::where('code', 'medaka')->first();
+        if (!$default) {
+            throw new \RuntimeException('デフォルト種別（メダカ）が定義されていません。');
+        }
+        return $default;
     }
 }
 

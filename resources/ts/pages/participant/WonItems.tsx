@@ -89,6 +89,8 @@ interface AuctionGroup {
     can_update: boolean;
     calculated: boolean;
     can_calculate: boolean;
+    calculation_mode?: 'auto' | 'manual' | 'mixed' | null;
+    pending_manual_approval?: boolean;
   };
   won_items: WonItemData[];
 }
@@ -439,6 +441,14 @@ export default function WonItems() {
                   </Typography>
                 </Box>
 
+                {/* 「その他」種別を含むため送料が手動確定待ちの案内 */}
+                {group.shipping.pending_manual_approval && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    「その他」種別の商品を含むため、送料は管理者が確認後に確定します。
+                    確定しましたらメール・LINEでお知らせしますので、そのまましばらくお待ちください。
+                  </Alert>
+                )}
+
                 {/* オークション単位のアクションボタン */}
                 {auctionId && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -446,8 +456,22 @@ export default function WonItems() {
                     {group.shipping.calculated && (
                       <Chip label="送料計算済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
                     )}
+                    {/* 「その他」種別を含む場合は管理者による手動確定待ちを明示 */}
+                    {group.shipping.pending_manual_approval && (
+                      <Chip
+                        label="管理者の送料確定待ち"
+                        size="small"
+                        sx={{ bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 600 }}
+                      />
+                    )}
                     {/* 請求書（送料計算後のみ） */}
-                    <Tooltip title={!group.shipping.calculated ? '送料計算後にダウンロードできます' : ''}>
+                    <Tooltip title={
+                      group.shipping.pending_manual_approval
+                        ? '「その他」種別の送料は管理者が確定します。確定後にダウンロードできます'
+                        : !group.shipping.calculated
+                          ? '送料計算後にダウンロードできます'
+                          : ''
+                    }>
                       <span>
                         <Button
                           variant="outlined"
@@ -588,11 +612,15 @@ export default function WonItems() {
                       落札手数料: ¥{group.summary.commission_total.toLocaleString()}
                     </Typography>
                   )}
-                  {group.summary.shipping_fee > 0 && (
+                  {group.summary.shipping_fee > 0 ? (
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       配送料合計: ¥{group.summary.shipping_fee.toLocaleString()}
                     </Typography>
-                  )}
+                  ) : group.shipping.pending_manual_approval ? (
+                    <Typography variant="body2" sx={{ color: '#B45309' }}>
+                      配送料合計: 管理者確定待ち
+                    </Typography>
+                  ) : null}
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#059669' }}>
                     合計: ¥{group.summary.grand_total.toLocaleString()}
                   </Typography>

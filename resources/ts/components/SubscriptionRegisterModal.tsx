@@ -203,7 +203,26 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
   const disabledSubmit = submitting || loading || (!replaceCardOnly && !selectedPlanId);
 
   return (
-    <Dialog open={open} onClose={submitting ? undefined : onClose} fullWidth maxWidth="sm" disableEscapeKeyDown={submitting}>
+    <Dialog
+      open={open}
+      onClose={(_e, reason) => {
+        if (submitting) return;
+        if (!replaceCardOnly && (reason === 'backdropClick' || reason === 'escapeKeyDown')) return;
+        onClose();
+      }}
+      fullWidth
+      maxWidth="sm"
+      disableEscapeKeyDown={submitting || !replaceCardOnly}
+      slotProps={{
+        backdrop: {
+          sx: {
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(0,0,0,0.45)',
+          },
+        },
+      }}
+    >
       <DialogTitle sx={{ pb: 1 }}>
         {replaceCardOnly ? 'カード情報の更新' : '年会費プラン加入'}
       </DialogTitle>
