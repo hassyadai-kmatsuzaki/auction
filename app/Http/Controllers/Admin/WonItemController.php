@@ -412,7 +412,7 @@ class WonItemController extends Controller
     /**
      * 管理者による送料一括計算（オークション×落札者単位）
      */
-    public function calculateShipping($auctionId, $winnerId)
+    public function calculateShipping(Request $request, $auctionId, $winnerId)
     {
         $wonItems = WonItem::where('winner_id', $winnerId)
             ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
@@ -504,19 +504,31 @@ class WonItemController extends Controller
     }
 
     /**
-     * 管理者による送料承認（手動調整可）
+     * 管理者による送料の手動入力＆確定
      *
-     * 承認すると shipping_approved_at がセットされ、落札者側に送料と請求書が開示される。
-     * shipping_fee を指定すると自動計算値を上書きする。
+     * 「その他」種別を含む発送単位（calculation_mode = manual）の送料を確定するエンドポイント。
+     * shipping_fee を必須で受け取り、落札者ごとの数量比で按分する。
+     * 0円で確定する場合は adjustment_reason（送料無料の根拠）が必須。
+     * 自動計算種別のみの発送単位は calculateShipping 内で即時確定される。
      */
     public function approveShipping(Request $request, $auctionId, $winnerId)
     {
         $validator = Validator::make($request->all(), [
-            'shipping_fee' => 'nullable|integer|min:0|max:1000000',
+            'shipping_fee' => 'required|integer|min:0|max:1000000',
             'adjustment_reason' => 'nullable|string|max:500',
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $overrideFee = (int) $request->input('shipping_fee');
+        $reason = $request->input('adjustment_reason');
+
+        if ($overrideFee === 0 && empty(trim((string) $reason))) {
+            return response()->json([
+                'success' => false,
+                'message' => '送料0円で確定する場合は理由（送料無料の根拠等）が必須です。',
+            ], 422);
         }
 
         $wonItems = WonItem::where('winner_id', $winnerId)
@@ -531,31 +543,18 @@ class WonItemController extends Controller
             return response()->json(['success' => false, 'message' => '送料が未計算です。先に送料計算を実行してください。'], 409);
         }
 
-        $overrideFee = $request->input('shipping_fee');
-        $reason = $request->input('adjustment_reason');
         $adminId = $request->user()->id;
 
         \DB::transaction(function () use ($wonItems, $overrideFee, $reason, $adminId) {
-            if ($overrideFee !== null) {
-                // 手動調整: 落札者間の数量比で按分
-                $quantities = $wonItems->map(fn ($w) => $w->item->quantity ?? 1)->toArray();
-                $apportioned = \App\Services\ShippingCalculatorService::apportionFee((int) $overrideFee, $quantities);
-                foreach ($wonItems->values() as $i => $w) {
-                    $w->update([
-                        'shipping_fee' => $apportioned[$i],
-                        'shipping_approved_at' => now(),
-                        'shipping_approved_by' => $adminId,
-                        'shipping_adjustment_reason' => $reason,
-                    ]);
-                }
-            } else {
-                foreach ($wonItems as $w) {
-                    $w->update([
-                        'shipping_approved_at' => now(),
-                        'shipping_approved_by' => $adminId,
-                        'shipping_adjustment_reason' => null,
-                    ]);
-                }
+            $quantities = $wonItems->map(fn ($w) => $w->item->quantity ?? 1)->toArray();
+            $apportioned = \App\Services\ShippingCalculatorService::apportionFee($overrideFee, $quantities);
+            foreach ($wonItems->values() as $i => $w) {
+                $w->update([
+                    'shipping_fee' => $apportioned[$i],
+                    'shipping_approved_at' => now(),
+                    'shipping_approved_by' => $adminId,
+                    'shipping_adjustment_reason' => $reason,
+                ]);
             }
         });
 
@@ -566,9 +565,7 @@ class WonItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $overrideFee !== null
-                ? '送料を手動調整して承認しました。'
-                : '送料を承認しました。',
+            'message' => '送料を確定しました。',
         ]);
     }
 

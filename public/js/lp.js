@@ -98,6 +98,115 @@
   }
 
   /* =============================
+     Hero - decorative drifting dots (image area only)
+     ============================= */
+  function initHeroDots() {
+    var canvas = document.getElementById('hero-dots');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var dots = [];
+    var w = 0, h = 0;
+    var raf = null;
+    var t = 0;
+    var reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function resize() {
+      var rect = canvas.getBoundingClientRect();
+      w = Math.max(1, rect.width);
+      h = Math.max(1, rect.height);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var count = Math.max(30, Math.min(80, Math.round((w * h) / 9000)));
+      dots = [];
+      for (var i = 0; i < count; i++) {
+        var size = Math.random();
+        dots.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.18,
+          vy: (Math.random() - 0.5) * 0.18,
+          r: size < 0.7 ? Math.random() * 1.6 + 0.8
+                        : Math.random() * 2.4 + 2.2,
+          a: Math.random() * 0.35 + 0.25,
+          accent: Math.random() < 0.14,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      t += 0.01;
+      for (var k = 0; k < dots.length; k++) {
+        var p = dots[k];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -10) p.x = w + 10;
+        else if (p.x > w + 10) p.x = -10;
+        if (p.y < -10) p.y = h + 10;
+        else if (p.y > h + 10) p.y = -10;
+
+        var pulse = 0.85 + Math.sin(t + p.phase) * 0.15;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        var alpha = (p.a * pulse).toFixed(3);
+        ctx.fillStyle = p.accent
+          ? 'rgba(255,228,92,' + alpha + ')'
+          : 'rgba(255,255,255,' + alpha + ')';
+        ctx.fill();
+      }
+    }
+
+    function tick() {
+      draw();
+      raf = requestAnimationFrame(tick);
+    }
+    function start() {
+      if (raf) return;
+      raf = requestAnimationFrame(tick);
+    }
+    function stop() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+    }
+
+    resize();
+    if (reduced) {
+      // single static render
+      draw();
+    } else {
+      start();
+    }
+
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        resize();
+        if (reduced) draw();
+      }, 200);
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (reduced) return;
+      if (document.hidden) stop(); else start();
+    });
+
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (reduced) return;
+          if (e.isIntersecting) start(); else stop();
+        });
+      }, { threshold: 0 });
+      io.observe(canvas);
+    }
+  }
+
+  /* =============================
      Init
      ============================= */
   document.addEventListener('DOMContentLoaded', function () {
@@ -105,5 +214,6 @@
     initHeader();
     initLineupScroll();
     initFloatingCta();
+    initHeroDots();
   });
 })();

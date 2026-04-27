@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
 use App\Models\WonItem;
-use App\Services\ShippingCalculatorService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -46,7 +45,7 @@ class WonItemController extends Controller
         // オークション別にグルーピング
         $grouped = $wonItems->groupBy(fn ($wonItem) => $wonItem->item?->auction?->id ?? 0);
 
-        $auctions = $grouped->map(function ($items, $auctionId) {
+        $auctions = $grouped->map(function ($items, $auctionId) use ($visibleFee) {
             $auction = $items->first()->item?->auction;
             $auctionSubtotal = $items->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
             $auctionCommission = $items->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
@@ -297,108 +296,6 @@ class WonItemController extends Controller
                 'updated_count' => $wonItems->count(),
             ],
         ]);
-    }
-
-    /**
-     * オークション内全落札品の送料を一括計算
-     *
-     * @param int $auctionId
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function calculateShipping($auctionId)
-    {
-        $userId = Auth::id();
-
-        $wonItems = WonItem::forWinner($userId)
-            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
-            ->with('item')
-            ->get();
-
-        if ($wonItems->isEmpty()) {
-            return response()->json(['success' => false, 'message' => '該当する落札品がありません。'], 404);
-        }
-
-        // 既に管理者が承認済みの送料がある場合は再計算不可
-        if ($wonItems->contains(fn ($w) => $w->shipping_approved_at !== null)) {
-            return response()->json(['success' => false, 'message' => '送料は既に確定済みです。'], 400);
-        }
-
-        // 既に全品計算済みの場合
-        if ($wonItems->every(fn ($w) => $w->shipping_calculated_at !== null)) {
-            return response()->json(['success' => false, 'message' => '送料は既に計算済みです。管理者の承認をお待ちください。'], 400);
-        }
-
-        $first = $wonItems->first();
-        if (!$first->shipping_prefecture) {
-            return response()->json(['success' => false, 'message' => '配送先住所を先に設定してください。'], 400);
-        }
-
-        try {
-            $calculator = app(ShippingCalculatorService::class);
-            $region = $calculator->getRegionByPrefecture($first->shipping_prefecture);
-            if (!$region) {
-                return response()->json(['success' => false, 'message' => '配送先地域を特定できません。'], 400);
-            }
-
-            $wonItems = $wonItems->values();
-            $items = $wonItems->map(fn ($w) => [
-                'quantity' => $w->item->quantity,
-                'species_type_id' => $w->item->species_type_id,
-            ])->toArray();
-            $result = $calculator->calculate($items, $region);
-            $mode = $result['calculation_mode'] ?? 'auto';
-
-            // manual は落札者側から確定不可。管理者の手動入力待ちにする。
-            if ($mode === 'manual') {
-                foreach ($wonItems as $wonItem) {
-                    $wonItem->update([
-                        'shipping_fee' => 0,
-                        'shipping_fee_auto' => null,
-                        'shipping_breakdown' => $result,
-                        'calculation_mode' => 'manual',
-                        'shipping_calculated_at' => now(),
-                    ]);
-                }
-                return response()->json([
-                    'success' => true,
-                    'message' => '「その他」種別を含むため、送料は管理者が確定します。',
-                    'data' => [
-                        'calculation_mode' => 'manual',
-                        'total_shipping_fee' => null,
-                        'region' => $region,
-                        'species_breakdown' => $result['species_breakdown'] ?? [],
-                    ],
-                ]);
-            }
-
-            $totalShippingFee = $result['total_shipping_fee'];
-            $quantities = $wonItems->map(fn ($w) => $w->item->quantity)->toArray();
-            $apportioned = ShippingCalculatorService::apportionFee($totalShippingFee, $quantities);
-            foreach ($wonItems as $i => $wonItem) {
-                $wonItem->update([
-                    'shipping_fee' => $apportioned[$i],
-                    'shipping_fee_auto' => $apportioned[$i],
-                    'shipping_breakdown' => $result,
-                    'calculation_mode' => $mode,
-                    'shipping_calculated_at' => now(),
-                ]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => '送料を計算しました。',
-                'data' => [
-                    'calculation_mode' => $mode,
-                    'total_shipping_fee' => $totalShippingFee,
-                    'box_summary' => collect($result['boxes'])->pluck('box_size')->countBy()->map(fn ($count, $size) => $count > 1 ? "{$size}×{$count}" : (string) $size)->values()->implode('+'),
-                    'region' => $region,
-                    'species_breakdown' => $result['species_breakdown'] ?? [],
-                ],
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('送料計算エラー', ['auction_id' => $auctionId, 'error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => '送料の計算に失敗しました。'], 500);
-        }
     }
 
     /**

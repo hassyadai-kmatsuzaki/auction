@@ -111,7 +111,8 @@ class AuctionTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $this->assertDatabaseMissing('auctions', [
+        // Auction は SoftDelete を使うので deleted_at が入っていることを確認
+        $this->assertSoftDeleted('auctions', [
             'id' => $auction->id,
         ]);
     }
@@ -129,8 +130,17 @@ class AuctionTest extends TestCase
 
     public function test_admin_can_start_scheduled_auction(): void
     {
+        // ProcessAuctionCountdownJob は QUEUE_CONNECTION=sync 下で
+        // 即時に進行して 'finished' に至るため、Queue::fake() でジョブをキャプチャする。
+        \Illuminate\Support\Facades\Queue::fake();
+
         $auction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
-        Item::factory()->registered()->create(['auction_id' => $auction->id]);
+        $seller = $this->createSeller();
+        $sellerProfile = \App\Models\SellerProfile::factory()->create(['user_id' => $seller->id]);
+        Item::factory()->registered()->create([
+            'auction_id' => $auction->id,
+            'seller_profile_id' => $sellerProfile->id,
+        ]);
         Lane::factory()->create(['auction_id' => $auction->id]);
 
         $response = $this->actingAs($this->admin, 'sanctum')

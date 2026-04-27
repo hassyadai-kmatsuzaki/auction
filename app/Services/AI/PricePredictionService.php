@@ -17,17 +17,25 @@ class PricePredictionService
         $speciesName = $item->species_name;
 
         // 同品種の過去取引データを取得
-        $historicalData = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+        // STDDEV は SQLite で未対応のため、価格列を取得して PHP 側で集計する
+        $prices = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
             ->where('items.species_name', $speciesName)
             ->where('won_items.payment_status', 'paid')
-            ->selectRaw('
-                AVG(won_items.winning_price) as avg_price,
-                STDDEV(won_items.winning_price) as stddev_price,
-                MIN(won_items.winning_price) as min_price,
-                MAX(won_items.winning_price) as max_price,
-                COUNT(*) as sample_count
-            ')
-            ->first();
+            ->pluck('won_items.winning_price')
+            ->map(fn ($v) => (float) $v);
+
+        $sampleCount = $prices->count();
+        $avgPrice = $sampleCount > 0 ? $prices->avg() : 0.0;
+        $stddev = $sampleCount > 1
+            ? sqrt($prices->reduce(fn ($carry, $v) => $carry + ($v - $avgPrice) ** 2, 0.0) / $sampleCount)
+            : 0.0;
+        $historicalData = (object) [
+            'avg_price' => $avgPrice,
+            'stddev_price' => $stddev,
+            'min_price' => $sampleCount > 0 ? $prices->min() : 0,
+            'max_price' => $sampleCount > 0 ? $prices->max() : 0,
+            'sample_count' => $sampleCount,
+        ];
 
         // 最近のトレンド（直近30日）
         $recentTrend = WonItem::join('items', 'won_items.item_id', '=', 'items.id')

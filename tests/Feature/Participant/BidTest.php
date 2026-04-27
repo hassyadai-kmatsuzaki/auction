@@ -22,9 +22,9 @@ class BidTest extends TestCase
     {
         parent::setUp();
         $this->seedRoles();
-        $this->participant = $this->createParticipant();
+        $this->participant = $this->createParticipantWithSubscription();
         $this->admin = $this->createAdmin();
-        
+
         $this->auction = Auction::factory()->live()->create(['created_by' => $this->admin->id]);
         $this->lane = Lane::factory()->active()->create(['auction_id' => $this->auction->id]);
         
@@ -62,10 +62,17 @@ class BidTest extends TestCase
 
     public function test_participant_can_leave_bid(): void
     {
-        // First join
+        // 落札権利者（最高入札者）の単独参加では離脱できない仕様。
+        // 2 人いる状態で離脱できることを確認する。
         BidParticipant::create([
             'item_id' => $this->item->id,
             'user_id' => $this->participant->id,
+            'is_active' => true,
+        ]);
+        $other = $this->createParticipant();
+        BidParticipant::create([
+            'item_id' => $this->item->id,
+            'user_id' => $other->id,
             'is_active' => true,
         ]);
 

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EscrowTransaction extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'won_item_id',
         'buyer_id',

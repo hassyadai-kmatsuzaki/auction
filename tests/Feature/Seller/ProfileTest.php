@@ -113,4 +113,38 @@ class ProfileTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
     }
+
+    public function test_seller_can_upload_profile_image(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $file = \Illuminate\Http\UploadedFile::fake()->image('avatar.jpg', 500, 500);
+
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->post('/api/seller/profile/image', ['image' => $file]);
+
+        $response->assertOk();
+        $this->sellerProfile->refresh();
+        $this->assertNotNull($this->sellerProfile->profile_image_path);
+    }
+
+    public function test_seller_image_upload_validates_extension(): void
+    {
+        $file = \Illuminate\Http\UploadedFile::fake()->create('avatar.exe', 100);
+
+        $this->actingAs($this->seller, 'sanctum')
+            ->post('/api/seller/profile/image', ['image' => $file])
+            ->assertStatus(422);
+    }
+
+    public function test_seller_can_delete_profile_image(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $this->sellerProfile->update(['profile_image_path' => 'profile-images/test.jpg']);
+
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->deleteJson('/api/seller/profile/image');
+
+        $response->assertOk();
+        $this->assertNull($this->sellerProfile->fresh()->profile_image_path);
+    }
 }

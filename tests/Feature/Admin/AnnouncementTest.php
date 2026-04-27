@@ -190,4 +190,44 @@ class AnnouncementTest extends TestCase
             'status' => 'published',
         ]);
     }
+
+    public function test_admin_can_generate_content_with_ai(): void
+    {
+        config(['services.openai.api_key' => 'test-key']);
+        \Illuminate\Support\Facades\Http::fake([
+            'api.openai.com/v1/chat/completions' => \Illuminate\Support\Facades\Http::response([
+                'choices' => [
+                    ['message' => ['content' => '【AI生成】重要なお知らせ本文']],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/announcements/generate-content', [
+                'title' => 'メンテナンスのお知らせ',
+                'target_roles' => ['participant', 'seller'],
+                'is_important' => true,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.content', '【AI生成】重要なお知らせ本文');
+    }
+
+    public function test_generate_content_validates_title(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/announcements/generate-content', [])
+            ->assertStatus(422);
+    }
+
+    public function test_generate_content_returns_500_when_api_key_missing(): void
+    {
+        config(['services.openai.api_key' => '']);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/announcements/generate-content', [
+                'title' => 'タイトル',
+            ])
+            ->assertStatus(500);
+    }
 }

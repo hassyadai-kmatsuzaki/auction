@@ -19,7 +19,7 @@ class ItemTest extends TestCase
     {
         parent::setUp();
         $this->seedRoles();
-        $this->seller = $this->createSeller();
+        $this->seller = $this->createSellerWithSubscription();
         $this->sellerProfile = SellerProfile::factory()->create(['user_id' => $this->seller->id]);
         $this->admin = $this->createAdmin();
         $this->auction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
@@ -315,5 +315,51 @@ class ItemTest extends TestCase
         
         $this->assertEquals(count($itemNumbers), count($uniqueItemNumbers), 'item_numberが重複しています');
         $this->assertEquals(5, count($items));
+    }
+
+    public function test_seller_can_destroy_own_draft_item(): void
+    {
+        $item = Item::factory()->draft()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->deleteJson("/api/seller/items/{$item->id}");
+        $response->assertOk();
+    }
+
+    public function test_seller_cannot_destroy_others_item(): void
+    {
+        $other = $this->createSellerWithSubscription();
+        $otherProfile = SellerProfile::factory()->create(['user_id' => $other->id]);
+        $item = Item::factory()->draft()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $otherProfile->id,
+        ]);
+
+        $this->actingAs($this->seller, 'sanctum')
+            ->deleteJson("/api/seller/items/{$item->id}")
+            ->assertStatus(404);
+    }
+
+    public function test_seller_can_get_stats(): void
+    {
+        Item::factory()->count(3)->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->getJson('/api/seller/items/stats');
+        $response->assertOk()
+            ->assertJsonStructure(['data']);
+    }
+
+    public function test_seller_can_view_seller_species_types(): void
+    {
+        $response = $this->actingAs($this->seller, 'sanctum')
+            ->getJson('/api/seller/species-types');
+        $response->assertOk();
     }
 }

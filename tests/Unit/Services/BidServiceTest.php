@@ -45,57 +45,8 @@ class BidServiceTest extends TestCase
         $this->lane->update(['current_item_id' => $this->item->id]);
     }
 
-    public function test_user_can_join_bid(): void
-    {
-        $result = $this->bidService->join(
-            $this->item,
-            $this->participant->id,
-            '127.0.0.1',
-            'Test Agent'
-        );
-
-        $this->assertTrue($result['success']);
-        $this->assertEquals('入札に参加しました。', $result['message']);
-        $this->assertEquals($this->item->id, $result['data']['item_id']);
-        $this->assertTrue($result['data']['is_active']);
-    }
-
-    public function test_cannot_join_non_live_item(): void
-    {
-        $this->item->update(['status' => 'registered']);
-
-        $result = $this->bidService->join(
-            $this->item,
-            $this->participant->id
-        );
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContains('入札を受け付けていません', $result['message']);
-    }
-
-    public function test_cannot_join_when_auction_not_live(): void
-    {
-        $this->auction->update(['status' => 'scheduled']);
-
-        $result = $this->bidService->join(
-            $this->item,
-            $this->participant->id
-        );
-
-        $this->assertFalse($result['success']);
-    }
-
-    public function test_user_can_leave_bid(): void
-    {
-        // まず参加
-        $this->bidService->join($this->item, $this->participant->id);
-
-        // 離脱
-        $result = $this->bidService->leave($this->item, $this->participant->id);
-
-        $this->assertTrue($result['success']);
-        $this->assertEquals('入札から離脱しました。', $result['message']);
-    }
+    // join/leave 系の振る舞いは Actions/JoinBidAction, LeaveBidAction にロジックが移管済み。
+    // それぞれ JoinBidActionTest / LeaveBidActionTest で網羅しているためここでは扱わない。
 
     public function test_price_increment_calculation(): void
     {
@@ -121,14 +72,4 @@ class BidServiceTest extends TestCase
         $this->assertNotEquals(0, ($invalidBid - $currentPrice) % $bidIncrement);
     }
 
-    /**
-     * カスタムアサーション
-     */
-    protected function assertStringContains(string $needle, string $haystack): void
-    {
-        $this->assertTrue(
-            str_contains($haystack, $needle),
-            "Failed asserting that '$haystack' contains '$needle'"
-        );
-    }
 }

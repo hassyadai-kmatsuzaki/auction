@@ -120,6 +120,66 @@ class TwoFactorAuthTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_2fa_disable_with_correct_password(): void
+    {
+        // setUp の User の password はファクトリ既定値（'password'）
+        $service = new TwoFactorService();
+        $service->generateSecret($this->user);
+        $this->user->update(['two_factor_confirmed_at' => now()]);
+
+        $response = $this->actingAs($this->user)
+            ->deleteJson('/api/two-factor/disable', ['password' => 'password']);
+
+        $response->assertOk();
+        $this->assertNull($this->user->fresh()->two_factor_secret);
+        $this->assertNull($this->user->fresh()->two_factor_confirmed_at);
+    }
+
+    public function test_regenerate_recovery_codes(): void
+    {
+        $service = new TwoFactorService();
+        $service->generateSecret($this->user);
+        $this->user->update(['two_factor_confirmed_at' => now()]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/two-factor/recovery-codes');
+
+        $response->assertOk()
+            ->assertJsonStructure(['data' => ['recovery_codes']]);
+        $this->assertCount(8, $response->json('data.recovery_codes'));
+    }
+
+    public function test_2fa_verify_with_valid_code(): void
+    {
+        $service = new TwoFactorService();
+        $service->generateSecret($this->user);
+        $this->user->update(['two_factor_confirmed_at' => now()]);
+        $secret = decrypt($this->user->fresh()->two_factor_secret);
+        $code = $this->generateTotpCode($secret);
+
+        $response = $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id,
+            'code' => $code,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_2fa_verify_with_wrong_code_fails(): void
+    {
+        $service = new TwoFactorService();
+        $service->generateSecret($this->user);
+        $this->user->update(['two_factor_confirmed_at' => now()]);
+
+        $response = $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id,
+            'code' => '000000',
+        ]);
+
+        $response->assertStatus(422);
+    }
+
     private function generateTotpCode(string $secret): string
     {
         $timeStep = (int) floor(time() / 30);

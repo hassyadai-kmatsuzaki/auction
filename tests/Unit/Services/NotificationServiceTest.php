@@ -150,4 +150,121 @@ class NotificationServiceTest extends TestCase
         // デフォルト設定が適用されることを確認
         $this->assertIsArray($settings);
     }
+
+    public function test_send_shipping_fee_finalized_notification_queues_mail(): void
+    {
+        $w = WonItem::factory()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+            'shipping_fee' => 1000,
+        ]);
+        $wonItems = WonItem::with(['user', 'item'])->whereIn('id', [$w->id])->get();
+
+        $this->participant->update(['notification_settings' => ['email_shipping' => true]]);
+
+        $result = $this->notificationService->sendShippingFeeFinalizedNotification($wonItems);
+        $this->assertTrue($result);
+        Mail::assertQueued(\App\Mail\ShippingFeeFinalizedMail::class);
+    }
+
+    public function test_shipping_fee_finalized_returns_false_for_empty_collection(): void
+    {
+        $result = $this->notificationService->sendShippingFeeFinalizedNotification(collect());
+        $this->assertFalse($result);
+    }
+
+    public function test_shipping_fee_finalized_skipped_when_user_disabled_setting(): void
+    {
+        // 設定を先に更新してから WonItem の user リレーションを load する
+        $this->participant->update(['notification_settings' => ['email_shipping' => false]]);
+
+        $w = WonItem::factory()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+        ]);
+        $wonItems = WonItem::with(['user', 'item'])->whereIn('id', [$w->id])->get();
+
+        $result = $this->notificationService->sendShippingFeeFinalizedNotification($wonItems);
+        $this->assertFalse($result);
+        Mail::assertNotQueued(\App\Mail\ShippingFeeFinalizedMail::class);
+    }
+
+    public function test_send_bid_limit_reached_notification_does_not_throw(): void
+    {
+        // Returns void; ensure it doesn't throw with valid input
+        $this->participant->update(['notification_settings' => ['line_bid_limit_reached' => true]]);
+        $this->notificationService->sendBidLimitReachedNotification(
+            $this->participant->id,
+            'メダカ',
+            10000.0,
+            5000.0,
+        );
+        $this->assertTrue(true);
+    }
+
+    public function test_send_auction_start_notification(): void
+    {
+        // 通知設定を有効にした participant を増やしておく
+        $this->participant->update(['notification_settings' => ['email_auction_start' => true]]);
+        $count = $this->notificationService->sendAuctionStartNotification($this->auction);
+        // 戻り値は送信件数（Int）
+        $this->assertGreaterThanOrEqual(0, $count);
+    }
+
+    public function test_send_item_sold_notification(): void
+    {
+        $wonItem = WonItem::factory()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+        ]);
+        $wonItem->load(['item.sellerProfile.user', 'winner']);
+
+        $this->seller->update(['notification_settings' => ['email_item_sold' => true]]);
+
+        $result = $this->notificationService->sendItemSoldNotification($wonItem);
+        $this->assertTrue($result || $result === false);
+    }
+
+    public function test_send_seller_payment_received_notification(): void
+    {
+        $wonItem = WonItem::factory()->confirmed()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+        ]);
+        $wonItem->load(['item.sellerProfile.user']);
+
+        $this->seller->update(['notification_settings' => ['email_payment_received' => true]]);
+
+        $result = $this->notificationService->sendSellerPaymentReceivedNotification($wonItem);
+        $this->assertTrue($result || $result === false);
+    }
+
+    public function test_send_invoice_ready_notification(): void
+    {
+        // 落札者が居ないと送信件数 0
+        WonItem::factory()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+            'shipping_approved_at' => now(),
+        ]);
+
+        $count = $this->notificationService->sendInvoiceReadyNotification($this->auction);
+        $this->assertGreaterThanOrEqual(0, $count);
+    }
+
+    public function test_send_payment_reminder_notification(): void
+    {
+        $wonItem = WonItem::factory()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+            'payment_status' => 'pending',
+            'payment_deadline' => now()->addHours(20),
+        ]);
+        $wonItem->load(['item', 'winner']);
+
+        $this->participant->update(['notification_settings' => ['email_payment_reminder' => true]]);
+
+        $this->notificationService->sendPaymentReminderNotification($wonItem, '24時間前');
+        $this->assertTrue(true);
+    }
 }

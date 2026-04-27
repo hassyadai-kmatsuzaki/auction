@@ -420,7 +420,6 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
     Route::put('/auctions/{auctionId}/address', [ParticipantWonItemController::class, 'updateAddress']);
-    Route::post('/auctions/{auctionId}/calculate-shipping', [ParticipantWonItemController::class, 'calculateShipping']);
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     

@@ -47,7 +47,8 @@ class WonItemTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'won_items',
+                    'auctions',
+                    'summary',
                 ],
             ]);
     }
@@ -79,8 +80,9 @@ class WonItemTest extends TestCase
 
     public function test_participant_can_update_shipping_address(): void
     {
+        $auctionId = $this->wonItem->item->auction_id;
         $response = $this->actingAs($this->participant, 'sanctum')
-            ->putJson("/api/participant/won-items/{$this->wonItem->id}/address", [
+            ->putJson("/api/participant/auctions/{$auctionId}/address", [
                 'shipping_postal_code' => '123-4567',
                 'shipping_prefecture' => '東京都',
                 'shipping_city' => '新宿区',
@@ -105,9 +107,10 @@ class WonItemTest extends TestCase
             'payment_status' => 'confirmed',
             'shipping_locked_at' => now(),
         ]);
+        $auctionId = $this->wonItem->item->auction_id;
 
         $response = $this->actingAs($this->participant, 'sanctum')
-            ->putJson("/api/participant/won-items/{$this->wonItem->id}/address", [
+            ->putJson("/api/participant/auctions/{$auctionId}/address", [
                 'shipping_postal_code' => '530-0001',
                 'shipping_prefecture' => '大阪府',
                 'shipping_city' => '大阪市北区',
@@ -122,8 +125,9 @@ class WonItemTest extends TestCase
 
     public function test_address_update_requires_postal_code(): void
     {
+        $auctionId = $this->wonItem->item->auction_id;
         $response = $this->actingAs($this->participant, 'sanctum')
-            ->putJson("/api/participant/won-items/{$this->wonItem->id}/address", [
+            ->putJson("/api/participant/auctions/{$auctionId}/address", [
                 'shipping_prefecture' => '東京都',
                 'shipping_city' => '新宿区',
             ]);

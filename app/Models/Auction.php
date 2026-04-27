@@ -100,6 +100,12 @@ class Auction extends BaseModel
             return false;
         }
 
+        // 商品（生体）が登録されている場合は削除不可。
+        // 出品者の作業を巻き戻さないために、items を先に外してから削除する運用。
+        if ($this->items()->exists()) {
+            return false;
+        }
+
         return true;
     }
 

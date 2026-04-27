@@ -2,7 +2,9 @@
 
 namespace Tests;
 
+use App\Models\Plan;
 use App\Models\Role;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,7 +34,8 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * 出品者ユーザーを作成
+     * 出品者ユーザーを作成（サブスクは付与しない）。
+     * CheckSubscription 配下のエンドポイントを叩く場合は attachActiveSubscription を別途呼ぶ。
      */
     protected function createSeller(): User
     {
@@ -43,7 +46,8 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * 買受者ユーザーを作成
+     * 買受者ユーザーを作成（サブスクは付与しない）。
+     * CheckSubscription 配下のエンドポイントを叩く場合は attachActiveSubscription を別途呼ぶ。
      */
     protected function createParticipant(): User
     {
@@ -51,6 +55,44 @@ abstract class TestCase extends BaseTestCase
         $user = User::factory()->create();
         $user->roles()->attach($role->id);
         return $user;
+    }
+
+    /**
+     * サブスク付きの出品者を作成
+     */
+    protected function createSellerWithSubscription(): User
+    {
+        $user = $this->createSeller();
+        $this->attachActiveSubscription($user, allowsBid: false, allowsSell: true);
+        return $user;
+    }
+
+    /**
+     * サブスク付きの買受者を作成
+     */
+    protected function createParticipantWithSubscription(): User
+    {
+        $user = $this->createParticipant();
+        $this->attachActiveSubscription($user, allowsBid: true, allowsSell: false);
+        return $user;
+    }
+
+    /**
+     * 任意ユーザーに active サブスクと能力フラグ付きプランを紐付ける。
+     * CheckSubscription ミドルウェア配下のルートをテストから叩くためのヘルパ。
+     */
+    protected function attachActiveSubscription(User $user, bool $allowsBid = true, bool $allowsSell = true): Subscription
+    {
+        $plan = Plan::factory()->create([
+            'allows_bid' => $allowsBid,
+            'allows_sell' => $allowsSell,
+        ]);
+        return Subscription::factory()->create([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'status' => Subscription::STATUS_ACTIVE,
+            'current_period_end' => now()->addYear(),
+        ]);
     }
 
     /**

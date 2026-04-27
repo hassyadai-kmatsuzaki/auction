@@ -40,6 +40,63 @@ class ShippingCalculatorServiceTest extends TestCase
     }
 
     /** @test */
+    public function getRegionByPrefecture_は_都道府県の接尾辞を許容する(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        // 「東京都」と「東京」のどちらでも引ける
+        $this->assertSame($calculator->getRegionByPrefecture('東京都'), $calculator->getRegionByPrefecture('東京'));
+        $this->assertSame($calculator->getRegionByPrefecture('北海道'), $calculator->getRegionByPrefecture('北海'));
+    }
+
+    /** @test */
+    public function getRegionByPrefecture_は_未知の県を_null_で返す(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $this->assertNull($calculator->getRegionByPrefecture('未知の県'));
+    }
+
+    /** @test */
+    public function apportionFee_は_数量0件で空配列を返す(): void
+    {
+        $this->assertSame([], ShippingCalculatorService::apportionFee(1000, []));
+    }
+
+    /** @test */
+    public function apportionFee_は_数量比に従って按分し誤差を最後の要素に寄せる(): void
+    {
+        // 1000 を 1:3 で按分 → 250 / 750
+        $this->assertSame([250, 750], ShippingCalculatorService::apportionFee(1000, [1, 3]));
+
+        // 1000 を 1:1:1 で按分 → 333,333,334（端数寄せ）
+        $result = ShippingCalculatorService::apportionFee(1000, [1, 1, 1]);
+        $this->assertSame(1000, array_sum($result));
+        $this->assertCount(3, $result);
+
+        // 0 円は全員 0
+        $this->assertSame([0, 0], ShippingCalculatorService::apportionFee(0, [2, 3]));
+    }
+
+    /** @test */
+    public function apportionFee_は_数量合計0なら均等割で誤差を末尾に寄せる(): void
+    {
+        // 1000 を quantity=0,0,0 で按分 → 333/333/334
+        $result = ShippingCalculatorService::apportionFee(1000, [0, 0, 0]);
+        $this->assertSame(1000, array_sum($result));
+        $this->assertSame(333, $result[0]);
+        $this->assertSame(333, $result[1]);
+        $this->assertSame(334, $result[2]);
+    }
+
+    /** @test */
+    public function apportionFee_は_負端数を含めても合計を維持する(): void
+    {
+        // 100 を 1:2:3:4:5:6 で按分 → 合計 100 を維持
+        $result = ShippingCalculatorService::apportionFee(100, [1, 2, 3, 4, 5, 6]);
+        $this->assertSame(100, array_sum($result));
+        $this->assertCount(6, $result);
+    }
+
+    /** @test */
     public function メダカ単独_少量_関東_S袋1個80号箱(): void
     {
         $calculator = new ShippingCalculatorService();

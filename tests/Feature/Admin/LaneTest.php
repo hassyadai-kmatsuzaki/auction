@@ -150,4 +150,99 @@ class LaneTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_admin_can_create_additional_lane(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/lanes/create", [
+                'lane_name' => 'B レーン',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.lane.lane_number', 2)
+            ->assertJsonPath('data.lane.lane_name', 'B レーン');
+    }
+
+    public function test_create_lane_blocked_for_started_auction(): void
+    {
+        $this->auction->update(['status' => 'live']);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/lanes/create")
+            ->assertStatus(400);
+    }
+
+    public function test_admin_cannot_exceed_10_lanes(): void
+    {
+        // 既存 1 + 9 = 10 レーン
+        for ($i = 2; $i <= 10; $i++) {
+            Lane::factory()->create(['auction_id' => $this->auction->id, 'lane_number' => $i]);
+        }
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/lanes/create")
+            ->assertStatus(400);
+    }
+
+    public function test_admin_can_delete_extra_lane(): void
+    {
+        $extra = Lane::factory()->create(['auction_id' => $this->auction->id, 'lane_number' => 2]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/admin/auctions/{$this->auction->id}/lanes/{$extra->id}")
+            ->assertOk();
+
+        $this->assertDatabaseMissing('lanes', ['id' => $extra->id]);
+    }
+
+    public function test_cannot_delete_last_lane(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/admin/auctions/{$this->auction->id}/lanes/{$this->lane->id}")
+            ->assertStatus(400);
+    }
+
+    public function test_delete_lane_blocked_for_started_auction(): void
+    {
+        $extra = Lane::factory()->create(['auction_id' => $this->auction->id, 'lane_number' => 2]);
+        $this->auction->update(['status' => 'live']);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/admin/auctions/{$this->auction->id}/lanes/{$extra->id}")
+            ->assertStatus(400);
+    }
+
+    public function test_admin_can_update_lane_name(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/auctions/{$this->auction->id}/lanes/{$this->lane->id}", [
+                'lane_name' => '高級魚レーン',
+            ]);
+
+        $response->assertOk();
+        $this->assertSame('高級魚レーン', $this->lane->fresh()->lane_name);
+    }
+
+    public function test_admin_can_bulk_unassign_items(): void
+    {
+        $this->lane->items()->attach($this->item->id, ['sequence_order' => 1]);
+        $this->assertSame(1, \DB::table('lane_items')->where('lane_id', $this->lane->id)->count());
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/lanes/bulk-unassign");
+
+        $response->assertOk()
+            ->assertJsonPath('data.unassigned_count', 1);
+
+        $this->assertSame(0, \DB::table('lane_items')->where('lane_id', $this->lane->id)->count());
+    }
+
+    public function test_bulk_unassign_blocked_when_auction_started(): void
+    {
+        $this->auction->update(['status' => 'live']);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/lanes/bulk-unassign")
+            ->assertStatus(400);
+    }
 }

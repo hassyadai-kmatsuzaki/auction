@@ -363,29 +363,43 @@ export default function WonItemManagement() {
     }
   };
 
-  // 送料承認モーダルを開く
-  const handleOpenApproveShipping = (winnerId: number, autoFee: number) => {
+  // 送料入力モーダルを開く（「その他」を含む発送単位の手動確定用）
+  const handleOpenApproveShipping = (winnerId: number, _autoFee: number) => {
     setApproveShippingWinnerId(winnerId);
-    setApproveShippingAutoFee(autoFee);
-    setApproveShippingOverride(String(autoFee));
+    setApproveShippingAutoFee(0);
+    setApproveShippingOverride('');
     setApproveShippingReason('');
     setApproveShippingOpen(true);
   };
 
-  // 送料承認を実行
+  // 送料無料ボタン
+  const handleSetFreeShipping = () => {
+    setApproveShippingOverride('0');
+    setApproveShippingReason('送料無料');
+  };
+
+  // 送料入力を確定
   const handleSubmitApproveShipping = async () => {
     if (approveShippingWinnerId === null) return;
+    if (approveShippingOverride.trim() === '') {
+      setSnackbar({ open: true, message: '送料を入力してください', severity: 'error' });
+      return;
+    }
     const overrideNum = Number(approveShippingOverride);
-    const isOverridden = !Number.isNaN(overrideNum) && overrideNum !== approveShippingAutoFee;
-    if (isOverridden && !approveShippingReason.trim()) {
-      setSnackbar({ open: true, message: '金額を変更する場合は理由を入力してください', severity: 'error' });
+    if (Number.isNaN(overrideNum) || overrideNum < 0) {
+      setSnackbar({ open: true, message: '送料は0以上の数値を入力してください', severity: 'error' });
+      return;
+    }
+    if (overrideNum === 0 && !approveShippingReason.trim()) {
+      setSnackbar({ open: true, message: '送料0円で確定する場合は「送料無料」ボタンを押すか、理由を入力してください', severity: 'error' });
       return;
     }
     setActionLoading(true);
     try {
-      const payload: Record<string, any> = {};
-      if (isOverridden) {
-        payload.shipping_fee = overrideNum;
+      const payload: Record<string, any> = {
+        shipping_fee: overrideNum,
+      };
+      if (approveShippingReason.trim()) {
         payload.adjustment_reason = approveShippingReason.trim();
       }
       const response = await axios.post(
@@ -393,12 +407,12 @@ export default function WonItemManagement() {
         payload,
       );
       if (response.data.success) {
-        setSnackbar({ open: true, message: response.data.message || '送料を承認しました', severity: 'success' });
+        setSnackbar({ open: true, message: response.data.message || '送料を確定しました', severity: 'success' });
         setApproveShippingOpen(false);
         fetchWonItems();
       }
     } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || '送料の承認に失敗しました', severity: 'error' });
+      setSnackbar({ open: true, message: err.response?.data?.message || '送料の確定に失敗しました', severity: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -1039,7 +1053,7 @@ export default function WonItemManagement() {
                             onClick={() => handleOpenApproveShipping(group.winner!.id, totalShippingFee)}
                             disabled={actionLoading}
                           >
-                            送料承認
+                            送料入力
                           </Button>
                         )}
                       </Box>
@@ -1192,41 +1206,47 @@ export default function WonItemManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* 送料承認ダイアログ */}
+      {/* 送料入力ダイアログ（「その他」種別を含む発送単位の手動確定用） */}
       <Dialog open={approveShippingOpen} onClose={() => setApproveShippingOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>送料の承認</DialogTitle>
+        <DialogTitle>送料の入力</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              承認すると落札者に送料が開示され、請求書が発行可能になります。
-              自動計算値と異なる金額を入力すると、手動調整として記録されます。
+              「その他」種別が含まれているため、送料を手動で入力してください。
+              確定すると落札者に送料が開示され、請求書が発行可能になります。
             </Typography>
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>自動計算された送料</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                ¥{approveShippingAutoFee.toLocaleString()}
-              </Typography>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 2 }}>
+              <TextField
+                fullWidth
+                label="送料（円）"
+                type="number"
+                value={approveShippingOverride}
+                onChange={(e) => {
+                  setApproveShippingOverride(e.target.value);
+                  if (approveShippingReason === '送料無料') setApproveShippingReason('');
+                }}
+                inputProps={{ min: 0 }}
+                autoFocus
+              />
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={handleSetFreeShipping}
+                sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
+              >
+                送料無料
+              </Button>
             </Box>
             <TextField
               fullWidth
-              label="承認する送料（円）"
-              type="number"
-              value={approveShippingOverride}
-              onChange={(e) => setApproveShippingOverride(e.target.value)}
-              sx={{ mb: 2 }}
-              inputProps={{ min: 0 }}
+              label={Number(approveShippingOverride) === 0 ? '理由（必須）' : '理由（任意）'}
+              value={approveShippingReason}
+              onChange={(e) => setApproveShippingReason(e.target.value)}
+              multiline
+              rows={2}
+              required={Number(approveShippingOverride) === 0}
+              helperText="送料0円で確定する場合は理由が必須です"
             />
-            {Number(approveShippingOverride) !== approveShippingAutoFee && (
-              <TextField
-                fullWidth
-                label="変更理由（手動調整時のみ必須）"
-                value={approveShippingReason}
-                onChange={(e) => setApproveShippingReason(e.target.value)}
-                multiline
-                rows={2}
-                required
-              />
-            )}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1237,9 +1257,9 @@ export default function WonItemManagement() {
             variant="contained"
             color="success"
             onClick={handleSubmitApproveShipping}
-            disabled={actionLoading || approveShippingOverride === ''}
+            disabled={actionLoading || approveShippingOverride.trim() === ''}
           >
-            {actionLoading ? <CircularProgress size={20} /> : '承認する'}
+            {actionLoading ? <CircularProgress size={20} /> : '確定する'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -97,4 +97,151 @@ class SpeciesTypeManagementTest extends TestCase
         $user->roles()->attach($role->id);
         return $user;
     }
+
+    /** @test */
+    public function showは種別とその配下マスタを返す(): void
+    {
+        $admin = $this->createAdmin();
+        $medaka = SpeciesType::where('code', 'medaka')->first();
+        $res = $this->actingAs($admin)->getJson("/api/admin/masters/species-types/{$medaka->id}");
+        $res->assertOk()->assertJsonStructure(['data']);
+    }
+
+    /** @test */
+    public function reorderはsort_orderを一括更新する(): void
+    {
+        $admin = $this->createAdmin();
+        $medaka = SpeciesType::where('code', 'medaka')->first();
+        $other = SpeciesType::where('code', 'other')->first();
+
+        $this->actingAs($admin)->postJson('/api/admin/masters/species-types/reorder', [
+            'orders' => [
+                ['id' => $medaka->id, 'sort_order' => 99],
+                ['id' => $other->id, 'sort_order' => 0],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(99, (int) SpeciesType::find($medaka->id)->sort_order);
+        $this->assertSame(0, (int) SpeciesType::find($other->id)->sort_order);
+    }
+
+    /** @test */
+    public function bag_specs_CRUD_が動く(): void
+    {
+        $admin = $this->createAdmin();
+        $medaka = SpeciesType::where('code', 'medaka')->first();
+
+        // index
+        $this->actingAs($admin)
+            ->getJson("/api/admin/masters/species-types/{$medaka->id}/bag-specs")
+            ->assertOk();
+
+        // store（既存と被らないユニークなサイズ）
+        $stored = $this->actingAs($admin)
+            ->postJson("/api/admin/masters/species-types/{$medaka->id}/bag-specs", [
+                'bag_size' => 'XX',
+                'min_qty' => 1,
+                'max_qty' => 5,
+                'weight_kg' => 0.4,
+            ])->assertCreated();
+        $bagId = $stored->json('data.id');
+
+        // 同じ bag_size を再 store → 409
+        $this->actingAs($admin)
+            ->postJson("/api/admin/masters/species-types/{$medaka->id}/bag-specs", [
+                'bag_size' => 'XX', 'min_qty' => 1, 'weight_kg' => 0.4,
+            ])->assertStatus(409);
+
+        // update
+        $this->actingAs($admin)
+            ->patchJson("/api/admin/masters/species-types/{$medaka->id}/bag-specs/{$bagId}", [
+                'weight_kg' => 0.5,
+            ])->assertOk();
+
+        // destroy
+        $this->actingAs($admin)
+            ->deleteJson("/api/admin/masters/species-types/{$medaka->id}/bag-specs/{$bagId}")
+            ->assertOk();
+        $this->assertDatabaseMissing('bag_specs', ['id' => $bagId]);
+    }
+
+    /** @test */
+    public function bag_specs_storeはvalidationを返す(): void
+    {
+        $admin = $this->createAdmin();
+        $medaka = SpeciesType::where('code', 'medaka')->first();
+
+        $this->actingAs($admin)
+            ->postJson("/api/admin/masters/species-types/{$medaka->id}/bag-specs", [])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function box_capacities_upsert_と_destroy(): void
+    {
+        $admin = $this->createAdmin();
+        $medaka = SpeciesType::where('code', 'medaka')->first();
+
+        // index
+        $this->actingAs($admin)
+            ->getJson("/api/admin/masters/species-types/{$medaka->id}/box-capacities")
+            ->assertOk();
+
+        // upsert
+        $this->actingAs($admin)
+            ->putJson("/api/admin/masters/species-types/{$medaka->id}/box-capacities", [
+                'capacities' => [
+                    ['box_size' => 80, 'bag_size' => 'XX', 'max_count' => 6],
+                ],
+            ])->assertOk();
+
+        $cap = \App\Models\BoxCapacity::where('species_type_id', $medaka->id)
+            ->where('bag_size', 'XX')->first();
+        $this->assertSame(6, (int) $cap->max_count);
+
+        // 再 upsert で値更新
+        $this->actingAs($admin)
+            ->putJson("/api/admin/masters/species-types/{$medaka->id}/box-capacities", [
+                'capacities' => [
+                    ['box_size' => 80, 'bag_size' => 'XX', 'max_count' => 12],
+                ],
+            ])->assertOk();
+        $this->assertSame(12, (int) $cap->fresh()->max_count);
+
+        // destroy
+        $this->actingAs($admin)
+            ->deleteJson("/api/admin/masters/species-types/{$medaka->id}/box-capacities/{$cap->id}")
+            ->assertOk();
+    }
+
+    /** @test */
+    public function mix_restrictions_CRUD(): void
+    {
+        $admin = $this->createAdmin();
+        $medaka = SpeciesType::where('code', 'medaka')->first();
+
+        $this->actingAs($admin)
+            ->getJson("/api/admin/masters/species-types/{$medaka->id}/mix-restrictions")
+            ->assertOk();
+
+        $stored = $this->actingAs($admin)
+            ->postJson("/api/admin/masters/species-types/{$medaka->id}/mix-restrictions", [
+                'box_size' => 100,
+                'bag_size_a' => 'A',
+                'bag_size_b' => 'B',
+            ])->assertCreated();
+        $rowId = $stored->json('data.id');
+
+        // bag_size_a == bag_size_b は弾かれる
+        $this->actingAs($admin)
+            ->postJson("/api/admin/masters/species-types/{$medaka->id}/mix-restrictions", [
+                'box_size' => 100,
+                'bag_size_a' => 'A',
+                'bag_size_b' => 'A',
+            ])->assertStatus(422);
+
+        $this->actingAs($admin)
+            ->deleteJson("/api/admin/masters/species-types/{$medaka->id}/mix-restrictions/{$rowId}")
+            ->assertOk();
+    }
 }

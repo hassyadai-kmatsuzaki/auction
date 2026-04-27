@@ -94,4 +94,47 @@ class SystemSettingTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+    public function test_admin_can_get_auction_defaults(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/settings/defaults');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data' => ['auction_settings', 'fee_settings', 'shipping_settings'],
+            ]);
+    }
+
+    public function test_admin_can_get_shipping_rates(): void
+    {
+        SystemSetting::set('shipping_rates', [
+            ['region' => 'kanto', 'size_60' => 800, 'size_80' => 1000, 'size_100' => 1200],
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/settings/shipping/rates');
+
+        $response->assertOk()
+            ->assertJsonStructure(['data' => ['shipping_rates']]);
+    }
+
+    public function test_admin_can_update_shipping_rates(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson('/api/admin/settings/shipping/rates', [
+                'shipping_rates' => [
+                    ['region' => 'kanto', 'size_60' => 1100, 'size_80' => 1300, 'size_100' => 1500],
+                ],
+            ]);
+
+        $response->assertOk();
+    }
+
+    public function test_update_shipping_rates_validates(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->putJson('/api/admin/settings/shipping/rates', ['shipping_rates' => []])
+            ->assertStatus(422);
+    }
 }

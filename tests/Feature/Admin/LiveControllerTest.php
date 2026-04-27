@@ -131,6 +131,93 @@ class LiveControllerTest extends TestCase
             ]);
     }
 
+    public function test_admin_can_start_scheduled_auction(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $auction = Auction::factory()->scheduled()->create([
+            'created_by' => $this->admin->id,
+            'lane_count' => 1,
+        ]);
+        Lane::factory()->create(['auction_id' => $auction->id]);
+        Item::factory()->registered()->create([
+            'auction_id' => $auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$auction->id}/live/start");
+
+        $response->assertOk()->assertJson(['success' => true]);
+        $auction->refresh();
+        $this->assertSame('live', $auction->status);
+    }
+
+    public function test_admin_cannot_start_auction_without_items(): void
+    {
+        $auction = Auction::factory()->scheduled()->create([
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$auction->id}/live/start")
+            ->assertStatus(400);
+    }
+
+    public function test_admin_cannot_start_already_finished_auction(): void
+    {
+        $auction = Auction::factory()->finished()->create([
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$auction->id}/live/start")
+            ->assertStatus(400);
+    }
+
+    public function test_admin_can_finish_live_auction(): void
+    {
+        $auction = $this->createLiveAuction();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$auction->id}/live/finish");
+
+        $response->assertOk()->assertJson(['success' => true]);
+        $auction->refresh();
+        $this->assertSame('finished', $auction->status);
+    }
+
+    public function test_admin_can_open_and_close_entrance(): void
+    {
+        $auction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
+
+        // 開く
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$auction->id}/entrance/open")
+            ->assertOk();
+
+        // 状態を確認
+        $statusResponse = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/admin/auctions/{$auction->id}/entrance-status");
+        $statusResponse->assertOk();
+
+        // 閉じる
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$auction->id}/entrance/close")
+            ->assertOk();
+    }
+
+    public function test_admin_can_get_countdown_status(): void
+    {
+        $auction = $this->createLiveAuction();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/admin/auctions/{$auction->id}/countdown-status");
+
+        $response->assertOk()
+            ->assertJsonStructure(['success', 'data' => ['countdowns']]);
+    }
+
     public function test_admin_can_adjust_item_price(): void
     {
         $auction = $this->createLiveAuction();
