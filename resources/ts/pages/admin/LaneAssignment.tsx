@@ -36,6 +36,7 @@ import {
   Store as StoreIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface LaneItem {
   id: number;
@@ -779,7 +780,7 @@ export default function LaneAssignment() {
                                       #{item.item_number} {item.species_name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                      ¥{item.start_price.toLocaleString()} / {item.quantity}匹
+                                      ¥{formatYen(item.start_price)} / {item.quantity}匹
                                     </Typography>
                                   </Box>
                                   {item.is_premium && (
@@ -830,7 +831,7 @@ export default function LaneAssignment() {
                               #{item.item_number} {item.species_name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              ¥{item.start_price.toLocaleString()} / {item.quantity}匹
+                              ¥{formatYen(item.start_price)} / {item.quantity}匹
                             </Typography>
                             {item.seller_name && (
                               <Typography variant="caption" sx={{ display: 'block', color: 'info.main', fontSize: '0.65rem', lineHeight: 1.2 }}>
@@ -975,7 +976,7 @@ export default function LaneAssignment() {
                                     #{item.item_number} {item.species_name}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
-                                    ¥{item.start_price.toLocaleString()} / {item.quantity}匹
+                                    ¥{formatYen(item.start_price)} / {item.quantity}匹
                                   </Typography>
                                   {item.seller_name && (
                                     <Typography variant="caption" sx={{ display: 'block', color: 'info.main', fontSize: '0.65rem', lineHeight: 1.2 }}>

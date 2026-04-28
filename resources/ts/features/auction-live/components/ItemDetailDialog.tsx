@@ -17,6 +17,7 @@ import { BidButton } from './BidButton';
 import { CountdownChip } from './CountdownChip';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
 import { optimizedImageUrl } from '@/lib/optimizedMedia';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Props {
   open: boolean;
@@ -179,7 +180,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                     const price = priceLabel === 'start'
                       ? (startPrice ?? item?.current_price ?? 0)
                       : (item?.current_price ?? 0);
-                    return Math.floor(Number(price)).toLocaleString();
+                    return formatYen(price);
                   })()}
                   <Typography component="span" variant="body2" sx={{ ml: 1, fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
                     /1{unit}

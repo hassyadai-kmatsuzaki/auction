@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { BoltOutlined as BoltIcon } from '@mui/icons-material';
+import { formatYen } from '@/lib/formatPrice';
 
 interface QuickOptions {
   base_price: number;
@@ -31,7 +32,7 @@ export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSel
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
       <BoltIcon sx={{ fontSize: 16, color: 'warning.main' }} />
       <Typography variant="caption" color="text.secondary">
-        クイック入力（{isLive ? '現在価格' : '開始価格'} ¥{Math.floor(quickOptions.base_price).toLocaleString()} 基準）
+        クイック入力（{isLive ? '現在価格' : '開始価格'} ¥{formatYen(quickOptions.base_price)} 基準）
       </Typography>
     </Box>
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
@@ -53,7 +54,7 @@ export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSel
               {label}
             </Typography>
             <Typography variant="caption" sx={{ lineHeight: 1, fontSize: '0.65rem', color: isSelected ? 'inherit' : 'text.secondary' }}>
-              ¥{value.toLocaleString()}
+              ¥{formatYen(value)}
             </Typography>
           </Button>
         );

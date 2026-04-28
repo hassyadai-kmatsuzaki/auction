@@ -4,12 +4,15 @@ import {
   Box, Typography, Grid, Card, CardContent, CardMedia, CardActions,
   Button, Chip, Paper, Tabs, Tab, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Divider, Container, IconButton,
-  Alert, CircularProgress,
+  Alert, CircularProgress, Stack, List, ListItem, ListItemText, ListItemIcon,
+  Avatar, Switch, FormControlLabel, TextField, MenuItem, Select, FormControl, InputLabel, Badge,
 } from '@mui/material';
 import {
   PlayArrow, Gavel, Event, AccessTime, ArrowForward, People,
   EmojiEvents, Timer, MeetingRoom, PriceCheck, Wifi, Refresh,
-  Favorite, FavoriteBorder, ViewModule, ArrowBack,
+  Favorite, FavoriteBorder, ViewModule, ArrowBack, MenuBook, Search,
+  Notifications, Settings as SettingsIcon, Lock, Logout, ChevronRight,
+  PlayCircle, LocalShipping, Receipt,
 } from '@mui/icons-material';
 
 const meta: Meta = { title: 'Pages/参加者', tags: ['autodocs'] };
@@ -20,7 +23,6 @@ export const Home: StoryObj = {
   name: 'ホーム',
   render: () => (
     <Box>
-      {/* 開催中バナー */}
       <Box sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)', color: 'white', py: 4, px: 2 }}>
         <Container maxWidth="lg">
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
@@ -33,7 +35,6 @@ export const Home: StoryObj = {
           <Button variant="contained" size="large" endIcon={<ArrowForward />} sx={{ bgcolor: 'white', color: 'primary.main', fontWeight: 700, px: 4, '&:hover': { bgcolor: 'grey.100' } }}>今すぐ参加する</Button>
         </Container>
       </Box>
-      {/* 次回開催 */}
       <Container maxWidth="lg" sx={{ pt: 3 }}>
         <Card sx={{ border: '1px solid', borderColor: 'primary.100', mb: 3 }}>
           <CardContent sx={{ p: 2.5 }}>
@@ -91,6 +92,44 @@ export const AuctionList: StoryObj = {
   ),
 };
 
+/** オークション出品一覧（事前確認） */
+export const AuctionItems: StoryObj = {
+  name: 'オークション出品一覧',
+  render: () => (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <IconButton size="small"><ArrowBack /></IconButton>
+        <Typography variant="h5" fontWeight="bold">第18回 春の特別オークション 出品一覧</Typography>
+      </Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>2026年4月3日(金) 13:00〜 / 全 23 件</Typography>
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <TextField placeholder="品種名で検索" size="small" InputProps={{ startAdornment: <Search fontSize="small" /> }} />
+        <FormControl size="small" sx={{ minWidth: 150 }}><InputLabel>並び替え</InputLabel><Select label="並び替え" defaultValue="number"><MenuItem value="number">出品番号順</MenuItem><MenuItem value="price">価格順</MenuItem></Select></FormControl>
+      </Box>
+      <Grid container spacing={2}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Grid item xs={12} sm={6} md={4} key={i}>
+            <Card>
+              <Box sx={{ position: 'relative', aspectRatio: '4/3', bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography color="text.secondary">NO IMAGE</Typography>
+                <IconButton sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(255,255,255,0.85)' }}>{i % 2 === 0 ? <Favorite color="error" /> : <FavoriteBorder />}</IconButton>
+                {i === 1 && <Chip label="プレミアム" color="warning" size="small" sx={{ position: 'absolute', top: 8, left: 8 }} />}
+              </Box>
+              <CardContent>
+                <Typography variant="caption" color="text.secondary">No.{i}</Typography>
+                <Typography variant="subtitle1" fontWeight="bold">サンプル生体 {i}</Typography>
+                <Typography variant="body2" color="text.secondary">数量: {i}匹</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>開始価格</Typography>
+                <Typography variant="h6" color="primary.main" fontWeight="bold">¥{(i * 5000).toLocaleString()}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Container>
+  ),
+};
+
 /** ライブオークション画面 */
 export const AuctionLive: StoryObj = {
   name: 'ライブオークション',
@@ -139,7 +178,6 @@ export const AuctionLive: StoryObj = {
             </Grid>
           ))}
         </Grid>
-        {/* 次の商品 */}
         <Paper sx={{ mt: 3, p: 2 }}>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>次の商品</Typography>
           <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
@@ -177,20 +215,149 @@ export const WonItems: StoryObj = {
       <Typography variant="h4" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}><EmojiEvents color="warning" /> 落札一覧</Typography>
       <TableContainer component={Paper}>
         <Table>
-          <TableHead><TableRow><TableCell>No.</TableCell><TableCell>品種</TableCell><TableCell align="right">単価</TableCell><TableCell align="right">数量</TableCell><TableCell align="right">合計(税込)</TableCell><TableCell>支払状況</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>No.</TableCell><TableCell>品種</TableCell><TableCell align="right">単価</TableCell><TableCell align="right">数量</TableCell><TableCell align="right">合計(税込)</TableCell><TableCell>支払状況</TableCell><TableCell>配送</TableCell></TableRow></TableHead>
           <TableBody>
-            {[{ no: 1, name: '幹之メダカ（フルボディ）', price: 3500, qty: 5, total: 19250, status: '入金済み' }, { no: 3, name: '三色ラメ幹之', price: 5000, qty: 3, total: 16500, status: '入金待ち' }].map((item) => (
+            {[{ no: 1, name: '幹之メダカ（フルボディ）', price: 3500, qty: 5, total: 19250, status: '入金済み', delivery: '発送済み' }, { no: 3, name: '三色ラメ幹之', price: 5000, qty: 3, total: 16500, status: '入金待ち', delivery: '発送前' }].map((item) => (
               <TableRow key={item.no}>
                 <TableCell>{item.no}</TableCell><TableCell>{item.name}</TableCell>
                 <TableCell align="right">¥{item.price.toLocaleString()}/1匹</TableCell>
                 <TableCell align="right">{item.qty}匹</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{item.total.toLocaleString()}</TableCell>
                 <TableCell><Chip label={item.status} size="small" color={item.status === '入金済み' ? 'success' : 'warning'} /></TableCell>
+                <TableCell><Chip label={item.delivery} size="small" color={item.delivery === '発送済み' ? 'success' : 'default'} icon={<LocalShipping />} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+    </Container>
+  ),
+};
+
+/** お気に入り */
+export const Favorites: StoryObj = {
+  name: 'お気に入り',
+  render: () => (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}><Favorite color="error" /> お気に入り</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>気になる出品をマークしてオークション当日に備えましょう</Typography>
+      <Grid container spacing={2}>
+        {[1, 2, 3, 4].map((i) => (
+          <Grid item xs={12} sm={6} md={3} key={i}>
+            <Card>
+              <Box sx={{ position: 'relative', aspectRatio: '1/1', bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography color="text.secondary">NO IMAGE</Typography>
+                <IconButton sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(255,255,255,0.85)' }}><Favorite color="error" /></IconButton>
+              </Box>
+              <CardContent>
+                <Typography variant="caption" color="text.secondary">第18回 春の特別</Typography>
+                <Typography variant="subtitle1" fontWeight="bold" noWrap>サンプル生体 {i}</Typography>
+                <Typography variant="caption" color="text.secondary">開始価格</Typography>
+                <Typography variant="h6" color="primary.main" fontWeight="bold">¥{(i * 5000).toLocaleString()}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Container>
+  ),
+};
+
+/** デモ */
+export const Demo: StoryObj = {
+  name: 'デモ',
+  render: () => (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" fontWeight="bold" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}><PlayCircle color="primary" /> デモ体験</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>本番前に操作感を確認できます</Typography>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ border: '2px solid', borderColor: 'primary.main' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>ガイド付きデモ</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>初めての方向け。チュートリアルに沿って一歩ずつ操作を学べます</Typography>
+              <Button variant="contained" fullWidth size="large" startIcon={<PlayArrow />}>ガイド付きデモを開始</Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>フリーモード</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>自由にデモ環境を操作。慣れた方向けです</Typography>
+              <Button variant="outlined" fullWidth size="large" startIcon={<PlayArrow />}>フリーモードを開始</Button>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
+  ),
+};
+
+/** マニュアル */
+export const Manual: StoryObj = {
+  name: 'マニュアル',
+  render: () => (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Typography variant="h4" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}><MenuBook /> マニュアル</Typography>
+      <List component={Paper}>
+        {[
+          { t: 'はじめに', d: 'オークションへの参加方法' },
+          { t: '事前準備', d: 'アカウント登録、配送先設定' },
+          { t: '当日の流れ', d: '待機室入室から落札確定まで' },
+          { t: '入札の操作', d: '入札ボタン、上限設定の使い方' },
+          { t: '落札後', d: '入金、商品到着までの流れ' },
+          { t: 'よくある質問', d: 'トラブルシューティング' },
+        ].map((c) => (
+          <ListItem key={c.t} divider button>
+            <ListItemText primary={c.t} secondary={c.d} primaryTypographyProps={{ fontWeight: 'bold' }} />
+            <ChevronRight />
+          </ListItem>
+        ))}
+      </List>
+    </Container>
+  ),
+};
+
+/** 設定 */
+export const Settings: StoryObj = {
+  name: '設定',
+  render: () => (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Typography variant="h4" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}><SettingsIcon /> 設定</Typography>
+      <Stack spacing={2}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>プロフィール</Typography>
+          <Stack spacing={2}>
+            <TextField label="お名前" fullWidth defaultValue="田中太郎" />
+            <TextField label="メールアドレス" fullWidth defaultValue="tanaka@example.com" />
+            <TextField label="電話番号" fullWidth defaultValue="090-1234-5678" />
+          </Stack>
+        </CardContent></Card>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>配送先住所</Typography>
+          <Stack spacing={2}>
+            <TextField label="郵便番号" fullWidth defaultValue="100-0001" />
+            <TextField label="都道府県" fullWidth defaultValue="東京都" />
+            <TextField label="市区町村以降" fullWidth defaultValue="千代田区千代田1-1" />
+          </Stack>
+        </CardContent></Card>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>通知設定</Typography>
+          <List disablePadding>
+            <ListItem disablePadding secondaryAction={<Switch defaultChecked />}><ListItemIcon><Notifications /></ListItemIcon><ListItemText primary="メール通知" secondary="お知らせや落札確定をメールで受信" /></ListItem>
+            <ListItem disablePadding secondaryAction={<Switch defaultChecked />}><ListItemIcon><Notifications /></ListItemIcon><ListItemText primary="プッシュ通知" secondary="ブラウザのプッシュ通知" /></ListItem>
+          </List>
+        </CardContent></Card>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>セキュリティ</Typography>
+          <List disablePadding>
+            <ListItem disablePadding secondaryAction={<Button size="small">変更</Button>}><ListItemIcon><Lock /></ListItemIcon><ListItemText primary="パスワード変更" /></ListItem>
+            <ListItem disablePadding secondaryAction={<Switch />}><ListItemIcon><Lock /></ListItemIcon><ListItemText primary="2要素認証" secondary="アプリ認証で安全性向上" /></ListItem>
+          </List>
+        </CardContent></Card>
+        <Button variant="outlined" color="error" startIcon={<Logout />}>ログアウト</Button>
+      </Stack>
     </Container>
   ),
 };

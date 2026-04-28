@@ -26,7 +26,7 @@
 <header class="header" id="header">
   <div class="header__inner">
     <a href="/" class="header__logo">
-      <img src="/img/logo.png?v=1" alt="日本メダカオンライン市場" class="header__logo-img">
+      <img src="/img/logo.png?v=2" alt="日本メダカオンライン市場" class="header__logo-img">
     </a>
     <div class="header__right">
       <a href="/login" class="header__btn header__btn--login">ログイン</a>
@@ -189,7 +189,7 @@
         @for ($i = 0; $i < 2; $i++)
           @for ($j = 0; $j < 12; $j++)
             <div class="partners-marquee__item">
-              <img src="/img/logo.png" alt="" loading="lazy">
+              <img src="/img/logo.png?v=2" alt="" loading="lazy">
             </div>
           @endfor
         @endfor
@@ -570,7 +570,7 @@
   <div class="container">
     <div class="footer__top">
       <div class="footer__brand">
-        <img src="/img/logo.png?v=1" alt="日本メダカオンライン市場" class="footer__logo">
+        <img src="/img/logo.png?v=2" alt="日本メダカオンライン市場" class="footer__logo">
         <p class="footer__operator">運営: 日本メダカオンライン市場運営事務局</p>
       </div>
       <nav class="footer__links" aria-label="フッターナビゲーション">

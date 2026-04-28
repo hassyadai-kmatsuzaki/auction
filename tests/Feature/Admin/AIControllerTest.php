@@ -18,12 +18,6 @@ use App\Services\AI\RecommendationService;
 use Mockery;
 use Tests\TestCase;
 
-/**
- * 管理者向け AI 機能 (Admin\AIController) のテスト。
- *
- * 外部 API 依存サービス (画像解析 / 価格予測 / 詐欺検知 / レコメンド / NLP) は
- * Mock してコントローラの I/O とゲートのみ検証する。
- */
 class AIControllerTest extends TestCase
 {
     private User $admin;
@@ -54,19 +48,46 @@ class AIControllerTest extends TestCase
         ]);
     }
 
+    private function makePhotoMedia(int $itemId): ItemMedia
+    {
+        return ItemMedia::create([
+            'item_id' => $itemId,
+            'media_type' => 'photo_top',
+            'mime_type' => 'image/jpeg',
+            'file_name' => 'a.jpg',
+            'file_size' => 100,
+            'file_path' => 'a.jpg',
+            'display_order' => 1,
+        ]);
+    }
+
     public function test_dashboard_returns_aggregates(): void
     {
         $response = $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/admin/ai/dashboard');
+
         $response->assertOk()
             ->assertJsonStructure([
                 'data' => ['image_analyses', 'price_predictions', 'fraud_alerts', 'recommendations_generated'],
             ]);
     }
 
+    public function test_unauthenticated_user_gets_401(): void
+    {
+        $this->getJson('/api/admin/ai/dashboard')->assertStatus(401);
+    }
+
+    public function test_non_admin_cannot_access_ai(): void
+    {
+        $participant = $this->createParticipant();
+        $this->actingAs($participant, 'sanctum')
+            ->getJson('/api/admin/ai/dashboard')
+            ->assertStatus(403);
+    }
+
     public function test_analyze_image_requires_photo_media(): void
     {
-        $item = $this->makeItem(); // メディアなし
+        $item = $this->makeItem();
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/ai/image-analysis/{$item->id}")
@@ -77,16 +98,7 @@ class AIControllerTest extends TestCase
     {
         config(['services.openai.api_key' => '']);
         $item = $this->makeItem();
-        ItemMedia::create([
-            'item_id' => $item->id,
-            'media_type' => 'photo_top',
-            'mime_type' => 'image/jpeg',
-            'file_name' => 'a.jpg',
-            'file_size' => 100,
-            'file_path' => 'a.jpg',
-            'media_path' => 'a.jpg',
-            'display_order' => 1,
-        ]);
+        $this->makePhotoMedia($item->id);
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/ai/image-analysis/{$item->id}")
@@ -97,16 +109,7 @@ class AIControllerTest extends TestCase
     {
         config(['services.openai.api_key' => 'fake-key']);
         $item = $this->makeItem();
-        ItemMedia::create([
-            'item_id' => $item->id,
-            'media_type' => 'photo_top',
-            'mime_type' => 'image/jpeg',
-            'file_name' => 'a.jpg',
-            'file_size' => 100,
-            'file_path' => 'a.jpg',
-            'media_path' => 'a.jpg',
-            'display_order' => 1,
-        ]);
+        $this->makePhotoMedia($item->id);
 
         $this->mock(ImageAnalysisService::class, function ($m) {
             $m->shouldReceive('analyzeItem')->once()->andReturn(null);
@@ -117,16 +120,39 @@ class AIControllerTest extends TestCase
             ->assertStatus(502);
     }
 
+    public function test_analyze_image_returns_200_with_data_on_success(): void
+    {
+        config(['services.openai.api_key' => 'fake-key']);
+        $item = $this->makeItem();
+        $this->makePhotoMedia($item->id);
+
+        $this->mock(ImageAnalysisService::class, function ($m) use ($item) {
+            $m->shouldReceive('analyzeItem')->once()->andReturn(
+                AIImageAnalysis::create([
+                    'item_id' => $item->id,
+                    'quality_score' => 8.5,
+                    'breed_confidence' => 90,
+                    'predicted_breed' => '幹之メダカ',
+                    'model_version' => 'gpt-4o-mini',
+                ])
+            );
+        });
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/image-analysis/{$item->id}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
     public function test_batch_analyze_images(): void
     {
         $this->mock(ImageAnalysisService::class, function ($m) {
             $m->shouldReceive('analyzeAuctionItems')->once()->andReturn(5);
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/ai/image-analysis/batch/{$this->auction->id}");
-
-        $response->assertOk()
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/image-analysis/batch/{$this->auction->id}")
+            ->assertOk()
             ->assertJsonPath('data.analyzed_count', 5);
     }
 
@@ -135,8 +161,8 @@ class AIControllerTest extends TestCase
         $item = $this->makeItem();
         AIImageAnalysis::create([
             'item_id' => $item->id,
-            'health_score' => 85,
-            'confidence' => 0.9,
+            'quality_score' => 8.0,
+            'breed_confidence' => 85,
             'model_version' => 'v1',
         ]);
 
@@ -165,10 +191,9 @@ class AIControllerTest extends TestCase
             );
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/ai/price-prediction/{$item->id}");
-
-        $response->assertOk()
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/price-prediction/{$item->id}")
+            ->assertOk()
             ->assertJsonPath('data.predicted_price', 12345);
     }
 
@@ -178,9 +203,10 @@ class AIControllerTest extends TestCase
             $m->shouldReceive('getMarketTrends')->once()->andReturn(['trend1', 'trend2']);
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/admin/ai/market-trends');
-        $response->assertOk();
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/ai/market-trends')
+            ->assertOk()
+            ->assertJsonPath('data', ['trend1', 'trend2']);
     }
 
     public function test_run_fraud_detection(): void
@@ -191,10 +217,9 @@ class AIControllerTest extends TestCase
             ]);
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/ai/fraud-detection/{$this->auction->id}");
-
-        $response->assertOk()
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/fraud-detection/{$this->auction->id}")
+            ->assertOk()
             ->assertJsonPath('data.new_alerts', 1);
     }
 
@@ -206,40 +231,43 @@ class AIControllerTest extends TestCase
             );
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/admin/ai/fraud-alerts');
-        $response->assertOk();
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/ai/fraud-alerts')
+            ->assertOk();
     }
 
     public function test_resolve_fraud_alert(): void
     {
         $alert = AIFraudAlert::create([
+            'auction_id' => $this->auction->id,
             'alert_type' => 'shill_bidding',
             'severity' => 'high',
             'status' => 'open',
             'description' => 'test',
-            'metadata' => [],
+            'evidence' => [],
         ]);
 
-        $response = $this->actingAs($this->admin, 'sanctum')
+        $this->actingAs($this->admin, 'sanctum')
             ->patchJson("/api/admin/ai/fraud-alerts/{$alert->id}", [
                 'status' => 'resolved',
                 'notes' => '対応済み',
-            ]);
+            ])
+            ->assertOk();
 
-        $response->assertOk();
-        $this->assertSame('resolved', $alert->fresh()->status);
-        $this->assertSame($this->admin->id, (int) $alert->fresh()->resolved_by);
+        $fresh = $alert->fresh();
+        $this->assertSame('resolved', $fresh->status);
+        $this->assertSame($this->admin->id, (int) $fresh->resolved_by);
     }
 
     public function test_resolve_fraud_alert_validates_status(): void
     {
         $alert = AIFraudAlert::create([
+            'auction_id' => $this->auction->id,
             'alert_type' => 'bid_pattern',
             'severity' => 'low',
             'status' => 'open',
             'description' => 'tx',
-            'metadata' => [],
+            'evidence' => [],
         ]);
 
         $this->actingAs($this->admin, 'sanctum')
@@ -256,10 +284,9 @@ class AIControllerTest extends TestCase
             $m->shouldReceive('generateRecommendations')->once()->andReturn(['rec1', 'rec2']);
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson("/api/admin/ai/recommendations/{$user->id}");
-
-        $response->assertOk()
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/recommendations/{$user->id}")
+            ->assertOk()
             ->assertJsonPath('data.count', 2);
     }
 
@@ -267,29 +294,15 @@ class AIControllerTest extends TestCase
     {
         $this->mock(NLPService::class, function ($m) {
             $m->shouldReceive('extractItemInfo')->once()->andReturn([
-                'species' => 'メダカ',
+                'species_name' => 'メダカ',
                 'quantity' => 10,
             ]);
         });
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson('/api/admin/ai/nlp/extract', ['text' => 'メダカ 10匹']);
-
-        $response->assertOk()
-            ->assertJsonPath('data.species', 'メダカ');
-    }
-
-    public function test_classify_category(): void
-    {
-        $this->mock(NLPService::class, function ($m) {
-            $m->shouldReceive('classifyCategory')->once()->andReturn('premium');
-        });
-
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->postJson('/api/admin/ai/nlp/classify', ['species_name' => '幹之メダカ']);
-
-        $response->assertOk()
-            ->assertJsonPath('data.category', 'premium');
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/ai/nlp/extract', ['text' => 'メダカ 10匹'])
+            ->assertOk()
+            ->assertJsonPath('data.species_name', 'メダカ');
     }
 
     public function test_extract_validates_text_required(): void
@@ -299,11 +312,22 @@ class AIControllerTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_non_admin_cannot_access_ai(): void
+    public function test_classify_category(): void
     {
-        $participant = $this->createParticipant();
-        $this->actingAs($participant, 'sanctum')
-            ->getJson('/api/admin/ai/dashboard')
-            ->assertStatus(403);
+        $this->mock(NLPService::class, function ($m) {
+            $m->shouldReceive('classifyCategory')->once()->andReturn('premium');
+        });
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/ai/nlp/classify', ['species_name' => '幹之メダカ'])
+            ->assertOk()
+            ->assertJsonPath('data.category', 'premium');
+    }
+
+    public function test_classify_validates_species_name(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/ai/nlp/classify', [])
+            ->assertStatus(422);
     }
 }

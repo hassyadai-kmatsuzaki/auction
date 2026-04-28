@@ -51,7 +51,7 @@ function Logo() {
     <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
       <Box
         component="img"
-        src="/img/logo.png?v=1"
+        src="/img/logo.png?v=2"
         alt="MEDAKA AUCTION PORT"
         sx={{
           height: 48,

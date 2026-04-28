@@ -10,6 +10,7 @@ import {
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import type { PriceIncrementTier, CountdownTier } from '../../../types';
+import { formatYen } from '../../../lib/formatPrice';
 
 interface WaitingRoomProps {
   title: string;
@@ -25,7 +26,7 @@ interface EntranceBlockedProps extends WaitingRoomProps {
   entranceCountdown: string | null;
 }
 
-const formatPrice = (v: number) => `¥${v.toLocaleString()}`;
+const formatPrice = (v: number | string | null | undefined) => `¥${formatYen(v)}`;
 
 /** 待機室（入室可能・オークション開始待ち） */
 export const WaitingRoom = React.memo(({ title, auctionId, priceIncrementTiers, countdownTiers }: WaitingRoomProps) => {

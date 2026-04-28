@@ -8,6 +8,7 @@ import {
   Info as InfoIcon,
 } from '@mui/icons-material';
 import { optimizedImageUrl } from '@/lib/optimizedMedia';
+import { formatYen } from '@/lib/formatPrice';
 
 interface ItemData {
   id: number;
@@ -109,7 +110,7 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
         )}
         <Box sx={{ mt: 1 }}>
           <Typography variant="h6" color="primary.main" fontWeight="bold">
-            ¥{Number(item.start_price).toLocaleString()}〜
+            ¥{formatYen(item.start_price)}〜
           </Typography>
           <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
         </Box>

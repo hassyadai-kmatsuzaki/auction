@@ -34,6 +34,7 @@ import {
   PlayCircle as PlayCircleIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface ItemDetail {
   id: number;
@@ -446,7 +447,7 @@ export default function ItemDetail() {
                   開始価格
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  ¥{item.start_price.toLocaleString()}
+                  ¥{formatYen(item.start_price)}
                 </Typography>
               </Box>
 
@@ -458,7 +459,7 @@ export default function ItemDetail() {
                       落札価格
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>
-                      ¥{item.won_item.winning_price.toLocaleString()}
+                      ¥{formatYen(item.won_item.winning_price)}
                     </Typography>
                   </Box>
                   <Box sx={{ mb: 2 }}>
@@ -466,7 +467,7 @@ export default function ItemDetail() {
                       手数料
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      ¥{item.won_item.commission_amount.toLocaleString()}
+                      ¥{formatYen(item.won_item.commission_amount)}
                     </Typography>
                   </Box>
                   <Box>
@@ -474,7 +475,7 @@ export default function ItemDetail() {
                       受取金額
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      ¥{item.won_item.seller_amount.toLocaleString()}
+                      ¥{formatYen(item.won_item.seller_amount)}
                     </Typography>
                   </Box>
                 </>

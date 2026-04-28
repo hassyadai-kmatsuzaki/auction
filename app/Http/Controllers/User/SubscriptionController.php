@@ -29,7 +29,9 @@ class SubscriptionController extends Controller
             'data' => [
                 'subscription' => $subscription,
                 'plans'        => $plans,
-                'requires_registration' => !$subscription || in_array($subscription->status, ['canceled', 'pending'], true),
+                // id <= 509 はテストユーザーのため決済登録モーダルの対象外
+                'requires_registration' => $user->id > 509
+                    && (!$subscription || in_array($subscription->status, ['canceled', 'pending'], true)),
                 'is_active'    => $subscription ? $subscription->isActive() : false,
                 'square_public' => [
                     'application_id' => config('services.square.application_id'),

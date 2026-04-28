@@ -50,6 +50,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface Settlement {
   id: number;
@@ -226,7 +227,7 @@ export default function SalesSettlement() {
                       累計受取金額
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669' }}>
-                      ¥{Number(statistics.total_net_amount).toLocaleString()}
+                      ¥{formatYen(statistics.total_net_amount)}
                     </Typography>
                   </Box>
                 </Box>
@@ -245,7 +246,7 @@ export default function SalesSettlement() {
                       累計売上
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      ¥{Number(statistics.total_sales).toLocaleString()}
+                      ¥{formatYen(statistics.total_sales)}
                     </Typography>
                   </Box>
                 </Box>
@@ -264,7 +265,7 @@ export default function SalesSettlement() {
                       累計手数料
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      ¥{Number(statistics.total_commission).toLocaleString()}
+                      ¥{formatYen(statistics.total_commission)}
                     </Typography>
                   </Box>
                 </Box>
@@ -325,7 +326,7 @@ export default function SalesSettlement() {
                           borderRadius: 8,
                         }}
                         formatter={(value: number, name: string) => [
-                          `¥${value.toLocaleString()}`,
+                          `¥${formatYen(value)}`,
                           name === 'sales' ? '売上' : '受取金額'
                         ]}
                       />
@@ -491,13 +492,13 @@ export default function SalesSettlement() {
                             </Box>
                           </TableCell>
                           <TableCell align="center">{settlement.items_count}点</TableCell>
-                          <TableCell align="right">¥{Number(settlement.total_sales).toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{formatYen(settlement.total_sales)}</TableCell>
                           <TableCell align="right" sx={{ color: 'error.main' }}>
-                            -¥{Number(settlement.commission).toLocaleString()}
+                            -¥{formatYen(settlement.commission)}
                           </TableCell>
                           <TableCell align="right">
                             <Typography variant="body2" sx={{ fontWeight: 700, color: 'success.main' }}>
-                              ¥{Number(settlement.net_amount).toLocaleString()}
+                              ¥{formatYen(settlement.net_amount)}
                             </Typography>
                           </TableCell>
                           <TableCell align="center">
@@ -591,15 +592,15 @@ export default function SalesSettlement() {
                             <TableCell>No.{item.item.item_number}</TableCell>
                             <TableCell>{item.item.species_name}</TableCell>
                             <TableCell>{item.buyer}</TableCell>
-                            <TableCell align="right">¥{Number(item.winning_price).toLocaleString()}</TableCell>
+                            <TableCell align="right">¥{formatYen(item.winning_price)}</TableCell>
                             <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                              {item.shipping_fee > 0 ? `¥${Number(item.shipping_fee).toLocaleString()}` : '-'}
+                              {item.shipping_fee > 0 ? `¥${formatYen(item.shipping_fee)}` : '-'}
                             </TableCell>
                             <TableCell align="right" sx={{ color: 'error.main' }}>
-                              -¥{Number(item.commission).toLocaleString()}
+                              -¥{formatYen(item.commission)}
                             </TableCell>
                             <TableCell align="right" sx={{ fontWeight: 600, color: 'success.main' }}>
-                              ¥{Number(item.seller_amount).toLocaleString()}
+                              ¥{formatYen(item.seller_amount)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -616,21 +617,21 @@ export default function SalesSettlement() {
                 <ListItem sx={{ px: 0, py: 1 }}>
                   <ListItemText primary="売上金額" />
                   <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    ¥{Number(selectedSettlement.total_sales).toLocaleString()}
+                    ¥{formatYen(selectedSettlement.total_sales)}
                   </Typography>
                 </ListItem>
                 <Divider />
                 <ListItem sx={{ px: 0, py: 1 }}>
                   <ListItemText primary="出品手数料" />
                   <Typography variant="body1" sx={{ color: 'error.main' }}>
-                    -¥{Number(selectedSettlement.commission).toLocaleString()}
+                    -¥{formatYen(selectedSettlement.commission)}
                   </Typography>
                 </ListItem>
                 {selectedSettlement.shipping_fee > 0 && (
                   <ListItem sx={{ px: 0, py: 1 }}>
                     <ListItemText primary="配送料" />
                     <Typography variant="body1" sx={{ color: 'error.main' }}>
-                      -¥{Number(selectedSettlement.shipping_fee).toLocaleString()}
+                      -¥{formatYen(selectedSettlement.shipping_fee)}
                     </Typography>
                   </ListItem>
                 )}
@@ -641,7 +642,7 @@ export default function SalesSettlement() {
                     primaryTypographyProps={{ fontWeight: 600 }}
                   />
                   <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
-                    ¥{Number(selectedSettlement.net_amount).toLocaleString()}
+                    ¥{formatYen(selectedSettlement.net_amount)}
                   </Typography>
                 </ListItem>
               </List>

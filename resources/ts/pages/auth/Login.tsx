@@ -130,7 +130,7 @@ export default function Login() {
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Box
             component="img"
-            src="/img/logo.png?v=1"
+            src="/img/logo.png?v=2"
             alt="MEDAICHI"
             sx={{
               display: 'block',

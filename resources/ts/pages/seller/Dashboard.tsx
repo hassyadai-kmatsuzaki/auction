@@ -38,6 +38,7 @@ import {
   OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 // 出品者向け広告データ
 interface SponsoredAd {
@@ -533,7 +534,7 @@ export default function SellerDashboard() {
         <Grid item xs={12} sm={6} lg={3}>
           <StatCard
             title="入金待ち"
-            value={`¥${stats.pending_payment.toLocaleString()}`}
+            value={`¥${formatYen(stats.pending_payment)}`}
             subValue={`${stats.pending_payment_count}件`}
             icon={<ReceiptIcon />}
             color="#F59E0B"
@@ -671,7 +672,7 @@ export default function SellerDashboard() {
                           <TableCell align="right">
                             {item.final_price ? (
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                ¥{item.final_price.toLocaleString()}
+                                ¥{formatYen(item.final_price)}
                               </Typography>
                             ) : (
                               <Typography variant="body2" sx={{ color: 'text.secondary' }}>

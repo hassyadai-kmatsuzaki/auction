@@ -13,6 +13,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { aiPriceApi, adminDataApi } from '../../api/admin/aiApi';
+import { formatYen } from '../../lib/formatPrice';
 
 interface AuctionOption { id: number; title: string; event_date: string; }
 interface ItemOption { id: number; item_number: number; species_name: string; start_price: number; current_price: number; status: string; }
@@ -103,7 +104,7 @@ export default function AIPricePrediction() {
           <Grid item xs={12} md={5}>
             <Autocomplete
               options={items}
-              getOptionLabel={(o) => `No.${o.item_number} ${o.species_name}（開始¥${o.start_price.toLocaleString()}）`}
+              getOptionLabel={(o) => `No.${o.item_number} ${o.species_name}（開始¥${formatYen(o.start_price)}）`}
               value={selectedItem}
               onChange={(_, v) => { setSelectedItem(v); setResult(null); setError(''); }}
               disabled={!selectedAuction}
@@ -137,7 +138,7 @@ export default function AIPricePrediction() {
             <Grid item xs={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.50', borderRadius: 2 }}>
                 <Typography variant="h4" fontWeight={700} color="success.main">
-                  ¥{result.predicted_price.toLocaleString()}
+                  ¥{formatYen(result.predicted_price)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">予測落札価格</Typography>
               </Box>
@@ -145,7 +146,7 @@ export default function AIPricePrediction() {
             <Grid item xs={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
                 <Typography variant="h6" fontWeight={600}>
-                  ¥{result.price_low.toLocaleString()} - ¥{result.price_high.toLocaleString()}
+                  ¥{formatYen(result.price_low)} - ¥{formatYen(result.price_high)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">予測レンジ</Typography>
               </Box>
@@ -161,7 +162,7 @@ export default function AIPricePrediction() {
             <Grid item xs={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.50', borderRadius: 2 }}>
                 <Typography variant="h6" fontWeight={600} color="info.main">
-                  ¥{selectedItem?.start_price.toLocaleString()}
+                  ¥{formatYen(selectedItem?.start_price)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">開始価格</Typography>
               </Box>
@@ -199,7 +200,7 @@ export default function AIPricePrediction() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="species_name" fontSize={11} />
                 <YAxis />
-                <Tooltip formatter={(v: number) => `¥${v.toLocaleString()}`} />
+                <Tooltip formatter={(v: number) => `¥${formatYen(v)}`} />
                 <Bar dataKey="avg_price" name="平均落札価格" fill="#10B981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="max_price" name="最高落札価格" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -221,9 +222,9 @@ export default function AIPricePrediction() {
                     <TableRow key={i} hover>
                       <TableCell>{t.species_name}</TableCell>
                       <TableCell align="right">{t.transaction_count}件</TableCell>
-                      <TableCell align="right">¥{Math.round(t.avg_price).toLocaleString()}</TableCell>
-                      <TableCell align="right">¥{Math.round(t.max_price).toLocaleString()}</TableCell>
-                      <TableCell align="right">¥{Math.round(t.min_price).toLocaleString()}</TableCell>
+                      <TableCell align="right">¥{formatYen(t.avg_price)}</TableCell>
+                      <TableCell align="right">¥{formatYen(t.max_price)}</TableCell>
+                      <TableCell align="right">¥{formatYen(t.min_price)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

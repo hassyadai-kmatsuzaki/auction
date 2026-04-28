@@ -10,6 +10,7 @@ import { BidButton } from './BidButton';
 import { PreBidOverlay } from './PreBidOverlay';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
 import { optimizedImageUrl } from '@/lib/optimizedMedia';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Props {
   lane: LiveLane;
@@ -192,7 +193,7 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary">現在単価</Typography>
           <Typography variant="h4" color="primary.main" fontWeight="bold">
-            ¥{Math.floor(item.current_price).toLocaleString()}
+            ¥{formatYen(item.current_price)}
             <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
               /1{item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}
             </Typography>

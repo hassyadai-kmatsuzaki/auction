@@ -87,6 +87,7 @@ import {
   Menu as MenuIcon,
   MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
+import { formatYen } from '../../lib/formatPrice';
 
 export default function DesignSystem() {
   const theme = useTheme();
@@ -540,7 +541,7 @@ export default function DesignSystem() {
                       <TableCell>{row.id}</TableCell>
                       <TableCell>{row.name}</TableCell>
                       <TableCell align="right">{row.quantity}匹</TableCell>
-                      <TableCell align="right">¥{row.price.toLocaleString()}</TableCell>
+                      <TableCell align="right">¥{formatYen(row.price)}</TableCell>
                       <TableCell align="center">
                         <Chip
                           label={row.status}

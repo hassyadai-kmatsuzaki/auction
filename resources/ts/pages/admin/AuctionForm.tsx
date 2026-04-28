@@ -18,6 +18,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ja } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 import { useAuctionForm } from '../../features/auction-form/hooks/useAuctionForm';
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
@@ -149,9 +150,9 @@ export default function AuctionForm() {
                       <TableBody>
                         {(formData.custom_auction_settings.price_increment_tiers ?? []).map((tier: any, idx: number) => (
                           <TableRow key={idx}>
-                            <TableCell>¥{tier.from_price?.toLocaleString()}</TableCell>
-                            <TableCell>{tier.to_price != null ? `¥${tier.to_price.toLocaleString()}` : '上限なし'}</TableCell>
-                            <TableCell>¥{tier.increment_amount?.toLocaleString()}</TableCell>
+                            <TableCell>¥{formatYen(tier.from_price)}</TableCell>
+                            <TableCell>{tier.to_price != null ? `¥${formatYen(tier.to_price)}` : '上限なし'}</TableCell>
+                            <TableCell>¥{formatYen(tier.increment_amount)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -177,8 +178,8 @@ export default function AuctionForm() {
                       <TableBody>
                         {(formData.custom_auction_settings.countdown_tiers ?? []).map((tier: any, idx: number) => (
                           <TableRow key={idx}>
-                            <TableCell>¥{tier.from_price?.toLocaleString()}</TableCell>
-                            <TableCell>{tier.to_price != null ? `¥${tier.to_price.toLocaleString()}` : '上限なし'}</TableCell>
+                            <TableCell>¥{formatYen(tier.from_price)}</TableCell>
+                            <TableCell>{tier.to_price != null ? `¥${formatYen(tier.to_price)}` : '上限なし'}</TableCell>
                             <TableCell>{tier.bid_countdown_seconds}秒</TableCell>
                             <TableCell>{tier.freeze_countdown_seconds}秒</TableCell>
                           </TableRow>

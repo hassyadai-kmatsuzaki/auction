@@ -13,6 +13,7 @@ import {
 import type { LiveLane, UpcomingItem } from '@/types';
 import { BidLimitBadge } from '../../bid-limit/components/BidLimitBadge';
 import { optimizedImageUrl } from '@/lib/optimizedMedia';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Props {
   lanes: LiveLane[];
@@ -93,7 +94,7 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
                   {item.species_name}
                 </Typography>
                 <Typography variant="caption" color="primary.main" fontWeight="bold">
-                  ¥{Number(item.start_price).toLocaleString()}〜
+                  ¥{formatYen(item.start_price)}〜
                 </Typography>
 
                 {/* アクションボタン */}
@@ -163,7 +164,7 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
                 No.{infoItem.item_number} / 数量: {infoItem.quantity}
               </Typography>
               <Typography variant="h5" color="primary.main" fontWeight="bold">
-                ¥{Number(infoItem.start_price).toLocaleString()}〜
+                ¥{formatYen(infoItem.start_price)}〜
               </Typography>
               <Divider sx={{ my: 2 }} />
 

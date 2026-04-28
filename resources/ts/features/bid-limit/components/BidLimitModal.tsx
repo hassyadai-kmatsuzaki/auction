@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon, PriceCheck as PriceCheckIcon } from '@mui/icons-material';
 import { QuickLimitButtons } from './QuickLimitButtons';
+import { formatYen } from '@/lib/formatPrice';
 
 interface QuickOptions {
   base_price: number;
@@ -112,7 +113,7 @@ export const BidLimitModal = React.memo(({
 
       <DialogContent sx={{ pt: 1 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {speciesName} ／ {isLive ? '現在' : '開始'}価格 ¥{Math.floor(currentPrice).toLocaleString()}
+          {speciesName} ／ {isLive ? '現在' : '開始'}価格 ¥{formatYen(currentPrice)}
         </Typography>
 
         {/* クイック入力 */}
@@ -149,7 +150,7 @@ export const BidLimitModal = React.memo(({
         {isBelowCurrent && (
           <Alert severity="warning" sx={{ mt: 1.5, py: 0.5 }}>
             <Typography variant="caption">
-              現在価格（¥{currentPrice.toLocaleString()}）以下の設定です。
+              現在価格（¥{formatYen(currentPrice)}）以下の設定です。
               {isLive ? '入札中の場合は即時自動オフになります。' : 'オークション開始時に即時発動する可能性があります。'}
             </Typography>
           </Alert>
@@ -158,7 +159,7 @@ export const BidLimitModal = React.memo(({
         {/* 現在の設定表示 */}
         {currentLimitPrice && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>
-            現在の設定: ¥{Math.floor(currentLimitPrice).toLocaleString()}
+            現在の設定: ¥{formatYen(currentLimitPrice)}
           </Typography>
         )}
       </DialogContent>

@@ -112,7 +112,7 @@ export default function ParticipantLayout() {
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box
               component="img"
-              src="/img/logo.png?v=1"
+              src="/img/logo.png?v=2"
               alt="MEDAKA AUCTION PORT"
               onClick={() => { window.location.href = '/participant/home'; }}
               sx={{

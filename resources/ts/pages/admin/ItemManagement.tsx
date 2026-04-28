@@ -53,6 +53,7 @@ import {
   FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface Seller {
   id: number;
@@ -574,7 +575,7 @@ export default function ItemManagement() {
                     </Box>
                   </TableCell>
                   <TableCell align="center">{item.quantity}匹</TableCell>
-                  <TableCell align="right">¥{item.start_price.toLocaleString()}</TableCell>
+                  <TableCell align="right">¥{formatYen(item.start_price)}</TableCell>
                   <TableCell align="center">
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       {item.seller?.name || '-'}

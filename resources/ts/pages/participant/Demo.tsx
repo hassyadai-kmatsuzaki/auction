@@ -19,6 +19,7 @@ import { CelebrationOverlay } from '../../features/auction-live/components/Celeb
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { DemoTourPopover, TourStep } from '../../components/DemoTourPopover';
+import { formatYen } from '../../lib/formatPrice';
 
 // ─── Demo data builders ───
 
@@ -258,7 +259,7 @@ export default function Demo() {
       stopTimer(laneId);
       updateLaneItem(laneId, item => {
         const increment = Math.max(100, Math.round(item.current_price * 0.1));
-        notify(`他の参加者が入札！ +¥${increment.toLocaleString()}`, 'warning');
+        notify(`他の参加者が入札！ +¥${formatYen(increment)}`, 'warning');
         return {
           ...item,
           phase: 'freeze',
@@ -407,7 +408,7 @@ export default function Demo() {
           current_price: steps[i],
           active_bidders_count: Math.max(2, item.active_bidders_count),
         }));
-        notify(`他の参加者が入札！ ¥${steps[i].toLocaleString()}`, 'warning');
+        notify(`他の参加者が入札！ ¥${formatYen(steps[i])}`, 'warning');
         i++;
       }, 800);
     });
@@ -442,7 +443,7 @@ export default function Demo() {
     if (!limitModalLaneId) return;
     updateLaneItem(limitModalLaneId, item => ({ ...item, my_limit_price: price, my_limit_triggered: false }));
     setLimitModalLaneId(null);
-    notify(`上限価格を ¥${price.toLocaleString()} に設定しました`, 'success');
+    notify(`上限価格を ¥${formatYen(price)} に設定しました`, 'success');
     if (tourActive && activeStep === 7) {
       setTimeout(() => goToStepRef.current(8), 800);
     }
@@ -804,7 +805,7 @@ export default function Demo() {
                     {item.is_premium && <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />}
                   </Box>
                   <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.species_name}</Typography>
-                  <Typography variant="caption" color="primary.main" fontWeight="bold">¥{item.start_price.toLocaleString()}〜</Typography>
+                  <Typography variant="caption" color="primary.main" fontWeight="bold">¥{formatYen(item.start_price)}〜</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.5 }}>
                     <IconButton size="small" sx={{ p: 0.25 }} onClick={() => notify(`${item.species_name} の詳細（デモ）`, 'info')}>
                       <InfoIcon sx={{ fontSize: 16, color: 'primary.main' }} />
@@ -849,15 +850,15 @@ export default function Demo() {
                     {wonItems.map((w, i) => (
                       <TableRow key={i}>
                         <TableCell>{w.species_name}</TableCell>
-                        <TableCell align="right">¥{w.winning_price.toLocaleString()}/匹</TableCell>
+                        <TableCell align="right">¥{formatYen(w.winning_price)}/匹</TableCell>
                         <TableCell align="right">{w.quantity}匹</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{w.total_amount.toLocaleString()}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{formatYen(w.total_amount)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow>
                       <TableCell colSpan={3} align="right" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>合計</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'primary.main' }}>
-                        ¥{wonTotal.toLocaleString()}
+                        ¥{formatYen(wonTotal)}
                       </TableCell>
                     </TableRow>
                   </TableBody>

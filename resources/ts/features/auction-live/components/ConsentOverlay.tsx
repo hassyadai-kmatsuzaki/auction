@@ -9,6 +9,7 @@ import {
   Info as InfoIcon,
 } from '@mui/icons-material';
 import type { PriceIncrementTier, CountdownTier } from '../../../types';
+import { formatYen } from '../../../lib/formatPrice';
 
 interface Props {
   onAgree: () => void;
@@ -16,7 +17,7 @@ interface Props {
   countdownTiers?: CountdownTier[];
 }
 
-const formatPrice = (v: number) => `¥${v.toLocaleString()}`;
+const formatPrice = (v: number | string | null | undefined) => `¥${formatYen(v)}`;
 
 export const ConsentOverlay = React.memo(({ onAgree, priceIncrementTiers, countdownTiers }: Props) => (
   <Box

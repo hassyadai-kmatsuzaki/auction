@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { EmojiEvents as EmojiEventsIcon } from '@mui/icons-material';
 import type { WonItemSummary } from '@/types';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Props {
   items: WonItemSummary[];
@@ -39,11 +40,11 @@ export const WonItemsPanel = React.memo(({ items, totalAmount }: Props) => {
                   <TableCell>{item.item_number}</TableCell>
                   <TableCell>{item.species_name}</TableCell>
                   <TableCell align="right">
-                    ¥{Math.floor(item.winning_price).toLocaleString()}/1{unit}
+                    ¥{formatYen(item.winning_price)}/1{unit}
                   </TableCell>
                   <TableCell align="right">{item.quantity}{unit}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                    ¥{Math.floor(item.total_amount).toLocaleString()}
+                    ¥{formatYen(item.total_amount)}
                   </TableCell>
                 </TableRow>
               );
@@ -51,7 +52,7 @@ export const WonItemsPanel = React.memo(({ items, totalAmount }: Props) => {
             <TableRow>
               <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold' }}>合計金額</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold', color: 'primary.main', fontSize: '1.1rem' }}>
-                ¥{Math.floor(totalAmount).toLocaleString()}
+                ¥{formatYen(totalAmount)}
               </TableCell>
             </TableRow>
           </TableBody>

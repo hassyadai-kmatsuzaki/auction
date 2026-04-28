@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import { aiRecommendApi, aiDashboardApi } from '../../api/admin/aiApi';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface UserOption { id: number; name: string; email: string; }
 interface Recommendation {
@@ -186,7 +187,7 @@ export default function AIRecommendations() {
                           </Typography>
                           {rec.item?.start_price && (
                             <Typography variant="caption" color="text.secondary">
-                              ¥{rec.item.start_price.toLocaleString()}〜
+                              ¥{formatYen(rec.item.start_price)}〜
                             </Typography>
                           )}
                         </Box>

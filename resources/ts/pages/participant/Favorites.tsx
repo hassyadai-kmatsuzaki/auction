@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { bidLimitApi } from '../../api/participant/bidLimitApi';
@@ -398,7 +399,7 @@ export default function Favorites() {
                   )}
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="h6" color="primary.main" fontWeight="bold">
-                      ¥{Number(item.start_price).toLocaleString()}〜
+                      ¥{formatYen(item.start_price)}〜
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {item.quantity}匹セット

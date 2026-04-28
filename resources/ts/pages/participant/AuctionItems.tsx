@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
@@ -326,7 +327,7 @@ export default function AuctionItems() {
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.seller_name || '—'}</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{item.quantity}匹</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{Number(item.start_price).toLocaleString()}</TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{formatYen(item.start_price)}</TableCell>
                     <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                       <BidLimitBadge

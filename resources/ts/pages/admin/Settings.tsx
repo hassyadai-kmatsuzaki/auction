@@ -12,6 +12,7 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 import { useSettings } from '../../features/settings/hooks/useSettings';
 import { useNotificationStore } from '../../stores/notificationStore';
 
@@ -552,7 +553,7 @@ export default function AdminSettings() {
                           <TableRow key={region}>
                             <TableCell>{region}</TableCell>
                             {[80, 100, 120, 140].map((sz) => (
-                              <TableCell key={sz} align="right">¥{(sizes[sz] ?? 0).toLocaleString()}</TableCell>
+                              <TableCell key={sz} align="right">¥{formatYen(sizes[sz] ?? 0)}</TableCell>
                             ))}
                           </TableRow>
                         ))}
@@ -577,10 +578,10 @@ export default function AdminSettings() {
                         {packingMaterials.map((m: any) => (
                           <TableRow key={m.box_size}>
                             <TableCell>{m.box_size}サイズ</TableCell>
-                            <TableCell align="right">¥{m.styrofoam_cost?.toLocaleString()}</TableCell>
-                            <TableCell align="right">¥{m.bag_material_cost?.toLocaleString()}</TableCell>
-                            <TableCell align="right">¥{m.coolant_cost?.toLocaleString()}</TableCell>
-                            <TableCell align="right">¥{m.total_cost?.toLocaleString()}</TableCell>
+                            <TableCell align="right">¥{formatYen(m.styrofoam_cost)}</TableCell>
+                            <TableCell align="right">¥{formatYen(m.bag_material_cost)}</TableCell>
+                            <TableCell align="right">¥{formatYen(m.coolant_cost)}</TableCell>
+                            <TableCell align="right">¥{formatYen(m.total_cost)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

@@ -30,6 +30,7 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface ShippingItem {
   id: number;
@@ -273,11 +274,11 @@ export default function SellerShipping() {
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        ¥{Number(item.price).toLocaleString()}
+                        ¥{formatYen(item.price)}
                       </Typography>
                       {(item.shipping_fee ?? 0) > 0 && (
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          配送料 ¥{Number(item.shipping_fee).toLocaleString()}
+                          配送料 ¥{formatYen(item.shipping_fee)}
                         </Typography>
                       )}
                     </TableCell>

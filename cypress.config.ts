@@ -26,6 +26,10 @@ export default defineConfig({
       E2E_SELLER_PASSWORD: process.env.E2E_SELLER_PASSWORD || 'password',
       E2E_PARTICIPANT_EMAIL: process.env.E2E_PARTICIPANT_EMAIL || 'participant1@example.com',
       E2E_PARTICIPANT_PASSWORD: process.env.E2E_PARTICIPANT_PASSWORD || 'password',
+      // 追加: MailHog (staging で立ち上がっている前提)
+      MAILHOG_URL: process.env.MAILHOG_URL || 'http://localhost:8025',
+      // 追加: テストヘルパーのベース URL (api-test.php 用)。通常は baseUrl と同じ。
+      TEST_HELPER_BASE_URL: process.env.TEST_HELPER_BASE_URL || process.env.CYPRESS_BASE_URL || 'http://localhost:8430',
     },
     setupNodeEvents(on, config) {
       // マニュアル生成用のタスク
@@ -39,11 +43,33 @@ export default defineConfig({
           console.log(`📸 Manual Step: ${step.step} - ${step.description}`);
           return null;
         },
-        
+
         // テストスイート名を設定
         setTestSuite(suiteName: string) {
           currentTestSuite = suiteName;
           return null;
+        },
+
+        // PDF バイナリを受け取りテキスト化する (cy.downloadPdf から呼ばれる)
+        // Cypress の cy.task は Buffer を直接渡せないので base64 文字列で受け取る。
+        async pdfParse(payload: { base64: string }): Promise<{
+          text: string;
+          numpages: number;
+          info: any;
+          metadata: any;
+        }> {
+          // pdf-parse は devDependencies に追加が必要。
+          // require を try/catch して、未インストールでも他のテストが落ちないようにする。
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const pdfParse = require('pdf-parse');
+          const buffer = Buffer.from(payload.base64, 'base64');
+          const result = await pdfParse(buffer);
+          return {
+            text: result.text,
+            numpages: result.numpages,
+            info: result.info,
+            metadata: result.metadata,
+          };
         },
         
         // マニュアルを生成

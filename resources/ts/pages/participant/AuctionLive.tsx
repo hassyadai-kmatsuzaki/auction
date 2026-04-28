@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { EmojiEvents as EmojiEventsIcon } from '@mui/icons-material';
 import axios from '@/lib/axios';
+import { formatYen } from '@/lib/formatPrice';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuctionSocket } from '../../hooks/useAuctionSocket';
@@ -468,16 +469,16 @@ export default function AuctionLive() {
                         <TableRow key={item.id}>
                           <TableCell>{item.item_number}</TableCell>
                           <TableCell>{item.species_name}</TableCell>
-                          <TableCell align="right">¥{Math.floor(item.winning_price).toLocaleString()}/1{unit}</TableCell>
+                          <TableCell align="right">¥{formatYen(item.winning_price)}/1{unit}</TableCell>
                           <TableCell align="right">{item.quantity}{unit}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{Math.floor(item.total_amount).toLocaleString()}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold' }}>¥{formatYen(item.total_amount)}</TableCell>
                         </TableRow>
                       );
                     })}
                     <TableRow>
                       <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>合計金額</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'primary.main' }}>
-                        ¥{Math.floor(wonTotalAmount).toLocaleString()}
+                        ¥{formatYen(wonTotalAmount)}
                       </TableCell>
                     </TableRow>
                   </TableBody>

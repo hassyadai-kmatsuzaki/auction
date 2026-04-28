@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,6 +13,23 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        // ----------------------------------------------------------------
+        // Cypress E2E 用テストヘルパー (routes/api-test.php) のロード
+        // ----------------------------------------------------------------
+        // APP_ENV が local / testing / staging の場合だけ /api/test-helpers/* を有効化する。
+        // 本番では then クロージャ内の if が false になるため、ルートファイル自体が
+        // include されない (＝多重防御の (A))。
+        // さらに routes/api-test.php 側でも EnsureNonProduction ミドルウェアを噛ませて
+        // 404 にする (＝多重防御の (B))。
+        //
+        // ※ 本番デプロイ時は必ず APP_ENV=production になっていることを確認すること。
+        then: function () {
+            if (app()->environment(['local', 'testing', 'staging'])) {
+                Route::middleware('api')
+                    ->prefix('api')
+                    ->group(__DIR__.'/../routes/api-test.php');
+            }
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

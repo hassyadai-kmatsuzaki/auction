@@ -4,6 +4,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
 } from '@mui/material';
 import { SkipNext as SkipNextIcon, People as PeopleIcon } from '@mui/icons-material';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Bidder {
   user_id: number;
@@ -66,7 +67,7 @@ export const LaneControlCard = React.memo(({ lane, onNextItem, isLoading }: Prop
                 <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>
                 <Typography variant="body2" fontWeight="bold">{item.species_name}</Typography>
                 <Typography variant="body2" color="primary.main">
-                  ¥{Math.floor(item.current_price).toLocaleString()}
+                  ¥{formatYen(item.current_price)}
                 </Typography>
               </Box>
             </Box>

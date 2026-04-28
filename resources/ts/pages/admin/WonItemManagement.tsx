@@ -54,6 +54,7 @@ import {
   LocationOn as LocationOnIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface WonItem {
   id: number;
@@ -425,7 +426,7 @@ export default function WonItemManagement() {
       const response = await axios.post(`/api/admin/auctions/${auctionId}/winners/${winnerId}/calculate-shipping`);
       if (response.data.success) {
         const fee = response.data.data?.total_shipping_fee;
-        setSnackbar({ open: true, message: `送料を計算しました（¥${Number(fee).toLocaleString()}）`, severity: 'success' });
+        setSnackbar({ open: true, message: `送料を計算しました（¥${formatYen(fee)}）`, severity: 'success' });
         fetchWonItems();
       }
     } catch (err: any) {
@@ -555,10 +556,10 @@ export default function WonItemManagement() {
       )}
       <TableCell align="right">
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          ¥{Number(item.total_amount).toLocaleString()}
+          ¥{formatYen(item.total_amount)}
         </Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          (手数料¥{Number(item.commission_amount).toLocaleString()})
+          (手数料¥{formatYen(item.commission_amount)})
         </Typography>
       </TableCell>
     </TableRow>
@@ -603,10 +604,10 @@ export default function WonItemManagement() {
       </TableCell>
       <TableCell align="right">
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          ¥{Number(item.total_amount).toLocaleString()}
+          ¥{formatYen(item.total_amount)}
         </Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          (手数料¥{Number(item.commission_amount).toLocaleString()})
+          (手数料¥{formatYen(item.commission_amount)})
         </Typography>
       </TableCell>
       <TableCell align="center">{getPaymentStatusChip(item.payment_status)}</TableCell>
@@ -852,14 +853,14 @@ export default function WonItemManagement() {
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3, mb: 4 }}>
           <StatCard
             title="総売上"
-            value={`¥${Number(statistics.total_sales).toLocaleString()}`}
+            value={`¥${formatYen(statistics.total_sales)}`}
             subValue={`${statistics.total_items}件`}
             icon={<MoneyIcon />}
             color="#3B82F6"
           />
           <StatCard
             title="入金確認済"
-            value={`¥${Number(statistics.paid_amount).toLocaleString()}`}
+            value={`¥${formatYen(statistics.paid_amount)}`}
             subValue={`${statistics.paid_count}件`}
             icon={<CheckCircleIcon />}
             color="#059669"
@@ -867,7 +868,7 @@ export default function WonItemManagement() {
           <StatCard
             title="未入金"
             value={`${statistics.pending_count}件`}
-            subValue={`¥${Number(statistics.pending_amount).toLocaleString()}`}
+            subValue={`¥${formatYen(statistics.pending_amount)}`}
             icon={<ReceiptIcon />}
             color="#F59E0B"
           />
@@ -880,7 +881,7 @@ export default function WonItemManagement() {
           />
           <StatCard
             title="合計送料"
-            value={`¥${Number(statistics.total_shipping_fees ?? 0).toLocaleString()}`}
+            value={`¥${formatYen(statistics.total_shipping_fees ?? 0)}`}
             subValue="按分後の集計"
             icon={<Inventory2Icon />}
             color="#0EA5E9"
@@ -990,7 +991,7 @@ export default function WonItemManagement() {
                       <Box>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札合計</Typography>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          ¥{totalAmount.toLocaleString()}
+                          ¥{formatYen(totalAmount)}
                         </Typography>
                       </Box>
                       <Divider orientation="vertical" flexItem />
@@ -999,7 +1000,7 @@ export default function WonItemManagement() {
                         {allCalculated ? (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             <Typography variant="h6" sx={{ fontWeight: 700, color: allApproved ? 'success.main' : 'info.main' }}>
-                              ¥{totalShippingFee.toLocaleString()}
+                              ¥{formatYen(totalShippingFee)}
                             </Typography>
                             <Chip
                               size="small"
@@ -1307,7 +1308,7 @@ export default function WonItemManagement() {
                 <Grid item xs={6}>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>送料合計</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: 'info.main' }}>
-                    ¥{Number(shippingDetail.breakdown.total_shipping_fee).toLocaleString()}
+                    ¥{formatYen(shippingDetail.breakdown.total_shipping_fee)}
                   </Typography>
                 </Grid>
               </Grid>
@@ -1348,23 +1349,23 @@ export default function WonItemManagement() {
                             ))}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">¥{Number(box.shipping_cost).toLocaleString()}</TableCell>
-                        <TableCell align="right">¥{Number(box.packing_material_cost).toLocaleString()}</TableCell>
+                        <TableCell align="right">¥{formatYen(box.shipping_cost)}</TableCell>
+                        <TableCell align="right">¥{formatYen(box.packing_material_cost)}</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          ¥{Number(box.shipping_cost + box.packing_material_cost).toLocaleString()}
+                          ¥{formatYen(box.shipping_cost + box.packing_material_cost)}
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow>
                       <TableCell colSpan={2} sx={{ fontWeight: 600 }}>合計</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        ¥{Number(shippingDetail.breakdown.shipping_cost).toLocaleString()}
+                        ¥{formatYen(shippingDetail.breakdown.shipping_cost)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        ¥{Number(shippingDetail.breakdown.packing_material_cost).toLocaleString()}
+                        ¥{formatYen(shippingDetail.breakdown.packing_material_cost)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>
-                        ¥{Number(shippingDetail.breakdown.total_shipping_fee).toLocaleString()}
+                        ¥{formatYen(shippingDetail.breakdown.total_shipping_fee)}
                       </TableCell>
                     </TableRow>
                   </TableBody>

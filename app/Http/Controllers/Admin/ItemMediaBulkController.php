@@ -107,8 +107,13 @@ class ItemMediaBulkController extends Controller
 
                 ItemMedia::create([
                     'item_id'       => $itemId,
-                    'media_type'    => 'photo',
+                    // ZIP 一括アップロードでは sequence=1 を「上面」、それ以降を「その他」に振る。
+                    // item_media.media_type は enum なのでマスタ値を厳格に渡す。
+                    'media_type'    => $sequence === 1 ? 'photo_top' : 'photo_other',
                     'file_path'     => $storagePath,
+                    'file_name'     => $filename,
+                    'mime_type'     => 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext),
+                    'file_size'     => $fileSize,
                     'is_thumbnail'  => $isThumbnail,
                     'display_order' => $maxOrder + 1,
                 ]);

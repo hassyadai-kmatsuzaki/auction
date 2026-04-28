@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box, Paper, Typography } from '@mui/material';
 import confetti from 'canvas-confetti';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Props {
   speciesName: string;
@@ -60,7 +61,7 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
         </Typography>
         <Typography variant="h6" gutterBottom>{speciesName}</Typography>
         <Typography variant="h4" color="primary.main" fontWeight="bold">
-          ¥{Math.floor(winningPrice).toLocaleString()}
+          ¥{formatYen(winningPrice)}
         </Typography>
       </Paper>
     </Box>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Chip, Tooltip } from '@mui/material';
 import { PriceCheck as PriceCheckIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import { formatYen } from '@/lib/formatPrice';
 
 interface Props {
   limitPrice: number | null;
@@ -40,7 +41,7 @@ export const BidLimitBadge = React.memo(({ limitPrice, isTriggered, onEdit, onRe
   return (
     <Chip
       icon={<PriceCheckIcon sx={{ fontSize: size === 'small' ? 14 : 16 }} />}
-      label={`上限: ¥${Math.floor(limitPrice).toLocaleString()}`}
+      label={`上限: ¥${formatYen(limitPrice)}`}
       size={size}
       color={isTriggered ? 'default' : 'primary'}
       variant={isTriggered ? 'outlined' : 'filled'}

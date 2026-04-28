@@ -38,6 +38,7 @@ import {
   Add as AddIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface Item {
   id: number;
@@ -248,7 +249,7 @@ export default function ItemHistory() {
                     総売上
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    ¥{stats.total_sales.toLocaleString()}
+                    ¥{formatYen(stats.total_sales)}
                   </Typography>
                 </Box>
               </Box>
@@ -383,11 +384,11 @@ export default function ItemHistory() {
                           )}
                         </TableCell>
                         <TableCell align="center">{item.quantity}匹</TableCell>
-                        <TableCell align="right">¥{item.start_price.toLocaleString()}</TableCell>
+                        <TableCell align="right">¥{formatYen(item.start_price)}</TableCell>
                         <TableCell align="right">
                           {item.won_item ? (
                             <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                              ¥{item.won_item.winning_price.toLocaleString()}
+                              ¥{formatYen(item.won_item.winning_price)}
                             </Typography>
                           ) : (
                             '-'

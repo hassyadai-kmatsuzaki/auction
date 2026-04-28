@@ -20,6 +20,7 @@ import { useLiveControl, ADMIN_LIVE_QUERY_KEY } from '../../features/live-contro
 import { LaneControlCard } from '../../features/live-control/components/LaneControlCard';
 import { useNotificationStore } from '../../stores/notificationStore';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgcolor: string }> = {
   live:       { label: '入札中',   color: '#059669', bgcolor: '#ECFDF5' },
@@ -300,10 +301,10 @@ export default function LiveControl() {
                                   </Box>
                                 </Box>
                               </TableCell>
-                              <TableCell align="right"><Typography variant="body2">¥{Number(item.start_price).toLocaleString()}</Typography></TableCell>
+                              <TableCell align="right"><Typography variant="body2">¥{formatYen(item.start_price)}</Typography></TableCell>
                               <TableCell align="right">
                                 <Typography variant="body2" sx={{ fontWeight: item.status === 'sold' ? 700 : 400, color: item.status === 'sold' ? 'primary.main' : 'inherit' }}>
-                                  ¥{Number(item.current_price).toLocaleString()}
+                                  ¥{formatYen(item.current_price)}
                                 </Typography>
                               </TableCell>
                               <TableCell align="center"><StatusChip status={item.status} /></TableCell>

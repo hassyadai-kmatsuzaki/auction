@@ -92,7 +92,7 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box
               component="img"
-              src="/img/logo.png?v=1"
+              src="/img/logo.png?v=2"
               alt="MEDAKA AUCTION PORT"
               onClick={() => { handleDrawerClose(); onNavigate('home'); }}
               sx={{

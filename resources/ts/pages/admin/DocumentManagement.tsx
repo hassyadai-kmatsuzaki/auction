@@ -36,6 +36,7 @@ import {
   PaymentNoticeRow,
   DeliveryNoteRow,
 } from '@/api/admin/documentApi';
+import { formatYen } from '@/lib/formatPrice';
 
 export default function DocumentManagement() {
   const [tabValue, setTabValue] = useState(0);
@@ -221,7 +222,7 @@ export default function DocumentManagement() {
                       <TableCell align="center">{row.items_count}点</TableCell>
                       <TableCell align="right">
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          ¥{row.total_amount.toLocaleString()}
+                          ¥{formatYen(row.total_amount)}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">{getInvoiceStatusChip(row.status)}</TableCell>
@@ -304,13 +305,13 @@ export default function DocumentManagement() {
                       </TableCell>
                       <TableCell>{row.auction}</TableCell>
                       <TableCell align="center">{row.items_count}点</TableCell>
-                      <TableCell align="right">¥{row.sales_amount.toLocaleString()}</TableCell>
+                      <TableCell align="right">¥{formatYen(row.sales_amount)}</TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>
-                        -¥{row.commission.toLocaleString()}
+                        -¥{formatYen(row.commission)}
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="body2" sx={{ fontWeight: 700, color: '#059669' }}>
-                          ¥{row.net_amount.toLocaleString()}
+                          ¥{formatYen(row.net_amount)}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">{getPaymentStatusChip(row.status)}</TableCell>

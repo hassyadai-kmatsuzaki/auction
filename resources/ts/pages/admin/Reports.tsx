@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 
 interface ReportData {
   report_type: string;
@@ -151,7 +152,7 @@ export default function Reports() {
                     <CardContent sx={{ p: 2, textAlign: 'center' }}>
                       <Typography variant="body2" color="text.secondary">総売上</Typography>
                       <Typography variant="h5" fontWeight={700}>
-                        ¥{(ts?.total_sales ?? 0).toLocaleString()}
+                        ¥{formatYen(ts?.total_sales ?? 0)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -171,7 +172,7 @@ export default function Reports() {
                     <CardContent sx={{ p: 2, textAlign: 'center' }}>
                       <Typography variant="body2" color="text.secondary">平均落札価格</Typography>
                       <Typography variant="h5" fontWeight={700}>
-                        ¥{(ts?.average_price ?? 0).toLocaleString()}
+                        ¥{formatYen(ts?.average_price ?? 0)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -203,7 +204,7 @@ export default function Reports() {
                       </Box>
                       <Box>
                         <Typography variant="h4" fontWeight={700}>
-                          ¥{(ts?.highest_price ?? 0).toLocaleString()}
+                          ¥{formatYen(ts?.highest_price ?? 0)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">最高落札価格</Typography>
                       </Box>
@@ -270,8 +271,8 @@ export default function Reports() {
                             <TableRow key={i} hover>
                               <TableCell>{s.species_name}</TableCell>
                               <TableCell align="right">{s.count}件</TableCell>
-                              <TableCell align="right">¥{Math.round(s.total_amount).toLocaleString()}</TableCell>
-                              <TableCell align="right">¥{Math.round(s.avg_price).toLocaleString()}</TableCell>
+                              <TableCell align="right">¥{formatYen(s.total_amount)}</TableCell>
+                              <TableCell align="right">¥{formatYen(s.avg_price)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

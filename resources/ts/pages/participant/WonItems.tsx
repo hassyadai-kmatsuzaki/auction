@@ -41,6 +41,7 @@ import {
   Star as StarIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { formatYen } from '../../lib/formatPrice';
 import ReviewDialog from '../../features/reviews/ReviewDialog';
 import { optimizedImageUrl } from '../../lib/optimizedMedia';
 
@@ -341,7 +342,7 @@ export default function WonItems() {
                 合計落札金額
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                ¥{summary.grand_total.toLocaleString()}
+                ¥{formatYen(summary.grand_total)}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {summary.auction_count}件のオークション / {summary.item_count}品
@@ -354,7 +355,7 @@ export default function WonItems() {
                 入金確認済み
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#059669' }}>
-                ¥{summary.paid_amount.toLocaleString()}
+                ¥{formatYen(summary.paid_amount)}
               </Typography>
             </Paper>
           </Grid>
@@ -364,7 +365,7 @@ export default function WonItems() {
                 支払い待ち
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#F59E0B' }}>
-                ¥{summary.pending_amount.toLocaleString()}
+                ¥{formatYen(summary.pending_amount)}
               </Typography>
             </Paper>
           </Grid>
@@ -374,7 +375,7 @@ export default function WonItems() {
                 配送料金合計
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#64748B' }}>
-                ¥{summary.shipping_fee.toLocaleString()}
+                ¥{formatYen(summary.shipping_fee)}
               </Typography>
             </Paper>
           </Grid>
@@ -422,7 +423,7 @@ export default function WonItems() {
                     </Typography>
                   </Box>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: '#059669' }}>
-                    ¥{group.summary.grand_total.toLocaleString()}
+                    ¥{formatYen(group.summary.grand_total)}
                   </Typography>
                   {group.summary.all_paid ? (
                     <Chip label="入金済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
@@ -554,8 +555,8 @@ export default function WonItems() {
                           {/* 金額情報 */}
                           <Box sx={{ display: 'flex', gap: 3, mb: 1, flexWrap: 'wrap' }}>
                             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                              ¥{Number(wonItem.winning_price).toLocaleString()} × {wonItem.quantity}匹
-                              = <strong>¥{(Number(wonItem.winning_price) * Number(wonItem.quantity)).toLocaleString()}</strong>
+                              ¥{formatYen(wonItem.winning_price)} × {wonItem.quantity}匹
+                              = <strong>¥{formatYen(Number(wonItem.winning_price) * Number(wonItem.quantity))}</strong>
                             </Typography>
                             {wonItem.payment_deadline && wonItem.payment_status === 'pending' && (
                               <Typography variant="body2" sx={{ color: 'error.main' }}>
@@ -605,16 +606,16 @@ export default function WonItems() {
                 {/* オークション合計 */}
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 3, pt: 1, flexWrap: 'wrap' }}>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    商品小計: ¥{group.summary.subtotal.toLocaleString()}
+                    商品小計: ¥{formatYen(group.summary.subtotal)}
                   </Typography>
                   {group.summary.commission_total > 0 && (
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      落札手数料: ¥{group.summary.commission_total.toLocaleString()}
+                      落札手数料: ¥{formatYen(group.summary.commission_total)}
                     </Typography>
                   )}
                   {group.summary.shipping_fee > 0 ? (
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      配送料合計: ¥{group.summary.shipping_fee.toLocaleString()}
+                      配送料合計: ¥{formatYen(group.summary.shipping_fee)}
                     </Typography>
                   ) : group.shipping.pending_manual_approval ? (
                     <Typography variant="body2" sx={{ color: '#B45309' }}>
@@ -622,7 +623,7 @@ export default function WonItems() {
                     </Typography>
                   ) : null}
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#059669' }}>
-                    合計: ¥{group.summary.grand_total.toLocaleString()}
+                    合計: ¥{formatYen(group.summary.grand_total)}
                   </Typography>
                 </Box>
               </AccordionDetails>
