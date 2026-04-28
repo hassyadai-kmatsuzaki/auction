@@ -1586,6 +1586,50 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   .cta-banner__visual img { max-height: 460px; }
 }
 
+/* SP-only: woman image peeks from the bottom-right; copy and buttons stay on the left */
+@media (max-width: 767px) {
+  .cta-banner__inner {
+    position: relative;
+    padding: 2.5rem 1.25rem 1.75rem;
+    gap: 1.25rem;
+  }
+  .cta-banner__copy {
+    position: relative;
+    z-index: 2;
+    padding-bottom: 0;
+  }
+  .cta-banner__title,
+  .cta-banner__desc {
+    max-width: 72%;
+  }
+  .cta-banner__actions {
+    position: relative;
+    z-index: 2;
+    max-width: 78%;
+  }
+  .cta-banner__visual {
+    position: absolute;
+    right: -6%;
+    bottom: 0;
+    width: 46%;
+    min-height: 0;
+    margin: 0;
+    pointer-events: none;
+    z-index: 1;
+    display: block;
+    align-items: flex-end;
+    justify-content: flex-end;
+  }
+  .cta-banner__visual img {
+    width: 100%;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    object-fit: contain;
+    object-position: right bottom;
+  }
+}
+
 /* ===================================
    FOOTER
    =================================== */
