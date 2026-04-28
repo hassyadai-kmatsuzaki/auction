@@ -33,6 +33,11 @@ class CheckSubscription
             return $next($request);
         }
 
+        // id <= 509 はテストユーザーのためサブスクリプション必須チェックを免除
+        if ($user->id <= 509) {
+            return $next($request);
+        }
+
         $subscription = $user->subscription()->with('plan')->first();
 
         if (!$subscription || !$subscription->isActive()) {

@@ -7,6 +7,7 @@ let manualSteps: any[] = [];
 let currentTestSuite = '';
 
 export default defineConfig({
+  projectId: 'rnc774',
   e2e: {
     baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:8430',
     specPattern: 'cypress/e2e/**/*.cy.ts',
