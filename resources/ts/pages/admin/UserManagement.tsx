@@ -23,12 +23,15 @@ import {
   CircularProgress,
   Alert,
   Tooltip,
+  Checkbox,
+  Stack,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Visibility as VisibilityIcon,
   PersonAdd as PersonAddIcon,
   Refresh as RefreshIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -75,6 +78,45 @@ export default function UserManagement() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+
+  // 複数選択（ページ横断で蓄積される。ページを跨いで選んでも保持される設計）
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  const isAllOnPageSelected = users.length > 0 && users.every(u => selectedIds.has(u.id));
+  const isSomeOnPageSelected = users.some(u => selectedIds.has(u.id)) && !isAllOnPageSelected;
+
+  const toggleOne = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllOnPage = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (isAllOnPageSelected) {
+        users.forEach(u => next.delete(u.id));
+      } else {
+        users.forEach(u => next.add(u.id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  /**
+   * 選択中ユーザーをまとめてメール配信フォームに渡す。
+   * URL に乗せると 100 件超で長くなるので sessionStorage 経由にしている。
+   */
+  const handleBulkEmail = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    sessionStorage.setItem('email-campaign:initial-user-ids', JSON.stringify(ids));
+    navigate('/admin/email-campaigns/create?from=user_selection');
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -179,6 +221,21 @@ export default function UserManagement() {
         </Alert>
       )}
 
+      {/* 一括操作バー（選択中のみ表示） */}
+      {selectedIds.size > 0 && (
+        <Paper sx={{ p: 1.5, mb: 2, bgcolor: 'primary.50', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" sx={{ flexGrow: 1 }}>
+            <strong>{selectedIds.size}</strong> 人を選択中
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button size="small" onClick={clearSelection}>選択解除</Button>
+            <Button size="small" variant="contained" startIcon={<EmailIcon />} onClick={handleBulkEmail}>
+              選択ユーザーにメール送信
+            </Button>
+          </Stack>
+        </Paper>
+      )}
+
       {/* 検索・フィルタ */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -259,6 +316,14 @@ export default function UserManagement() {
             <Table>
               <TableHead>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      indeterminate={isSomeOnPageSelected}
+                      checked={isAllOnPageSelected}
+                      onChange={toggleAllOnPage}
+                      inputProps={{ 'aria-label': 'このページの全員を選択' }}
+                    />
+                  </TableCell>
                   <TableCell>ID</TableCell>
                   <TableCell>名前</TableCell>
                   <TableCell>屋号</TableCell>
@@ -274,7 +339,7 @@ export default function UserManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">
                         ユーザーが見つかりませんでした
                       </Typography>
@@ -282,7 +347,14 @@ export default function UserManagement() {
                   </TableRow>
                 ) : (
                   users.map((user) => (
-                    <TableRow key={user.id} hover>
+                    <TableRow key={user.id} hover selected={selectedIds.has(user.id)}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedIds.has(user.id)}
+                          onChange={() => toggleOne(user.id)}
+                          inputProps={{ 'aria-label': `ユーザー ${user.id} を選択` }}
+                        />
+                      </TableCell>
                       <TableCell>{user.id}</TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">

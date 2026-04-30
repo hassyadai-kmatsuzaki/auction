@@ -26,21 +26,45 @@ import { emailCampaignApi, TargetType, CampaignTargetFilter } from '../../api/ad
 /**
  * メール一斉/個別配信の作成画面。
  *
- * クエリ ?user_id=N で立ち上げると target_type=manual + その user の n=1 で初期化される
- * （UserDetail の「メール送信」から個別送信したい時のフロー）。
+ * 起動経路:
+ * - ?user_id=N        … UserDetail の「メール送信」から（n=1 の個別送信）
+ * - ?from=user_selection … UserManagement のチェックボックス選択から。
+ *                          ID 配列は sessionStorage に置いてある（URL に長大に乗せないため）。
  */
+const SESSION_KEY_INITIAL_USER_IDS = 'email-campaign:initial-user-ids';
+
+function readInitialUserIds(searchParams: URLSearchParams): number[] {
+  const single = searchParams.get('user_id');
+  if (single) {
+    const n = parseInt(single, 10);
+    return Number.isFinite(n) && n > 0 ? [n] : [];
+  }
+  if (searchParams.get('from') === 'user_selection') {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY_INITIAL_USER_IDS);
+      sessionStorage.removeItem(SESSION_KEY_INITIAL_USER_IDS); // 一度使ったら破棄
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.filter((n: unknown) => typeof n === 'number' && n > 0) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export default function EmailCampaignForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const initialUserId = searchParams.get('user_id');
-  const initialTargetType: TargetType = initialUserId ? 'manual' : 'all';
+  const initialUserIds = readInitialUserIds(searchParams);
+  const initialTargetType: TargetType = initialUserIds.length > 0 ? 'manual' : 'all';
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [targetType, setTargetType] = useState<TargetType>(initialTargetType);
   const [filter, setFilter] = useState<CampaignTargetFilter>({});
-  const [manualIds, setManualIds] = useState<string>(initialUserId ?? '');
+  const [manualIds, setManualIds] = useState<string>(initialUserIds.join(', '));
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewSample, setPreviewSample] = useState<{ id: number; name: string; email: string }[]>([]);
   const [previewing, setPreviewing] = useState(false);
@@ -130,7 +154,9 @@ export default function EmailCampaignForm() {
   return (
     <Box sx={{ p: 3, maxWidth: 1080, mx: 'auto' }}>
       <Typography variant="h5" mb={2}>
-        {initialUserId ? 'メール個別送信' : 'メール配信 新規作成'}
+        {initialUserIds.length === 1 ? 'メール個別送信'
+          : initialUserIds.length > 1 ? `メール送信（${initialUserIds.length}人を選択中）`
+          : 'メール配信 新規作成'}
       </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

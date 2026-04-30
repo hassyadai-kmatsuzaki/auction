@@ -80,11 +80,11 @@ class PlanController extends Controller
     {
         $plan = Plan::findOrFail($id);
 
+        // code / amount は既存契約者の課金に直結するため編集不可。
+        // 料金改定は新コードのプランを別途作成し、旧プランは is_active=false で受付停止する運用。
         $validator = Validator::make($request->all(), [
-            'code'        => 'sometimes|required|string|max:50|unique:plans,code,' . $plan->id,
             'name'        => 'sometimes|required|string|max:100',
             'description' => 'nullable|string',
-            'amount'      => 'sometimes|required|integer|min:0|max:99999999',
             'allows_bid'  => 'sometimes|required|boolean',
             'allows_sell' => 'sometimes|required|boolean',
             'is_active'   => 'boolean',
@@ -113,26 +113,6 @@ class PlanController extends Controller
             'success' => true,
             'message' => 'プランを更新しました',
             'data'    => ['plan' => $plan->fresh()],
-        ]);
-    }
-
-    public function destroy($id)
-    {
-        $plan = Plan::findOrFail($id);
-
-        $inUse = $plan->subscriptions()->whereIn('status', ['active', 'past_due', 'suspended'])->exists();
-        if ($inUse) {
-            return response()->json([
-                'success' => false,
-                'message' => 'このプランには有効なサブスクリプションが存在するため削除できません。先にユーザーを別プランに移してください。',
-            ], 409);
-        }
-
-        $plan->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'プランを削除しました',
         ]);
     }
 }

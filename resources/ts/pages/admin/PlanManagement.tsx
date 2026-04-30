@@ -5,7 +5,7 @@ import {
   DialogActions, TextField, FormControlLabel, Switch, Stack, CircularProgress,
   Alert, Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
 interface Plan {
@@ -129,16 +129,6 @@ export default function PlanManagement() {
     }
   };
 
-  const remove = async (plan: Plan) => {
-    if (!window.confirm(`プラン「${plan.name}」を削除します。よろしいですか？`)) return;
-    try {
-      await axios.delete(`/api/admin/plans/${plan.id}`);
-      await load();
-    } catch (e: any) {
-      alert(e?.response?.data?.message ?? '削除に失敗しました');
-    }
-  };
-
   return (
     <Box sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -186,9 +176,6 @@ export default function PlanManagement() {
                       <Tooltip title="編集">
                         <IconButton size="small" onClick={() => openEdit(p)}><EditIcon fontSize="small" /></IconButton>
                       </Tooltip>
-                      <Tooltip title="削除">
-                        <IconButton size="small" onClick={() => remove(p)}><DeleteIcon fontSize="small" /></IconButton>
-                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -209,7 +196,8 @@ export default function PlanManagement() {
             <TextField label="説明" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               multiline rows={2} fullWidth />
             <TextField label="年会費（円）*" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^0-9]/g, '') })}
-              helperText={formErrors.amount ?? '税込の年額（円）'} error={!!formErrors.amount} fullWidth inputProps={{ inputMode: 'numeric' }} />
+              helperText={formErrors.amount ?? (form.id ? '料金は変更できません。改定する場合は新コードでプランを作成してください' : '税込の年額（円）')}
+              error={!!formErrors.amount} fullWidth inputProps={{ inputMode: 'numeric' }} disabled={!!form.id} />
             <FormControlLabel control={<Switch checked={form.allows_bid} onChange={(e) => setForm({ ...form, allows_bid: e.target.checked })} />} label="落札（入札）を許可" />
             <FormControlLabel control={<Switch checked={form.allows_sell} onChange={(e) => setForm({ ...form, allows_sell: e.target.checked })} />} label="出品を許可" />
             <FormControlLabel control={<Switch checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />} label="新規加入を受け付ける" />

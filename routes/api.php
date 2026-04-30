@@ -340,7 +340,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     });
 
     // プラン管理（年会費）
-    Route::apiResource('plans', \App\Http\Controllers\Admin\PlanController::class);
+    // 料金は既存契約者の次回更新分から無告知で適用されるため amount は更新不可。
+    // 削除は履歴（subscriptions/payments の plan_id）が壊れるため不可。新規受付停止は is_active トグルで行う。
+    Route::apiResource('plans', \App\Http\Controllers\Admin\PlanController::class)->except(['destroy']);
 
     // サブスクリプション管理
     Route::get('subscriptions', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index']);
