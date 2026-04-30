@@ -62,7 +62,7 @@ class SendAuctionPreviewJob implements ShouldQueue
 
         // 参加者
         $participants = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
-            ->where('is_active', true)->get();
+            ->approved()->get();
 
         $sentCount = 0;
         foreach ($participants as $user) {
@@ -81,7 +81,7 @@ class SendAuctionPreviewJob implements ShouldQueue
 
         // 出品者
         $sellers = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
-            ->where('is_active', true)->get();
+            ->approved()->get();
 
         foreach ($sellers as $seller) {
             try {

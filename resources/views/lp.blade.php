@@ -579,7 +579,7 @@
         <a href="/legal/terms">利用規約</a>
       </nav>
     </div>
-    <p class="footer__copy">&copy; 2026 株式会社サバント All Rights Reserved.</p>
+    <p class="footer__copy">&copy; 2026 日本メダカオンライン市場運営事務局 All Rights Reserved.</p>
   </div>
 </footer>
 

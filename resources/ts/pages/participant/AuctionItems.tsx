@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Typography, Grid, Chip, Paper, Tabs, Tab,
@@ -91,6 +91,11 @@ export default function AuctionItems() {
   // 全商品IDを算出
   const allItemIds = lanes.flatMap((l: any) => l.items.map((i: any) => i.id)) as number[];
 
+  const itemIdsForFavoritesKey = useMemo(() => {
+    const ids = lanes.flatMap((l: any) => l.items.map((i: any) => i.id)) as number[];
+    return [...new Set(ids)].sort((a, b) => a - b).join(',');
+  }, [lanes]);
+
   // 指値を TanStack Query で管理（画面更新しても保持される）
   const { data: limitSettings = {} } = useQuery({
     queryKey: ['bid-limits-batch', auctionId, allItemIds.join(',')],
@@ -99,13 +104,14 @@ export default function AuctionItems() {
     staleTime: 10_000,
   });
 
-  // お気に入り取得
+  // お気に入り取得（商品ID集合が変わったときのみ）
   useEffect(() => {
-    if (!allItemIds.length) return;
-    axios.post('/api/participant/favorites/check', { item_ids: allItemIds })
+    if (!itemIdsForFavoritesKey) return;
+    const itemIds = itemIdsForFavoritesKey.split(',').map(Number);
+    axios.post('/api/participant/favorites/check', { item_ids: itemIds })
       .then((r) => { if (r.data.success) setFavoriteIds(new Set(r.data.data.favorite_item_ids)); })
       .catch(() => {});
-  }, [lanes]);
+  }, [itemIdsForFavoritesKey]);
 
   const invalidateLimits = () => {
     queryClient.invalidateQueries({ queryKey: ['bid-limits-batch'] });

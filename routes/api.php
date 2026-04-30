@@ -139,8 +139,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // 管理者API
 Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin')->group(function () {
+    Route::get('users-bank-transfer-renewals', [UserController::class, 'bankTransferRenewals']);
     Route::apiResource('users', UserController::class);
     Route::post('users/{id}/restore', [UserController::class, 'restore']);
+    Route::post('users/{id}/confirm-bank-transfer', [UserController::class, 'confirmBankTransfer']);
+    Route::post('users/{id}/renew-bank-transfer', [UserController::class, 'renewBankTransfer']);
     
     // お知らせ管理
     Route::apiResource('announcements', AdminAnnouncementController::class);
@@ -404,9 +407,11 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::get('/auctions/{id}/my-won-items', [ParticipantAuctionController::class, 'myWonItems']);
     Route::get('/auctions/{id}/items', [ParticipantAuctionController::class, 'items']);
     
-    // 入札（プランの allows_bid が必要）
-    Route::middleware('check.subscription:bid')->group(function () {
+    // 入札（プランの allows_bid が必要 + throttle で連打抑制）
+    Route::middleware(['check.subscription:bid', 'throttle:bids'])->group(function () {
         Route::post('/bids', [ParticipantBidController::class, 'toggle']);
+    });
+    Route::middleware(['check.subscription:bid', 'throttle:bid-limits'])->group(function () {
         Route::post('/bid-limits', [ParticipantBidLimitController::class, 'store']);
         Route::delete('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'destroy']);
     });
@@ -487,10 +492,12 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     // 配送追跡
     Route::get('/tracking/{trackingNumber}', [\App\Http\Controllers\Api\TrackingController::class, 'show']);
 
-    // お気に入り
+    // お気に入り（書込みは throttle で抑制）
     Route::get('/favorites', [ParticipantFavoriteController::class, 'index']);
-    Route::post('/favorites/toggle', [ParticipantFavoriteController::class, 'toggle']);
-    Route::post('/favorites/check', [ParticipantFavoriteController::class, 'checkBulk']);
+    Route::middleware('throttle:favorites')->group(function () {
+        Route::post('/favorites/toggle', [ParticipantFavoriteController::class, 'toggle']);
+        Route::post('/favorites/check', [ParticipantFavoriteController::class, 'checkBulk']);
+    });
 
     // 評価
     Route::get('/reviews/received', [\App\Http\Controllers\Participant\ReviewController::class, 'received']);

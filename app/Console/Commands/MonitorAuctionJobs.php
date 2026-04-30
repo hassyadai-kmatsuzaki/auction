@@ -77,8 +77,15 @@ class MonitorAuctionJobs extends Command
 
         ProcessAuctionCountdownJob::dispatch($auction->id);
 
-        $staleSec = $heartbeat ? (now()->timestamp - $heartbeat) . '秒前' : 'なし';
-        Log::warning("MonitorAuctionJobs: Re-dispatched countdown job for auction {$auction->id} (heartbeat: {$staleSec})");
-        $this->warn("Auction {$auction->id}: ジョブを再ディスパッチしました (heartbeat: {$staleSec})");
+        $staleSec = $heartbeat ? (now()->timestamp - $heartbeat) : null;
+        Log::warning('countdown.job.re_dispatched', [
+            'auction_id' => $auction->id,
+            'heartbeat_age_seconds' => $staleSec,
+            'new_generation' => $newGen,
+        ]);
+        $this->warn(
+            "Auction {$auction->id}: ジョブを再ディスパッチしました (heartbeat: "
+            . ($staleSec === null ? 'なし' : "{$staleSec}秒前") . ')'
+        );
     }
 }

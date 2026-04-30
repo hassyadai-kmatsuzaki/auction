@@ -14,8 +14,14 @@ import axios from '../../lib/axios';
 
 const BG_IMAGE = '/img/regist-bg.avif?v=1';
 
-export default function Register() {
+interface RegisterProps {
+  /** 'seller' なら出品者として申請（落札者権限も同時に付与） */
+  registrationType?: 'buyer' | 'seller';
+}
+
+export default function Register({ registrationType = 'buyer' }: RegisterProps = {}) {
   const navigate = useNavigate();
+  const isSeller = registrationType === 'seller';
   const [formData, setFormData] = useState({
     name: '',
     trade_name: '',
@@ -49,7 +55,7 @@ export default function Register() {
     setErrors({});
 
     try {
-      await axios.post('/api/auth/register', formData);
+      await axios.post('/api/auth/register', { ...formData, registration_type: registrationType });
       setSuccess(true);
     } catch (err: any) {
       console.error('登録エラー:', err);
@@ -248,10 +254,12 @@ export default function Register() {
               mb: 0.75,
             }}
           >
-            新規登録
+            {isSeller ? '出品者として新規登録' : '新規登録'}
           </Typography>
           <Typography sx={{ color: '#000', fontSize: '0.875rem' }}>
-            必要な情報を入力してください (承認制)
+            {isSeller
+              ? '出品者登録すると、落札者権限も同時に付与されます (承認制)'
+              : '必要な情報を入力してください (承認制)'}
           </Typography>
         </Box>
 

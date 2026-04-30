@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
+import BankTransferRenewalsAlert from '../components/BankTransferRenewalsAlert';
 
 const drawerWidth = 280;
 
@@ -550,6 +551,7 @@ export default function AdminLayout() {
           <Outlet />
         </Box>
       </Box>
+      <BankTransferRenewalsAlert />
     </Box>
   );
 }

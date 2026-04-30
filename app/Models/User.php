@@ -41,6 +41,8 @@ class User extends Authenticatable
         'rejected_at',
         'rejected_by',
         'rejection_reason',
+        'payment_method_preference',
+        'bank_transfer_confirmed_at',
         'last_login_at',
         'is_active',
         'email_verified_at',
@@ -76,6 +78,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'approved_at' => 'datetime',
             'rejected_at' => 'datetime',
+            'bank_transfer_confirmed_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
             'password' => 'hashed',
@@ -221,6 +224,15 @@ class User extends Authenticatable
     }
 
     /**
+     * 銀行振込モード未確認 (毎ログイン時に振込情報モーダルを表示すべきか)
+     */
+    public function needsBankTransferReminder(): bool
+    {
+        return $this->payment_method_preference === 'bank_transfer'
+            && $this->bank_transfer_confirmed_at === null;
+    }
+
+    /**
      * 特定のロールを持っているかチェック
      *
      * @param string $roleName
@@ -251,5 +263,15 @@ class User extends Authenticatable
     public function hasAllRoles(array $roleNames): bool
     {
         return $this->roles()->whereIn('name', $roleNames)->count() === count($roleNames);
+    }
+
+    /**
+     * 承認済み(=ログイン可能)ユーザーのみに絞るスコープ。
+     * 一斉メール通知の宛先取得など、承認前ユーザーへ送ってはいけない場面で使う。
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('is_active', true)
+            ->where('status', 'approved');
     }
 }

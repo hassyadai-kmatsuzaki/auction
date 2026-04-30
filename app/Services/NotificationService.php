@@ -208,7 +208,7 @@ class NotificationService
         $sentCount = 0;
         try {
             $participants = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
-                ->where('is_active', true)->get();
+                ->approved()->get();
 
             foreach ($participants as $participant) {
                 if ($this->shouldSendParticipantNotification($participant, 'email_auction_start')) {
@@ -237,7 +237,7 @@ class NotificationService
         $sentCount = 0;
         try {
             $sellers = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
-                ->where('is_active', true)->get();
+                ->approved()->get();
             foreach ($sellers as $seller) {
                 if ($this->shouldSendSellerNotification($seller, 'email_new_auction')) {
                     Mail::to($seller->email)->queue(new NewAuctionNotificationMail($auction, $seller));
@@ -250,7 +250,7 @@ class NotificationService
             }
 
             $participants = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
-                ->where('is_active', true)->get();
+                ->approved()->get();
             foreach ($participants as $participant) {
                 if ($this->shouldSendParticipantNotification($participant, 'email_new_auction')) {
                     Mail::to($participant->email)->queue(new NewAuctionNotificationMail($auction, $participant));
@@ -439,7 +439,7 @@ class NotificationService
     {
         try {
             $sellers = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
-                ->where('is_active', true)->get();
+                ->approved()->get();
             foreach ($sellers as $seller) {
                 // メール
                 if ($seller->email && $this->shouldSendSellerNotification($seller, 'email_auction_start')) {

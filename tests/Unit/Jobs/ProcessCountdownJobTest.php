@@ -7,6 +7,10 @@ use App\Services\CountdownService;
 use Mockery;
 use Tests\TestCase;
 
+/**
+ * ProcessCountdownJob は ProcessAuctionCountdownJob に置き換わった非推奨ジョブ。
+ * dispatch されても何もしない（警告ログのみ）ことを保証する。
+ */
 class ProcessCountdownJobTest extends TestCase
 {
     public function test_default_properties_and_queue(): void
@@ -20,50 +24,13 @@ class ProcessCountdownJobTest extends TestCase
         $this->assertSame(500, ProcessCountdownJob::TICK_INTERVAL_MS);
     }
 
-    public function test_handle_exits_when_state_missing(): void
+    public function test_handle_is_no_op_and_does_not_call_service(): void
     {
         $service = Mockery::mock(CountdownService::class);
-        $service->shouldReceive('getCountdownState')->once()->with(7)->andReturn(null);
+        $service->shouldNotReceive('getCountdownState');
         $service->shouldNotReceive('tick');
 
         (new ProcessCountdownJob(7, 1))->handle($service);
-        $this->assertTrue(true);
-    }
-
-    public function test_handle_exits_when_state_not_running(): void
-    {
-        $service = Mockery::mock(CountdownService::class);
-        $service->shouldReceive('getCountdownState')->once()->with(8)->andReturn(['is_running' => false]);
-        $service->shouldNotReceive('tick');
-
-        (new ProcessCountdownJob(8, 1))->handle($service);
-        $this->assertTrue(true);
-    }
-
-    public function test_handle_breaks_on_countdown_end_without_next_item(): void
-    {
-        $service = Mockery::mock(CountdownService::class);
-        $service->shouldReceive('getCountdownState')
-            ->once()->with(9)->andReturn(['is_running' => true]);
-        $service->shouldReceive('tick')
-            ->once()->with(9)
-            ->andReturn(['action' => 'countdown_end', 'next_item' => null]);
-
-        (new ProcessCountdownJob(9, 1))->handle($service);
-        $this->assertTrue(true);
-    }
-
-    public function test_handle_breaks_when_tick_throws(): void
-    {
-        $service = Mockery::mock(CountdownService::class);
-        $service->shouldReceive('getCountdownState')
-            ->once()->with(10)->andReturn(['is_running' => true]);
-        $service->shouldReceive('tick')
-            ->once()->with(10)
-            ->andThrow(new \RuntimeException('boom'));
-
-        // 例外でも握り潰してジョブは正常終了する
-        (new ProcessCountdownJob(10, 1))->handle($service);
         $this->assertTrue(true);
     }
 

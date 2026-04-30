@@ -76,6 +76,8 @@ class LoginController extends Controller
                     'city' => $user->city,
                     'address_line1' => $user->address_line1,
                     'address_line2' => $user->address_line2,
+                    'payment_method_preference' => $user->payment_method_preference,
+                    'bank_transfer_confirmed_at' => $user->bank_transfer_confirmed_at,
                     'roles' => $user->roles->map(function ($role) {
                         return [
                             'id' => $role->id,
@@ -133,6 +135,8 @@ class LoginController extends Controller
                     'city' => $user->city,
                     'address_line1' => $user->address_line1,
                     'address_line2' => $user->address_line2,
+                    'payment_method_preference' => $user->payment_method_preference,
+                    'bank_transfer_confirmed_at' => $user->bank_transfer_confirmed_at,
                     'roles' => $user->roles->map(function ($role) {
                         return [
                             'id' => $role->id,

@@ -8,6 +8,7 @@ use App\Models\BidEvent;
 use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,29 +28,49 @@ class LeaveBidAction
             return BidResultDto::failure('この商品は現在入札を受け付けていません。');
         }
 
-        DB::beginTransaction();
+        // 同じ item に対する同時 Join/Leave を Redis レベルで直列化
+        $bidLock = Cache::lock("bid_inflight:item:{$item->id}", 5);
+        if (!$bidLock->get()) {
+            return BidResultDto::failure('現在他のユーザーの入札を処理中です。少しお待ちください。');
+        }
+
         try {
-            $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
+
+        // ─── ロック順序プロトコル ─────────────────────────────────
+        // items(行ロック) → bid_participants → bid_events の順で取得し、
+        // handlePriceIncrement / JoinBidAction / adjustPriceByBidLimits と
+        // 同じロック順を守ることでデッドロックを回避する。
+        $tx = DB::transaction(function () use ($item, $userId, $ipAddress, $userAgent) {
+            $locked = Item::where('id', $item->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status !== 'live') {
+                return ['fail' => 'この商品は現在入札を受け付けていません。'];
+            }
+
+            $participant = BidParticipant::forItem($locked->id)->forUser($userId)->first();
             if (!$participant || !$participant->is_active) {
-                DB::rollBack();
-                return BidResultDto::failure('入札に参加していません。');
+                return ['fail' => '入札に参加していません。'];
             }
 
             // 最高入札者（落札権利者）は入札を解除できない
-            $activeBidders = BidParticipant::forItem($item->id)->active()->count();
+            $activeBidders = BidParticipant::forItem($locked->id)->active()->count();
             if ($activeBidders === 1 && $participant->is_active) {
-                DB::rollBack();
-                return BidResultDto::failure('最高入札者は入札を解除できません。');
+                return ['fail' => '最高入札者は入札を解除できません。'];
             }
 
             $participant->deactivate();
-            BidEvent::recordLeave($item->id, $userId, $item->current_price, $ipAddress, $userAgent);
-            $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
+            BidEvent::recordLeave($locked->id, $userId, (float) $locked->current_price, $ipAddress, $userAgent);
+            $activeBidderCount = BidParticipant::forItem($locked->id)->active()->count();
+
+            return [
+                'active_bidder_count' => $activeBidderCount,
+                'current_price'       => (float) $locked->current_price,
+            ];
+        }, 3);
+
+        if (isset($tx['fail'])) {
+            return BidResultDto::failure($tx['fail']);
         }
+        $activeBidderCount = $tx['active_bidder_count'];
 
         $auction = $item->auction;
         $lane    = Lane::where('current_item_id', $item->id)->first();
@@ -69,5 +90,9 @@ class LeaveBidAction
             'current_price'       => $item->current_price,
             'active_bidder_count' => $activeBidderCount,
         ], '入札から離脱しました。');
+
+        } finally {
+            optional($bidLock)->release();
+        }
     }
 }

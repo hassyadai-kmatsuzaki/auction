@@ -34,6 +34,7 @@ import {
   Block as BlockIcon,
   PlayArrow as PlayArrowIcon,
   Delete as DeleteIcon,
+  AccountBalance as AccountBalanceIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -99,6 +100,8 @@ interface User {
   rejected_at: string | null;
   rejected_by: number | null;
   rejection_reason: string | null;
+  payment_method_preference: 'card' | 'bank_transfer' | null;
+  bank_transfer_confirmed_at: string | null;
   last_login_at: string | null;
   created_at: string;
   roles: Role[];
@@ -119,6 +122,7 @@ export default function UserDetail() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [confirmBankDialogOpen, setConfirmBankDialogOpen] = useState(false);
   
   // 編集フォーム
   const [editForm, setEditForm] = useState({
@@ -223,6 +227,21 @@ export default function UserDetail() {
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'ステータスの更新に失敗しました');
+    }
+  };
+
+  const handleConfirmBankTransfer = async () => {
+    try {
+      const response = await axios.post(`/api/admin/users/${id}/confirm-bank-transfer`);
+
+      if (response.data.success) {
+        setSuccess('振込確認を完了しました');
+        setConfirmBankDialogOpen(false);
+        fetchUser();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || '振込確認の処理に失敗しました');
+      setConfirmBankDialogOpen(false);
     }
   };
 
@@ -369,6 +388,25 @@ export default function UserDetail() {
                 sx={{ mt: 0.5 }}
               />
             </Box>
+
+            {user.payment_method_preference === 'bank_transfer' && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  銀行振込
+                </Typography>
+                <Chip
+                  label={user.bank_transfer_confirmed_at ? '振込確認済み' : '振込確認待ち'}
+                  color={user.bank_transfer_confirmed_at ? 'success' : 'warning'}
+                  size="small"
+                  sx={{ mt: 0.5 }}
+                />
+                {user.bank_transfer_confirmed_at && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    確認日時: {new Date(user.bank_transfer_confirmed_at).toLocaleString('ja-JP')}
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Paper>
         </Grid>
 
@@ -865,6 +903,17 @@ export default function UserDetail() {
                 </Button>
               )}
 
+              {user.payment_method_preference === 'bank_transfer' && !user.bank_transfer_confirmed_at && (
+                <Button
+                  variant="contained"
+                  color="info"
+                  startIcon={<AccountBalanceIcon />}
+                  onClick={() => setConfirmBankDialogOpen(true)}
+                >
+                  振込確認済み
+                </Button>
+              )}
+
               <Button
                 variant="outlined"
                 color="error"
@@ -997,6 +1046,25 @@ export default function UserDetail() {
           <Button onClick={() => setStatusDialogOpen(false)}>キャンセル</Button>
           <Button onClick={handleStatusChange} variant="contained" color="primary">
             変更
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 振込確認ダイアログ */}
+      <Dialog open={confirmBankDialogOpen} onClose={() => setConfirmBankDialogOpen(false)}>
+        <DialogTitle>振込確認</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            このユーザーの銀行振込入金を確認済みにしますか？
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            年会費プランが有効化され、ユーザーへの振込案内モーダルは次回ログイン以降表示されなくなります。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmBankDialogOpen(false)}>キャンセル</Button>
+          <Button onClick={handleConfirmBankTransfer} variant="contained" color="primary">
+            確認済みにする
           </Button>
         </DialogActions>
       </Dialog>

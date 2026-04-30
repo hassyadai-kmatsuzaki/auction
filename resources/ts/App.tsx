@@ -9,6 +9,7 @@ import RootRedirect from './components/RootRedirect';
 // Auth pages（小さいので同期ロード）
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import RegisterSeller from './pages/auth/RegisterSeller';
 import SetPassword from './pages/auth/SetPassword';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
@@ -104,6 +105,7 @@ function App() {
             {/* 認証ページ（認証済みユーザーはダッシュボードにリダイレクト） */}
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+            <Route path="/register/seller" element={<GuestRoute><RegisterSeller /></GuestRoute>} />
             <Route path="/auth/set-password" element={<SetPassword />} />
             <Route path="/auth/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
             <Route path="/auth/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />

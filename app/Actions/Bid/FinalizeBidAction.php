@@ -105,29 +105,45 @@ class FinalizeBidAction
 
         app(MetricRecorder::class)->itemSold($item->id, $winnerId, (float) $finalPrice);
 
-        // トランザクション外でブロードキャスト
+        // ─── 外側トランザクション完了後にブロードキャスト ─────────────
+        // CountdownService::handleCountdownEnd から呼ばれる場合、本メソッドは
+        // ネストした内側トランザクションになる。内側 commit 時点ではまだ外側が
+        // commit されていないので、ItemSold を即時 broadcast すると、受信した
+        // クライアントが GET で読みに行った時に「sold が反映されていない」状態を
+        // 観測する可能性がある。DB::afterCommit() で本当に永続化された後に流す。
         $lane = Lane::where('current_item_id', $item->id)->first();
         if ($lane) {
-            try {
-                broadcast(new ItemSold(
-                    $item->auction->id, $lane->id, $item->id,
-                    $winnerId, $finalPrice,
-                    $item->species_name ?? '', $item->item_number ?? 0, $item->quantity ?? 1
-                ));
-            } catch (\Exception $e) {
-                Log::warning("ItemSold broadcast error: " . $e->getMessage());
-                app(MetricRecorder::class)->broadcastFailure('ItemSold', $e->getMessage());
-            }
+            $auctionId = $item->auction->id;
+            $laneId = $lane->id;
+            $itemId = $item->id;
+            $speciesName = $item->species_name ?? '';
+            $itemNumber = $item->item_number ?? 0;
+            $quantity = $item->quantity ?? 1;
+            DB::afterCommit(function () use ($auctionId, $laneId, $itemId, $winnerId, $finalPrice, $speciesName, $itemNumber, $quantity) {
+                try {
+                    broadcast(new ItemSold(
+                        $auctionId, $laneId, $itemId,
+                        $winnerId, $finalPrice,
+                        $speciesName, $itemNumber, $quantity
+                    ));
+                } catch (\Exception $e) {
+                    Log::warning("ItemSold broadcast error: " . $e->getMessage());
+                    app(MetricRecorder::class)->broadcastFailure('ItemSold', $e->getMessage());
+                }
+            });
         }
 
         // 非同期通知（失敗してもオークション処理に影響しない）
-        try {
-            $notificationService = app(NotificationService::class);
-            $notificationService->sendWonItemNotification($wonItem);
-            $notificationService->sendItemSoldNotification($wonItem);
-        } catch (\Exception $e) {
-            Log::warning('落札通知でエラー（オークション処理には影響なし）', ['error' => $e->getMessage()]);
-        }
+        // 通知も commit 後にすべき（commit 失敗時に「落札しました」LINE が飛んだら整合崩壊）
+        DB::afterCommit(function () use ($wonItem) {
+            try {
+                $notificationService = app(NotificationService::class);
+                $notificationService->sendWonItemNotification($wonItem);
+                $notificationService->sendItemSoldNotification($wonItem);
+            } catch (\Exception $e) {
+                Log::warning('落札通知でエラー（オークション処理には影響なし）', ['error' => $e->getMessage()]);
+            }
+        });
 
         return BidResultDto::success([
             'item_id'       => $item->id,

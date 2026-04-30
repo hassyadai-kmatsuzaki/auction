@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\SellerProfile;
 use App\Models\EmailVerificationToken;
 use App\Mail\SetPasswordMail;
+use App\Services\Payment\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -263,6 +264,12 @@ class UserController extends Controller
                         'approved_at' => now(),
                         'approved_by' => auth()->id(),
                     ]);
+
+                    // 承認時に出品者ロールがあれば SellerProfile も自動有効化
+                    $hasSellerRole = $user->roles()->where('name', 'seller')->exists();
+                    if ($hasSellerRole && $user->sellerProfile) {
+                        $user->sellerProfile->update(['is_active' => true]);
+                    }
                 }
             }
 
@@ -322,6 +329,112 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'ユーザーを削除しました',
+        ]);
+    }
+
+    /**
+     * 銀行振込モードで更新期限が30日以内に迫っているユーザー一覧。
+     * 管理画面トップで通知モーダルとして使用する。
+     */
+    public function bankTransferRenewals(Request $request)
+    {
+        $threshold = now()->copy()->addDays(30);
+
+        $users = User::with(['subscription.plan'])
+            ->where('payment_method_preference', 'bank_transfer')
+            ->where('is_active', true)
+            ->whereHas('subscription', function ($q) use ($threshold) {
+                $q->where('status', 'active')
+                  ->whereNotNull('current_period_end')
+                  ->where('current_period_end', '<=', $threshold);
+            })
+            ->get()
+            ->map(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                    'company_name' => $u->company_name,
+                    'bank_transfer_confirmed_at' => $u->bank_transfer_confirmed_at,
+                    'subscription' => [
+                        'id' => $u->subscription->id,
+                        'status' => $u->subscription->status,
+                        'plan_name' => $u->subscription->plan?->name,
+                        'plan_amount' => $u->subscription->plan?->amount,
+                        'current_period_end' => $u->subscription->current_period_end,
+                    ],
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => ['users' => $users],
+        ]);
+    }
+
+    /**
+     * 銀行振込モードのユーザーに対して年次更新案内を発行する（管理者操作）。
+     * bank_transfer_confirmed_at をリセットしてログイン時に振込情報モーダルを再表示させ、
+     * 新たな pending payment を1件作成する。入金確認時には confirmBankTransfer を使う。
+     */
+    public function renewBankTransfer($id, SubscriptionService $service)
+    {
+        $user = User::findOrFail($id);
+
+        try {
+            $subscription = $service->prepareBankTransferRenewal($user);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => '更新案内を発行しました。ユーザー次回ログイン時に振込情報モーダルが表示されます。',
+            'data' => [
+                'user' => $user->fresh(['roles']),
+                'subscription' => $subscription,
+            ],
+        ]);
+    }
+
+    /**
+     * 銀行振込確認済みにする。pending payment を completed、subscription を active に切替え、
+     * 振込確認モーダルが次回ログイン以降表示されないように bank_transfer_confirmed_at を打刻する。
+     *
+     * @param int $id
+     * @param SubscriptionService $service
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function confirmBankTransfer($id, SubscriptionService $service)
+    {
+        $user = User::findOrFail($id);
+
+        if ($user->payment_method_preference !== 'bank_transfer') {
+            return response()->json([
+                'success' => false,
+                'message' => 'このユーザーは銀行振込モードではありません',
+            ], 422);
+        }
+
+        try {
+            $subscription = $service->confirmBankTransfer($user);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => '振込確認を完了しました',
+            'data' => [
+                'user' => $user->fresh(['roles']),
+                'subscription' => $subscription,
+            ],
         ]);
     }
 

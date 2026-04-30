@@ -24,14 +24,26 @@ class SubscriptionController extends Controller
 
         $plans = Plan::active()->ordered()->get();
 
+        // 銀行振込モードで管理者の振込確認待ち
+        // 初回申込中 (status=pending) も、年次更新案内中 (status=active で confirmed_at がリセットされた状態) も含む。
+        // テストユーザー (id<=509) は除外。
+        $bankTransferPending = $user->id > 509
+            && $subscription
+            && $user->payment_method_preference === 'bank_transfer'
+            && $user->bank_transfer_confirmed_at === null;
+
+        // 通常の登録ゲート判定。bank_transfer 申請済み (= 管理者の振込確認待ち) は対象外。
+        $requiresRegistration = $user->id > 509
+            && !$bankTransferPending
+            && (!$subscription || in_array($subscription->status, ['canceled', 'pending'], true));
+
         return response()->json([
             'success' => true,
             'data' => [
                 'subscription' => $subscription,
                 'plans'        => $plans,
-                // id <= 509 はテストユーザーのため決済登録モーダルの対象外
-                'requires_registration' => $user->id > 509
-                    && (!$subscription || in_array($subscription->status, ['canceled', 'pending'], true)),
+                'requires_registration' => $requiresRegistration,
+                'bank_transfer_pending' => $bankTransferPending,
                 'is_active'    => $subscription ? $subscription->isActive() : false,
                 'square_public' => [
                     'application_id' => config('services.square.application_id'),
@@ -47,11 +59,18 @@ class SubscriptionController extends Controller
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $paymentMethod = $request->input('payment_method', 'card');
+
+        $rules = [
             'plan_id'             => 'required|exists:plans,id',
-            'source_id'           => 'required|string|max:1000',
-            'verification_token'  => 'nullable|string|max:2000',
-        ], [
+            'payment_method'      => 'nullable|string|in:card,bank_transfer',
+        ];
+        if ($paymentMethod === 'card') {
+            $rules['source_id']          = 'required|string|max:1000';
+            $rules['verification_token'] = 'nullable|string|max:2000';
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
             'plan_id.required' => 'プランを選択してください',
             'source_id.required' => 'カード情報の送信に失敗しました。再度お試しください',
         ]);
@@ -63,6 +82,19 @@ class SubscriptionController extends Controller
         $user = $request->user();
 
         try {
+            if ($paymentMethod === 'bank_transfer') {
+                $subscription = $this->service->subscribeWithBankTransfer($user, $plan);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => '銀行振込のお申し込みを受け付けました。お振込み確認後にご利用可能となります。',
+                    'data' => [
+                        'subscription' => $subscription,
+                        'payment_method' => 'bank_transfer',
+                    ],
+                ], 201);
+            }
+
             $subscription = $this->service->subscribe(
                 $user,
                 $plan,
@@ -86,7 +118,10 @@ class SubscriptionController extends Controller
         return response()->json([
             'success' => true,
             'message' => '年会費プランへの加入が完了しました',
-            'data' => ['subscription' => $subscription],
+            'data' => [
+                'subscription' => $subscription,
+                'payment_method' => 'card',
+            ],
         ], 201);
     }
 

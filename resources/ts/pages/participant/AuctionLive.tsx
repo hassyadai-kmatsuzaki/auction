@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Grid, CircularProgress, Alert, Button,
@@ -214,17 +214,23 @@ export default function AuctionLive() {
     },
   });
 
-  // 現在商品のお気に入り状態を取得（詳細モーダルのハート表示用）
-  useEffect(() => {
-    if (!liveState?.lanes) return;
-    const itemIds = liveState.lanes
+  // 価格・カウントダウン等で lanes の参照だけ変わることがあるため、current_item.id の集合が変わったときだけキーが更新されるようにする
+  const liveCurrentItemIdsKey = useMemo(() => {
+    if (!liveState?.lanes?.length) return '';
+    const ids = liveState.lanes
       .map(l => l.current_item?.id)
       .filter((id): id is number => typeof id === 'number');
-    if (itemIds.length === 0) return;
+    return [...new Set(ids)].sort((a, b) => a - b).join(',');
+  }, [liveState?.lanes]);
+
+  // 現在商品のお気に入り状態を取得（詳細モーダルのハート表示用）
+  useEffect(() => {
+    if (!liveCurrentItemIdsKey) return;
+    const itemIds = liveCurrentItemIdsKey.split(',').map(Number);
     axios.post('/api/participant/favorites/check', { item_ids: itemIds })
       .then((r) => { if (r.data.success) setFavoriteIds(new Set(r.data.data.favorite_item_ids)); })
       .catch(() => {});
-  }, [liveState?.lanes]);
+  }, [liveCurrentItemIdsKey]);
 
   const handleCurrentItemFavoriteToggle = async (itemId: number) => {
     try {

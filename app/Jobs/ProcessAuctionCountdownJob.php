@@ -85,7 +85,11 @@ class ProcessAuctionCountdownJob implements ShouldQueue
     {
         // 世代チェック: ディスパッチ後に世代が進んでいたら即終了
         if (!$this->isCurrentGeneration()) {
-            Log::info("Auction countdown job SKIPPED for auction {$this->auctionId}: outdated generation (job={$this->generation}, current=" . Cache::get(self::generationKey($this->auctionId)) . ")");
+            Log::info('countdown.job.skipped_outdated_generation', [
+                'auction_id' => $this->auctionId,
+                'job_generation' => $this->generation,
+                'current_generation' => (int) Cache::get(self::generationKey($this->auctionId), 0),
+            ]);
             return;
         }
 
@@ -95,11 +99,18 @@ class ProcessAuctionCountdownJob implements ShouldQueue
 
         if (!$lockAcquired) {
             $existingPid = Cache::get($lockKey);
-            Log::warning("Auction countdown job SKIPPED for auction {$this->auctionId}: another job is running (pid={$existingPid})");
+            Log::warning('countdown.job.skipped_lock_held', [
+                'auction_id' => $this->auctionId,
+                'existing_pid' => $existingPid,
+            ]);
             return;
         }
 
-        Log::info("Auction countdown job STARTED for auction {$this->auctionId} (pid=" . getmypid() . ", generation={$this->generation})");
+        Log::info('countdown.job.started', [
+            'auction_id' => $this->auctionId,
+            'pid' => getmypid(),
+            'generation' => $this->generation,
+        ]);
         
         // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
@@ -173,16 +184,33 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             ));
 
             // オークション開始通知を送信（参加者 + 出品者）
+            // 失敗してもライブ進行は止めないが、全員に通知が届かない事象は重大なので
+            // CloudWatch メトリクスに失敗を記録し、運用側で検知できるようにする。
             try {
                 $auctionForNotification = Auction::find($this->auctionId);
                 if ($auctionForNotification) {
                     $notificationService = app(\App\Services\NotificationService::class);
                     $sentCount = $notificationService->sendAuctionStartNotification($auctionForNotification);
                     $notificationService->sendSellerAuctionStartNotification($auctionForNotification);
-                    Log::info("オークション開始通知送信: {$sentCount}件", ['auction_id' => $this->auctionId]);
+                    Log::info('auction.start_notification.sent', [
+                        'auction_id' => $this->auctionId,
+                        'sent_count' => $sentCount,
+                    ]);
                 }
             } catch (\Exception $e) {
-                Log::warning('オークション開始通知でエラー', ['error' => $e->getMessage()]);
+                Log::warning('auction.start_notification.failed', [
+                    'auction_id' => $this->auctionId,
+                    'error' => $e->getMessage(),
+                ]);
+                try {
+                    app(\App\Services\Monitoring\MetricRecorder::class)->jobFailure(
+                        'AuctionStartNotification',
+                        $e->getMessage(),
+                        ['auction_id' => (string) $this->auctionId]
+                    );
+                } catch (\Throwable $metricErr) {
+                    Log::warning('MetricRecorder failed for start notification: ' . $metricErr->getMessage());
+                }
             }
 
             Log::info("Pre-start countdown completed for auction {$this->auctionId}, lanes started");
@@ -327,8 +355,13 @@ class ProcessAuctionCountdownJob implements ShouldQueue
         Cache::forget($jobKey);
         Cache::forget($heartbeatKey);
         Cache::forget($lockKey);
-        
-        Log::info("Auction countdown job COMPLETED for auction {$this->auctionId}, iterations: {$iterations}, idle: {$idleIterations}" . ($superseded ? ' (superseded by new generation)' : ''));
+
+        Log::info('countdown.job.completed', [
+            'auction_id' => $this->auctionId,
+            'iterations' => $iterations,
+            'idle_iterations' => $idleIterations,
+            'superseded' => $superseded,
+        ]);
     }
 
     /**

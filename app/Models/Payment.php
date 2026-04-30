@@ -14,6 +14,9 @@ class Payment extends BaseModel
     public const STATUS_FAILED    = 'failed';
     public const STATUS_REFUNDED  = 'refunded';
 
+    public const METHOD_CARD          = 'card';
+    public const METHOD_BANK_TRANSFER = 'bank_transfer';
+
     protected $fillable = [
         'subscription_id',
         'user_id',
@@ -23,6 +26,7 @@ class Payment extends BaseModel
         'idempotency_key',
         'amount',
         'currency',
+        'method',
         'status',
         'failure_reason',
         'receipt_url',

@@ -18,6 +18,7 @@ use App\Events\BidLimitReached;
 use App\Events\CountdownTick;
 use App\Events\LaneItemChanged;
 use App\Events\AuctionStatusChanged;
+use App\Logging\BroadcastFailureLogger;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +29,14 @@ class CountdownService
      * Tick interval in seconds (0.5 = 500ms)
      */
     public const TICK_INTERVAL = 0.5;
+
+    /**
+     * countdown:lane:* キャッシュの TTL（秒）。
+     * ジョブの heartbeat TTL（4時間）と一致させ、長時間ポーズでも cache が消えないようにする。
+     * 短い TTL（旧: 3600s）だと、長時間ポーズ中に cache 切れ → 再 startCountdown で
+     * カウント秒数が start_price 基準にリセットされ、freeze が無視される事故が起きる。
+     */
+    public const CACHE_TTL = 14400;
 
     public function __construct(
         private readonly FinalizeBidAction                $finalizeBidAction,
@@ -47,6 +56,21 @@ class CountdownService
     protected function getCacheKey(int $laneId): string
     {
         return "countdown:lane:{$laneId}";
+    }
+
+    /**
+     * pre_bid / freeze など低頻度フェーズで「整数秒のティックだけ」 broadcast するか判定。
+     *
+     * tick は 0.5 秒ごとに呼ばれるが、ボタン無効中の表示は 1 秒粒度で十分。
+     * remaining が 0 のときも broadcast（フェーズ終了タイミングを必ず通知）。
+     */
+    protected function shouldBroadcastLowFrequency(float $remainingSeconds): bool
+    {
+        if ($remainingSeconds <= 0) {
+            return true;
+        }
+        // 0.5 ステップで減算する前提で、整数秒（n.0）のときのみ true
+        return abs(fmod($remainingSeconds, 1.0)) < 0.05;
     }
 
     /**
@@ -85,7 +109,7 @@ class CountdownService
             'last_bidder_user_id' => null,
         ];
         
-        Cache::put($this->getCacheKey($lane->id), $cacheData, 3600);
+        Cache::put($this->getCacheKey($lane->id), $cacheData, self::CACHE_TTL);
 
         Log::info("Countdown started: lane {$lane->id}, item {$item->id}, bid={$bidSeconds}s, freeze={$freezeSeconds}s");
     }
@@ -132,7 +156,7 @@ class CountdownService
             'last_bidder_user_id' => null,
         ];
 
-        Cache::put($this->getCacheKey($lane->id), $cacheData, 3600);
+        Cache::put($this->getCacheKey($lane->id), $cacheData, self::CACHE_TTL);
 
         Log::info("Pre-bid countdown started: lane {$lane->id}, item {$item->id}, delay {$preBidDelay}s");
     }
@@ -173,7 +197,7 @@ class CountdownService
         $state['remaining_seconds'] = $freezeSeconds;
         $state['started_at'] = now()->timestamp;
 
-        Cache::put($this->getCacheKey($lane->id), $state, 3600);
+        Cache::put($this->getCacheKey($lane->id), $state, self::CACHE_TTL);
 
         Log::info("Freeze countdown started: lane {$lane->id}, {$freezeSeconds}s");
     }
@@ -194,7 +218,7 @@ class CountdownService
         $state['remaining_seconds'] = $bidSeconds;
         $state['started_at'] = now()->timestamp;
 
-        Cache::put($this->getCacheKey($lane->id), $state, 3600);
+        Cache::put($this->getCacheKey($lane->id), $state, self::CACHE_TTL);
 
         Log::info("Bid countdown started: lane {$lane->id}, {$bidSeconds}s");
     }
@@ -274,8 +298,7 @@ class CountdownService
                 'bidding'
             ));
         } catch (\Exception $e) {
-            Log::warning("Broadcast error lane {$laneId}: " . $e->getMessage());
-            $this->metrics->broadcastFailure('CountdownTick', $e->getMessage());
+            BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'bidding']);
         }
 
         $this->metrics->countdownTick($laneId, 'bidding', (float) $state['remaining_seconds']);
@@ -302,35 +325,41 @@ class CountdownService
                     $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
                     $state['remaining_seconds'] = $bidSeconds;
                     $state['phase'] = 'bidding';
-                    Cache::put($this->getCacheKey($laneId), $state, 3600);
+                    Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
                     return ['action' => 'recovery', 'lane_id' => $laneId];
                 }
             }
         }
 
-        Cache::put($this->getCacheKey($laneId), $state, 3600);
+        Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
 
         return ['action' => 'tick', 'remaining_seconds' => $state['remaining_seconds']];
     }
 
     /**
      * 入札開始待機フェーズのティック処理（0.5秒ごと）
+     *
+     * ■ broadcast は 1 秒粒度に間引く:
+     *   pre_bid 中は入札ボタンが無効化されているので 0.5 秒粒度の表示精度は不要。
+     *   broadcast 半減で Reverb の outbound 帯域を抑える。
+     *   フェーズ切替の broadcast は別途行うので終了タイミングは取りこぼさない。
      */
     protected function tickPreBid(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
     {
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
         $state['pre_bid_remaining_seconds'] = $state['remaining_seconds'];
 
-        try {
-            broadcast(new CountdownTick(
-                $auction->id, $lane->id, $item->id,
-                (float) $state['remaining_seconds'],
-                0, $item->current_price,
-                'pre_bid'
-            ));
-        } catch (\Exception $e) {
-            Log::warning("Pre-bid broadcast error lane {$laneId}: " . $e->getMessage());
-            $this->metrics->broadcastFailure('CountdownTick', $e->getMessage());
+        if ($this->shouldBroadcastLowFrequency($state['remaining_seconds'])) {
+            try {
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    (float) $state['remaining_seconds'],
+                    0, $item->current_price,
+                    'pre_bid'
+                ));
+            } catch (\Exception $e) {
+                BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'pre_bid']);
+            }
         }
 
         $this->metrics->countdownTick($laneId, 'pre_bid', (float) $state['remaining_seconds']);
@@ -342,7 +371,7 @@ class CountdownService
             $state['pre_bid_remaining_seconds'] = 0;
             $state['started_at'] = now()->timestamp;
 
-            Cache::put($this->getCacheKey($laneId), $state, 3600);
+            Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
 
             // pre_bid→bidding 遷移時に初回カウントダウン値をbroadcast
             try {
@@ -354,7 +383,7 @@ class CountdownService
                     'bidding'
                 ));
             } catch (\Exception $e) {
-                Log::warning("PreBid->Bid broadcast error lane {$laneId}: " . $e->getMessage());
+                BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'pre_bid_to_bidding']);
             }
 
             Log::info("Pre-bid ended, bidding started: lane {$laneId}, item {$item->id}, countdown={$bidSeconds}s");
@@ -362,7 +391,7 @@ class CountdownService
             return ['action' => 'pre_bid_end', 'lane_id' => $laneId];
         }
 
-        Cache::put($this->getCacheKey($laneId), $state, 3600);
+        Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
 
         return ['action' => 'pre_bid_tick', 'remaining_seconds' => $state['remaining_seconds']];
     }
@@ -370,6 +399,8 @@ class CountdownService
     /**
      * フリーズ（誤タップ防止）フェーズのティック処理（0.5秒ごと）
      * フリーズ中は入札ボタンが無効化される
+     *
+     * ■ broadcast は 1 秒粒度に間引く（pre_bid と同じ理由：UX 影響なし、帯域節約）
      */
     protected function tickFreeze(int $laneId, Lane $lane, Item $item, Auction $auction, array $state): array
     {
@@ -378,16 +409,17 @@ class CountdownService
 
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
-        try {
-            broadcast(new CountdownTick(
-                $auction->id, $lane->id, $item->id,
-                (float) $state['remaining_seconds'],
-                $activeBidderCount, $freshPrice,
-                'freeze'
-            ));
-        } catch (\Exception $e) {
-            Log::warning("Freeze broadcast error lane {$laneId}: " . $e->getMessage());
-            $this->metrics->broadcastFailure('CountdownTick', $e->getMessage());
+        if ($this->shouldBroadcastLowFrequency($state['remaining_seconds'])) {
+            try {
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    (float) $state['remaining_seconds'],
+                    $activeBidderCount, $freshPrice,
+                    'freeze'
+                ));
+            } catch (\Exception $e) {
+                BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'freeze']);
+            }
         }
 
         $this->metrics->countdownTick($laneId, 'freeze', (float) $state['remaining_seconds']);
@@ -398,7 +430,7 @@ class CountdownService
             $state['remaining_seconds'] = $bidSeconds;
             $state['started_at'] = now()->timestamp;
 
-            Cache::put($this->getCacheKey($laneId), $state, 3600);
+            Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
 
             // freeze→bidding 遷移時に初回カウントダウン値をbroadcast
             // これがないとフロントは bidding 初回値を受信できず表示がずれる
@@ -410,7 +442,7 @@ class CountdownService
                     'bidding'
                 ));
             } catch (\Exception $e) {
-                Log::warning("Freeze->Bid broadcast error lane {$laneId}: " . $e->getMessage());
+                BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'freeze_to_bidding']);
             }
 
             Log::info("Freeze ended, bid countdown started: lane {$laneId}, item {$item->id}, countdown={$bidSeconds}s");
@@ -418,7 +450,7 @@ class CountdownService
             return ['action' => 'freeze_end', 'lane_id' => $laneId];
         }
 
-        Cache::put($this->getCacheKey($laneId), $state, 3600);
+        Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
 
         return ['action' => 'freeze_tick', 'remaining_seconds' => $state['remaining_seconds']];
     }
@@ -453,7 +485,10 @@ class CountdownService
                 return;
             }
 
-            $freshActiveCount = BidParticipant::forItem($locked->id)->active()->count();
+            // 行ロック内で active 入札者を一括取得し、count はコレクションから取る
+            // （count() / get() を別々に発行していた重複クエリを統合）
+            $allActive = BidParticipant::forItem($locked->id)->active()->get();
+            $freshActiveCount = $allActive->count();
             if ($freshActiveCount <= 1) {
                 DB::rollBack();
                 Log::info("handlePriceIncrement: active count dropped to {$freshActiveCount} under lock. item={$locked->id} — skipping.");
@@ -479,8 +514,6 @@ class CountdownService
             // - 有効な指値ユーザーがいない場合 → lastBidder が1回分残る（従来動作）
             $autoLeftUserIds = [];
 
-            $allActive = BidParticipant::forItem($item->id)->active()->get();
-
             // 有効な指値を持つユーザーを指値の高い順に取得
             $validLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
@@ -493,12 +526,10 @@ class CountdownService
             $hasProtectedUsers = count($protectedUserIds) > 0;
 
             // lastBidder が null の場合、最後に入札した人をフォールバック
+            // すでに $allActive を取得済みなので、追加クエリは発行せずコレクションから抽出する
             $resolvedLastBidder = $lastBidderUserId;
             if (!$resolvedLastBidder && !$hasProtectedUsers && $allActive->isNotEmpty()) {
-                $latestParticipant = BidParticipant::forItem($item->id)
-                    ->active()
-                    ->orderBy('activated_at', 'desc')
-                    ->first();
+                $latestParticipant = $allActive->sortByDesc('activated_at')->first();
                 $resolvedLastBidder = $latestParticipant?->user_id;
             }
 
@@ -526,6 +557,22 @@ class CountdownService
                 Log::info("Bid-limit holder on price increment: item={$item->id}, holder={$effectiveHolder}, protected=" . implode(',', $protectedUserIds));
             }
 
+            // ─── フリーズ/落札権利者キャッシュを「コミット前」に書き込む ───
+            // 理由: items 行ロックが解放されるのは DB::commit() のタイミング。
+            //       後続の JoinBidAction などはロック取得後に phase を再判定するため、
+            //       commit 前にキャッシュを書いておかないと「freeze 開始の瞬間に
+            //       入札を試みた人」が freeze 判定をすり抜けてしまう（数 ms の窓）。
+            //       commit 失敗時はキャッシュだけ freeze になるが、tick が freeze を
+            //       消化したあと bidding に戻るので最終整合は保たれる。
+            $this->startFreezeCountdown($lane);
+
+            $cacheKey = $this->getCacheKey($lane->id);
+            $state = Cache::get($cacheKey);
+            if ($state) {
+                $state['last_bidder_user_id'] = $hasProtectedUsers ? $effectiveHolder : null;
+                Cache::put($cacheKey, $state, self::CACHE_TTL);
+            }
+
             DB::commit();
 
             $this->metrics->priceIncrement($item->id, $lane->id, $oldPrice, $newPrice, 'auto_increment');
@@ -534,18 +581,6 @@ class CountdownService
             Log::error("Price increment error: " . $e->getMessage());
             $this->metrics->priceIncrementFailed($item->id, 'handle_price_increment', $e->getMessage());
             return;
-        }
-
-        // 価格更新成功 → フリーズカウントダウン開始
-        $this->startFreezeCountdown($lane);
-
-        // 落札権利者を更新:
-        // 指値最高者がいればその人を維持、いなければクリア
-        $cacheKey = $this->getCacheKey($lane->id);
-        $state = Cache::get($cacheKey);
-        if ($state) {
-            $state['last_bidder_user_id'] = $hasProtectedUsers ? $effectiveHolder : null;
-            Cache::put($cacheKey, $state, 3600);
         }
 
         $freshItem = $item->fresh();
@@ -561,7 +596,7 @@ class CountdownService
                 $autoLeftUserIds
             ));
         } catch (\Exception $e) {
-            Log::warning("PriceUpdated broadcast error: " . $e->getMessage());
+            BroadcastFailureLogger::warn('PriceUpdated', $e->getMessage(), ['item_id' => $item->id, 'lane_id' => $lane->id]);
         }
 
         // 自動離脱を全クライアントに通知（入札者数の同期）
@@ -572,7 +607,7 @@ class CountdownService
                     $newActiveBidderCount, 'left'
                 ));
             } catch (\Exception $e) {
-                Log::warning("Auto-left BidderUpdated broadcast error: " . $e->getMessage());
+                BroadcastFailureLogger::warn('BidderUpdated', $e->getMessage(), ['item_id' => $item->id, 'lane_id' => $lane->id, 'event_type' => 'auto_left']);
             }
         }
 
@@ -833,7 +868,7 @@ class CountdownService
                 $currentItemData
             ));
         } catch (\Exception $e) {
-            Log::warning("LaneItemChanged broadcast error: " . $e->getMessage());
+            BroadcastFailureLogger::warn('LaneItemChanged', $e->getMessage(), ['lane_id' => $lane->id]);
         }
 
         return $nextItem;
@@ -876,7 +911,7 @@ class CountdownService
         $state = Cache::get($this->getCacheKey($laneId));
         if ($state) {
             $state['is_running'] = false;
-            Cache::put($this->getCacheKey($laneId), $state, 3600);
+            Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
             Log::info("Countdown paused: lane {$laneId}, remaining {$state['remaining_seconds']}s");
         }
     }
@@ -909,7 +944,7 @@ class CountdownService
         }
 
         $state['is_running'] = true;
-        Cache::put($this->getCacheKey($laneId), $state, 3600);
+        Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
         Log::info("Countdown resumed: lane {$laneId}, remaining {$state['remaining_seconds']}s, phase {$state['phase']}");
     }
 
@@ -956,7 +991,7 @@ class CountdownService
                     'すべての出品が終了しました。オークションが自動終了しました。'
                 ));
             } catch (\Exception $e) {
-                Log::warning("AuctionStatusChanged broadcast error: " . $e->getMessage());
+                BroadcastFailureLogger::warn('AuctionStatusChanged', $e->getMessage(), ['auction_id' => $auction->id]);
             }
         }
     }
@@ -1176,23 +1211,9 @@ class CountdownService
             Log::error("adjustPriceByBidLimits checkBidLimits error: " . $e->getMessage());
         }
 
-        // 🔓 価格変更とそれに伴う指値トリガー処理までを1トランザクションで確定
-        try {
-            DB::commit();
-            $this->metrics->priceIncrement($item->id, $lane->id, (float) $currentPrice, (float) $targetPrice, 'bid_limit_adjust');
-        } catch (\Throwable $e) {
-            Log::error("adjustPriceByBidLimits commit failed: " . $e->getMessage());
-            $this->metrics->priceIncrementFailed($item->id, 'adjust_price_by_bid_limits', $e->getMessage());
-            throw $e;
-        }
-
-        if ($startFreeze) {
-            $this->startFreezeCountdown($lane);
-        }
-
-        // 落札権利者をキャッシュに記録
-        // 優先順位: 1) 指値がまだ有効なユーザー（最高額・先着順）
-        //           2) 保護されたユーザー（同額指値の先着者）
+        // ─── フリーズ/落札権利者キャッシュを「コミット前」に書き込む ───
+        // handlePriceIncrement と同じ理由：items 行ロック解放前に freeze を
+        // 反映しておかないと、後続 join がフリーズ中なのに通り抜けてしまう。
         $effectiveHolder = null;
 
         $highestLimitUser = BidLimitPrice::where('item_id', $item->id)
@@ -1208,14 +1229,28 @@ class CountdownService
             $effectiveHolder = $protectedUserIds[0];
         }
 
+        if ($startFreeze) {
+            $this->startFreezeCountdown($lane);
+        }
+
         if ($effectiveHolder) {
             $cacheKey = $this->getCacheKey($lane->id);
             $state = Cache::get($cacheKey);
             if ($state) {
                 $state['last_bidder_user_id'] = $effectiveHolder;
-                Cache::put($cacheKey, $state, 3600);
+                Cache::put($cacheKey, $state, self::CACHE_TTL);
                 Log::info("adjustPriceByBidLimits: set last_bidder_user_id={$effectiveHolder}");
             }
+        }
+
+        // 🔓 価格変更とそれに伴う指値トリガー処理までを1トランザクションで確定
+        try {
+            DB::commit();
+            $this->metrics->priceIncrement($item->id, $lane->id, (float) $currentPrice, (float) $targetPrice, 'bid_limit_adjust');
+        } catch (\Throwable $e) {
+            Log::error("adjustPriceByBidLimits commit failed: " . $e->getMessage());
+            $this->metrics->priceIncrementFailed($item->id, 'adjust_price_by_bid_limits', $e->getMessage());
+            throw $e;
         }
 
         $newActiveBidderCount = BidParticipant::forItem($item->id)->active()->count();
@@ -1229,7 +1264,7 @@ class CountdownService
                 $autoLeftUserIds
             ));
         } catch (\Exception $e) {
-            Log::warning("adjustPriceByBidLimits PriceUpdated broadcast error: " . $e->getMessage());
+            BroadcastFailureLogger::warn('PriceUpdated', $e->getMessage(), ['item_id' => $item->id, 'lane_id' => $lane->id, 'source' => 'adjust_by_bid_limits']);
         }
 
         if (count($autoLeftUserIds) > 0) {
@@ -1239,7 +1274,7 @@ class CountdownService
                     $newActiveBidderCount, 'left'
                 ));
             } catch (\Exception $e) {
-                Log::warning("adjustPriceByBidLimits BidderUpdated broadcast error: " . $e->getMessage());
+                BroadcastFailureLogger::warn('BidderUpdated', $e->getMessage(), ['item_id' => $item->id, 'lane_id' => $lane->id, 'event_type' => 'auto_left_bid_limit']);
             }
         }
     }

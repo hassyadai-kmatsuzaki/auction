@@ -17,6 +17,8 @@ export interface User {
   city?: string;
   address_line1?: string;
   address_line2?: string;
+  payment_method_preference?: 'card' | 'bank_transfer' | null;
+  bank_transfer_confirmed_at?: string | null;
   roles?: Role[];
   created_at: string;
   updated_at?: string;

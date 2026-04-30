@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Role;
+use App\Models\SellerProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,9 @@ class RegisterController extends Controller
 {
     /**
      * ユーザー登録申請
+     *
+     * registration_type=seller の場合、seller + participant の両ロールを付与し
+     * SellerProfile も初期作成する（管理者承認後に有効化）
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -32,6 +36,7 @@ class RegisterController extends Controller
             'city' => 'required|string|max:100',
             'address_line1' => 'required|string|max:255',
             'address_line2' => 'nullable|string|max:255',
+            'registration_type' => 'nullable|string|in:buyer,seller',
         ], [
             'name.required' => 'お名前は必須です。',
             'name.max' => 'お名前は255文字以内で入力してください。',
@@ -57,9 +62,11 @@ class RegisterController extends Controller
             ], 422);
         }
 
+        $registrationType = $request->input('registration_type', 'buyer');
+        $isSellerRegistration = $registrationType === 'seller';
+
         DB::beginTransaction();
         try {
-            // ユーザーを作成（承認待ちステータス）
             $user = User::create([
                 'name' => $request->name,
                 'trade_name' => $request->trade_name,
@@ -75,10 +82,36 @@ class RegisterController extends Controller
                 'status' => 'pending',
             ]);
 
-            // 参加者ロールを付与
-            $participantRole = Role::where('name', 'participant')->first();
-            if ($participantRole) {
-                $user->roles()->attach($participantRole->id);
+            $roleNames = $isSellerRegistration
+                ? ['seller', 'participant']
+                : ['participant'];
+
+            foreach ($roleNames as $roleName) {
+                $role = Role::where('name', $roleName)->first();
+                if ($role) {
+                    $user->roles()->attach($role->id, [
+                        'assigned_at' => now(),
+                    ]);
+                }
+            }
+
+            // 出品者登録の場合は SellerProfile も用意（管理者の手作業を省く）
+            if ($isSellerRegistration) {
+                SellerProfile::create([
+                    'user_id' => $user->id,
+                    'seller_code' => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
+                    'seller_name' => $user->trade_name ?? $user->name,
+                    'corporate_name' => $user->company_name,
+                    'contact_name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone ?? '',
+                    'postal_code' => $user->postal_code,
+                    'prefecture' => $user->prefecture,
+                    'city' => $user->city,
+                    'address_line1' => $user->address_line1,
+                    'address_line2' => $user->address_line2,
+                    'is_active' => false,
+                ]);
             }
 
             DB::commit();
@@ -92,6 +125,7 @@ class RegisterController extends Controller
                         'name' => $user->name,
                         'email' => $user->email,
                         'status' => $user->status,
+                        'registration_type' => $registrationType,
                     ],
                 ],
             ], 201);

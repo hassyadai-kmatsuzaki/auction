@@ -140,6 +140,154 @@ class SubscriptionService
     }
 
     /**
+     * 銀行振込モードでの加入申請。
+     * Square 課金は行わず、subscription/payment を pending で作成し、
+     * 管理者が振込確認するまで利用不可状態にしておく。
+     */
+    public function subscribeWithBankTransfer(User $user, Plan $plan): Subscription
+    {
+        if (!$plan->is_active) {
+            throw new RuntimeException('このプランは加入できません');
+        }
+        if ($user->subscription && !in_array($user->subscription->status, [Subscription::STATUS_CANCELED], true)) {
+            throw new RuntimeException('既にサブスクリプションが存在します');
+        }
+
+        return DB::transaction(function () use ($user, $plan) {
+            $subscription = Subscription::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'plan_id'              => $plan->id,
+                    'square_customer_id'   => null,
+                    'square_card_id'       => null,
+                    'card_brand'           => null,
+                    'card_last4'           => null,
+                    'card_exp_month'       => null,
+                    'card_exp_year'        => null,
+                    'status'               => Subscription::STATUS_PENDING,
+                    'current_period_start' => null,
+                    'current_period_end'   => null,
+                    'canceled_at'          => null,
+                    'suspended_at'         => null,
+                    'suspended_reason'     => null,
+                ]
+            );
+
+            Payment::create([
+                'subscription_id'  => $subscription->id,
+                'user_id'          => $user->id,
+                'plan_id'          => $plan->id,
+                'idempotency_key'  => 'bank-' . $user->id . '-' . Str::uuid(),
+                'amount'           => (int) $plan->amount,
+                'currency'         => 'JPY',
+                'method'           => Payment::METHOD_BANK_TRANSFER,
+                'status'           => Payment::STATUS_PENDING,
+            ]);
+
+            $user->forceFill([
+                'payment_method_preference'  => 'bank_transfer',
+                'bank_transfer_confirmed_at' => null,
+            ])->save();
+
+            return $subscription->fresh('plan');
+        });
+    }
+
+    /**
+     * 年次更新の振込案内を発行する（管理者操作）。
+     * subscription は active のまま、bank_transfer_confirmed_at をリセットして
+     * ユーザーログイン時に振込情報モーダルを再表示させる。新たな pending payment を作成しておき、
+     * 入金確認時に confirmBankTransfer() で完了処理を行う。
+     */
+    public function prepareBankTransferRenewal(User $user): Subscription
+    {
+        $subscription = $user->subscription;
+        if (!$subscription) {
+            throw new RuntimeException('サブスクリプションがありません');
+        }
+        if ($user->payment_method_preference !== 'bank_transfer') {
+            throw new RuntimeException('このユーザーは銀行振込モードではありません');
+        }
+
+        return DB::transaction(function () use ($user, $subscription) {
+            // 既に未完了の bank_transfer payment が残っていれば再利用する（重複作成を防ぐ）
+            $existingPending = Payment::where('user_id', $user->id)
+                ->where('method', Payment::METHOD_BANK_TRANSFER)
+                ->where('status', Payment::STATUS_PENDING)
+                ->exists();
+
+            if (!$existingPending) {
+                $plan = $subscription->plan ?? Plan::find($subscription->plan_id);
+                Payment::create([
+                    'subscription_id'  => $subscription->id,
+                    'user_id'          => $user->id,
+                    'plan_id'          => $subscription->plan_id,
+                    'idempotency_key'  => 'bank-renew-' . $user->id . '-' . Str::uuid(),
+                    'amount'           => (int) ($plan?->amount ?? 0),
+                    'currency'         => 'JPY',
+                    'method'           => Payment::METHOD_BANK_TRANSFER,
+                    'status'           => Payment::STATUS_PENDING,
+                ]);
+            }
+
+            $user->forceFill([
+                'bank_transfer_confirmed_at' => null,
+            ])->save();
+
+            return $subscription->fresh('plan');
+        });
+    }
+
+    /**
+     * 管理者が振込確認したときの処理。
+     * pending の payment を completed に、subscription を active に切り替え、
+     * bank_transfer_confirmed_at を打刻して以降のリマインダーを止める。
+     */
+    public function confirmBankTransfer(User $user): Subscription
+    {
+        $subscription = $user->subscription;
+        if (!$subscription) {
+            throw new RuntimeException('サブスクリプションがありません');
+        }
+
+        return DB::transaction(function () use ($user, $subscription) {
+            $now = now();
+
+            $pending = Payment::where('user_id', $user->id)
+                ->where('method', Payment::METHOD_BANK_TRANSFER)
+                ->where('status', Payment::STATUS_PENDING)
+                ->latest('id')
+                ->first();
+
+            if ($pending) {
+                $pending->update([
+                    'status'  => Payment::STATUS_COMPLETED,
+                    'paid_at' => $now,
+                ]);
+            }
+
+            $base = $subscription->current_period_end && $subscription->current_period_end->isFuture()
+                ? $subscription->current_period_end
+                : $now;
+
+            $subscription->update([
+                'status'               => Subscription::STATUS_ACTIVE,
+                'current_period_start' => $now,
+                'current_period_end'   => $base->copy()->addYear(),
+                'canceled_at'          => null,
+                'suspended_at'         => null,
+                'suspended_reason'     => null,
+            ]);
+
+            $user->forceFill([
+                'bank_transfer_confirmed_at' => $now,
+            ])->save();
+
+            return $subscription->fresh('plan');
+        });
+    }
+
+    /**
      * カード再登録（失効/変更時に呼ばれる）
      */
     public function replaceCard(User $user, string $sourceId, ?string $verificationToken = null): Subscription
