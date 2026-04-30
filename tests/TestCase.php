@@ -28,7 +28,7 @@ abstract class TestCase extends BaseTestCase
     protected function createAdmin(): User
     {
         $role = Role::firstOrCreate(['name' => 'admin']);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'approved', 'approved_at' => now()]);
         $user->roles()->attach($role->id);
         return $user;
     }
@@ -40,7 +40,7 @@ abstract class TestCase extends BaseTestCase
     protected function createSeller(): User
     {
         $role = Role::firstOrCreate(['name' => 'seller']);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'approved', 'approved_at' => now()]);
         $user->roles()->attach($role->id);
         return $user;
     }
@@ -52,7 +52,7 @@ abstract class TestCase extends BaseTestCase
     protected function createParticipant(): User
     {
         $role = Role::firstOrCreate(['name' => 'participant']);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'approved', 'approved_at' => now()]);
         $user->roles()->attach($role->id);
         return $user;
     }
