@@ -27,7 +27,7 @@ class ItemSoldNotificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】出品商品が落札されました',
+            subject: '【日本メダカオンライン市場】出品商品が落札されました',
         );
     }
 

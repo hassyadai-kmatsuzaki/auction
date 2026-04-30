@@ -7,87 +7,98 @@ use App\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * 開発・staging 環境で初期テストユーザーを投入する Seeder。
+ *
+ * ⚠ 本番実行不可:
+ *   - 固定メールアドレス (admin@example.com / participant@example.com / seller@example.com)
+ *     を弱パスワード `password` で作成するため、production で実行するとセキュリティ事故。
+ *   - 旧版は `User::create()` をそのまま叩いていたため、再実行で UNIQUE constraint エラー。
+ *
+ * 本版の改修:
+ *   1. production では abort
+ *   2. firstOrCreate で冪等化（既存ユーザーは触らない）
+ *   3. 既存ユーザーへのロール割り当ても重複防止
+ *   4. パスワードは ADMIN_INITIAL_PASSWORD env から取得可、未設定なら `password`
+ */
 class AdminUserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // 管理者アカウントを作成
-        $admin = User::create([
-            'name' => 'システム管理者',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password'),
-            'status' => 'approved',
-            'approved_at' => now(),
-            'email_verified_at' => now(),
-            'is_active' => true,
-        ]);
-
-        // admin, seller, participant 全ロールを付与（ロール切り替え可能にするため）
-        $adminRole = Role::where('name', 'admin')->first();
-        $sellerRoleForAdmin = Role::where('name', 'seller')->first();
-        $participantRoleForAdmin = Role::where('name', 'participant')->first();
-        $admin->roles()->attach($adminRole->id, [
-            'assigned_at' => now(),
-        ]);
-        if ($sellerRoleForAdmin) {
-            $admin->roles()->attach($sellerRoleForAdmin->id, [
-                'assigned_at' => now(),
-            ]);
-        }
-        if ($participantRoleForAdmin) {
-            $admin->roles()->attach($participantRoleForAdmin->id, [
-                'assigned_at' => now(),
-            ]);
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'AdminUserSeeder は弱パスワードの固定アカウント（admin@example.com 等）を '
+                . '作成するため production では実行できません。'
+                . ' 本番の admin 作成は別途運用手順で行ってください。'
+            );
         }
 
-        $this->command->info('管理者アカウントを作成しました（全ロール付与）。');
-        $this->command->info('メール: admin@example.com');
-        $this->command->info('パスワード: password');
+        $password = env('ADMIN_INITIAL_PASSWORD', 'password');
+        $hashed = Hash::make($password);
 
-        // テスト用の参加者アカウント
-        $participant = User::create([
-            'name' => '参加者テスト',
-            'email' => 'participant@example.com',
-            'password' => Hash::make('password'),
-            'status' => 'approved',
-            'approved_at' => now(),
-            'email_verified_at' => now(),
-            'is_active' => true,
-        ]);
-
+        $adminRole       = Role::where('name', 'admin')->first();
+        $sellerRole      = Role::where('name', 'seller')->first();
         $participantRole = Role::where('name', 'participant')->first();
-        $participant->roles()->attach($participantRole->id, [
-            'assigned_at' => now(),
-        ]);
 
-        $this->command->info('参加者アカウントを作成しました。');
-        $this->command->info('メール: participant@example.com');
-        $this->command->info('パスワード: password');
+        // ─── admin@example.com（admin / seller / participant 全ロール）──
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name'              => 'システム管理者',
+                'password'          => $hashed,
+                'status'            => 'approved',
+                'approved_at'       => now(),
+                'email_verified_at' => now(),
+                'is_active'         => true,
+            ]
+        );
+        $this->attachRoleIfMissing($admin, $adminRole);
+        $this->attachRoleIfMissing($admin, $sellerRole);
+        $this->attachRoleIfMissing($admin, $participantRole);
+        $this->command->info(($admin->wasRecentlyCreated ? '作成: ' : '既存: ') . 'admin@example.com');
 
-        // テスト用の出品者アカウント（出品者+参加者の両方）
-        $seller = User::create([
-            'name' => '出品者テスト',
-            'email' => 'seller@example.com',
-            'password' => Hash::make('password'),
-            'status' => 'approved',
-            'approved_at' => now(),
-            'email_verified_at' => now(),
-            'is_active' => true,
-        ]);
+        // ─── participant@example.com ────────────────────────────
+        $participant = User::firstOrCreate(
+            ['email' => 'participant@example.com'],
+            [
+                'name'              => '参加者テスト',
+                'password'          => $hashed,
+                'status'            => 'approved',
+                'approved_at'       => now(),
+                'email_verified_at' => now(),
+                'is_active'         => true,
+            ]
+        );
+        $this->attachRoleIfMissing($participant, $participantRole);
+        $this->command->info(($participant->wasRecentlyCreated ? '作成: ' : '既存: ') . 'participant@example.com');
 
-        $sellerRole = Role::where('name', 'seller')->first();
-        $seller->roles()->attach($sellerRole->id, [
-            'assigned_at' => now(),
-        ]);
-        $seller->roles()->attach($participantRole->id, [
-            'assigned_at' => now(),
-        ]);
+        // ─── seller@example.com（seller + participant）─────────
+        $seller = User::firstOrCreate(
+            ['email' => 'seller@example.com'],
+            [
+                'name'              => '出品者テスト',
+                'password'          => $hashed,
+                'status'            => 'approved',
+                'approved_at'       => now(),
+                'email_verified_at' => now(),
+                'is_active'         => true,
+            ]
+        );
+        $this->attachRoleIfMissing($seller, $sellerRole);
+        $this->attachRoleIfMissing($seller, $participantRole);
+        $this->command->info(($seller->wasRecentlyCreated ? '作成: ' : '既存: ') . 'seller@example.com');
 
-        $this->command->info('出品者アカウントを作成しました（参加者権限も付与）。');
-        $this->command->info('メール: seller@example.com');
-        $this->command->info('パスワード: password');
+        $this->command->info('初期パスワード: ' . $password);
+    }
+
+    private function attachRoleIfMissing(User $user, ?Role $role): void
+    {
+        if (!$role) {
+            return;
+        }
+        if ($user->roles()->where('role_id', $role->id)->exists()) {
+            return;
+        }
+        $user->roles()->attach($role->id, ['assigned_at' => now()]);
     }
 }

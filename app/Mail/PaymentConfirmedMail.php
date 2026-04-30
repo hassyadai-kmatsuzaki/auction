@@ -27,7 +27,7 @@ class PaymentConfirmedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】ご入金確認のお知らせ',
+            subject: '【日本メダカオンライン市場】ご入金確認のお知らせ',
         );
     }
 

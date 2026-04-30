@@ -27,7 +27,7 @@ class SellerPaymentReceivedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】入金確認・発送依頼のお知らせ',
+            subject: '【日本メダカオンライン市場】入金確認・発送依頼のお知らせ',
         );
     }
 

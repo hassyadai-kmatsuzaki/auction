@@ -33,7 +33,7 @@ class SetPasswordMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】パスワード設定のお願い',
+            subject: '【日本メダカオンライン市場】パスワード設定のお願い',
         );
     }
 

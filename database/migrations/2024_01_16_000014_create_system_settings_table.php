@@ -33,7 +33,7 @@ return new class extends Migration
             // サイト設定
             [
                 'setting_key' => 'site_name',
-                'setting_value' => 'メダカライブオークション',
+                'setting_value' => '日本メダカオンライン市場',
                 'value_type' => 'string',
                 'category' => 'site',
                 'display_name' => 'サイト名',

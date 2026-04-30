@@ -36,8 +36,21 @@ class PostAuctionE2ESeeder extends Seeder
     private const TITLE_PREFIX = '[E2E-POST-AUCTION]';
     private const PRIMARY_WINNER_ID = 516;
 
+    /**
+     * ⚠ 本 Seeder は `[E2E-POST-AUCTION]` プレフィックスの Auction とその関連を
+     *   delete し、固定 ID 516 の User の住所を WonItem に転写する。
+     *   本番では同名の Auction や別人の User があると意図せぬ削除/転写を起こすため abort。
+     */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'PostAuctionE2ESeeder は [E2E-POST-AUCTION] 系の Auction を delete し '
+                . '固定 User(id=516) の住所を参照するため production では実行できません。'
+                . ' staging / local でのみ使用してください。'
+            );
+        }
+
         $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->orderBy('id')->first();
         if (!$admin) {
             $this->command->error('admin ユーザーが見つかりません。AdminUserSeeder を先に実行してください。');

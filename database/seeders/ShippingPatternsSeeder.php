@@ -105,8 +105,21 @@ class ShippingPatternsSeeder extends Seeder
         ],
     ];
 
+    /**
+     * ⚠ 本 Seeder は固定 ID の User(509, 516) の住所を上書きし、
+     *   `[配送料パターン]` プレフィックスの Auction とその関連を delete する。
+     *   本番では別人にあたる ID を書き換える可能性があるため abort する。
+     */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'ShippingPatternsSeeder は User(id=509, 516) の住所を上書きし '
+                . '関連 Auction を delete するため production では実行できません。'
+                . ' staging / local でのみ使用してください。'
+            );
+        }
+
         $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->orderBy('id')->first();
         if (!$admin) {
             $this->command->error('admin ユーザーが見つかりません。AdminUserSeeder を先に実行してください。');

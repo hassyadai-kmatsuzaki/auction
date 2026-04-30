@@ -266,7 +266,7 @@ class NotificationTestController extends Controller
     {
         $auction = new Auction();
         $auction->id = 0;
-        $auction->title = '【テスト】第99回メダカライブオークション';
+        $auction->title = '【テスト】第99回日本メダカオンライン市場';
         $auction->event_date = now()->addDays(7);
         $auction->start_time = '20:00';
         $auction->description = 'これはテストメールです。実際のオークションではありません。';

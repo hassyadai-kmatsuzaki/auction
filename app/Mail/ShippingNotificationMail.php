@@ -27,7 +27,7 @@ class ShippingNotificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】商品発送のお知らせ',
+            subject: '【日本メダカオンライン市場】商品発送のお知らせ',
         );
     }
 

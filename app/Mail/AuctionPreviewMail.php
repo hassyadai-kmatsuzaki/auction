@@ -25,7 +25,7 @@ class AuctionPreviewMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "【メダカライブオークション】明日開催のお知らせ - {$this->auction->title}",
+            subject: "【日本メダカオンライン市場】明日開催のお知らせ - {$this->auction->title}",
         );
     }
 

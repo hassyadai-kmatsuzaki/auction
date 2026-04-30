@@ -33,7 +33,7 @@ class PasswordResetMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】パスワードリセット',
+            subject: '【日本メダカオンライン市場】パスワードリセット',
         );
     }
 

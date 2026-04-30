@@ -89,6 +89,41 @@ class SubscriptionServiceTest extends TestCase
         ]);
     }
 
+    public function test_subscribe_は_過去の銀行振込フラグをリセットして加入後の振込モーダル誤表示を防ぐ(): void
+    {
+        Http::fake([
+            '*connect.squareupsandbox.com/v2/customers' => Http::response([
+                'customer' => ['id' => 'CUST_RESET'],
+            ], 200),
+            '*connect.squareupsandbox.com/v2/cards' => Http::response([
+                'card' => ['id' => 'CARD_RESET', 'card_brand' => 'VISA', 'last_4' => '4242'],
+            ], 200),
+            '*connect.squareupsandbox.com/v2/payments' => Http::response([
+                'payment' => ['id' => 'PAY_RESET', 'status' => 'COMPLETED'],
+            ], 200),
+        ]);
+
+        // 過去に銀行振込モードを試したまま canceled になっているユーザーを再現する。
+        $user = $this->createParticipant();
+        $user->forceFill([
+            'payment_method_preference'  => 'bank_transfer',
+            'bank_transfer_confirmed_at' => null,
+        ])->save();
+        $plan = $this->makePlan();
+        Subscription::create([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'status'  => Subscription::STATUS_CANCELED,
+            'canceled_at' => now()->subDay(),
+        ]);
+
+        app(SubscriptionService::class)->subscribe($user->fresh(), $plan, 'cnon:src');
+
+        $fresh = $user->fresh();
+        $this->assertSame('card', $fresh->payment_method_preference);
+        $this->assertNull($fresh->bank_transfer_confirmed_at);
+    }
+
     public function test_subscribe_は_未設定環境でRuntimeException(): void
     {
         config(['services.square.access_token' => '', 'services.square.location_id' => '']);

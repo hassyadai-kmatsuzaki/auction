@@ -27,7 +27,7 @@ class WonItemNotificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】落札のお知らせ',
+            subject: '【日本メダカオンライン市場】落札のお知らせ',
         );
     }
 

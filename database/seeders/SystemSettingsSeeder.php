@@ -16,7 +16,7 @@ class SystemSettingsSeeder extends Seeder
             // ==================== システム設定 ====================
             [
                 'key' => 'site_name',
-                'value' => 'メダカライブオークション',
+                'value' => '日本メダカオンライン市場',
                 'type' => 'string',
                 'category' => 'system',
                 'label' => 'サイト名',

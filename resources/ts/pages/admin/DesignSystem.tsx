@@ -117,7 +117,7 @@ export default function DesignSystem() {
           デザインシステム
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          メダカライブオークションシステムで使用されるデザインコンポーネント一覧
+          日本メダカオンライン市場システムで使用されるデザインコンポーネント一覧
         </Typography>
       </Box>
 
@@ -225,7 +225,7 @@ export default function DesignSystem() {
             <CardContent>
               <Typography variant="subtitle1" gutterBottom>subtitle1. サブタイトル1</Typography>
               <Typography variant="subtitle2" gutterBottom>subtitle2. サブタイトル2</Typography>
-              <Typography variant="body1" gutterBottom>body1. 本文テキスト。メダカライブオークションシステムで使用される標準の本文テキストです。</Typography>
+              <Typography variant="body1" gutterBottom>body1. 本文テキスト。日本メダカオンライン市場システムで使用される標準の本文テキストです。</Typography>
               <Typography variant="body2" gutterBottom>body2. 補足テキスト。より小さなサイズで補足情報を表示します。</Typography>
               <Typography variant="caption" display="block" gutterBottom>caption. キャプションテキスト</Typography>
               <Typography variant="overline" display="block">overline. オーバーライン</Typography>

@@ -27,9 +27,22 @@ class DemoDataSeeder extends Seeder
 
     /**
      * デモデータを作成
+     *
+     * ⚠ 本 Seeder は「admin 以外の全ユーザー削除」「Auction/Item/Lane/WonItem
+     *   などの truncate」を行う完全に破壊的なシーダー。本番環境で実行すると
+     *   入札履歴・落札履歴・参加者アカウントが復旧不能な形で全消失するため、
+     *   production 環境では起動時に abort する。
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'DemoDataSeeder は破壊的（admin 以外の全ユーザー削除 + 主要テーブル truncate）'
+                . 'のため production では実行できません。'
+                . ' staging / local でのみ使用してください。'
+            );
+        }
+
         $this->command->info('デモデータの作成を開始します...');
         $this->command->info("設定: 出品者{$this->sellerCount}名, 買受者{$this->participantCount}名, オークション{$this->auctionCount}件, アイテム約" . ($this->auctionCount * $this->itemsPerAuction) . "件");
 

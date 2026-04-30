@@ -28,7 +28,7 @@ class NewAuctionNotificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【メダカライブオークション】新規オークション開催のお知らせ',
+            subject: '【日本メダカオンライン市場】新規オークション開催のお知らせ',
         );
     }
 

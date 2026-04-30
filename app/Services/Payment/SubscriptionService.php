@@ -135,6 +135,14 @@ class SubscriptionService
                 'raw_response'     => $payment,
             ]);
 
+            // カード加入が確定したので、過去に銀行振込モードを試した残りカスのフラグをリセットしておく。
+            // これをやらないと SubscriptionController::show() の bank_transfer_pending 判定が真のままになり、
+            // 加入直後に振込情報モーダルが誤表示される。
+            $user->forceFill([
+                'payment_method_preference'  => 'card',
+                'bank_transfer_confirmed_at' => null,
+            ])->save();
+
             return $subscription->fresh('plan');
         });
     }

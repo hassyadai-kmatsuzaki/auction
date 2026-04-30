@@ -29,7 +29,7 @@ class ShippingFeeFinalizedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: '【メダカライブオークション】送料確定のお知らせ');
+        return new Envelope(subject: '【日本メダカオンライン市場】送料確定のお知らせ');
     }
 
     public function content(): Content

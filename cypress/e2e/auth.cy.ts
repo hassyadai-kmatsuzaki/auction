@@ -12,7 +12,7 @@ describe('認証', () => {
   });
 
   it('AUTH-01: ログイン画面が表示される', () => {
-    cy.contains('メダカライブオークション').should('be.visible');
+    cy.contains('日本メダカオンライン市場').should('be.visible');
     cy.get('input[type="email"]').should('be.visible');
     cy.get('input[type="password"]').should('be.visible');
     cy.contains('button', 'ログイン').should('be.visible');

@@ -12,14 +12,20 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * - RoleSeeder は冪等で全環境で実行する。
+     * - AdminUserSeeder は弱パスワードの固定アカウントを作るため production ではスキップ。
      */
     public function run(): void
     {
-        // ロールを作成
-        $this->call([
-            RoleSeeder::class,
-            AdminUserSeeder::class,
-        ]);
+        $this->call([RoleSeeder::class]);
+
+        if (app()->environment('production')) {
+            $this->command?->info('production 環境のため AdminUserSeeder をスキップしました。');
+            return;
+        }
+
+        $this->call([AdminUserSeeder::class]);
     }
 
     /**
