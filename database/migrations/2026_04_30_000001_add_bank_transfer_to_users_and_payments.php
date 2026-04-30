@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->enum('payment_method_preference', ['card', 'bank_transfer'])
                   ->nullable()
-                  ->after('rejection_reason')
+                  ->after('rejected_reason')
                   ->comment('決済手段の選好。bank_transfer ならログイン時に振込情報モーダルを表示');
             $table->timestamp('bank_transfer_confirmed_at')
                   ->nullable()
