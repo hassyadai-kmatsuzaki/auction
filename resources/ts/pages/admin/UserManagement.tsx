@@ -110,11 +110,19 @@ export default function UserManagement() {
   /**
    * 選択中ユーザーをまとめてメール配信フォームに渡す。
    * URL に乗せると 100 件超で長くなるので sessionStorage 経由にしている。
+   * フォーム側のピッカーが即座に名前/メアドを描画できるよう、ID だけでなく `{id, name, email}` で渡す。
+   * 別ページで選択して現在ページにいないユーザーは ID から再構築できないので minimal な dummy を入れておく。
    */
   const handleBulkEmail = () => {
     if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds);
-    sessionStorage.setItem('email-campaign:initial-user-ids', JSON.stringify(ids));
+    const usersOnThisPage = new Map(users.map((u) => [u.id, u]));
+    const payload = Array.from(selectedIds).map((id) => {
+      const u = usersOnThisPage.get(id);
+      return u
+        ? { id: u.id, name: u.name, email: u.email, trade_name: u.trade_name }
+        : { id, name: `ユーザー#${id}`, email: '', trade_name: null };
+    });
+    sessionStorage.setItem('email-campaign:initial-users', JSON.stringify(payload));
     navigate('/admin/email-campaigns/create?from=user_selection');
   };
 

@@ -22,76 +22,96 @@ import {
 } from '@mui/material';
 import { Send as SendIcon, Preview as PreviewIcon, Outbox as TestIcon } from '@mui/icons-material';
 import { emailCampaignApi, TargetType, CampaignTargetFilter } from '../../api/admin/emailCampaignApi';
+import MultiUserPicker, { PickerUser } from '../../components/admin/MultiUserPicker';
+import axios from '../../lib/axios';
 
 /**
  * メール一斉/個別配信の作成画面。
  *
  * 起動経路:
- * - ?user_id=N        … UserDetail の「メール送信」から（n=1 の個別送信）
- * - ?from=user_selection … UserManagement のチェックボックス選択から。
- *                          ID 配列は sessionStorage に置いてある（URL に長大に乗せないため）。
+ * - ?user_id=N           … UserDetail の「メール送信」（n=1 の個別送信）。ID から API でユーザー情報を取得して埋める
+ * - ?from=user_selection … UserManagement のチェックボックス選択。`{id, name, email}[]` が sessionStorage にある
+ *                          （URL に長大に乗せないため）
+ *
+ * 「ユーザーで指定」モードは MultiUserPicker（名前/メール検索オートコンプリート）で
+ * ユーザーを直接選ぶ UI に統一している。
  */
-const SESSION_KEY_INITIAL_USER_IDS = 'email-campaign:initial-user-ids';
-
-function readInitialUserIds(searchParams: URLSearchParams): number[] {
-  const single = searchParams.get('user_id');
-  if (single) {
-    const n = parseInt(single, 10);
-    return Number.isFinite(n) && n > 0 ? [n] : [];
-  }
-  if (searchParams.get('from') === 'user_selection') {
-    try {
-      const raw = sessionStorage.getItem(SESSION_KEY_INITIAL_USER_IDS);
-      sessionStorage.removeItem(SESSION_KEY_INITIAL_USER_IDS); // 一度使ったら破棄
-      if (!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr.filter((n: unknown) => typeof n === 'number' && n > 0) : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
+const SESSION_KEY_INITIAL_USERS = 'email-campaign:initial-users';
 
 export default function EmailCampaignForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const initialUserIds = readInitialUserIds(searchParams);
-  const initialTargetType: TargetType = initialUserIds.length > 0 ? 'manual' : 'all';
-
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [targetType, setTargetType] = useState<TargetType>(initialTargetType);
+  const [targetType, setTargetType] = useState<TargetType>('all');
   const [filter, setFilter] = useState<CampaignTargetFilter>({});
-  const [manualIds, setManualIds] = useState<string>(initialUserIds.join(', '));
+  const [selectedUsers, setSelectedUsers] = useState<PickerUser[]>([]);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewSample, setPreviewSample] = useState<{ id: number; name: string; email: string }[]>([]);
   const [previewing, setPreviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [testSending, setTestSending] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // フォーム状態が変わったら件数を都度クリア（古い件数で送信させないため）
+  // 起動時に「どのユーザーが事前選択されているか」を解決する
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // (a) sessionStorage 経由（UserManagement の複数選択から）
+        if (searchParams.get('from') === 'user_selection') {
+          const raw = sessionStorage.getItem(SESSION_KEY_INITIAL_USERS);
+          sessionStorage.removeItem(SESSION_KEY_INITIAL_USERS);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              if (!cancelled) {
+                setSelectedUsers(parsed.filter((u: any) => u && typeof u.id === 'number'));
+                setTargetType('manual');
+              }
+              return;
+            }
+          }
+        }
+
+        // (b) クエリ user_id=N（UserDetail からの個別送信）。API で名前/メアドを取りに行く
+        const single = searchParams.get('user_id');
+        if (single) {
+          const id = parseInt(single, 10);
+          if (Number.isFinite(id) && id > 0) {
+            const res = await axios.get(`/api/admin/users/${id}`);
+            const u = res.data?.data?.user ?? res.data?.data ?? null;
+            if (u && u.id && !cancelled) {
+              setSelectedUsers([{ id: u.id, name: u.name, email: u.email, trade_name: u.trade_name ?? null }]);
+              setTargetType('manual');
+            }
+          }
+        }
+      } catch {
+        // 失敗しても致命ではない（ユーザーは検索 UI で選び直せる）
+      } finally {
+        if (!cancelled) setInitializing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 入力変更で件数キャッシュを毎回クリア（古い件数で誤送信させないため）
   useEffect(() => {
     setPreviewCount(null);
     setPreviewSample([]);
-  }, [targetType, filter, manualIds]);
-
-  const parseManualIds = (): number[] => {
-    return manualIds
-      .split(/[\s,]+/)
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => Number.isFinite(n) && n > 0);
-  };
+  }, [targetType, filter, selectedUsers]);
 
   const buildPayload = () => ({
     subject,
     body_markdown: body,
     target_type: targetType,
     target_filter: targetType === 'filter' ? filter : null,
-    target_user_ids: targetType === 'manual' ? parseManualIds() : null,
+    target_user_ids: targetType === 'manual' ? selectedUsers.map((u) => u.id) : null,
   });
 
   const handlePreview = async () => {
@@ -149,13 +169,13 @@ export default function EmailCampaignForm() {
     }
   };
 
-  const isManualValid = targetType !== 'manual' || parseManualIds().length > 0;
+  const isManualValid = targetType !== 'manual' || selectedUsers.length > 0;
 
   return (
     <Box sx={{ p: 3, maxWidth: 1080, mx: 'auto' }}>
       <Typography variant="h5" mb={2}>
-        {initialUserIds.length === 1 ? 'メール個別送信'
-          : initialUserIds.length > 1 ? `メール送信（${initialUserIds.length}人を選択中）`
+        {selectedUsers.length === 1 ? 'メール個別送信'
+          : selectedUsers.length > 1 ? `メール送信（${selectedUsers.length}人を選択中）`
           : 'メール配信 新規作成'}
       </Typography>
 
@@ -192,7 +212,7 @@ export default function EmailCampaignForm() {
           <RadioGroup row value={targetType} onChange={(e) => setTargetType(e.target.value as TargetType)}>
             <FormControlLabel value="all" control={<Radio />} label="承認済みユーザー全員" />
             <FormControlLabel value="filter" control={<Radio />} label="条件で絞り込み" />
-            <FormControlLabel value="manual" control={<Radio />} label="ユーザーIDで指定" />
+            <FormControlLabel value="manual" control={<Radio />} label="ユーザーを選んで指定" />
           </RadioGroup>
         </FormControl>
 
@@ -262,15 +282,14 @@ export default function EmailCampaignForm() {
 
         {targetType === 'manual' && (
           <Box sx={{ mt: 2, pl: 1 }}>
-            <TextField
-              label="ユーザーID（カンマ・スペース・改行区切り）"
-              value={manualIds}
-              onChange={(e) => setManualIds(e.target.value)}
-              fullWidth
-              multiline
-              minRows={3}
-              helperText={`${parseManualIds().length} 件のIDを認識`}
-            />
+            {initializing ? (
+              <Box display="flex" alignItems="center" gap={1}><CircularProgress size={16} /><Typography variant="body2">初期ユーザーを読み込み中...</Typography></Box>
+            ) : (
+              <MultiUserPicker
+                value={selectedUsers}
+                onChange={setSelectedUsers}
+              />
+            )}
           </Box>
         )}
       </Paper>
