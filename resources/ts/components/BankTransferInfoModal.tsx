@@ -15,6 +15,11 @@ import { AccountBalance } from '@mui/icons-material';
 interface Props {
   open: boolean;
   onClose: () => void;
+  /**
+   * 閉じるボタン・バックドロップクリック・Escでの閉じる操作を許可するか。
+   * SubscriptionGate のように管理者の入金確認まで強制表示したい場面では false。
+   */
+  dismissible?: boolean;
 }
 
 const BANK_INFO = {
@@ -27,11 +32,15 @@ const BANK_INFO = {
   accountHolder: 'カ）ネプ ニホンメダカオンラインイチバ',
 };
 
-export default function BankTransferInfoModal({ open, onClose }: Props) {
+export default function BankTransferInfoModal({ open, onClose, dismissible = true }: Props) {
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={(_e, reason) => {
+        if (!dismissible && (reason === 'backdropClick' || reason === 'escapeKeyDown')) return;
+        onClose();
+      }}
+      disableEscapeKeyDown={!dismissible}
       fullWidth
       maxWidth="sm"
       slotProps={{
@@ -75,16 +84,22 @@ export default function BankTransferInfoModal({ open, onClose }: Props) {
             </Stack>
           </Box>
 
+          <Typography variant="body2" color="text.secondary">
+            振り込み後に公式LINEにご報告いただけますと幸いです。
+          </Typography>
+
           <Typography variant="caption" color="text.secondary">
             振込が確認されますと、本ご案内は次回ログイン以降表示されなくなります。
           </Typography>
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} variant="contained">
-          閉じる
-        </Button>
-      </DialogActions>
+      {dismissible && (
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={onClose} variant="contained">
+            閉じる
+          </Button>
+        </DialogActions>
+      )}
     </Dialog>
   );
 }

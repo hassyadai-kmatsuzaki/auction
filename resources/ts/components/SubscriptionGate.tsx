@@ -79,6 +79,7 @@ export default function SubscriptionGate({ children }: Props) {
       />
       <BankTransferInfoModal
         open={bankInfoOpen}
+        dismissible={false}
         onClose={() => setBankInfoOpen(false)}
       />
     </>
