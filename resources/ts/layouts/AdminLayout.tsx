@@ -39,6 +39,7 @@ import {
   CreditCard as CreditCardIcon,
   Subscriptions as SubscriptionsIcon,
   WorkspacePremium as PlanIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -93,6 +94,7 @@ export default function AdminLayout() {
   const menuItems = [
     { text: 'ダッシュボード', icon: <DashboardIcon />, path: '/admin/dashboard' },
     { text: 'お知らせ管理', icon: <CampaignIcon />, path: '/admin/announcements' },
+    { text: 'メール配信', icon: <EmailIcon />, path: '/admin/email-campaigns' },
   ];
 
   const userSubItems = [

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\WonItem;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
 
 class ItemSoldNotificationMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public $wonItem;
     public $seller;
@@ -20,6 +21,7 @@ class ItemSoldNotificationMail extends Mailable
     {
         $this->wonItem = $wonItem;
         $this->seller = $wonItem->item->seller ?? null;
+        $this->routeViaNotify();
     }
 
     public function envelope(): Envelope

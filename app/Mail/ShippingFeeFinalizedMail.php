@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\WonItem;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -12,7 +13,7 @@ use Illuminate\Support\Collection;
 
 class ShippingFeeFinalizedMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public Collection $wonItems;
     public $user;
@@ -23,6 +24,7 @@ class ShippingFeeFinalizedMail extends Mailable
         $this->wonItems = $wonItems;
         $this->user = $wonItems->first()->user;
         $this->totalShippingFee = (int) $wonItems->sum('shipping_fee');
+        $this->routeViaNotify();
     }
 
     public function envelope(): Envelope

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\WonItem;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -11,12 +12,14 @@ use Illuminate\Queue\SerializesModels;
 
 class PaymentReminderMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public function __construct(
         public WonItem $wonItem,
         public string  $urgency = '24時間前',
-    ) {}
+    ) {
+        $this->routeViaNotify();
+    }
 
     public function envelope(): Envelope
     {

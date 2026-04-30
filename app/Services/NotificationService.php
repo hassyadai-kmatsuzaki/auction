@@ -39,6 +39,12 @@ class NotificationService
     private function sendLine(int $userId, string $type, string $text, ?array $flexContent = null): void
     {
         try {
+            // 未承認/停止ユーザーへの通知漏れ防止。参加・落札時は承認済みでも、
+            // 事後に status が pending/suspended/rejected へ落ちたケースで LINE が飛ぶのを止める。
+            $user = User::find($userId);
+            if (!$user || !$user->is_active || $user->status !== 'approved') {
+                return;
+            }
             SendLineNotificationJob::dispatch($userId, $type, $text, $flexContent);
         } catch (\Exception $e) {
             Log::warning("LINE notification dispatch failed: {$type} user={$userId} - " . $e->getMessage());
@@ -299,6 +305,8 @@ class NotificationService
         try {
             $user = $wonItem->user;
             if (!$user) return;
+            // 入金催促メールも未承認/停止アカウントへは送らない（事後ステータス変更ケース対策）。
+            if (!$user->is_active || $user->status !== 'approved') return;
 
             // メール
             if ($user->email) {
@@ -462,6 +470,9 @@ class NotificationService
 
     protected function shouldSendSellerNotification(User $seller, string $settingKey): bool
     {
+        // 未承認/停止アカウントには配信しない（クエリ段で approved() を使っていない個別送信パス対策）。
+        if (!$seller->is_active || $seller->status !== 'approved') return false;
+
         $profile = SellerProfile::where('user_id', $seller->id)->first();
         if (!$profile) return true;
         $settings = $profile->notification_settings ?? [];
@@ -470,6 +481,9 @@ class NotificationService
 
     protected function shouldSendParticipantNotification(User $participant, string $settingKey): bool
     {
+        // 未承認/停止アカウントには配信しない（クエリ段で approved() を使っていない個別送信パス対策）。
+        if (!$participant->is_active || $participant->status !== 'approved') return false;
+
         $settings = $participant->notification_settings ?? [];
         return $settings[$settingKey] ?? true;
     }

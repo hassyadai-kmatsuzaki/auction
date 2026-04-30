@@ -26,6 +26,15 @@ return [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        // SES Configuration Set 名。設定するとバウンス/苦情イベントが SNS 経由で受け取れる。
+        'configuration_set' => env('AWS_SES_CONFIGURATION_SET'),
+        // バルク送信時の最大 TPS。SES アカウントの送信レート上限に合わせて設定
+        'send_rate_per_second' => (int) env('AWS_SES_SEND_RATE_PER_SECOND', 14),
+        // SNS 経由でバウンス/苦情通知を受ける Topic ARN（Webhook 側で許可リスト照合に使用）
+        'sns_topic_arns' => array_values(array_filter([
+            env('SES_SNS_TOPIC_ARN_BOUNCE'),
+            env('SES_SNS_TOPIC_ARN_COMPLAINT'),
+        ])),
     ],
 
     'slack' => [

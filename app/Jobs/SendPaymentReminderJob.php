@@ -26,7 +26,7 @@ class SendPaymentReminderJob implements ShouldQueue
 
     public function __construct()
     {
-        $this->onQueue('default');
+        $this->onQueue('notify');
     }
 
     public function handle(NotificationService $notificationService): void

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -10,14 +11,16 @@ use Illuminate\Queue\SerializesModels;
 
 class BidLimitReachedMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public function __construct(
         public string $speciesName,
         public float  $limitPrice,
         public float  $currentPrice,
         public string $userName,
-    ) {}
+    ) {
+        $this->routeViaNotify();
+    }
 
     public function envelope(): Envelope
     {

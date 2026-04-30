@@ -35,6 +35,7 @@ import {
   PlayArrow as PlayArrowIcon,
   Delete as DeleteIcon,
   AccountBalance as AccountBalanceIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -308,6 +309,14 @@ export default function UserDetail() {
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           ユーザー詳細
         </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<EmailIcon />}
+          onClick={() => navigate(`/admin/email-campaigns/create?user_id=${id}`)}
+          sx={{ mr: 1 }}
+        >
+          メール送信
+        </Button>
         <Button
           variant="contained"
           startIcon={<EditIcon />}

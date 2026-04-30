@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -10,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 
 class FavoriteApproachingMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public function __construct(
         public string $speciesName,
@@ -18,7 +19,9 @@ class FavoriteApproachingMail extends Mailable
         public string $laneName,
         public string $auctionTitle,
         public string $userName,
-    ) {}
+    ) {
+        $this->routeViaNotify();
+    }
 
     public function envelope(): Envelope
     {

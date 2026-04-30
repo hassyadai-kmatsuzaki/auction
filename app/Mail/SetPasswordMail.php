@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToPriorityQueue;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
 
 class SetPasswordMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToPriorityQueue;
 
     public $user;
     public $verificationUrl;
@@ -23,6 +24,7 @@ class SetPasswordMail extends Mailable
     {
         $this->user = $user;
         $this->verificationUrl = $verificationUrl;
+        $this->routeViaPriority();
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\WonItem;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
 
 class PaymentConfirmedMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public $wonItem;
     public $user;
@@ -20,6 +21,7 @@ class PaymentConfirmedMail extends Mailable
     {
         $this->wonItem = $wonItem;
         $this->user = $wonItem->user;
+        $this->routeViaNotify();
     }
 
     public function envelope(): Envelope

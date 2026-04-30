@@ -19,6 +19,8 @@ use App\Services\CountdownService;
 use App\Services\Monitoring\MetricRecorder;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -58,6 +60,40 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureRateLimiting();
+        $this->configureOutgoingMailHeaders();
+    }
+
+    /**
+     * 全送信メールに共通ヘッダを差し込む。
+     *
+     * - Reply-To: 返信不可運用なので noreply に固定
+     * - Auto-Submitted / X-Auto-Response-Suppress: 自動応答ループ抑止
+     * - X-SES-CONFIGURATION-SET: SES のバウンス/苦情イベントを SNS に流すために必須
+     *
+     * Mailable 側に手を入れないことで、既存・新規いずれのメールにも一律適用する。
+     */
+    protected function configureOutgoingMailHeaders(): void
+    {
+        $configurationSet = config('services.ses.configuration_set');
+        $replyTo = config('mail.reply_to.address') ?: config('mail.from.address');
+
+        Event::listen(function (MessageSending $event) use ($configurationSet, $replyTo) {
+            $message = $event->message; // Symfony\Component\Mime\Email
+            $headers = $message->getHeaders();
+
+            if ($replyTo && !$headers->has('Reply-To')) {
+                $message->replyTo($replyTo);
+            }
+            if (!$headers->has('Auto-Submitted')) {
+                $headers->addTextHeader('Auto-Submitted', 'auto-generated');
+            }
+            if (!$headers->has('X-Auto-Response-Suppress')) {
+                $headers->addTextHeader('X-Auto-Response-Suppress', 'All');
+            }
+            if ($configurationSet && !$headers->has('X-SES-CONFIGURATION-SET')) {
+                $headers->addTextHeader('X-SES-CONFIGURATION-SET', $configurationSet);
+            }
+        });
     }
 
     /**
@@ -90,6 +126,13 @@ class AppServiceProvider extends ServiceProvider
         // 参加者向け一般 API（読み取り中心）: 1 分に 300 回
         RateLimiter::for('participant-general', fn (Request $r) =>
             Limit::perMinute(300)->by($byUserOrIp($r))
+        );
+
+        // SES 送信レート制限。SES アカウントの Max send rate (TPS) に合わせて設定する。
+        // notify キューワーカーが複数プロセスで動いていても、グローバルにこの上限を超えない。
+        // 上限超過時は SendCampaignEmailJob が release() されてリトライされる。
+        RateLimiter::for('ses-send', fn () =>
+            Limit::perSecond((int) config('services.ses.send_rate_per_second', 14))->by('ses-global')
         );
     }
 }

@@ -1029,6 +1029,36 @@ numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/queue-default.log
 
+; ---- Queue Worker: notify (バルク配信・LINE通知・落札系メール) ----
+; メール一斉配信や LINE 通知などの「外部送信系」を捌く専用キュー。
+; default に同居させると、一斉配信中に他の業務 Job が詰まるため独立させている。
+[program:auction-queue-notify]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/auction/artisan queue:work redis --queue=notify --sleep=3 --tries=3 --timeout=120 --memory=128 --max-jobs=1000 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=ec2-user
+numprocs=2
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/queue-notify.log
+
+; ---- Queue Worker: notify-priority (認証系トランザクションメール) ----
+; パスワードリセット等、ユーザー操作をブロックするトランザクションメール専用。
+; notify が一斉配信で詰まっても影響を受けないよう独立ワーカーで捌く。
+[program:auction-queue-notify-priority]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/auction/artisan queue:work redis --queue=notify-priority --sleep=1 --tries=3 --timeout=60 --memory=128 --max-jobs=1000 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=ec2-user
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/queue-notify-priority.log
+
 ; ---- Laravel Reverb (WebSocket) ----
 [program:auction-reverb]
 command=php /var/www/auction/artisan reverb:start --host=0.0.0.0 --port=6001
@@ -1042,8 +1072,9 @@ redirect_stderr=true
 stdout_logfile=/var/log/supervisor/reverb.log
 ```
 
-> **注意**: 通常モード（t3.small）では countdown×1, default×1 で運用。
+> **注意**: 通常モード（t3.small）では countdown×1, default×1, notify×2, notify-priority×1 で運用。
 > オークションモード（t3.large）にスケールアップ時は `numprocs` を countdown×5, default×2 に変更。
+> notify / notify-priority はメール SES の TPS 制限がボトルネックなので、ワーカーを増やしても上限以上は出ない。スケール対象外。
 
 ### 11-2. Supervisor 反映
 

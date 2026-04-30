@@ -22,7 +22,7 @@ class SendLineNotificationJob implements ShouldQueue
         public string $text,
         public ?array $flexContent = null,
     ) {
-        $this->onQueue('default');
+        $this->onQueue('notify');
     }
 
     public function handle(LineService $lineService): void

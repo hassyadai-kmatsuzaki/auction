@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToPriorityQueue;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -11,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
 
 class PasswordResetMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToPriorityQueue;
 
     public $user;
     public $resetUrl;
@@ -23,6 +24,7 @@ class PasswordResetMail extends Mailable
     {
         $this->user = $user;
         $this->resetUrl = $resetUrl;
+        $this->routeViaPriority();
     }
 
     /**

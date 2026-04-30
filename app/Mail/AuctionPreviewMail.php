@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\Auction;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -12,12 +13,14 @@ use Illuminate\Queue\SerializesModels;
 
 class AuctionPreviewMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, RoutesToNotifyQueue;
 
     public function __construct(
         public Auction $auction,
         public User    $user,
-    ) {}
+    ) {
+        $this->routeViaNotify();
+    }
 
     public function envelope(): Envelope
     {

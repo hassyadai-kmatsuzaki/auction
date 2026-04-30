@@ -46,6 +46,9 @@ const ParticipantManual      = lazy(() => import('./pages/participant/Manual'));
 const AdminDashboard         = lazy(() => import('./pages/admin/Dashboard'));
 const AnnouncementManagement = lazy(() => import('./pages/admin/AnnouncementManagement'));
 const AnnouncementForm       = lazy(() => import('./pages/admin/AnnouncementForm'));
+const EmailCampaignManagement = lazy(() => import('./pages/admin/EmailCampaignManagement'));
+const EmailCampaignForm      = lazy(() => import('./pages/admin/EmailCampaignForm'));
+const EmailCampaignDetail    = lazy(() => import('./pages/admin/EmailCampaignDetail'));
 const AuctionManagement      = lazy(() => import('./pages/admin/AuctionManagement'));
 const AuctionForm            = lazy(() => import('./pages/admin/AuctionForm'));
 const ItemManagement         = lazy(() => import('./pages/admin/ItemManagement'));
@@ -170,6 +173,11 @@ function App() {
             <Route path="announcements" element={<AnnouncementManagement />} />
             <Route path="announcements/create" element={<AnnouncementForm />} />
             <Route path="announcements/:id/edit" element={<AnnouncementForm />} />
+
+            {/* メール配信 */}
+            <Route path="email-campaigns" element={<EmailCampaignManagement />} />
+            <Route path="email-campaigns/create" element={<EmailCampaignForm />} />
+            <Route path="email-campaigns/:id" element={<EmailCampaignDetail />} />
             
             {/* オークション管理 */}
             <Route path="auctions" element={<AuctionManagement />} />

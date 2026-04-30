@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
+use App\Http\Controllers\Admin\EmailCampaignController as AdminEmailCampaignController;
 use App\Http\Controllers\Admin\AuctionController as AdminAuctionController;
 use App\Http\Controllers\Admin\SystemSettingController;
 use App\Http\Controllers\User\AnnouncementController as UserAnnouncementController;
@@ -149,6 +150,15 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::apiResource('announcements', AdminAnnouncementController::class);
     Route::patch('announcements/{id}/toggle-visibility', [AdminAnnouncementController::class, 'toggleVisibility']);
     Route::post('announcements/generate-content', [AdminAnnouncementController::class, 'generateContent']);
+
+    // メール配信管理
+    // preview/test-send は POST だが副作用（DB 書き込み）はないので apiResource の前に置く
+    Route::post('email-campaigns/preview', [AdminEmailCampaignController::class, 'preview']);
+    Route::post('email-campaigns/test-send', [AdminEmailCampaignController::class, 'testSend']);
+    Route::get('email-campaigns', [AdminEmailCampaignController::class, 'index']);
+    Route::get('email-campaigns/{id}', [AdminEmailCampaignController::class, 'show'])->whereNumber('id');
+    Route::post('email-campaigns', [AdminEmailCampaignController::class, 'store']);
+    Route::post('email-campaigns/{id}/cancel', [AdminEmailCampaignController::class, 'cancel'])->whereNumber('id');
     
     // オークション管理
     Route::apiResource('auctions', AdminAuctionController::class);

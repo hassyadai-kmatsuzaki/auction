@@ -51,6 +51,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // APIではCSRF保護を無効化
         $middleware->validateCsrfTokens(except: [
             'api/*',
+            // SES → SNS Webhook は AWS から POST されるため CSRF 適用外。
+            // 認証は SNS 署名検証 + Topic ARN ホワイトリストで行う。
+            'webhooks/ses/*',
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {

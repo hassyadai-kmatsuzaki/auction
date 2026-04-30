@@ -71,6 +71,7 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+            'permission' => 0664,
         ],
 
         'slack' => [
@@ -144,6 +145,7 @@ return [
             'level' => 'info',
             'days' => 90,
             'replace_placeholders' => false,
+            'permission' => 0664,
         ],
 
         'alerts' => [
@@ -153,6 +155,7 @@ return [
             'days' => env('ALERTS_LOG_DAYS', 30),
             'tap' => [\App\Logging\PlainJsonFormatter::class],
             'replace_placeholders' => false,
+            'permission' => 0664,
         ],
 
     ],

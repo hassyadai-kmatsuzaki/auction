@@ -53,6 +53,10 @@ class User extends Authenticatable
         'google_id',
         'trust_score',
         'review_count',
+        'email_bounced_at',
+        'email_complained_at',
+        'email_opt_out_at',
+        'unsubscribe_token',
     ];
 
     /**
@@ -65,6 +69,7 @@ class User extends Authenticatable
         'remember_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'unsubscribe_token',
     ];
 
     /**
@@ -84,6 +89,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'notification_settings' => 'array',
             'two_factor_confirmed_at' => 'datetime',
+            'email_bounced_at' => 'datetime',
+            'email_complained_at' => 'datetime',
+            'email_opt_out_at' => 'datetime',
         ];
     }
 
@@ -273,5 +281,38 @@ class User extends Authenticatable
     {
         return $query->where('is_active', true)
             ->where('status', 'approved');
+    }
+
+    /**
+     * バルク配信が可能なユーザーのみに絞るスコープ。
+     * バウンス/苦情/opt-out のいずれかが立っていれば除外される。
+     * トランザクションメール（パスワードリセット等）はこのスコープを使わない。
+     */
+    public function scopeMailable($query)
+    {
+        return $query->whereNull('email_bounced_at')
+            ->whereNull('email_complained_at')
+            ->whereNull('email_opt_out_at');
+    }
+
+    /**
+     * バルク配信を受け取れる状態か（個別判定用）。
+     */
+    public function canReceiveBulkEmail(): bool
+    {
+        return $this->email_bounced_at === null
+            && $this->email_complained_at === null
+            && $this->email_opt_out_at === null;
+    }
+
+    /**
+     * 配信停止リンク用の URL。unsubscribe_token をそのまま埋め込む。
+     */
+    public function getUnsubscribeUrl(): ?string
+    {
+        if (empty($this->unsubscribe_token)) {
+            return null;
+        }
+        return rtrim(config('app.url'), '/') . '/unsubscribe/' . $this->unsubscribe_token;
     }
 }
