@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\SellerProfile;
 use App\Models\EmailVerificationToken;
+use App\Mail\AccountApprovedMail;
 use App\Mail\SetPasswordMail;
 use App\Services\Payment\SubscriptionService;
 use Illuminate\Http\Request;
@@ -252,6 +253,8 @@ class UserController extends Controller
             'roles.*' => 'string|in:admin,seller,participant',
         ]);
 
+        $shouldNotifyApproval = false;
+
         DB::beginTransaction();
         try {
             // ユーザー情報更新
@@ -263,6 +266,7 @@ class UserController extends Controller
             // ステータス変更時の処理
             if ($request->has('status')) {
                 if ($request->status === 'approved' && $user->wasChanged('status')) {
+                    $shouldNotifyApproval = true;
                     $user->update([
                         'approved_at' => now(),
                         'approved_by' => auth()->id(),
@@ -289,6 +293,10 @@ class UserController extends Controller
             }
 
             DB::commit();
+
+            if ($shouldNotifyApproval) {
+                Mail::to($user->email)->queue(new AccountApprovedMail($user));
+            }
 
             return response()->json([
                 'success' => true,
