@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=28">
+  <link rel="stylesheet" href="/css/lp.css?v=29">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
@@ -21,93 +21,116 @@
     })(document);
   </script>
 </head>
-<body class="lp-bizpro lp-bizpro--buyer">
+<body>
 
-<!-- ===== HEADER (sticky, biz-nav) ===== -->
-<header class="bizpro-header" id="header">
-  <div class="bizpro-header__inner">
-    <a href="/buyer" class="bizpro-header__logo">
-      <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="bizpro-header__logo-img">
+<!-- ===== HEADER ===== -->
+<header class="header" id="header">
+  <div class="header__inner">
+    <a href="/buyer" class="header__logo">
+      <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="header__logo-img">
     </a>
-    <nav class="bizpro-header__nav" aria-label="ヘッダーナビ">
-      <a href="/seller" class="bizpro-header__link">出品者の方へ</a>
-      <a href="/buyer" class="bizpro-header__link is-current" aria-current="page">落札者の方へ</a>
-      <a href="#pricing" class="bizpro-header__link">料金</a>
-      <a href="#faq" class="bizpro-header__link">FAQ</a>
-    </nav>
-    <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="bizpro-header__cta">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
-      <span>LINEで登録</span>
-    </a>
+    <div class="header__right">
+      <a href="/seller" class="header__btn header__btn--login">出品者の方へ</a>
+      <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="header__cta">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+        <span>LINE登録</span>
+      </a>
+    </div>
   </div>
 </header>
 
-<!-- ===== ① FV / HERO ===== -->
-<section class="bizpro-hero">
-  <div class="bizpro-hero__bg" aria-hidden="true"></div>
-  <div class="bizpro-hero__inner container">
-    <div class="bizpro-hero__badge">
-      <span class="bizpro-hero__badge-l">MEMBERS ONLY</span>
-      <span class="bizpro-hero__badge-sep" aria-hidden="true">・</span>
-      <span class="bizpro-hero__badge-r">業者向けオンラインオークション</span>
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero__inner">
+    <p class="hero__eyebrow sp-only hero-anim" data-hero-delay="1">MEMBERS ONLY × 業者向けオンラインオークション</p>
+
+    <div class="hero__visual hero-anim" data-hero-delay="2">
+      <img src="/img/lp/fv-okada-yui.png" alt="" class="hero__visual-img" loading="eager">
     </div>
-    <p class="bizpro-hero__lead">業界初</p>
-    <h1 class="bizpro-hero__title">業者専用<br class="sp-only">オンラインオークション</h1>
-    <p class="bizpro-hero__desc">
-      審査を通過したプロ出品者のメダカを、<br class="sp-only">匿名・卸値で仕入れられる場所。<br>
-      業者だけのオンラインオークション、<br class="sp-only">それが {{ $brand }} です。
-    </p>
-    <div class="bizpro-hero__cta">
-      <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="bizpro-btn bizpro-btn--primary">
-        <span>LINE追加でデモを試す</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+
+    <div class="hero__copy hero-anim" data-hero-delay="3">
+      <p class="hero__eyebrow hero__eyebrow--inline pc-only">MEMBERS ONLY × 業者向けオンラインオークション</p>
+      <h1 class="hero__title">
+        <span class="hero__title-line">業界初、業者専用</span>
+        <span class="hero__title-line hero__title-line--strong">オンラインオークション。</span>
+      </h1>
+      <p class="hero__desc">
+        審査を通過したプロ出品者のメダカを、<br class="pc-only">
+        匿名・卸値で仕入れられる場所。<br>
+        業者だけのオンラインオークション、それが {{ $brand }} です。
+      </p>
+    </div>
+
+    <div class="hero__cta hero-anim" data-hero-delay="4">
+      <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="hero__cta-card hero__cta-card--primary">
+        <span class="hero__cta-card__icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2-3 5-5 9-5s7 2 9 5c-2 3-5 5-9 5s-7-2-9-5z"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>
+        </span>
+        <span class="hero__cta-card__body">
+          <span class="hero__cta-card__title">LINE追加でデモを試す</span>
+          <span class="hero__cta-card__sub">落札したい方はこちら</span>
+        </span>
+        <span class="hero__cta-card__arrow" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
+      </a>
+      <a href="/seller" class="hero__cta-card hero__cta-card--secondary">
+        <span class="hero__cta-card__icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6h6"/><path d="M19 9V21H5V3h9z"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
+        </span>
+        <span class="hero__cta-card__body">
+          <span class="hero__cta-card__title">出品者の方へ</span>
+          <span class="hero__cta-card__sub">出品もご検討の方はこちら</span>
+        </span>
+        <span class="hero__cta-card__arrow" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
       </a>
     </div>
-    <p class="bizpro-hero__note">
-      ※ LINE登録だけで、すぐにデモをお試しいただけます。<br>
-      ※ 出品もご検討の方は <a href="/seller" class="bizpro-hero__note-link">出品者の方へ →</a>
-    </p>
   </div>
 </section>
 
 <!-- ===== ② 協賛企業・協力ブリーダー ロゴ帯 ===== -->
-<section class="bizpro-partners" id="partners">
+<section class="section section--partners" id="partners">
   <div class="container">
-    <div class="bizpro-partners__head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">PARTNERS</p>
-      <h2 class="bizpro-partners__title">協賛企業・協力ブリーダー</h2>
-      <p class="bizpro-partners__desc">
-        日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、<br class="pc-only">
-        業者間プラットフォームです。
-      </p>
+    <div class="partners-header anim" data-anim="fade-up">
+      <h2 class="partners-header__title">
+        協賛企業・<span class="partners-header__num">協力ブリーダー</span>
+      </h2>
     </div>
-    <div class="bizpro-partners__marquee anim" data-anim="fade-up" aria-hidden="true">
-      <div class="bizpro-partners__track">
+
+    <p class="partners-header__desc anim" data-anim="fade-up" style="text-align:center; max-width:680px; margin:0 auto 1.75rem; color:#4a5568; font-weight:500; line-height:1.85; font-size:clamp(0.92rem, 1.6vw, 1rem);">
+      日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、<br class="pc-only">
+      業者間プラットフォームです。
+    </p>
+
+    <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
+      <div class="partners-marquee__track">
         @for ($i = 0; $i < 2; $i++)
-          @for ($j = 0; $j < 10; $j++)
-            <div class="bizpro-partners__item">
+          @for ($j = 0; $j < 12; $j++)
+            <div class="partners-marquee__item">
               <img src="/img/logo.png?v=2" alt="" loading="lazy">
             </div>
           @endfor
         @endfor
       </div>
     </div>
-    <p class="bizpro-partners__note anim" data-anim="fade-up">※ 協賛企業・協力ブリーダーのロゴは順次掲載予定です。</p>
+
+    <p class="partners-note anim" data-anim="fade-up">※ 協賛企業・協力ブリーダーのロゴは順次掲載予定です。</p>
   </div>
 </section>
 
 <!-- ===== ③ メダカ業界を、もう一段。 ===== -->
-<section class="bizpro-mission">
+<section class="section section--mission">
   <div class="container">
-    <div class="bizpro-mission__inner anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow bizpro-eyebrow--center">MISSION</p>
-      <h2 class="bizpro-mission__title">メダカ業界を、<br class="sp-only">もう一段。</h2>
-      <p class="bizpro-mission__lead">
+    <div class="mission-inner anim" data-anim="fade-up">
+      <h2 class="mission-title">メダカ業界を、<br class="sp-only">もう一段。</h2>
+      <p class="mission-lead">
         日本のメダカ業界には、業者だけの場所が必要だと、<br class="pc-only">
         私たちは考えています。
       </p>
 
-      <div class="bizpro-mission__body">
+      <div class="mission-body">
         <p>ヤフオクは便利。でも、個人愛好家との混雑で、<br class="pc-only">
           業者間の相場は読みにくく、丹精込めた個体が値崩れすることもある。</p>
         <p>オフライン競りは信頼できる。でも、地域に縛られ、<br class="pc-only">
@@ -116,324 +139,374 @@
           それに見合うインフラが、これまでありませんでした。</p>
       </div>
 
-      <div class="bizpro-mission__pledge">
+      <div class="mission-pledge">
         <p>{{ $brand }} は、業者だけが集まれる<br class="sp-only">オンラインオークションです。</p>
         <p>信頼できるブリーダーから、信頼できる業者へ。<br>
           相場と収益を守りながら、業界全体を、もう一段引き上げる。</p>
       </div>
 
-      <div class="bizpro-mission__close">
-        <p class="bizpro-mission__close-line">このプラットフォームを、<br class="sp-only">皆さんと一緒につくっていきたい。</p>
-        <p class="bizpro-mission__close-sign">── それが、{{ $brand }} の出発点です。</p>
+      <div class="mission-close">
+        <p class="mission-close__line">このプラットフォームを、<br class="sp-only">皆さんと一緒につくっていきたい。</p>
+        <p class="mission-close__sign">── それが、{{ $brand }} の出発点です。</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ===== ④ 落札者の課題 ===== -->
-<section class="bizpro-problems">
+<section class="section section--problems" id="problems">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">CHALLENGES</p>
-      <h2 class="bizpro-section-title">こんなお悩み、<br class="sp-only">ありませんか？</h2>
-      <p class="bizpro-section-desc">
-        業者の仕入れには、これまでの市場では解決しきれなかった<br class="pc-only">
-        3つの課題がありました。
-      </p>
+    <div class="problems-header anim" data-anim="fade-up">
+      <h2 class="problems-header__title">こんなお悩み、<span class="problems-header__mark">ありませんか？</span></h2>
+      <p class="problems-header__desc">業者の仕入れには、これまでの市場では解決しきれなかった<br class="pc-only">3つの課題がありました。</p>
     </div>
-    <ul class="bizpro-problems__list">
-      <li class="bizpro-problems__item anim" data-anim="fade-up">
-        <span class="bizpro-problems__check" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+
+    <div class="problems-rows">
+      <div class="problem-row anim" data-anim="fade-up">
+        <span class="problem-row__tag">
+          仕入価格
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </span>
-        <p>ヤフオクは個人愛好家が主体で、<br class="sp-only">業者向けの卸値で仕入れにくい</p>
-      </li>
-      <li class="bizpro-problems__item anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-problems__check" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <ul class="problem-row__list">
+          <li>個人愛好家との混雑で相場が読めない</li>
+          <li>業者向けの卸値で仕入れにくい</li>
+        </ul>
+      </div>
+
+      <div class="problem-row anim" data-anim="fade-up" data-delay="1">
+        <span class="problem-row__tag">
+          匿名性
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </span>
-        <p>同業者と競合関係を気にせず、<br class="sp-only">匿名で仕入れたい</p>
-      </li>
-      <li class="bizpro-problems__item anim" data-anim="fade-up" data-delay="2">
-        <span class="bizpro-problems__check" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <ul class="problem-row__list">
+          <li>同業者と顔を合わせたくない</li>
+          <li>競合関係を気にせず仕入れたい</li>
+        </ul>
+      </div>
+
+      <div class="problem-row anim" data-anim="fade-up" data-delay="2">
+        <span class="problem-row__tag">
+          品質確認
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </span>
-        <p>加工無しの現物動画を<br class="sp-only">じっくり確認してから判断したい</p>
-      </li>
-    </ul>
+        <ul class="problem-row__list">
+          <li>写真だけでは状態が分からない</li>
+          <li>加工なしの動画でじっくり確認したい</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- ===== ⑤ 3つの仕組み ===== -->
-<section class="bizpro-mechanism">
+<section class="section section--mechanism" id="mechanism">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">MECHANISM</p>
-      <h2 class="bizpro-section-title">業者の仕入れを、<br class="sp-only">3つの仕組みで変えます。</h2>
-      <p class="bizpro-section-desc">お悩みのひとつひとつに、独自の仕組みで応えます。</p>
+    <div class="mechanism-header anim" data-anim="fade-up">
+      <h2 class="mechanism-header__title">
+        業者の仕入れを、<br class="sp-only"><span class="mechanism-header__mark">3つの仕組みで変えます</span>
+      </h2>
+      <p class="mechanism-header__desc">
+        個人愛好家を排除した業者専用市場、完全匿名の収納代行、<br class="pc-only">
+        加工なしの動画品質確認。<br class="sp-only">
+        独自の仕組みが、業者間取引を引き上げます。
+      </p>
     </div>
-    <div class="bizpro-mech-grid">
-      <article class="bizpro-mech-card anim" data-anim="fade-up">
-        <span class="bizpro-mech-card__num">01</span>
-        <h3 class="bizpro-mech-card__title">個人愛好家を排除した、<br>業者専用の入札市場</h3>
-        <p class="bizpro-mech-card__body">
-          所定の審査を通過した業者のみが参加できます。<br>
-          ヤフオクのような感情入札による価格高騰がなく、業者間の卸値で取引できます。
-        </p>
-      </article>
-      <article class="bizpro-mech-card anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-mech-card__num">02</span>
-        <h3 class="bizpro-mech-card__title">落札者・出品者ともに、<br>完全匿名</h3>
-        <p class="bizpro-mech-card__body">
-          {{ $brand }} が間に立つ収納代行モデル。<br>
-          屋号・連絡先・住所は相互に開示されません。同業者間の取引でも、競合関係を気にせず仕入れられます。
-        </p>
-      </article>
-      <article class="bizpro-mech-card anim" data-anim="fade-up" data-delay="2">
-        <span class="bizpro-mech-card__num">03</span>
-        <h3 class="bizpro-mech-card__title">加工無しの動画で、<br>現物をじっくり確認</h3>
-        <p class="bizpro-mech-card__body">
-          全ロットの横見・上見動画を、開催前日から公開。<br>
-          加工しない実物の動画を、好きなだけ・止めて・戻して。仕入れ判断の精度を上げられます。
-        </p>
-      </article>
+
+    <div class="solutions-grid">
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">01</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">業者専用の入札市場で、<br>感情入札による値崩れがない</span>
+        </span>
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">02</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">完全匿名の収納代行で、<br>同業者と競合しない</span>
+        </span>
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">03</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">加工なしの動画で、<br>現物をじっくり確認</span>
+        </span>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- ===== ⑥ 比較表 ===== -->
-<section class="bizpro-compare">
+<section class="section section--compare">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">COMPARISON</p>
-      <h2 class="bizpro-section-title">業者の仕入れ、<br class="sp-only">選択肢は3つ。</h2>
-      <p class="bizpro-section-desc">
+    <div class="compare-header anim" data-anim="fade-up">
+      <h2 class="compare-header__title">
+        業者の仕入れ、<span class="compare-header__mark">選択肢は3つ</span>
+      </h2>
+      <p class="compare-header__desc">
         これまでメダカ業界で、業者間の仕入れは3つのチャネルに分かれていました。<br class="pc-only">
         それぞれに長所と限界があります。
       </p>
     </div>
 
-    <div class="bizpro-compare__table-wrap anim" data-anim="fade-up">
-      <table class="bizpro-compare__table">
+    <div class="compare-table-wrap anim" data-anim="fade-up">
+      <table class="compare-table">
         <thead>
           <tr>
-            <th scope="col" class="bizpro-compare__th-empty"></th>
-            <th scope="col" class="bizpro-compare__col">
-              <span class="bizpro-compare__col-name">ヤフオク</span>
-              <span class="bizpro-compare__col-sub">公開市場</span>
-            </th>
-            <th scope="col" class="bizpro-compare__col">
-              <span class="bizpro-compare__col-name">オフライン<br>業者OK</span>
-              <span class="bizpro-compare__col-sub">地域中心</span>
-            </th>
-            <th scope="col" class="bizpro-compare__col bizpro-compare__col--us">
-              <span class="bizpro-compare__col-name">{{ $brand }}</span>
-              <span class="bizpro-compare__col-sub">業者向けオンライン</span>
-            </th>
+            <th></th>
+            <th><span class="compare-th__name">ヤフオク</span><span class="compare-th__sub">公開市場</span></th>
+            <th><span class="compare-th__name">オフライン業者OK</span><span class="compare-th__sub">地域中心</span></th>
+            <th class="compare-th--us"><span class="compare-th__name">{{ $brand }}</span><span class="compare-th__sub">業者向けオンライン</span></th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <th scope="row" class="bizpro-compare__row-name">参加層</th>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">制限なし</span></td>
-            <td><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">業者中心（地域）</span></td>
-            <td class="bizpro-compare__cell-us"><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">業者専用（審査制）</span></td>
+            <th scope="row">参加層</th>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">制限なし</span></td>
+            <td><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">業者中心（地域）</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">業者専用（審査制）</span></td>
           </tr>
           <tr>
-            <th scope="row" class="bizpro-compare__row-name">審査</th>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">なし</span></td>
-            <td><span class="bizpro-mark bizpro-mark--mid">△</span><span class="bizpro-compare__cell-note">紹介ベース<br>（知人を辿らないと参加できない）</span></td>
-            <td class="bizpro-compare__cell-us"><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">申込ベース<br>（誰でも申し込め、審査が明文化）</span></td>
+            <th scope="row">審査</th>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">なし</span></td>
+            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">紹介ベース</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">申込ベース<br>（明文化された審査）</span></td>
           </tr>
           <tr>
-            <th scope="row" class="bizpro-compare__row-name">仕入後の手取り</th>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">薄利</span></td>
-            <td><span class="bizpro-mark bizpro-mark--mid">△</span><span class="bizpro-compare__cell-note">時間／地理<br>コスト大</span></td>
-            <td class="bizpro-compare__cell-us"><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">卸値＋コストなし</span></td>
+            <th scope="row">仕入後の手取り</th>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">薄利</span></td>
+            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">時間／地理コスト大</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">卸値＋コストなし</span></td>
           </tr>
           <tr>
-            <th scope="row" class="bizpro-compare__row-name">地理制約</th>
-            <td><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">なし</span></td>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">あり</span></td>
-            <td class="bizpro-compare__cell-us"><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">なし</span></td>
+            <th scope="row">地理制約</th>
+            <td><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">なし</span></td>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">あり</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">なし</span></td>
           </tr>
           <tr>
-            <th scope="row" class="bizpro-compare__row-name">品質確認</th>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">自己申告</span></td>
-            <td><span class="bizpro-mark bizpro-mark--mid">△</span><span class="bizpro-compare__cell-note">現地で短時間</span></td>
-            <td class="bizpro-compare__cell-us"><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">加工なし動画</span></td>
+            <th scope="row">品質確認</th>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">自己申告</span></td>
+            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">現地で短時間</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">加工なし動画</span></td>
           </tr>
           <tr>
-            <th scope="row" class="bizpro-compare__row-name">匿名性</th>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">個人情報やりとり</span></td>
-            <td><span class="bizpro-mark bizpro-mark--bad">×</span><span class="bizpro-compare__cell-note">地域で顔バレ</span></td>
-            <td class="bizpro-compare__cell-us"><span class="bizpro-mark bizpro-mark--good">◎</span><span class="bizpro-compare__cell-note">完全匿名</span></td>
+            <th scope="row">匿名性</th>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">個人情報やりとり</span></td>
+            <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">地域で顔バレ</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">完全匿名</span></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <p class="bizpro-compare__strong anim" data-anim="fade-up">
-      オンラインの便利さと、業者間取引の信頼性を、両取りする。<br>
+    {{-- スマホ用カードレイアウト（仕様書「望ましい」要件） --}}
+    <div class="compare-cards anim" data-anim="fade-up">
+      <article class="compare-card">
+        <div class="compare-card__head">
+          <p class="compare-card__name">ヤフオク</p>
+          <p class="compare-card__sub">公開市場</p>
+        </div>
+        <ul class="compare-card__list">
+          <li><span>参加層</span><span class="compare-mark compare-mark--bad">×</span></li>
+          <li><span>審査</span><span class="compare-mark compare-mark--bad">×</span></li>
+          <li><span>仕入後の手取り</span><span class="compare-mark compare-mark--bad">×</span></li>
+          <li><span>地理制約</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>品質確認</span><span class="compare-mark compare-mark--bad">×</span></li>
+          <li><span>匿名性</span><span class="compare-mark compare-mark--bad">×</span></li>
+        </ul>
+      </article>
+      <article class="compare-card">
+        <div class="compare-card__head">
+          <p class="compare-card__name">オフライン業者OK</p>
+          <p class="compare-card__sub">地域中心</p>
+        </div>
+        <ul class="compare-card__list">
+          <li><span>参加層</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>審査</span><span class="compare-mark compare-mark--mid">△</span></li>
+          <li><span>仕入後の手取り</span><span class="compare-mark compare-mark--mid">△</span></li>
+          <li><span>地理制約</span><span class="compare-mark compare-mark--bad">×</span></li>
+          <li><span>品質確認</span><span class="compare-mark compare-mark--mid">△</span></li>
+          <li><span>匿名性</span><span class="compare-mark compare-mark--bad">×</span></li>
+        </ul>
+      </article>
+      <article class="compare-card compare-card--us">
+        <div class="compare-card__head">
+          <p class="compare-card__name">{{ $brand }}</p>
+          <p class="compare-card__sub">業者向けオンライン</p>
+        </div>
+        <ul class="compare-card__list">
+          <li><span>参加層</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>審査</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>仕入後の手取り</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>地理制約</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>品質確認</span><span class="compare-mark compare-mark--good">◎</span></li>
+          <li><span>匿名性</span><span class="compare-mark compare-mark--good">◎</span></li>
+        </ul>
+      </article>
+    </div>
+
+    <p class="compare-strong anim" data-anim="fade-up">
+      オンラインの便利さと、業者間取引の信頼性を、<br class="sp-only">両取りする。<br>
       それが、{{ $brand }} です。
     </p>
   </div>
 </section>
 
 <!-- ===== ⑥.5 仕入後の手取り ===== -->
-<section class="bizpro-takehome">
+<section class="section section--takehome">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">TAKE-HOME</p>
-      <h2 class="bizpro-section-title">仕入後の手取りに、<br class="sp-only">3つの差が集まります。</h2>
-      <p class="bizpro-section-desc">
+    <div class="takehome-header anim" data-anim="fade-up">
+      <h2 class="takehome-header__title">
+        仕入後の手取りに、<span class="takehome-header__mark">3つの差が集まります</span>
+      </h2>
+      <p class="takehome-header__desc">
         仕入価格・時間／地理コスト・品質ロス。<br class="pc-only">
         3つの違いが、最後の「手取り」を決めます。
       </p>
     </div>
 
-    <div class="bizpro-bars anim" data-anim="fade-up">
-      <div class="bizpro-bar">
-        <div class="bizpro-bar__label">ヤフオク仕入</div>
-        <div class="bizpro-bar__track"><div class="bizpro-bar__fill bizpro-bar__fill--low" style="width:14%"></div></div>
+    <div class="takehome-bars anim" data-anim="fade-up">
+      <div class="takehome-bar">
+        <div class="takehome-bar__label">ヤフオク仕入</div>
+        <div class="takehome-bar__track"><div class="takehome-bar__fill takehome-bar__fill--low" style="width:14%"></div></div>
       </div>
-      <div class="bizpro-bar">
-        <div class="bizpro-bar__label">オフライン仕入</div>
-        <div class="bizpro-bar__track"><div class="bizpro-bar__fill bizpro-bar__fill--mid" style="width:42%"></div></div>
+      <div class="takehome-bar">
+        <div class="takehome-bar__label">オフライン仕入</div>
+        <div class="takehome-bar__track"><div class="takehome-bar__fill takehome-bar__fill--mid" style="width:42%"></div></div>
       </div>
-      <div class="bizpro-bar bizpro-bar--us">
-        <div class="bizpro-bar__label">{{ $brand }} 仕入</div>
-        <div class="bizpro-bar__track">
-          <div class="bizpro-bar__fill bizpro-bar__fill--high" style="width:96%"></div>
-          <span class="bizpro-bar__badge">最大</span>
+      <div class="takehome-bar takehome-bar--us">
+        <div class="takehome-bar__label">{{ $brand }}</div>
+        <div class="takehome-bar__track">
+          <div class="takehome-bar__fill takehome-bar__fill--high" style="width:96%"></div>
+          <span class="takehome-bar__badge">最大</span>
         </div>
       </div>
     </div>
 
-    <div class="bizpro-takehome__reasons">
-      <article class="bizpro-takehome__reason anim" data-anim="fade-up">
-        <span class="bizpro-takehome__num">01</span>
-        <h3 class="bizpro-takehome__rtitle">仕入価格</h3>
+    <div class="takehome-reasons">
+      <article class="takehome-reason anim" data-anim="fade-up">
+        <span class="takehome-reason__index">理由 01</span>
+        <h3 class="takehome-reason__title">仕入価格</h3>
         <p>ヤフオクは個人向けの小売値、オフラインは安いが地域内競合のみ。{{ $brand }} は業者専用の卸値で取引できます。</p>
       </article>
-      <article class="bizpro-takehome__reason anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-takehome__num">02</span>
-        <h3 class="bizpro-takehome__rtitle">時間・地理コスト</h3>
+      <article class="takehome-reason anim" data-anim="fade-up" data-delay="1">
+        <span class="takehome-reason__index">理由 02</span>
+        <h3 class="takehome-reason__title">時間・地理コスト</h3>
         <p>オフラインは現地までの交通費・宿泊・拘束時間が利益を圧迫。{{ $brand }} はオンライン完結、移動ゼロで参加できます。</p>
       </article>
-      <article class="bizpro-takehome__reason anim" data-anim="fade-up" data-delay="2">
-        <span class="bizpro-takehome__num">03</span>
-        <h3 class="bizpro-takehome__rtitle">品質ロス</h3>
+      <article class="takehome-reason anim" data-anim="fade-up" data-delay="2">
+        <span class="takehome-reason__index">理由 03</span>
+        <h3 class="takehome-reason__title">品質ロス</h3>
         <p>ヤフオクの自己申告、オフラインの現地短時間判断では見落としが発生。{{ $brand }} は加工なし動画を前日からゆっくり確認、判断ミスを最小化します。</p>
       </article>
     </div>
-
-    <p class="bizpro-compare__strong anim" data-anim="fade-up">
-      3つの差が集まって、仕入後の手取りは {{ $brand }} が最大化します。
-    </p>
   </div>
 </section>
 
 <!-- ===== ⑦ 落札者向け 4カード詳細 ===== -->
-<section class="bizpro-buyer-detail">
+<section class="section section--solutions" id="solutions">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">FOR BUYERS</p>
-      <h2 class="bizpro-section-title">落札者の方へ</h2>
-      <p class="bizpro-section-desc">
-        2つの仕入れニーズに、{{ $brand }} は応えます。<br>
-        「ここでしか会えない個体」と、「ヤフオクで買えない価格」。
+    <div class="solutions-header anim" data-anim="fade-up">
+      <h2 class="solutions-header__title">
+        2つの仕入れニーズに、<br class="sp-only"><span class="solutions-header__mark">{{ $brand }} は応えます</span>
+      </h2>
+      <p class="solutions-header__desc">
+        「ここでしか会えない個体」と、「ヤフオクで買えない価格」。<br class="pc-only">
+        さらに「取引のすべてを代行」と「定期開催で計画的に」。
       </p>
     </div>
 
-    <div class="bizpro-detail-grid">
-      <article class="bizpro-detail-card bizpro-detail-card--top anim" data-anim="fade-up">
-        <span class="bizpro-detail-card__num">01</span>
-        <h3 class="bizpro-detail-card__title">普段会えないブリーダーの個体に、出会える</h3>
-        <p class="bizpro-detail-card__body">
-          厳選されたプロブリーダーの個体が並びます。<br>
-          「ヤフオクには出さない」「個別販売しない」ロットが、{{ $brand }} でだけ流通します。
-        </p>
-        <p class="bizpro-detail-card__tag">─ 希少な個体を求める方へ</p>
-      </article>
-      <article class="bizpro-detail-card bizpro-detail-card--top anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-detail-card__num">02</span>
-        <h3 class="bizpro-detail-card__title">標準個体も、ヤフオクで買えない卸値で</h3>
-        <p class="bizpro-detail-card__body">
-          特段稀少でない個体でも、ヤフオクの小売値より明確に安く。<br>
-          業者間の卸値で取引できます。
-        </p>
-        <p class="bizpro-detail-card__tag">─ 安定的な仕入れ量を必要とする方へ</p>
-      </article>
-      <article class="bizpro-detail-card anim" data-anim="fade-up">
-        <span class="bizpro-detail-card__num">03</span>
-        <h3 class="bizpro-detail-card__title">取引のすべてを、{{ $brand }} が代行</h3>
-        <p class="bizpro-detail-card__body">
-          落札後の決済は収納代行、配送は直送、死着は補償規定で対応。<br>
-          落札者は「決めて、待つ」だけで完結します。
-        </p>
-      </article>
-      <article class="bizpro-detail-card anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-detail-card__num">04</span>
-        <h3 class="bizpro-detail-card__title">月2回の定期開催で、計画的に仕入れられる</h3>
-        <p class="bizpro-detail-card__body">
-          固定スケジュール＋事前出品リストの公開で、仕入れ予算とロットを先に組めます。<br>
-          「いつ良い個体が出るか分からない」が、終わります。
-        </p>
-      </article>
+    <div class="solutions-grid">
+      <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">01</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">普段会えないブリーダーの個体に、出会える</span>
+          <span class="solution-card__arrow" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </span>
+      </a>
+      <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">02</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">標準個体も、ヤフオクで買えない卸値で</span>
+          <span class="solution-card__arrow" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </span>
+      </a>
+      <a href="#flow" class="solution-card anim" data-anim="fade-up">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:1.8rem; font-weight:900; color:#2bb1b7;">03</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">取引のすべてを、{{ $brand }} が代行</span>
+          <span class="solution-card__arrow" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </span>
+      </a>
+      <a href="#flow" class="solution-card anim" data-anim="fade-up" data-delay="1">
+        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'Inter',sans-serif; font-size:1.8rem; font-weight:900; color:#2bb1b7;">04</span>
+        </span>
+        <span class="solution-card__body">
+          <span class="solution-card__title">月2回の定期開催で、計画的に仕入れられる</span>
+          <span class="solution-card__arrow" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </span>
+      </a>
     </div>
   </div>
 </section>
 
-<!-- ===== ⑧ 動画品質確認 ===== -->
-<section class="bizpro-video">
+<!-- ===== ⑧ 動画品質確認 (差別化) ===== -->
+<section class="section section--video">
   <div class="container">
-    <div class="bizpro-section-head bizpro-section-head--white anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow bizpro-eyebrow--white">VIDEO QUALITY</p>
-      <h2 class="bizpro-section-title bizpro-section-title--white">加工なしの現物動画で、<br class="sp-only">現地より深く見極める。</h2>
-      <p class="bizpro-section-desc bizpro-section-desc--white">
+    <div class="video-header anim" data-anim="fade-up">
+      <h2 class="video-header__title">加工なしの現物動画で、<br class="sp-only">現地より深く見極める。</h2>
+      <p class="video-header__desc">
         全ロットの横見・上見動画を、開催前日から公開。<br>
         加工しない動画だから、写真では分からない実物の状態を、<br class="pc-only">
         オフラインの「現地で短時間」を超える深さで確認できます。
       </p>
     </div>
 
-    <div class="bizpro-video-grid">
-      <article class="bizpro-video-card anim" data-anim="fade-up">
-        <span class="bizpro-video-card__num">01</span>
-        <h3 class="bizpro-video-card__title">加工なし、だから実物が見える</h3>
-        <p class="bizpro-video-card__body">
-          メダカ業界では、写真の色補正・編集が常態化しています。<br>
-          {{ $brand }} は加工しない動画で出品。「届いたら写真と違った」を、構造的に防ぎます。
-        </p>
+    <div class="video-grid">
+      <article class="video-card anim" data-anim="fade-up">
+        <span class="video-card__index">POINT 01</span>
+        <h3 class="video-card__title">加工なし、だから実物が見える</h3>
+        <p>メダカ業界では、写真の色補正・編集が常態化しています。{{ $brand }} は加工しない動画で出品。「届いたら写真と違った」を、構造的に防ぎます。</p>
       </article>
-      <article class="bizpro-video-card anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-video-card__num">02</span>
-        <h3 class="bizpro-video-card__title">横見・上見の両方を、全ロット撮影</h3>
-        <p class="bizpro-video-card__body">
-          体形・体色・尾形・各鰭。評価で重要なすべての角度を、業界水準を超える精度で。<br>
-          撮影も {{ $brand }} が代行するので、出品者ごとのバラつきがありません。
-        </p>
+      <article class="video-card anim" data-anim="fade-up" data-delay="1">
+        <span class="video-card__index">POINT 02</span>
+        <h3 class="video-card__title">横見・上見の両方を、全ロット撮影</h3>
+        <p>体形・体色・尾形・各鰭。評価で重要なすべての角度を、業界水準を超える精度で。撮影も {{ $brand }} が代行するので、出品者ごとのバラつきがありません。</p>
       </article>
-      <article class="bizpro-video-card anim" data-anim="fade-up" data-delay="2">
-        <span class="bizpro-video-card__num">03</span>
-        <h3 class="bizpro-video-card__title">開催前日から、好きなだけ</h3>
-        <p class="bizpro-video-card__body">
-          現地で数分しか見られないオフラインと違い、前日からじっくり、何度でも見られます。<br>
-          仕入れの優先検討時間が、構造的に確保されます。
-        </p>
+      <article class="video-card anim" data-anim="fade-up" data-delay="2">
+        <span class="video-card__index">POINT 03</span>
+        <h3 class="video-card__title">開催前日から、好きなだけ</h3>
+        <p>現地で数分しか見られないオフラインと違い、前日からじっくり、何度でも見られます。仕入れの優先検討時間が、構造的に確保されます。</p>
       </article>
-      <article class="bizpro-video-card anim" data-anim="fade-up" data-delay="3">
-        <span class="bizpro-video-card__num">04</span>
-        <h3 class="bizpro-video-card__title">止めて、戻して、共有して</h3>
-        <p class="bizpro-video-card__body">
-          気になる瞬間を止めて。別の個体と比べて。仕入れチームと共有して相談。<br>
-          オフラインの「その場で判断」では不可能だった意思決定が可能になります。
-        </p>
+      <article class="video-card anim" data-anim="fade-up" data-delay="3">
+        <span class="video-card__index">POINT 04</span>
+        <h3 class="video-card__title">止めて、戻して、共有して</h3>
+        <p>気になる瞬間を止めて。別の個体と比べて。仕入れチームと共有して相談。オフラインの「その場で判断」では不可能だった意思決定が可能になります。</p>
       </article>
     </div>
 
-    <p class="bizpro-video__strong anim" data-anim="fade-up">
+    <p class="video-strong anim" data-anim="fade-up">
       現地で見るより、深く、長く、確かに。<br>
       それが、{{ $brand }} の品質確認です。
     </p>
@@ -441,264 +514,369 @@
 </section>
 
 <!-- ===== ⑨ 落札の流れ ===== -->
-<section class="bizpro-flow">
+<section class="section section--steps" id="flow">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">FLOW</p>
-      <h2 class="bizpro-section-title">落札までの4ステップ</h2>
-      <p class="bizpro-section-desc">業者会員になっていただいた後の、実際の取引フローです。</p>
+    <div class="steps-header anim" data-anim="fade-up">
+      <h2 class="steps-header__title">
+        <span class="steps-header__mark">落札までの4ステップ</span>
+      </h2>
+      <p class="steps-header__desc">
+        業者会員になっていただいた後の、実際の取引フローです。
+      </p>
     </div>
 
-    <ol class="bizpro-flow__list">
-      <li class="bizpro-flow__item anim" data-anim="fade-up">
-        <span class="bizpro-flow__step">STEP 01</span>
-        <h3 class="bizpro-flow__title">出品リストを確認</h3>
-        <p>LINE と Web で全ロットを公開します。加工なしの横見・上見動画を、ゆっくり何度でも確認できます。仕入れチームとの相談時間も、構造的に確保されます。</p>
-      </li>
-      <li class="bizpro-flow__item anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-flow__step">STEP 02</span>
-        <h3 class="bizpro-flow__title">オークションに参加・入札</h3>
-        <p>業者会員専用のオンライン会場で、リアルタイム形式のオークションに参加。事前入札も可能なので、当日リアルタイムで参加できない場合も入札を残しておけます。システム入札のため、忖度や手ゼリの不公平はありません。</p>
-      </li>
-      <li class="bizpro-flow__item anim" data-anim="fade-up" data-delay="2">
-        <span class="bizpro-flow__step">STEP 03</span>
-        <h3 class="bizpro-flow__title">落札・決済</h3>
-        <p>落札確定後、決済は振込で完了します。取引のすべてが {{ $brand }} とのやり取りなので、出品者と直接やり取りすることはありません。</p>
-      </li>
-      <li class="bizpro-flow__item anim" data-anim="fade-up" data-delay="3">
-        <span class="bizpro-flow__step">STEP 04</span>
-        <h3 class="bizpro-flow__title">受け取り</h3>
-        <p>{{ $brand }} から直送。配送伝票も {{ $brand }} 名義です。出品者と落札者の住所はやりとりされません。</p>
-      </li>
-    </ol>
-
-    <p class="bizpro-flow__strong anim" data-anim="fade-up">
-      リストを見て、入札して、待つだけ。<br>
-      仕入れに使う時間を、最小化できます。
-    </p>
+    <div class="steps-grid">
+      <div class="step-tile anim" data-anim="fade-up">
+        <span class="step-tile__index">STEP 01</span>
+        <h3 class="step-tile__title">出品リストを確認</h3>
+        <p class="step-tile__desc">LINE と Web で全ロットを公開。加工なしの横見・上見動画を、ゆっくり何度でも確認できます。</p>
+      </div>
+      <div class="step-tile anim" data-anim="fade-up" data-delay="1">
+        <span class="step-tile__index">STEP 02</span>
+        <h3 class="step-tile__title">オークションに参加・入札</h3>
+        <p class="step-tile__desc">業者会員専用のオンライン会場で、リアルタイム形式に参加。事前入札も可能です。</p>
+      </div>
+      <div class="step-tile anim" data-anim="fade-up" data-delay="2">
+        <span class="step-tile__index">STEP 03</span>
+        <h3 class="step-tile__title">落札・決済</h3>
+        <p class="step-tile__desc">落札確定後、決済は振込で完了。取引のすべてが {{ $brand }} とのやり取りです。</p>
+      </div>
+      <div class="step-tile anim" data-anim="fade-up" data-delay="3">
+        <span class="step-tile__index">STEP 04</span>
+        <h3 class="step-tile__title">受け取り</h3>
+        <p class="step-tile__desc">{{ $brand }} から直送。配送伝票も {{ $brand }} 名義で、相互の住所はやりとりされません。</p>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- ===== ⑩ 料金プラン ===== -->
-<section class="bizpro-pricing" id="pricing">
+<section class="section section--pricing" id="pricing">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">PRICING</p>
-      <h2 class="bizpro-section-title">シンプルな業者会員プラン2種。</h2>
-      <p class="bizpro-section-desc">登録は年会費のみ。あとは成約時の手数料だけです。</p>
+    <div class="pricing-header anim" data-anim="fade-up">
+      <h2 class="pricing-header__title">
+        <span class="pricing-header__mark">シンプルな業者会員プラン2種</span>
+      </h2>
+      <p class="pricing-header__desc">
+        登録は年会費のみ。あとは成約時の手数料だけです。
+      </p>
     </div>
 
-    <div class="bizpro-plans">
-      <article class="bizpro-plan anim" data-anim="fade-up">
-        <p class="bizpro-plan__tag">業者会員（落札）</p>
-        <p class="bizpro-plan__price"><em>5,500</em><small>円 / 年（税込）</small></p>
-        <ul class="bizpro-plan__feat">
-          <li>オークション閲覧</li>
-          <li>入札・落札</li>
-          <li>申込→審査制</li>
-        </ul>
-      </article>
-      <article class="bizpro-plan bizpro-plan--featured anim" data-anim="fade-up" data-delay="1">
-        <p class="bizpro-plan__tag">業者会員（出品兼）</p>
-        <p class="bizpro-plan__price"><em>11,000</em><small>円 / 年（税込）</small></p>
-        <ul class="bizpro-plan__feat">
-          <li>出品（売り手）</li>
-          <li>入札・落札</li>
-          <li>より厳格な審査制</li>
-        </ul>
-      </article>
+    <div class="pricing-cards anim" data-anim="fade-up">
+      <div class="pricing-card">
+        <span class="pricing-card__tag">業者会員（落札）</span>
+        <span class="pricing-card__price"><em>5,500</em><small>円</small></span>
+        <span class="pricing-card__note">年 / 税込</span>
+      </div>
+      <span class="pricing-plus" aria-hidden="true">/</span>
+      <div class="pricing-card">
+        <span class="pricing-card__tag">業者会員（出品兼）</span>
+        <span class="pricing-card__price"><em>11,000</em><small>円</small></span>
+        <span class="pricing-card__note">年 / 税込</span>
+      </div>
     </div>
 
-    <div class="bizpro-pricing__fee anim" data-anim="fade-up">
-      <span class="bizpro-pricing__fee-label">成約時手数料</span>
-      <span class="bizpro-pricing__fee-value">落札額の <em>10</em><small>%</small></span>
+    <div class="pricing-detail anim" data-anim="fade-up">
+      <p class="pricing-detail__title">プランの内訳</p>
+      <div class="pricing-detail__table">
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">業者会員（落札）</span>
+          <span class="pricing-detail__value">オークション閲覧 / 入札・落札 / 申込→審査</span>
+        </div>
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">業者会員（出品兼）</span>
+          <span class="pricing-detail__value">出品 + 入札・落札 / より厳格な審査</span>
+        </div>
+        <div class="pricing-detail__row">
+          <span class="pricing-detail__label">成約時手数料</span>
+          <span class="pricing-detail__value">落札額の 10%</span>
+        </div>
+      </div>
     </div>
 
-    <ul class="bizpro-pricing__notes anim" data-anim="fade-up">
-      <li>※ 出品兼プランには、買い手として落札する権利も含まれます。</li>
-      <li>※ 出品兼プランは、より厳格な審査を経てご加入いただけます。</li>
-    </ul>
+    <p class="pricing-note anim" data-anim="fade-up">
+      ※ 出品兼プランには、買い手として落札する権利も含まれます。<br>
+      ※ 出品兼プランは、より厳格な審査を経てご加入いただけます。
+    </p>
   </div>
 </section>
 
-<!-- ===== ⑪ LINE登録メリット + ステップ ===== -->
-<section class="bizpro-line">
+<!-- ===== ⑪ LINE 登録メリット + ステップ ===== -->
+<section class="section section--line">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">LINE</p>
-      <h2 class="bizpro-section-title">まずは、LINE から。</h2>
-      <p class="bizpro-section-desc">
+    <div class="line-header anim" data-anim="fade-up">
+      <h2 class="line-header__title">
+        まずは、<span class="line-header__mark">LINE から</span>。
+      </h2>
+      <p class="line-header__desc">
         即時の会員登録ではなく、LINE で先にサービスをご体験いただけます。<br class="pc-only">
         ご自身に合うかをご確認のうえ、ご判断ください。
       </p>
     </div>
 
-    <div class="bizpro-line__merits">
-      <article class="bizpro-line__merit anim" data-anim="fade-up">
-        <span class="bizpro-line__num">01</span>
-        <h3 class="bizpro-line__mtitle">デモで触ってから、判断できる</h3>
+    <div class="line-merits">
+      <article class="line-merit anim" data-anim="fade-up">
+        <span class="line-merit__index">01</span>
+        <h3 class="line-merit__title">デモで触ってから、判断できる</h3>
         <p>LINE登録するだけで、実際の入札画面と動画品質確認をお試しいただけます。会員登録するかは、触ってから決めていただけます。</p>
       </article>
-      <article class="bizpro-line__merit anim" data-anim="fade-up" data-delay="1">
-        <span class="bizpro-line__num">02</span>
-        <h3 class="bizpro-line__mtitle">出品リストを先行で受け取れる</h3>
+      <article class="line-merit anim" data-anim="fade-up" data-delay="1">
+        <span class="line-merit__index">02</span>
+        <h3 class="line-merit__title">出品リストを先行で受け取れる</h3>
         <p>次回オークションの出品リストを、LINE に直接お届け。仕入れの優先検討時間が確保できます。</p>
       </article>
-      <article class="bizpro-line__merit anim" data-anim="fade-up" data-delay="2">
-        <span class="bizpro-line__num">03</span>
-        <h3 class="bizpro-line__mtitle">申込・質問を LINE 上で完結</h3>
+      <article class="line-merit anim" data-anim="fade-up" data-delay="2">
+        <span class="line-merit__index">03</span>
+        <h3 class="line-merit__title">申込・質問を LINE 上で完結</h3>
         <p>申請フォーム・資料・質問は LINE 上で完結。別サイトを行き来する必要はありません。</p>
       </article>
     </div>
 
-    <ol class="bizpro-line__steps anim" data-anim="fade-up">
+    <ol class="line-steps anim" data-anim="fade-up">
       <li>
-        <span class="bizpro-line__step-num">01</span>
+        <span class="line-step__num">STEP 01</span>
         <h4>LINE で友だち追加</h4>
         <p>下のボタンから1タップで完了します。</p>
       </li>
       <li>
-        <span class="bizpro-line__step-num">02</span>
+        <span class="line-step__num">STEP 02</span>
         <h4>デモを試す</h4>
-        <p>LINE登録後、デモのURLをお送りします。実際の入札画面と動画品質確認をご体験ください。</p>
+        <p>LINE登録後、デモのURLをお送りします。実際の画面をご体験ください。</p>
       </li>
       <li>
-        <span class="bizpro-line__step-num">03</span>
+        <span class="line-step__num">STEP 03</span>
         <h4>LINEで質問・申込</h4>
         <p>ご質問はLINEで。納得いただけたら、申込フォームへ。</p>
       </li>
     </ol>
 
-    <div class="bizpro-line__cta anim" data-anim="fade-up">
-      <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="bizpro-btn bizpro-btn--line">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+    <div class="line-cta anim" data-anim="fade-up">
+      <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="btn-primary btn-primary--lg">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
         LINE追加でデモを試す
       </a>
-      <p class="bizpro-line__note">※ 友だち追加だけ。登録は無料です。</p>
+      <p class="line-cta__note">※ 友だち追加だけ。登録は無料です。</p>
     </div>
   </div>
 </section>
 
 <!-- ===== ⑫ 協力ブリーダーの声 ===== -->
-<section class="bizpro-voice">
+<section class="section section--voice" id="voice">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">VOICE</p>
-      <h2 class="bizpro-section-title">協力ブリーダーから</h2>
-      <p class="bizpro-section-desc">
+    <div class="voice-header anim" data-anim="fade-up">
+      <h2 class="voice-header__title">
+        <span class="voice-header__mark">協力ブリーダー</span>から
+      </h2>
+      <p class="voice-header__desc">
         ローンチに先立ち、出品予定のブリーダー様からコメントをいただきました。<br class="pc-only">
         業界の最前線で活動する皆さまの、率直な声をご覧ください。
       </p>
     </div>
 
-    <div class="bizpro-voice__grid">
-      <article class="bizpro-voice__card anim" data-anim="fade-up">
-        <p class="bizpro-voice__shop">屋号 A</p>
-        <p class="bizpro-voice__quote">「ヤフオクに出すには惜しい個体を、業者間でだけ動かしたい。{{ $brand }} はそのニーズに、最初に応えてくれる場所だと感じています。」</p>
-        <p class="bizpro-voice__author">── 代表者名</p>
+    <div class="voice-grid">
+      <article class="voice-tile anim" data-anim="fade-up">
+        <p class="voice-tile__quote">ヤフオクに出すには惜しい個体を、業者間でだけ動かしたい。{{ $brand }} はそのニーズに最初に応えてくれる場所だと感じています。</p>
+        <div class="voice-tile__author">
+          <span class="voice-tile__avatar"><img src="/img/lp/voice/01.png" alt="" loading="lazy"></span>
+          <span class="voice-tile__info">
+            <strong>屋号 A</strong>
+            <small>代表者名</small>
+          </span>
+        </div>
       </article>
-      <article class="bizpro-voice__card anim" data-anim="fade-up" data-delay="1">
-        <p class="bizpro-voice__shop">屋号 B</p>
-        <p class="bizpro-voice__quote">「動画撮影を運営側がやってくれるのが大きい。出品作業の手間が劇的に減るので、繁殖と選別に時間を使えるようになります。」</p>
-        <p class="bizpro-voice__author">── 代表者名</p>
+      <article class="voice-tile anim" data-anim="fade-up" data-delay="1">
+        <p class="voice-tile__quote">動画撮影を運営側がやってくれるのが大きい。出品作業の手間が劇的に減るので、繁殖と選別に時間を使えるようになります。</p>
+        <div class="voice-tile__author">
+          <span class="voice-tile__avatar"><img src="/img/lp/voice/02.png" alt="" loading="lazy"></span>
+          <span class="voice-tile__info">
+            <strong>屋号 B</strong>
+            <small>代表者名</small>
+          </span>
+        </div>
       </article>
-      <article class="bizpro-voice__card anim" data-anim="fade-up" data-delay="2">
-        <p class="bizpro-voice__shop">屋号 C</p>
-        <p class="bizpro-voice__quote">「匿名で取引できるのは、業者として本当に助かります。地域の同業者と顔を合わせる必要がない、フェアな入札環境はずっと欲しかったものでした。」</p>
-        <p class="bizpro-voice__author">── 代表者名</p>
+      <article class="voice-tile anim" data-anim="fade-up" data-delay="2">
+        <p class="voice-tile__quote">匿名で取引できるのは、業者として本当に助かります。地域の同業者と顔を合わせる必要がない、フェアな入札環境はずっと欲しかったものでした。</p>
+        <div class="voice-tile__author">
+          <span class="voice-tile__avatar"><img src="/img/lp/voice/03.png" alt="" loading="lazy"></span>
+          <span class="voice-tile__info">
+            <strong>屋号 C</strong>
+            <small>代表者名</small>
+          </span>
+        </div>
       </article>
     </div>
-    <p class="bizpro-voice__note">※ 上記は実装テンプレートです。取材後の実コメントに差し替えます。</p>
   </div>
 </section>
 
 <!-- ===== ⑬ FAQ ===== -->
-<section class="bizpro-faq" id="faq">
+<section class="section section--faq" id="faq">
   <div class="container">
-    <div class="bizpro-section-head anim" data-anim="fade-up">
-      <p class="bizpro-eyebrow">FAQ</p>
-      <h2 class="bizpro-section-title">よくあるご質問</h2>
+    <div class="faq-header anim" data-anim="fade-up">
+      <h2 class="faq-header__title">
+        <span class="faq-header__mark">よくある</span>ご質問
+      </h2>
+      <p class="faq-header__desc">
+        ご利用前によく寄せられるご質問をまとめました。お問い合わせの前にご確認ください。
+      </p>
     </div>
 
-    <div class="bizpro-faq__list anim" data-anim="fade-up">
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">ヤフオクとは競合しませんか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>しません。ヤフオクは個人愛好家主体の小売チャネル、{{ $brand }} は業者専用の卸チャネルです。使い分けることで手取り全体が増える設計です。</p></div>
+    <div class="faq-list anim" data-anim="fade-up">
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">ヤフオクとは競合しませんか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>しません。ヤフオクは個人愛好家主体の小売チャネル、{{ $brand }} は業者専用の卸チャネルです。使い分けることで手取り全体が増える設計です。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">法人でなくても参加できますか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>参加できます。屋号での活動実績があれば、個人事業主・専業ブリーダーの方も対象です。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">法人でなくても参加できますか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>参加できます。屋号での活動実績があれば、個人事業主・専業ブリーダーの方も対象です。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">LINE で友だち追加すると、すぐに会員登録になりますか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>なりません。LINE 登録後にデモの URL をお送りします。実際の入札画面と動画品質確認を体験した上で、ご自身のタイミングで申込フォームから会員登録いただけます。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">LINE で友だち追加すると、すぐに会員登録になりますか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>なりません。LINE 登録後にデモの URL をお送りします。実際の入札画面と動画品質確認を体験した上で、ご自身のタイミングで申込フォームから会員登録いただけます。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">インボイス対応していますか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>対応しています。{{ $brand }} はインボイス登録事業者です。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">インボイス対応していますか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>対応しています。{{ $brand }} はインボイス登録事業者です。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">既存のオフライン業者オークションとは何が違いますか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>主な違いは「全国オンラインで参加可能」「動画で品質確認できる」「完全匿名で取引できる」の3点です。詳しくは比較表セクションをご覧ください。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">既存のオフライン業者オークションとは何が違いますか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>主な違いは「全国オンラインで参加可能」「動画で品質確認できる」「完全匿名で取引できる」の3点です。詳しくは比較表セクションをご覧ください。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">落札者として参加するには？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>LINE から申込フォームをご提出ください。所定の審査を経て、業者会員としてご参加いただけます。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">落札者として参加するには？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>LINE から申込フォームをご提出ください。所定の審査を経て、業者会員としてご参加いただけます。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">同業者と入札で競合になることはありますか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>入札では業者間で競争が発生する場合がありますが、落札者は完全匿名のため、競合関係を気にすることなく取引できます。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">同業者と入札で競合になることはありますか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>入札では業者間で競争が発生する場合がありますが、落札者は完全匿名のため、競合関係を気にすることなく取引できます。</p>
+        </div>
       </details>
-      <details class="bizpro-faq__item">
-        <summary><span class="bizpro-faq__mark">Q</span><span class="bizpro-faq__q">事前入札はどう使いますか？</span><span class="bizpro-faq__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
-        <div class="bizpro-faq__a"><span class="bizpro-faq__mark bizpro-faq__mark--a">A</span><p>業者会員専用のオンライン会場で、リアルタイム入札と事前入札の両方が可能です。詳細は LINE 登録後のデモでご確認いただけます。</p></div>
+      <details class="faq-item">
+        <summary class="faq-item__q">
+          <span class="faq-item__mark">Q</span>
+          <span class="faq-item__text">事前入札はどう使いますか？</span>
+          <span class="faq-item__chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+        </summary>
+        <div class="faq-item__a">
+          <span class="faq-item__mark faq-item__mark--a">A</span>
+          <p>業者会員専用のオンライン会場で、リアルタイム入札と事前入札の両方が可能です。詳細は LINE 登録後のデモでご確認いただけます。</p>
+        </div>
       </details>
     </div>
   </div>
 </section>
 
 <!-- ===== ⑭ クロージング CTA ===== -->
-<section class="bizpro-closing">
-  <div class="container">
-    <div class="bizpro-closing__inner anim" data-anim="fade-up">
-      <h2 class="bizpro-closing__title">まずは、デモから。</h2>
-      <p class="bizpro-closing__desc">
-        LINE 登録するだけで、実際の入札画面と動画品質確認をお試しいただけます。<br class="pc-only">
-        会員登録するかは、触ってから決めていただけます。
-      </p>
-      <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="bizpro-btn bizpro-btn--line bizpro-btn--lg">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
-        LINE追加でデモを試す
-      </a>
-      <p class="bizpro-closing__notes">
-        ※ 友だち追加だけ。登録は無料です。<br>
-        ※ 出品もご検討の方は <a href="/seller">出品者の方へ →</a>
-      </p>
+<section class="section section--cta" id="cta">
+  <div class="cta-banner">
+    <div class="cta-banner__inner">
+      <div class="cta-banner__copy anim" data-anim="fade-up">
+        <h2 class="cta-banner__title">まずは、デモから。</h2>
+        <p class="cta-banner__desc">
+          LINE 登録するだけで、実際の入札画面と動画品質確認をお試しいただけます。<br class="pc-only">
+          会員登録するかは、触ってから決めていただけます。
+        </p>
+        <div class="cta-banner__actions">
+          <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="cta-banner__btn cta-banner__btn--white">
+            <span class="cta-banner__btn-main">
+              LINE追加でデモを試す
+              <span class="cta-banner__chev" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+            </span>
+            <span class="cta-banner__btn-sub">落札したい方はこちら</span>
+          </a>
+          <a href="/seller" class="cta-banner__btn cta-banner__btn--accent">
+            <span class="cta-banner__btn-main">
+              出品者の方へ
+              <span class="cta-banner__chev" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
+            </span>
+            <span class="cta-banner__btn-sub">出品もご検討の方はこちら</span>
+          </a>
+        </div>
+      </div>
+      <div class="cta-banner__visual anim" data-anim="fade-up" data-delay="1" aria-hidden="true">
+        <img src="/img/lp/cta.png" alt="" loading="lazy">
+      </div>
     </div>
   </div>
 </section>
 
 <!-- ===== FOOTER ===== -->
-<footer class="bizpro-footer">
+<footer class="footer">
   <div class="container">
-    <div class="bizpro-footer__top">
-      <div class="bizpro-footer__brand">
-        <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="bizpro-footer__logo">
-        <p class="bizpro-footer__name">{{ $brand }}（MEDAICHI）</p>
-        <p class="bizpro-footer__operator">運営: 株式会社NEP / 母体: 株式会社サバンナ</p>
-        <p class="bizpro-footer__invoice">インボイス登録番号: T-XXXXXXXXXXXXX</p>
+    <div class="footer__top">
+      <div class="footer__brand">
+        <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="footer__logo">
+        <p class="footer__operator">運営: 株式会社NEP / 母体: 株式会社サバンナ</p>
+        <p class="footer__operator">インボイス登録番号: T-XXXXXXXXXXXXX</p>
       </div>
-      <nav class="bizpro-footer__links" aria-label="フッターナビゲーション">
-        <a href="#">会社概要</a>
+      <nav class="footer__links" aria-label="フッターナビゲーション">
         <a href="/legal/tokushoho">特定商取引法に基づく表記</a>
         <a href="/legal/privacy">プライバシーポリシー</a>
         <a href="/legal/terms">利用規約</a>
-        <a href="#">お問い合わせ</a>
       </nav>
     </div>
-    <p class="bizpro-footer__copy">© {{ date('Y') }} {{ $brand }}</p>
+    <p class="footer__copy">&copy; {{ date('Y') }} {{ $brand }} All Rights Reserved.</p>
   </div>
 </footer>
+
+<!-- ===== FLOATING CTA (mobile) ===== -->
+<div class="floating-cta" id="floating-cta">
+  <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="btn-primary">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+    LINE追加でデモを試す
+  </a>
+</div>
 
 <script src="/js/lp.js?v=5"></script>
 </body>
