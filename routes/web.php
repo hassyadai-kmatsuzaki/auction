@@ -15,6 +15,15 @@ Route::get('/legal/tokushoho', $comingSoon);
 Route::get('/legal/privacy', $comingSoon);
 Route::get('/legal/terms', $comingSoon);
 
+// LP（業者向けオンラインオークション）— 公開前のため noindex 必須。
+$noindexLp = function (string $view) {
+    return response()
+        ->view($view)
+        ->header('X-Robots-Tag', 'noindex, nofollow');
+};
+Route::get('/buyer', fn () => $noindexLp('lp-buyer'));
+Route::get('/seller', fn () => $noindexLp('lp-seller'));
+
 // 配信停止リンク。catch-all より先に登録する必要あり。
 Route::get('/unsubscribe/{token}', [UnsubscribeController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{32,64}')

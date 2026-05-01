@@ -13,7 +13,6 @@ use App\Repositories\Eloquent\LaneRepository;
 use App\Actions\Bid\FinalizeBidAction;
 use App\Actions\Bid\LeaveBidAction;
 use App\Actions\Bid\SetBidLimitAction;
-use App\Actions\Line\NotifyFavoriteApproachingAction;
 use App\Services\BidService;
 use App\Services\CountdownService;
 use App\Services\Monitoring\MetricRecorder;
@@ -48,7 +47,6 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(FinalizeBidAction::class),
                 $app->make(LeaveBidAction::class),
                 $app->make(SetBidLimitAction::class),
-                $app->make(NotifyFavoriteApproachingAction::class),
                 $app->make(MetricRecorder::class),
             );
         });

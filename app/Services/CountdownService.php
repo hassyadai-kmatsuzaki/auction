@@ -6,7 +6,7 @@ use App\Actions\Auction\FinishAuctionAction;
 use App\Actions\Bid\FinalizeBidAction;
 use App\Actions\Bid\LeaveBidAction;
 use App\Actions\Bid\SetBidLimitAction;
-use App\Actions\Line\NotifyFavoriteApproachingAction;
+use App\Jobs\NotifyFavoriteApproachingJob;
 use App\Models\Auction;
 use App\Models\BidLimitPrice;
 use App\Models\Item;
@@ -42,7 +42,6 @@ class CountdownService
         private readonly FinalizeBidAction                $finalizeBidAction,
         private readonly LeaveBidAction                   $leaveBidAction,
         private readonly SetBidLimitAction                $setBidLimitAction,
-        private readonly NotifyFavoriteApproachingAction  $favoriteNotifyAction,
         private readonly MetricRecorder                   $metrics,
     ) {}
 
@@ -842,11 +841,11 @@ class CountdownService
             $preBidRemaining = ($countdownState && ($countdownState['phase'] ?? '') === 'pre_bid')
                 ? $countdownState['remaining_seconds'] : 0;
 
-            // お気に入り順番接近通知（5個前のユーザーにLINE通知）
+            // お気に入り順番接近通知（notify queue で非同期実行 — countdown worker をブロックしない）
             try {
-                $this->favoriteNotifyAction->execute($lane, $nextItem);
+                NotifyFavoriteApproachingJob::dispatch($lane, $nextItem);
             } catch (\Exception $e) {
-                Log::warning("Favorite notify error: " . $e->getMessage());
+                Log::warning("Favorite notify dispatch error: " . $e->getMessage());
             }
 
             // ★ 自動入札・指値調整後の最新状態を取得
