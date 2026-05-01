@@ -259,7 +259,9 @@ class NotificationService
                 );
             }
 
+            // seller ロールを持つユーザーは上の seller ループで送信済みのため除外（dual-role 二重送信対策）
             $participants = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
+                ->whereDoesntHave('roles', fn($q) => $q->where('name', 'seller'))
                 ->approved()->get();
             foreach ($participants as $participant) {
                 if ($this->shouldSendParticipantNotification($participant, 'email_new_auction')) {

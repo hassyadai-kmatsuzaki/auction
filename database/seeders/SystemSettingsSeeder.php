@@ -90,38 +90,15 @@ class SystemSettingsSeeder extends Seeder
             ],
 
             // ==================== 料金設定（出品者向け） ====================
-            [
-                'key' => 'seller_registration_fee',
-                'value' => '3000',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => '出品者登録料（初回）',
-                'description' => '出品者登録時の初期費用',
-            ],
-            [
-                'key' => 'seller_annual_fee',
-                'value' => '0',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => '出品者年会費',
-                'description' => '年間維持費（0で無料）',
-            ],
-            [
-                'key' => 'base_listing_fee',
-                'value' => '500',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => '基本出品料',
-                'description' => '1点あたりの出品料',
-            ],
-            [
-                'key' => 'premium_listing_fee',
-                'value' => '800',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => 'プレミアム出品料',
-                'description' => '個別撮影付きの出品料',
-            ],
+            // TODO: プレミアム出品プラン再開時にコメントを外す
+            // [
+            //     'key' => 'premium_listing_fee',
+            //     'value' => '800',
+            //     'type' => 'integer',
+            //     'category' => 'fee',
+            //     'label' => 'プレミアム出品料',
+            //     'description' => '個別撮影付きの出品料',
+            // ],
             [
                 'key' => 'seller_commission_rate',
                 'value' => '10',
@@ -130,39 +107,15 @@ class SystemSettingsSeeder extends Seeder
                 'label' => '出品者販売手数料率（%）',
                 'description' => '落札金額に対する手数料',
             ],
-            [
-                'key' => 'seller_commission_min',
-                'value' => '500',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => '出品者最低手数料',
-                'description' => '1点あたりの最低手数料',
-            ],
 
             // ==================== 料金設定（買受者向け） ====================
             [
-                'key' => 'buyer_registration_fee',
-                'value' => '0',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => '買受者登録料',
-                'description' => '買受者登録時の費用（0で無料）',
-            ],
-            [
                 'key' => 'buyer_commission_rate',
-                'value' => '5',
+                'value' => '10',
                 'type' => 'float',
                 'category' => 'fee',
                 'label' => '買受者落札手数料率（%）',
                 'description' => '落札金額に対する手数料',
-            ],
-            [
-                'key' => 'buyer_commission_min',
-                'value' => '300',
-                'type' => 'integer',
-                'category' => 'fee',
-                'label' => '買受者最低手数料',
-                'description' => '1点あたりの最低手数料',
             ],
 
             // ==================== 配送・梱包設定 ====================

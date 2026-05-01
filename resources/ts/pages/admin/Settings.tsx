@@ -46,9 +46,9 @@ interface SettingsState {
   freeze_countdown_seconds: string; bid_countdown_seconds: string;
   auction_start_countdown_seconds: string;
   // 料金
-  seller_registration_fee: string; seller_annual_fee: string; base_listing_fee: string;
-  premium_plan_fee: string; default_commission_rate: string; seller_commission_min: string;
-  buyer_registration_fee: string; buyer_commission_rate: string; buyer_commission_min: string;
+  // premium_plan_fee: string; // TODO: プレミアム出品プランを再開する際にコメントを外す
+  default_commission_rate: string;
+  buyer_commission_rate: string;
   // 配送
   packaging_fee: string; handling_fee: string; insurance_fee_rate: string;
   cooling_fee_summer: string; heating_fee_winter: string;
@@ -82,9 +82,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   show_consent_screen: false, venue_open_minutes_before_start: '30', item_switch_delay_seconds: '5',
   freeze_countdown_seconds: '1', bid_countdown_seconds: '5',
   auction_start_countdown_seconds: '10',
-  seller_registration_fee: '3000', seller_annual_fee: '0', base_listing_fee: '500',
-  premium_plan_fee: '300', default_commission_rate: '10', seller_commission_min: '500',
-  buyer_registration_fee: '0', buyer_commission_rate: '5', buyer_commission_min: '300',
+  default_commission_rate: '10',
+  buyer_commission_rate: '10',
   packaging_fee: '500', handling_fee: '300', insurance_fee_rate: '3',
   cooling_fee_summer: '300', heating_fee_winter: '300',
   company_name: '', company_address: '', company_phone: '', company_email: '',
@@ -127,15 +126,9 @@ export default function AdminSettings() {
       freeze_countdown_seconds:       String(d.auction?.freeze_countdown_seconds?.value ?? '1'),
       bid_countdown_seconds:          String(d.auction?.bid_countdown_seconds?.value ?? '5'),
       auction_start_countdown_seconds:String(d.auction?.auction_start_countdown_seconds?.value ?? '10'),
-      seller_registration_fee:        String(d.payment?.seller_registration_fee?.value ?? '3000'),
-      seller_annual_fee:              String(d.payment?.seller_annual_fee?.value ?? '0'),
-      base_listing_fee:               String(d.payment?.base_listing_fee?.value ?? '500'),
-      premium_plan_fee:               String(d.premium?.premium_plan_fee?.value ?? '300'),
+      // premium_plan_fee:            String(d.premium?.premium_plan_fee?.value ?? '300'), // TODO: プレミアム出品プラン再開時にコメントを外す
       default_commission_rate:        String(d.payment?.default_commission_rate?.value ?? '10'),
-      seller_commission_min:          String(d.payment?.seller_commission_min?.value ?? '500'),
-      buyer_registration_fee:         String(d.payment?.buyer_registration_fee?.value ?? '0'),
-      buyer_commission_rate:          String(d.payment?.buyer_commission_rate?.value ?? '5'),
-      buyer_commission_min:           String(d.payment?.buyer_commission_min?.value ?? '300'),
+      buyer_commission_rate:          String(d.payment?.buyer_commission_rate?.value ?? '10'),
       packaging_fee:                  String(d.shipping?.packaging_fee?.value ?? '500'),
       handling_fee:                   String(d.shipping?.handling_fee?.value ?? '300'),
       insurance_fee_rate:             String(d.shipping?.insurance_fee_rate?.value ?? '3'),
@@ -465,20 +458,18 @@ export default function AdminSettings() {
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#059669' }}>出品者向け料金</Typography>
                 <Grid container spacing={3}>
-                  {[
-                    { label: '登録料（初回）', k: 'seller_registration_fee' as const, helper: '出品者登録時の初期費用' },
-                    { label: '年会費', k: 'seller_annual_fee' as const, helper: '年間維持費（0で無料）' },
-                    { label: '基本出品料', k: 'base_listing_fee' as const, helper: '1点あたりの出品料' },
-                    { label: 'プレミアム出品料', k: 'premium_plan_fee' as const, helper: '個別撮影付きの出品料' },
-                    { label: '販売手数料率', k: 'default_commission_rate' as const, unit: '%', helper: '落札金額に対する手数料' },
-                    { label: '最低手数料', k: 'seller_commission_min' as const, helper: '1点あたりの最低手数料' },
-                  ].map(({ label, k, unit, helper }) => (
-                    <Grid item xs={12} sm={6} key={k}>
-                      <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
-                        InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
-                          : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
-                    </Grid>
-                  ))}
+                  {/* TODO: プレミアム出品プランを再開する際にコメントを外す
+                  <Grid item xs={12} sm={6}>
+                    <TextField fullWidth type="number" label="プレミアム出品料" value={s.premium_plan_fee} onChange={str('premium_plan_fee')}
+                      helperText="個別撮影付きの出品料"
+                      InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
+                  </Grid>
+                  */}
+                  <Grid item xs={12} sm={6}>
+                    <TextField fullWidth type="number" label="販売手数料率" value={s.default_commission_rate} onChange={str('default_commission_rate')}
+                      helperText="落札金額に対する手数料"
+                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+                  </Grid>
                 </Grid>
               </CardContent>
             </Card>
@@ -488,17 +479,11 @@ export default function AdminSettings() {
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#3B82F6' }}>買受者向け料金</Typography>
                 <Grid container spacing={3}>
-                  {[
-                    { label: '登録料', k: 'buyer_registration_fee' as const, helper: '買受者登録時の費用（0で無料）' },
-                    { label: '落札手数料率', k: 'buyer_commission_rate' as const, unit: '%', helper: '落札金額に対する手数料' },
-                    { label: '最低手数料', k: 'buyer_commission_min' as const, helper: '1点あたりの最低手数料' },
-                  ].map(({ label, k, unit, helper }) => (
-                    <Grid item xs={12} sm={6} key={k}>
-                      <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
-                        InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
-                          : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
-                    </Grid>
-                  ))}
+                  <Grid item xs={12} sm={6}>
+                    <TextField fullWidth type="number" label="落札手数料率" value={s.buyer_commission_rate} onChange={str('buyer_commission_rate')}
+                      helperText="落札金額に対する手数料"
+                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+                  </Grid>
                 </Grid>
               </CardContent>
             </Card>

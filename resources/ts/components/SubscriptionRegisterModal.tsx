@@ -7,7 +7,6 @@ import {
 import { CreditCard, AccountBalance } from '@mui/icons-material';
 import axios from '../lib/axios';
 import { useAuth } from '../contexts/AuthContext';
-import BankTransferInfoModal from './BankTransferInfoModal';
 
 declare global {
   interface Window {
@@ -43,15 +42,10 @@ interface Subscription {
 
 type PaymentMethod = 'card' | 'bank_transfer';
 
-interface CompleteOptions {
-  /** 当該セッション内では振込情報モーダルを再表示しない（直前にユーザーが見て閉じたばかりのため） */
-  skipBankInfoOnce?: boolean;
-}
-
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCompleted: (opts?: CompleteOptions) => void;
+  onCompleted: () => void;
   /** カード再登録モードの場合 true（プラン選択はスキップ） */
   replaceCardOnly?: boolean;
 }
@@ -90,7 +84,6 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [bankInfoOpen, setBankInfoOpen] = useState(false);
 
   const cardContainerRef = useRef<HTMLDivElement | null>(null);
   const cardInstanceRef = useRef<any>(null);
@@ -187,7 +180,7 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
           payment_method: 'bank_transfer',
         });
         await refreshUser();
-        setBankInfoOpen(true);
+        onCompleted();
         return;
       }
 
@@ -243,11 +236,6 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
     }
   };
 
-  const handleBankInfoClose = () => {
-    setBankInfoOpen(false);
-    onCompleted({ skipBankInfoOnce: true });
-  };
-
   const disabledSubmit =
     submitting ||
     loading ||
@@ -255,9 +243,8 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
     (!replaceCardOnly && visiblePlans.length === 0);
 
   return (
-    <>
     <Dialog
-      open={open && !bankInfoOpen}
+      open={open}
       onClose={(_e, reason) => {
         if (submitting) return;
         if (!replaceCardOnly && (reason === 'backdropClick' || reason === 'escapeKeyDown')) return;
@@ -419,8 +406,5 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
         </Button>
       </DialogActions>
     </Dialog>
-
-    <BankTransferInfoModal open={bankInfoOpen} onClose={handleBankInfoClose} />
-    </>
   );
 }

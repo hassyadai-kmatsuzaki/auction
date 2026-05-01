@@ -2,48 +2,73 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container, Paper, Typography, TextField, Button, Alert, Box, Link,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
 import { LockOutlined } from '@mui/icons-material';
 import axios from '../../lib/axios';
 export default function TwoFactorVerify() {
   const navigate = useNavigate();
   const location = useLocation();
-  const userId = (location.state as { userId?: number })?.userId;
+  const navState = (location.state as { userId?: number; forceLogoutOthers?: boolean }) ?? {};
+  const userId = navState.userId;
+  const initialForce = navState.forceLogoutOthers === true;
 
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [useRecovery, setUseRecovery] = useState(false);
+  const [forceLogoutDialogOpen, setForceLogoutDialogOpen] = useState(false);
+  const [pendingCode, setPendingCode] = useState('');
 
   if (!userId) {
     navigate('/login', { replace: true });
     return null;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performVerify = async (codeValue: string, forceLogoutOthers: boolean) => {
     setError('');
     setLoading(true);
 
     try {
-      const res = await axios.post('/api/auth/two-factor/verify', {
-        user_id: userId,
-        code,
-      });
+      const res = await axios.post(
+        '/api/auth/two-factor/verify',
+        {
+          user_id: userId,
+          code: codeValue,
+          force_logout_others: forceLogoutOthers,
+        },
+        { silent: true }
+      );
 
       const { token, user } = res.data.data;
       localStorage.setItem('auth_token', token);
       localStorage.setItem('user', JSON.stringify(user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-      // AuthContext を更新するため再読み込み
       window.location.href = user.roles.some((r: { name: string }) => r.name === 'admin')
         ? '/admin' : '/participant/home';
     } catch (err: any) {
+      const status = err?.response?.status;
+      const code = err?.response?.data?.code;
+      if (status === 409 && code === 'ALREADY_LOGGED_IN') {
+        setPendingCode(codeValue);
+        setForceLogoutDialogOpen(true);
+        return;
+      }
       setError(err.response?.data?.message || '認証に失敗しました');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performVerify(code, initialForce);
+  };
+
+  const handleConfirmForceLogout = async () => {
+    setForceLogoutDialogOpen(false);
+    await performVerify(pendingCode || code, true);
   };
 
   return (
@@ -101,6 +126,33 @@ export default function TwoFactorVerify() {
           </Link>
         </Box>
       </Paper>
+
+      <Dialog
+        open={forceLogoutDialogOpen}
+        onClose={() => setForceLogoutDialogOpen(false)}
+      >
+        <DialogTitle>他の端末でログイン中です</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            このアカウントは現在、別の端末でログインされています。
+            続行すると他の端末は強制的にログアウトされ、対象のメールアドレス宛に通知が送信されます。
+            よろしいですか？
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setForceLogoutDialogOpen(false)} disabled={loading}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleConfirmForceLogout}
+            variant="contained"
+            color="error"
+            disabled={loading}
+          >
+            {loading ? '処理中...' : '強制ログアウトして続行'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

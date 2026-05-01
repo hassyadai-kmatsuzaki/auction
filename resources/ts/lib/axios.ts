@@ -1,6 +1,16 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { notifyFromOutsideReact } from '../contexts/SnackbarContext';
 
+// 独自の axios リクエストオプション。silent=true で response interceptor の snackbar を抑制する。
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    silent?: boolean;
+  }
+  interface InternalAxiosRequestConfig {
+    silent?: boolean;
+  }
+}
+
 type ApiErrorBody = {
   success?: boolean;
   message?: string;
@@ -81,10 +91,15 @@ api.interceptors.response.use(
     if (status === 401) {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && !currentPath.startsWith('/auth/')) {
+        const hadToken = !!localStorage.getItem('auth_token');
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-        notifyFromOutsideReact('ログインが必要です。再度ログインしてください。', 'warning');
-        window.location.href = '/login';
+        // 「ログイン済みだったのに 401」= 他端末で奪われたケースが多いので reason を付けてバナー表示する
+        const target = hadToken ? '/login?reason=session_expired' : '/login';
+        if (!hadToken) {
+          notifyFromOutsideReact('ログインが必要です。再度ログインしてください。', 'warning');
+        }
+        window.location.href = target;
         return Promise.reject(error);
       }
     }

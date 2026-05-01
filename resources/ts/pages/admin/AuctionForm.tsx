@@ -202,26 +202,31 @@ export default function AuctionForm() {
                 </Box>
                 <Grid container spacing={3}>
                   <Grid item xs={12}><Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#059669' }}>出品者向け料金</Typography></Grid>
-                  {[
-                    { label: '基本出品料', key: 'base_listing_fee', prefix: '¥' },
-                    { label: 'プレミアム出品料', key: 'premium_listing_fee', prefix: '¥' },
-                    { label: '販売手数料率', key: 'seller_commission_rate', suffix: '%' },
-                    { label: '最低手数料', key: 'seller_commission_min', prefix: '¥' },
-                  ].map(({ label, key, prefix, suffix }) => (
+                  {/* TODO: プレミアム出品プラン再開時にコメントを外す
+                  {[{ label: 'プレミアム出品料', key: 'premium_listing_fee', prefix: '¥' }].map(({ label, key, prefix }) => (
                     <Grid item xs={12} sm={6} md={3} key={key}>
                       <TextField fullWidth label={label}
-                        value={`${prefix ?? ''}${(formData.custom_fee_settings as any)[key]}${suffix ?? ''}`}
+                        value={`${prefix ?? ''}${(formData.custom_fee_settings as any)[key]}`}
+                        InputProps={{ readOnly: true }} variant="filled" />
+                    </Grid>
+                  ))}
+                  */}
+                  {[
+                    { label: '販売手数料率', key: 'seller_commission_rate', suffix: '%' },
+                  ].map(({ label, key, suffix }) => (
+                    <Grid item xs={12} sm={6} md={3} key={key}>
+                      <TextField fullWidth label={label}
+                        value={`${(formData.custom_fee_settings as any)[key]}${suffix ?? ''}`}
                         InputProps={{ readOnly: true }} variant="filled" />
                     </Grid>
                   ))}
                   <Grid item xs={12}><Divider sx={{ my: 1 }} /><Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#3B82F6', mt: 2 }}>買受者向け料金</Typography></Grid>
                   {[
                     { label: '落札手数料率', key: 'buyer_commission_rate', suffix: '%' },
-                    { label: '最低手数料', key: 'buyer_commission_min', prefix: '¥' },
-                  ].map(({ label, key, prefix, suffix }) => (
+                  ].map(({ label, key, suffix }) => (
                     <Grid item xs={12} sm={6} md={3} key={key}>
                       <TextField fullWidth label={label}
-                        value={`${prefix ?? ''}${(formData.custom_fee_settings as any)[key]}${suffix ?? ''}`}
+                        value={`${(formData.custom_fee_settings as any)[key]}${suffix ?? ''}`}
                         InputProps={{ readOnly: true }} variant="filled" />
                     </Grid>
                   ))}
@@ -562,18 +567,25 @@ export default function AuctionForm() {
               </Box>
               <Grid container spacing={3}>
                 <Grid item xs={12}><Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#059669' }}>出品者向け料金</Typography></Grid>
-                {[
-                  { label: '基本出品料', key: 'base_listing_fee', prefix: true },
-                  { label: 'プレミアム出品料', key: 'premium_listing_fee', prefix: true },
-                  { label: '販売手数料率', key: 'seller_commission_rate', unit: '%' },
-                  { label: '最低手数料', key: 'seller_commission_min', prefix: true },
-                ].map(({ label, key, unit, prefix }) => (
+                {/* TODO: プレミアム出品プラン再開時にコメントを外す
+                {[{ label: 'プレミアム出品料', key: 'premium_listing_fee', prefix: true }].map(({ label, key, prefix }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
                     <TextField fullWidth type="number" label={label}
                       value={(formData.custom_fee_settings as any)[key]}
                       onChange={(e) => setCustomFee({ [key]: parseFloat(e.target.value) || 0 })}
-                      InputProps={prefix ? { startAdornment: <InputAdornment position="start">¥</InputAdornment> }
-                        : { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
+                      InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                      helperText={defaults ? `システム: ${(defaults.fee_settings as any)[key]}` : ''} />
+                  </Grid>
+                ))}
+                */}
+                {[
+                  { label: '販売手数料率', key: 'seller_commission_rate', unit: '%' },
+                ].map(({ label, key, unit }) => (
+                  <Grid item xs={12} sm={6} md={3} key={key}>
+                    <TextField fullWidth type="number" label={label}
+                      value={(formData.custom_fee_settings as any)[key]}
+                      onChange={(e) => setCustomFee({ [key]: parseFloat(e.target.value) || 0 })}
+                      InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                       helperText={defaults ? `システム: ${(defaults.fee_settings as any)[key]}` : ''} />
                   </Grid>
                 ))}
@@ -581,14 +593,12 @@ export default function AuctionForm() {
                 <Grid item xs={12}><Divider sx={{ my: 1 }} /><Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#3B82F6', mt: 2 }}>買受者向け料金</Typography></Grid>
                 {[
                   { label: '落札手数料率', key: 'buyer_commission_rate', unit: '%' },
-                  { label: '最低手数料', key: 'buyer_commission_min', prefix: true },
-                ].map(({ label, key, unit, prefix }) => (
+                ].map(({ label, key, unit }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
                     <TextField fullWidth type="number" label={label}
                       value={(formData.custom_fee_settings as any)[key]}
                       onChange={(e) => setCustomFee({ [key]: parseFloat(e.target.value) || 0 })}
-                      InputProps={prefix ? { startAdornment: <InputAdornment position="start">¥</InputAdornment> }
-                        : { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
+                      InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                       helperText={defaults ? `システム: ${(defaults.fee_settings as any)[key]}` : ''} />
                   </Grid>
                 ))}

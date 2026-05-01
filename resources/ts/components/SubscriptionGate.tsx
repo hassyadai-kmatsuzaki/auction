@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from '../lib/axios';
 import SubscriptionRegisterModal from './SubscriptionRegisterModal';
 import BankTransferInfoModal from './BankTransferInfoModal';
@@ -20,9 +20,6 @@ export default function SubscriptionGate({ children }: Props) {
   const [checking, setChecking] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [bankInfoOpen, setBankInfoOpen] = useState(false);
-  // 直前の登録フローでユーザーが振込情報モーダルを既に閉じたばかりの場合に true。
-  // 次の check() 1 回だけ振込情報モーダルの再表示をスキップする。
-  const skipBankInfoOnceRef = useRef(false);
 
   const isAdmin = hasRole('admin');
 
@@ -35,12 +32,9 @@ export default function SubscriptionGate({ children }: Props) {
         setModalOpen(true);
         setBankInfoOpen(false);
       } else if (d.bank_transfer_pending) {
-        if (!skipBankInfoOnceRef.current) {
-          setBankInfoOpen(true);
-        }
+        setBankInfoOpen(true);
         setModalOpen(false);
       }
-      skipBankInfoOnceRef.current = false;
     } catch (e) {
       // 失敗したら静かに無視（API ダウン時にアプリ全体を止めない）
     } finally {
@@ -69,11 +63,8 @@ export default function SubscriptionGate({ children }: Props) {
         onClose={() => {
           // 登録完了まで閉じさせない（承認済みユーザーへの強制ゲート）
         }}
-        onCompleted={(opts) => {
+        onCompleted={() => {
           setModalOpen(false);
-          if (opts?.skipBankInfoOnce) {
-            skipBankInfoOnceRef.current = true;
-          }
           check();
         }}
       />

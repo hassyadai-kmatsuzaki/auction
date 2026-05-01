@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\EnforcesSingleSession;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Hash;
 
 class LoginController extends Controller
 {
+    use EnforcesSingleSession;
+
     /**
      * ログイン
      *
@@ -52,7 +55,10 @@ class LoginController extends Controller
             ], 403);
         }
 
-        // 2FA が有効な場合はコード入力を要求
+        $forceLogoutOthers = $request->boolean('force_logout_others');
+
+        // 2FA が有効な場合はコード入力を要求（ここではまだトークン発行しないので
+        // 多重ログインチェックは TwoFactorController.verify 側で再判定する）
         if ($user->two_factor_confirmed_at) {
             return response()->json([
                 'success' => true,
@@ -61,6 +67,16 @@ class LoginController extends Controller
                     'user_id' => $user->id,
                 ],
             ]);
+        }
+
+        // 多重ログイン抑止: 他端末で生きているトークンがあれば 409 で返し、
+        // SPA に確認モーダルを出させてから force_logout_others=true で再送してもらう。
+        if (! $forceLogoutOthers && $this->hasActiveAuthToken($user)) {
+            return $this->alreadyLoggedInResponse($user->id);
+        }
+
+        if ($forceLogoutOthers) {
+            $this->revokeOtherSessionsAndNotify($user, $request);
         }
 
         // 最終ログイン日時を更新

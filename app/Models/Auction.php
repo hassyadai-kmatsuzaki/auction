@@ -390,8 +390,7 @@ class Auction extends BaseModel
     public function calculateBuyerCommission(float $price): float
     {
         $settings = $this->getFeeSettings();
-        $commission = $price * ($settings['buyer_commission_rate'] / 100);
-        return max($commission, $settings['buyer_commission_min']);
+        return $price * ($settings['buyer_commission_rate'] / 100);
     }
 
     /**
@@ -403,8 +402,7 @@ class Auction extends BaseModel
     public function calculateSellerCommission(float $price): float
     {
         $settings = $this->getFeeSettings();
-        $commission = $price * ($settings['seller_commission_rate'] / 100);
-        return max($commission, $settings['seller_commission_min']);
+        return $price * ($settings['seller_commission_rate'] / 100);
     }
 
     /**

@@ -7,10 +7,17 @@ interface AuthUser extends Omit<User, 'roles'> {
   roles: Role[];
 }
 
+export interface LoginResult {
+  twoFactorRequired?: boolean;
+  userId?: number;
+  /** サーバが ALREADY_LOGGED_IN を返した場合に true（呼び出し側で確認モーダルを出す） */
+  alreadyLoggedIn?: boolean;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ twoFactorRequired?: boolean; userId?: number } | void>;
+  login: (email: string, password: string, opts?: { forceLogoutOthers?: boolean }) => Promise<LoginResult | void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
@@ -31,6 +38,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // 初回ロード時に認証状態を確認
     checkAuth();
   }, []);
+
+  // ログイン中は /api/auth/me を 60 秒ごとにポーリングし、他端末ログインで強制ログアウトされた場合に
+  // 速やかにログイン画面へ遷移させる（401 で axios インターセプタがリダイレクトする）
+  useEffect(() => {
+    if (!user) return;
+    const interval = window.setInterval(() => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      axios
+        .get('/api/auth/me', { silent: true })
+        .catch(() => {
+          // 401 はインターセプタが処理する。それ以外は無視（ネットワーク断など）
+        });
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [user]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('auth_token');
@@ -56,26 +79,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (email: string, password: string): Promise<{ twoFactorRequired?: boolean; userId?: number } | void> => {
-    const response = await axios.post('/api/auth/login', {
-      email,
-      password,
-    });
+  const login = async (
+    email: string,
+    password: string,
+    opts?: { forceLogoutOthers?: boolean }
+  ): Promise<LoginResult | void> => {
+    try {
+      const response = await axios.post(
+        '/api/auth/login',
+        {
+          email,
+          password,
+          force_logout_others: opts?.forceLogoutOthers === true,
+        },
+        // 409 ALREADY_LOGGED_IN は呼び出し側で扱うので snackbar を抑制する
+        { silent: true }
+      );
 
-    const data = response.data.data;
+      const data = response.data.data;
 
-    // 2FA が必要な場合
-    if (data.two_factor_required) {
-      return { twoFactorRequired: true, userId: data.user_id };
+      // 2FA が必要な場合
+      if (data.two_factor_required) {
+        return { twoFactorRequired: true, userId: data.user_id };
+      }
+
+      const { token, user: userData } = data;
+
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      setUser(userData);
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { code?: string; data?: { user_id?: number } } } };
+      if (e?.response?.status === 409 && e.response.data?.code === 'ALREADY_LOGGED_IN') {
+        return { alreadyLoggedIn: true, userId: e.response.data.data?.user_id };
+      }
+      throw err;
     }
-
-    const { token, user: userData } = data;
-
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-    setUser(userData);
   };
 
   const logout = async () => {

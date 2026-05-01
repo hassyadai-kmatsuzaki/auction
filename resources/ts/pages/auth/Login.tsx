@@ -8,6 +8,11 @@ import {
   Alert,
   InputAdornment,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   EmailOutlined,
@@ -28,28 +33,43 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forceLogoutDialogOpen, setForceLogoutDialogOpen] = useState(false);
 
   useEffect(() => {
     const queryError = searchParams.get('error');
+    const reason = searchParams.get('reason');
     if (queryError) {
       setError(queryError);
       const next = new URLSearchParams(searchParams);
       next.delete('error');
       setSearchParams(next, { replace: true });
+    } else if (reason === 'session_expired') {
+      setInfo('別の端末でログインがあったため、または時間経過のためログアウトされました。再度ログインしてください。');
+      const next = new URLSearchParams(searchParams);
+      next.delete('reason');
+      setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLogin = async (forceLogoutOthers: boolean) => {
     setError('');
+    setInfo('');
     setLoading(true);
 
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, { forceLogoutOthers });
+
+      if (result?.alreadyLoggedIn) {
+        setForceLogoutDialogOpen(true);
+        return;
+      }
 
       if (result?.twoFactorRequired) {
-        navigate('/auth/two-factor', { state: { userId: result.userId } });
+        navigate('/auth/two-factor', {
+          state: { userId: result.userId, forceLogoutOthers },
+        });
         return;
       }
 
@@ -80,6 +100,16 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performLogin(false);
+  };
+
+  const handleConfirmForceLogout = async () => {
+    setForceLogoutDialogOpen(false);
+    await performLogin(true);
   };
 
   const inputSx = {
@@ -167,6 +197,21 @@ export default function Login() {
             アカウントにサインインして参加する
           </Typography>
         </Box>
+
+        {info && (
+          <Alert
+            severity="warning"
+            sx={{
+              mb: 2.5,
+              borderRadius: 2,
+              bgcolor: 'rgba(234, 179, 8, 0.15)',
+              color: '#000',
+              border: '1px solid rgba(234, 179, 8, 0.3)',
+            }}
+          >
+            {info}
+          </Alert>
+        )}
 
         {error && (
           <Alert
@@ -324,6 +369,33 @@ export default function Login() {
           </Typography>
         </Typography>
       </Box>
+
+      <Dialog
+        open={forceLogoutDialogOpen}
+        onClose={() => setForceLogoutDialogOpen(false)}
+      >
+        <DialogTitle>他の端末でログイン中です</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            このアカウントは現在、別の端末でログインされています。
+            続行すると他の端末は強制的にログアウトされ、対象のメールアドレス宛に通知が送信されます。
+            よろしいですか？
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setForceLogoutDialogOpen(false)} disabled={loading}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleConfirmForceLogout}
+            variant="contained"
+            color="error"
+            disabled={loading}
+          >
+            {loading ? '処理中...' : '強制ログアウトして続行'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -29,11 +29,8 @@ export interface AuctionFormData {
   };
   custom_fee_settings: {
     seller_commission_rate: number;
-    seller_commission_min: number;
     buyer_commission_rate: number;
-    buyer_commission_min: number;
-    base_listing_fee: number;
-    premium_listing_fee: number;
+    // premium_listing_fee: number; // TODO: プレミアム出品プラン再開時にコメントを外す
   };
   custom_shipping_settings: {
     packaging_fee: number;
@@ -77,11 +74,8 @@ const DEFAULT_FORM_DATA: AuctionFormData = {
   },
   custom_fee_settings: {
     seller_commission_rate: 10,
-    seller_commission_min: 500,
-    buyer_commission_rate: 5,
-    buyer_commission_min: 300,
-    base_listing_fee: 500,
-    premium_listing_fee: 800,
+    buyer_commission_rate: 10,
+    // premium_listing_fee: 800, // TODO: プレミアム出品プラン再開時にコメントを外す
   },
   custom_shipping_settings: {
     packaging_fee: 500,

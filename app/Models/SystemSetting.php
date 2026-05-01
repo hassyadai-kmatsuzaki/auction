@@ -203,16 +203,10 @@ class SystemSetting extends BaseModel
     {
         return [
             // 出品者向け
-            'seller_registration_fee' => self::get('seller_registration_fee', 3000),
-            'seller_annual_fee' => self::get('seller_annual_fee', 0),
-            'base_listing_fee' => self::get('base_listing_fee', 500),
-            'premium_listing_fee' => self::get('premium_plan_fee', 300),
+            // 'premium_listing_fee' => self::get('premium_plan_fee', 300), // TODO: プレミアム出品プランを再開する際にコメントを外す
             'seller_commission_rate' => self::get('default_commission_rate', 10),
-            'seller_commission_min' => self::get('seller_commission_min', 500),
             // 買受者向け
-            'buyer_registration_fee' => self::get('buyer_registration_fee', 0),
-            'buyer_commission_rate' => self::get('buyer_commission_rate', 5),
-            'buyer_commission_min' => self::get('buyer_commission_min', 300),
+            'buyer_commission_rate' => self::get('buyer_commission_rate', 10),
         ];
     }
 

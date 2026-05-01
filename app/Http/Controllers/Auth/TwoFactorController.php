@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\EnforcesSingleSession;
 use App\Http\Controllers\Controller;
 use App\Services\TwoFactorService;
 use Illuminate\Http\JsonResponse;
@@ -9,6 +10,8 @@ use Illuminate\Http\Request;
 
 class TwoFactorController extends Controller
 {
+    use EnforcesSingleSession;
+
     public function __construct(
         private TwoFactorService $twoFactorService,
     ) {}
@@ -158,6 +161,16 @@ class TwoFactorController extends Controller
                 'success' => false,
                 'message' => '認証コードが正しくありません',
             ], 422);
+        }
+
+        // 多重ログイン抑止（LoginController と同じロジック）
+        $forceLogoutOthers = $request->boolean('force_logout_others');
+        if (! $forceLogoutOthers && $this->hasActiveAuthToken($user)) {
+            return $this->alreadyLoggedInResponse($user->id);
+        }
+
+        if ($forceLogoutOthers) {
+            $this->revokeOtherSessionsAndNotify($user, $request);
         }
 
         // 最終ログイン日時を更新
