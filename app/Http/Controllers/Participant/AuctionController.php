@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\WonItem;
 use App\Services\AuctionService;
 use App\Services\BidService;
+use App\Services\TestModeService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,7 @@ class AuctionController extends Controller
     public function __construct(
         private readonly BidService     $bidService,
         private readonly AuctionService $auctionService,
+        private readonly TestModeService $testMode,
     ) {}
 
 
@@ -33,7 +35,8 @@ class AuctionController extends Controller
         $status = $request->input('status');
         
         $query = Auction::query();
-        
+        $this->testMode->applyToAuctionQuery($query);
+
         // 参加者には準備中は見せない
         $query->whereIn('status', ['scheduled', 'live', 'finished']);
         
@@ -57,9 +60,11 @@ class AuctionController extends Controller
         $auctionIds = $auctions->pluck('id')->all();
         $sellersByAuction = [];
         if (!empty($auctionIds)) {
-            $rows = Item::query()
+            $rowsQuery = Item::query()
                 ->whereIn('auction_id', $auctionIds)
-                ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
+                ->whereIn('status', ['registered', 'live', 'sold', 'unsold']);
+            $this->testMode->applyToItemQuery($rowsQuery);
+            $rows = $rowsQuery
                 ->join('seller_profiles', 'items.seller_profile_id', '=', 'seller_profiles.id')
                 ->select('items.auction_id', 'seller_profiles.seller_name')
                 ->distinct()
@@ -107,8 +112,13 @@ class AuctionController extends Controller
      */
     public function show($id)
     {
-        $auction = Auction::findOrFail($id);
-        
+        $auctionQuery = Auction::query()->where('id', $id);
+        $this->testMode->applyToAuctionQuery($auctionQuery);
+        $auction = $auctionQuery->first();
+        if (!$auction) {
+            return response()->json(['success' => false, 'message' => 'オークションが見つかりません。'], 404);
+        }
+
         // 参加者には準備中は見せない
         if ($auction->status === 'preparing') {
             return response()->json([
@@ -139,7 +149,12 @@ class AuctionController extends Controller
      */
     public function live($id)
     {
-        $auction = Auction::findOrFail($id);
+        $auctionQuery = Auction::query()->where('id', $id);
+        $this->testMode->applyToAuctionQuery($auctionQuery);
+        $auction = $auctionQuery->first();
+        if (!$auction) {
+            return response()->json(['success' => false, 'message' => 'オークションが見つかりません。'], 404);
+        }
 
         // 待機室: scheduledステータスの場合
         if ($auction->status === 'scheduled') {
@@ -189,13 +204,14 @@ class AuctionController extends Controller
     public function myWonItems($auctionId)
     {
         $userId = Auth::id();
-        
-        $wonItems = WonItem::where('winner_id', $userId)
+
+        $wonItemsQuery = WonItem::where('winner_id', $userId)
             ->whereHas('item', function ($q) use ($auctionId) {
                 $q->where('auction_id', $auctionId);
             })
-            ->with('item')
-            ->get();
+            ->with('item');
+        $this->testMode->applyToWonItemQuery($wonItemsQuery);
+        $wonItems = $wonItemsQuery->get();
         
         $totalAmount = 0;
         $items = $wonItems->map(function ($wi) use (&$totalAmount) {
@@ -229,10 +245,16 @@ class AuctionController extends Controller
      */
     public function items($auctionId)
     {
-        $auction = Auction::with(['lanes' => function ($query) {
-            $query->orderBy('lane_number');
-        }])->findOrFail($auctionId);
-        
+        $auctionQuery = Auction::query()->where('id', $auctionId)
+            ->with(['lanes' => function ($query) {
+                $query->orderBy('lane_number');
+            }]);
+        $this->testMode->applyToAuctionQuery($auctionQuery);
+        $auction = $auctionQuery->first();
+        if (!$auction) {
+            return response()->json(['success' => false, 'message' => 'オークションが見つかりません。'], 404);
+        }
+
         // 参加者には準備中は見せない
         if ($auction->status === 'preparing') {
             return response()->json([
@@ -247,14 +269,16 @@ class AuctionController extends Controller
         
         foreach ($lanes as $lane) {
             // レーンに割り当てられたアイテムを取得
-            $laneItems = $lane->items()
+            $laneItemsQuery = $lane->items()
                 ->whereIn('items.status', ['registered', 'live', 'sold', 'unsold'])
                 ->with([
                     'media' => function ($query) {
                         $query->orderBy('display_order');
                     },
                     'sellerProfile:id,seller_name,profile_image_path',
-                ])
+                ]);
+            $this->testMode->applyToItemQuery($laneItemsQuery);
+            $laneItems = $laneItemsQuery
                 ->orderBy('lane_items.sequence_order')
                 ->get();
 
@@ -286,7 +310,7 @@ class AuctionController extends Controller
         }
 
         // レーンに割り当てられていないアイテムも取得
-        $unassignedItems = Item::where('auction_id', $auctionId)
+        $unassignedItemsQuery = Item::where('auction_id', $auctionId)
             ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
             ->whereDoesntHave('lanes')
             ->with([
@@ -294,7 +318,9 @@ class AuctionController extends Controller
                     $query->orderBy('display_order');
                 },
                 'sellerProfile:id,seller_name',
-            ])
+            ]);
+        $this->testMode->applyToItemQuery($unassignedItemsQuery);
+        $unassignedItems = $unassignedItemsQuery
             ->orderBy('item_number')
             ->get();
 

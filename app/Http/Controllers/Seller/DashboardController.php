@@ -7,12 +7,15 @@ use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
 use App\Models\WonItem;
+use App\Services\TestModeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly TestModeService $testMode) {}
+
     /**
      * ダッシュボードデータ取得
      *
@@ -22,6 +25,24 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+
+        // テストモード中、閉じた世界外の出品者にはダッシュボードを空で返す（401/403 にはしない）
+        if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse($user)) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'stats' => [
+                        'total_items' => 0, 'items_this_month' => 0,
+                        'total_sales' => 0, 'sales_this_month' => 0,
+                        'pending_items' => 0, 'sold_items' => 0,
+                    ],
+                    'recent_items' => [],
+                    'upcoming_auctions' => [],
+                    'test_mode_notice' => '現在テスト運用中のため、出品データは表示されません。',
+                ],
+            ]);
+        }
+
         $profile = SellerProfile::where('user_id', $user->id)->first();
 
         if (!$profile) {

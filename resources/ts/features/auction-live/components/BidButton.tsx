@@ -82,9 +82,10 @@ const FreezeButton = React.memo(({ freezeRemainingSeconds = 0, freezeTotalSecond
 FreezeButton.displayName = 'FreezeButton';
 
 /**
- * 入札ON/OFFボタン
- * pre_bid / freeze フェーズ中は無効化
- * 最高入札者（1人だけの入札者）は入札解除不可
+ * 入札ボタン（単方向入札仕様）
+ * - 押す = 入札参加。OFF/離脱動線は廃止
+ * - 自分が active になった以降は disabled（落札権利者でも非権利者でも自分から降りられない）
+ * - pre_bid / freeze フェーズ中は無効化
  */
 export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRemainingSeconds, freezeTotalSeconds, isLoading, isTopBidder, activeBidderCount, onToggle }: Props) => {
   if (isPreBid) {
@@ -105,7 +106,7 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
   }
 
   const isActive = myBidStatus === 'active';
-  // 最高入札者（1人だけの入札者）は入札解除不可
+  // active 中は単方向仕様で押せない。「最高入札者」は表示ラベルの出し分けのみに使う
   const isOnlyBidder = isActive && activeBidderCount === 1;
 
   if (isActive) {
@@ -114,8 +115,7 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
         fullWidth
         variant="contained"
         size="large"
-        onClick={onToggle}
-        disabled={isLoading || isOnlyBidder}
+        disabled={true}
         startIcon={
           isLoading
             ? <CircularProgress size={20} color="inherit" />

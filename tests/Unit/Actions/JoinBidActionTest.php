@@ -4,6 +4,8 @@ namespace Tests\Unit\Actions;
 
 use App\Actions\Bid\JoinBidAction;
 use App\Models\Auction;
+use App\Models\BidEvent;
+use App\Models\BidLimitPrice;
 use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
@@ -133,6 +135,101 @@ class JoinBidActionTest extends TestCase
 
         $result = $this->action->execute($item, 1);
         $this->assertTrue($result->success);
+    }
+
+    /**
+     * @test
+     * 単方向入札仕様: 自分が既に active な状態で再度押下しても冪等成功で吸収する。
+     * （フロント disable 漏れや楽観更新ズレで二重リクエストが届いても DB を二重に書かない）
+     */
+    public function test_既にactiveな自分の二重押下は冪等成功で吸収される(): void
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
+        $userId  = 1;
+
+        BidParticipant::create([
+            'item_id'    => $item->id,
+            'user_id'    => $userId,
+            'is_active'  => true,
+            'activated_at' => now(),
+        ]);
+
+        $result = $this->action->execute($item, $userId);
+
+        $this->assertTrue($result->success);
+        $this->assertSame(1, BidEvent::where('item_id', $item->id)->where('user_id', $userId)->where('event_type', BidEvent::TYPE_JOIN)->count(),
+            '冪等成功時は recordJoin が新たに発行されないこと（既存ゼロのまま）'
+        );
+        $this->assertDatabaseHas('bid_participants', [
+            'item_id' => $item->id, 'user_id' => $userId, 'is_active' => true,
+        ]);
+    }
+
+    /**
+     * @test
+     * 単方向入札仕様（指値あり商品）: 既に他者が落札権利者として active な状態に滑り込んだ
+     * 入札は無視される。bid_events に TYPE_IGNORED として監査ログだけ残す。
+     */
+    public function test_指値あり商品で他者が権利者中の滑り込み入札は無視されignored記録される(): void
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
+
+        // 指値（is_triggered=false）が登録されている前提
+        BidLimitPrice::create([
+            'item_id'      => $item->id,
+            'user_id'      => 99,
+            'limit_price'  => 99999,
+            'is_triggered' => false,
+        ]);
+
+        // 既存の落札権利者 A
+        $userA = 10;
+        BidParticipant::create([
+            'item_id'    => $item->id,
+            'user_id'    => $userA,
+            'is_active'  => true,
+            'activated_at' => now(),
+        ]);
+
+        // 滑り込んできた B
+        $userB = 20;
+        $result = $this->action->execute($item, $userB);
+
+        $this->assertFalse($result->success);
+        $this->assertStringContainsString('既に他のユーザーが落札権利者', $result->message);
+        $this->assertDatabaseMissing('bid_participants', [
+            'item_id' => $item->id, 'user_id' => $userB, 'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('bid_events', [
+            'item_id'    => $item->id,
+            'user_id'    => $userB,
+            'event_type' => BidEvent::TYPE_IGNORED,
+        ]);
+    }
+
+    /**
+     * @test
+     * 単方向入札仕様（指値なし商品）: 1人目押下では active 登録のみで価格上昇しない。
+     * 2人目押下で初めて即時価格上昇＋フリーズが発動する（従来動作の維持）。
+     */
+    public function test_指値なし商品の1人目押下は価格上昇せずactive登録のみ(): void
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create([
+            'auction_id'    => $auction->id,
+            'status'        => 'live',
+            'current_price' => 1000,
+        ]);
+
+        $result = $this->action->execute($item, 1);
+
+        $this->assertTrue($result->success);
+        $this->assertSame(1000.0, (float) $item->fresh()->current_price);
+        $this->assertDatabaseHas('bid_participants', [
+            'item_id' => $item->id, 'user_id' => 1, 'is_active' => true,
+        ]);
     }
 
     /** @test */

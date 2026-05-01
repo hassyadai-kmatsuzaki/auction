@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Favorite;
 use App\Models\Item;
+use App\Services\TestModeService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 class FavoriteController extends Controller
 {
     use MediaUrlTrait;
+
+    public function __construct(private readonly TestModeService $testMode) {}
 
     /**
      * お気に入り一覧を取得
@@ -21,10 +24,20 @@ class FavoriteController extends Controller
         $userId = Auth::id();
         $includePast = $request->boolean('include_past', false);
 
-        $favorites = Favorite::where('user_id', $userId)
-            ->with(['item.auction', 'item.media', 'item.sellerProfile'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $favoritesQuery = Favorite::where('user_id', $userId)
+            ->with(['item.auction', 'item.media', 'item.sellerProfile.user']);
+
+        // テストモード中はクエリ段階で閉じた世界外を除外
+        if ($this->testMode->isEnabled()) {
+            $viewer = Auth::user();
+            if (!$this->testMode->currentUserCanSeeTestUniverse($viewer)) {
+                $favoritesQuery->whereRaw('1=0');
+            } else {
+                $favoritesQuery->whereHas('item.sellerProfile.user', fn ($q) => $q->where('is_test', true));
+            }
+        }
+
+        $favorites = $favoritesQuery->orderBy('created_at', 'desc')->get();
 
         $mapped = $favorites->map(function ($fav) {
             $item = $fav->item;

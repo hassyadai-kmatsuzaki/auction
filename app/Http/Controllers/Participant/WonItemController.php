@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
 use App\Models\WonItem;
+use App\Services\TestModeService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Validator;
 class WonItemController extends Controller
 {
     use MediaUrlTrait;
+
+    public function __construct(private readonly TestModeService $testMode) {}
 
     /**
      * 自分の落札商品一覧を取得
@@ -23,8 +26,10 @@ class WonItemController extends Controller
     {
         $userId = Auth::id();
 
-        $wonItems = WonItem::forWinner($userId)
-            ->with(['item.auction', 'item.media'])
+        $wonItemsQuery = WonItem::forWinner($userId)
+            ->with(['item.auction', 'item.media']);
+        $this->testMode->applyToWonItemQuery($wonItemsQuery);
+        $wonItems = $wonItemsQuery
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -149,9 +154,12 @@ class WonItemController extends Controller
     {
         $userId = Auth::id();
         
-        $wonItem = WonItem::forWinner($userId)
+        $wonItemQuery = WonItem::forWinner($userId)
             ->with(['item.auction', 'item.media'])
-            ->findOrFail($id);
+            ->where('id', $id);
+        $this->testMode->applyToWonItemQuery($wonItemQuery);
+        $wonItem = $wonItemQuery->first();
+        if (!$wonItem) abort(404);
         
         $item = $wonItem->item;
         $auction = $item?->auction;

@@ -7,6 +7,7 @@ use App\Actions\Bid\LeaveBidAction;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Services\BidService;
+use App\Services\TestModeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,10 +20,15 @@ class BidController extends Controller
         private readonly LeaveBidAction $leaveBidAction,
         // 後方互換性のため旧ServiceもDI（getActiveParticipations等で使用）
         private readonly BidService     $bidService,
+        private readonly TestModeService $testMode,
     ) {}
 
     /**
-     * 入札ON/OFF切り替え
+     * 入札参加（単方向入札仕様）
+     *
+     * 旧仕様の「ON/OFFトグル」は廃止。`is_active=false` のリクエストは
+     * 互換性のためエンドポイント自体は残すが、サーバーで一律 403 で拒否する。
+     * 自分からの離脱動線は存在しない（auto-left は CountdownService 経由のみ）。
      */
     public function toggle(Request $request): JsonResponse
     {
@@ -39,14 +45,25 @@ class BidController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $item      = Item::findOrFail($request->item_id);
+        // 単方向入札: 離脱リクエスト（is_active=false）は受け付けない
+        if (!$request->boolean('is_active')) {
+            return response()->json([
+                'success' => false,
+                'message' => '入札の取り消しはできません。',
+            ], 403);
+        }
+
+        $itemQuery = Item::query()->where('id', $request->item_id);
+        $this->testMode->applyToItemQuery($itemQuery);
+        $item = $itemQuery->first();
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => '指定された商品は存在しません。'], 404);
+        }
         $userId    = Auth::id();
         $ip        = $request->ip();
         $userAgent = $request->userAgent();
 
-        $result = $request->boolean('is_active')
-            ? $this->joinBidAction->execute($item, $userId, $ip, $userAgent)
-            : $this->leaveBidAction->execute($item, $userId, $ip, $userAgent);
+        $result = $this->joinBidAction->execute($item, $userId, $ip, $userAgent);
 
         return $result->toResponse();
     }

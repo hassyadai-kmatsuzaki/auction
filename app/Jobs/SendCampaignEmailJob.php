@@ -76,6 +76,7 @@ class SendCampaignEmailJob implements ShouldQueue
                 'sent_at' => now(),
             ]);
             DB::table('email_campaigns')->where('id', $campaign->id)->increment('sent_count');
+            $this->markCampaignCompletedIfDone($campaign->id);
         } catch (\Throwable $e) {
             Log::error('SendCampaignEmailJob failed', [
                 'recipient_id' => $recipient->id,
@@ -90,6 +91,7 @@ class SendCampaignEmailJob implements ShouldQueue
                     'error' => substr($e->getMessage(), 0, 1000),
                 ]);
                 $this->bumpFailed($campaign);
+                $this->markCampaignCompletedIfDone($campaign->id);
                 return;
             }
 
@@ -100,5 +102,26 @@ class SendCampaignEmailJob implements ShouldQueue
     private function bumpFailed(EmailCampaign $campaign): void
     {
         DB::table('email_campaigns')->where('id', $campaign->id)->increment('failed_count');
+    }
+
+    /**
+     * 自分が最後の 1 件だった場合にキャンペーンを sending → sent に遷移させる。
+     *
+     * 競合対策として WHERE で status='sending' AND sent+failed >= total を条件にした
+     * 単一 UPDATE で行う。複数ワーカーが同時に最後の1件を処理しても、
+     * 最初の UPDATE だけが 1 行更新を返し、残りは 0 行で no-op になる。
+     */
+    public static function markCampaignCompletedIfDone(int $campaignId): void
+    {
+        DB::table('email_campaigns')
+            ->where('id', $campaignId)
+            ->where('status', 'sending')
+            ->where('total_recipients', '>', 0)
+            ->whereRaw('(sent_count + failed_count) >= total_recipients')
+            ->update([
+                'status' => 'sent',
+                'completed_at' => now(),
+                'updated_at' => now(),
+            ]);
     }
 }

@@ -95,14 +95,19 @@ class LeaveBidActionTest extends TestCase
         $this->assertFalse($result->success);
     }
 
-    /** @test */
-    public function test_最高入札者は入札を解除できない(): void
+    /**
+     * @test
+     * 単方向入札仕様: ユーザー操作からの離脱動線は BidController で 403 拒否されるため、
+     * 「最高入札者は離脱できません」ガードは LeaveBidAction から削除済み。
+     * このテストは「指値到達等のシステム経由で唯一の active 参加者を強制離脱できる」ことを保証する
+     * （旧仕様ではこのケースがガードで誤って弾かれていた）。
+     */
+    public function test_唯一のactive参加者でもシステム経由なら離脱できる(): void
     {
         $auction = Auction::factory()->create(['status' => 'live']);
         $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
         $userId  = 1;
 
-        // 1人だけの入札者（最高入札者）
         BidParticipant::create([
             'item_id'    => $item->id,
             'user_id'    => $userId,
@@ -112,14 +117,11 @@ class LeaveBidActionTest extends TestCase
 
         $result = $this->action->execute($item, $userId);
 
-        $this->assertFalse($result->success);
-        $this->assertStringContainsString('最高入札者は入札を解除できません', $result->message);
-        
-        // データベースには変更がないことを確認
+        $this->assertTrue($result->success);
         $this->assertDatabaseHas('bid_participants', [
             'item_id'   => $item->id,
             'user_id'   => $userId,
-            'is_active' => true,
+            'is_active' => false,
         ]);
     }
 }

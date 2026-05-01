@@ -25,6 +25,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  Switch,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -95,6 +96,7 @@ interface User {
   address_line2: string | null;
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   is_active: boolean;
+  is_test: boolean;
   email_verified_at: string | null;
   approved_at: string | null;
   approved_by: number | null;
@@ -396,6 +398,31 @@ export default function UserDetail() {
                 size="small"
                 sx={{ mt: 0.5 }}
               />
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                テストユーザー
+              </Typography>
+              <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Switch
+                  size="small"
+                  checked={user.is_test}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    try {
+                      await axios.put(`/api/admin/users/${user.id}`, { is_test: next });
+                      setUser({ ...user, is_test: next });
+                      setSuccess(next ? 'テストユーザーに設定しました' : 'テストユーザー設定を解除しました');
+                    } catch (err: any) {
+                      setError(err?.response?.data?.message ?? 'テストユーザー設定の更新に失敗しました');
+                    }
+                  }}
+                />
+                <Typography variant="caption" color={user.is_test ? 'warning.main' : 'text.secondary'}>
+                  {user.is_test ? 'テストモード ON 中もこのユーザーは閉じた世界の住人になります' : 'テストモード ON で見えなくなります'}
+                </Typography>
+              </Box>
             </Box>
 
             {user.payment_method_preference === 'bank_transfer' && (

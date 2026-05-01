@@ -53,11 +53,11 @@ class DispatchEmailCampaignJob implements ShouldQueue
             'started_at' => now(),
         ]);
 
+        // ── Phase 1: 受信者を全件 insert する（dispatch はまだしない） ──
+        // 先に dispatch すると、worker が完走しても total_recipients=0 のままで
+        // 完了判定が走らないレースが起きるため、必ず total を確定させてから dispatch する。
         $query = $this->buildRecipientQuery($campaign);
-        $totalQueued = 0;
-
-        // 受信者を chunk で展開し、各 chunk が終わったら都度ディスパッチする
-        $query->select(['id', 'email'])->orderBy('id')->chunk(500, function ($users) use ($campaign, &$totalQueued) {
+        $query->select(['id', 'email'])->orderBy('id')->chunk(500, function ($users) use ($campaign) {
             $rows = [];
             foreach ($users as $u) {
                 $rows[] = [
@@ -71,18 +71,12 @@ class DispatchEmailCampaignJob implements ShouldQueue
             }
             // ユニークキー (campaign_id, user_id) で衝突したら無視（manual で重複指定された場合）
             EmailCampaignRecipient::insertOrIgnore($rows);
-
-            // 直近 chunk 分の recipient_id を取得して dispatch
-            $recipientIds = EmailCampaignRecipient::where('email_campaign_id', $campaign->id)
-                ->whereIn('user_id', collect($users)->pluck('id'))
-                ->where('status', 'queued')
-                ->pluck('id');
-
-            foreach ($recipientIds as $rid) {
-                SendCampaignEmailJob::dispatch($rid);
-            }
-            $totalQueued += $recipientIds->count();
         });
+
+        // ── Phase 2: total_recipients を確定 ──
+        $totalQueued = EmailCampaignRecipient::where('email_campaign_id', $campaign->id)
+            ->where('status', 'queued')
+            ->count();
 
         $campaign->update([
             'total_recipients' => $totalQueued,
@@ -93,7 +87,23 @@ class DispatchEmailCampaignJob implements ShouldQueue
                 'status' => 'sent',
                 'completed_at' => now(),
             ]);
+            Log::info('DispatchEmailCampaignJob: no recipients, completed immediately', ['campaign_id' => $campaign->id]);
+            return;
         }
+
+        // ── Phase 3: 全件分の SendCampaignEmailJob を dispatch ──
+        EmailCampaignRecipient::where('email_campaign_id', $campaign->id)
+            ->where('status', 'queued')
+            ->orderBy('id')
+            ->chunkById(500, function ($recipients) {
+                foreach ($recipients as $r) {
+                    SendCampaignEmailJob::dispatch($r->id);
+                }
+            });
+
+        // 念のため: dispatch の途中/直後に最終 worker が完走している可能性があるので、
+        // ここでも完了判定を呼んでおく。SendCampaignEmailJob 側にも同じ判定が入っている。
+        SendCampaignEmailJob::markCampaignCompletedIfDone($campaign->id);
 
         Log::info('DispatchEmailCampaignJob: dispatched', [
             'campaign_id' => $campaign->id,

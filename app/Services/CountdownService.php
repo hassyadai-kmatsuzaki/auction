@@ -460,9 +460,16 @@ class CountdownService
      *
      * 入札者2人以上 → 即座に価格上昇 → フリーズカウントダウン開始
      */
-    protected function handlePriceIncrement(Lane $lane, Item $item, Auction $auction, int $activeBidderCount, ?int $lastBidderUserId = null): void
+    protected function handlePriceIncrement(
+        Lane $lane,
+        Item $item,
+        Auction $auction,
+        int $activeBidderCount,
+        ?int $lastBidderUserId = null,
+        int $minActiveBidders = 2
+    ): void
     {
-        if ($item->status !== 'live' || $activeBidderCount <= 1) {
+        if ($item->status !== 'live' || $activeBidderCount < $minActiveBidders) {
             return;
         }
 
@@ -489,9 +496,9 @@ class CountdownService
             // （count() / get() を別々に発行していた重複クエリを統合）
             $allActive = BidParticipant::forItem($locked->id)->active()->get();
             $freshActiveCount = $allActive->count();
-            if ($freshActiveCount <= 1) {
+            if ($freshActiveCount < $minActiveBidders) {
                 DB::rollBack();
-                Log::info("handlePriceIncrement: active count dropped to {$freshActiveCount} under lock. item={$locked->id} — skipping.");
+                Log::info("handlePriceIncrement: active count dropped to {$freshActiveCount} (min={$minActiveBidders}) under lock. item={$locked->id} — skipping.");
                 return;
             }
 
@@ -634,9 +641,15 @@ class CountdownService
     }
 
     /**
-     * 入札者が参加した際の即時価格上昇処理
+     * 入札者が参加した際の即時価格上昇処理（単方向入札仕様）
      *
-     * 入札者が2人以上になった瞬間に呼ばれる:
+     * 発動閾値:
+     *   - 指値あり商品（is_triggered=false の BidLimitPrice が1件以上）: 1人目押下で発動
+     *     → 押下者が落札権利者として確定。後続の滑り込みは JoinBidAction 側で無視される。
+     *   - 指値なし商品: 2人目押下で発動（従来動作）
+     *     → 1人だけ参加した場合は開始価格でそのまま落札。
+     *
+     * 発動内容:
      * 1. 即座に価格を上昇
      * 2. フリーズカウントダウンを開始
      * 3. フリーズ後に落札カウントダウンを開始
@@ -645,11 +658,16 @@ class CountdownService
     {
         $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
 
-        if ($activeBidderCount < 2) {
+        $hasActiveLimits = BidLimitPrice::where('item_id', $item->id)
+            ->where('is_triggered', false)
+            ->exists();
+        $threshold = $hasActiveLimits ? 1 : 2;
+
+        if ($activeBidderCount < $threshold) {
             return;
         }
 
-        $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount, $lastBidderUserId);
+        $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount, $lastBidderUserId, $threshold);
     }
 
     /**

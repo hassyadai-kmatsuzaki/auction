@@ -6,6 +6,7 @@ use App\Actions\Bid\SetBidLimitAction;
 use App\Http\Controllers\Controller;
 use App\Models\BidLimitPrice;
 use App\Models\Item;
+use App\Services\TestModeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +16,19 @@ class BidLimitController extends Controller
 {
     public function __construct(
         private readonly SetBidLimitAction $setLimitAction,
+        private readonly TestModeService  $testMode,
     ) {}
+
+    /**
+     * テストモードの可視性チェックを通過した item を返す。404 時は null。
+     */
+    private function visibleItemOrNull(int $itemId, array $with = []): ?Item
+    {
+        $q = Item::query()->where('id', $itemId);
+        if (!empty($with)) $q->with($with);
+        $this->testMode->applyToItemQuery($q);
+        return $q->first();
+    }
 
     /**
      * 指値（上限価格）を設定・更新
@@ -34,7 +47,10 @@ class BidLimitController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $item   = Item::with('auction')->findOrFail($request->item_id);
+        $item = $this->visibleItemOrNull((int) $request->item_id, ['auction']);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => '指定された商品は存在しません。'], 404);
+        }
         $result = $this->setLimitAction->execute($item, Auth::id(), (float) $request->limit_price);
 
         return $result->toResponse();
@@ -45,7 +61,10 @@ class BidLimitController extends Controller
      */
     public function destroy(int $itemId): JsonResponse
     {
-        $item   = Item::findOrFail($itemId);
+        $item = $this->visibleItemOrNull($itemId);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => '指定された商品は存在しません。'], 404);
+        }
         $result = $this->setLimitAction->remove($item, Auth::id());
 
         return $result->toResponse();
@@ -89,7 +108,10 @@ class BidLimitController extends Controller
      */
     public function show(int $itemId): JsonResponse
     {
-        $item  = Item::findOrFail($itemId);
+        $item = $this->visibleItemOrNull($itemId);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => '指定された商品は存在しません。'], 404);
+        }
         $limit = BidLimitPrice::forItem($itemId)->forUser(Auth::id())->first();
 
         $base = (int) floor($item->status === 'live' ? $item->current_price : $item->start_price);

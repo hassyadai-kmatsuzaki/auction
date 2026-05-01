@@ -50,6 +50,7 @@ interface User {
   company_name: string | null;
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   is_active: boolean;
+  is_test: boolean;
   roles: Role[];
   last_login_at: string | null;
   created_at: string;
@@ -339,6 +340,7 @@ export default function UserManagement() {
                   <TableCell>メールアドレス</TableCell>
                   <TableCell>ロール</TableCell>
                   <TableCell align="center">ステータス</TableCell>
+                  <TableCell align="center">テスト</TableCell>
                   <TableCell>最終ログイン</TableCell>
                   <TableCell>登録日</TableCell>
                   <TableCell align="center">操作</TableCell>
@@ -347,7 +349,7 @@ export default function UserManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">
                         ユーザーが見つかりませんでした
                       </Typography>
@@ -402,6 +404,13 @@ export default function UserManagement() {
                           color={getStatusColor(user.status)}
                           size="small"
                         />
+                      </TableCell>
+                      <TableCell align="center">
+                        {user.is_test ? (
+                          <Chip label="TEST" size="small" color="warning" variant="outlined" />
+                        ) : (
+                          <Typography variant="caption" color="text.disabled">—</Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">

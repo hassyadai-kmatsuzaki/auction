@@ -5,27 +5,28 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { LIVE_STATE_QUERY_KEY } from './useAuctionLive';
 import type { LiveState } from '@/types';
 
+/**
+ * 単方向入札仕様: ON のリクエストだけを送信する。
+ * 旧仕様の「もう一度押すと OFF（離脱）」動線は廃止。落札権利者・非権利者を問わず
+ * ユーザー操作からは離脱できない。サーバー側でも `is_active=false` は 403 で拒否される。
+ */
 export function useBidToggle(auctionId: number) {
   const queryClient = useQueryClient();
   const { lockBid, unlockBid, isBidLocked } = useAuctionLiveStore();
   const showSnackbar = useNotificationStore((s) => s.showSnackbar);
 
   const mutation = useMutation({
-    mutationFn: ({ itemId, isActive }: { itemId: number; isActive: boolean }) =>
-      bidApi.toggle(itemId, isActive),
+    mutationFn: ({ itemId }: { itemId: number }) => bidApi.toggle(itemId, true),
 
-    // 楽観的更新: APIレスポンスを待たずにUIを即時更新
-    onMutate: async ({ itemId, isActive }) => {
+    // 楽観的更新: APIレスポンスを待たずに UI を 'active' に切り替える
+    onMutate: async ({ itemId }) => {
       lockBid(itemId);
-      // 進行中のクエリをキャンセル（競合防止）
       await queryClient.cancelQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
 
-      // スナップショット（ロールバック用）
       const previousData = queryClient.getQueryData<LiveState>(
         LIVE_STATE_QUERY_KEY(auctionId)
       );
 
-      // 楽観的にUIを更新
       queryClient.setQueryData<LiveState>(LIVE_STATE_QUERY_KEY(auctionId), (prev) => {
         if (!prev) return prev;
         return {
@@ -36,7 +37,7 @@ export function useBidToggle(auctionId: number) {
                   ...lane,
                   current_item: {
                     ...lane.current_item,
-                    my_bid_status: isActive ? 'active' : 'inactive',
+                    my_bid_status: 'active',
                   },
                 }
               : lane
@@ -47,14 +48,11 @@ export function useBidToggle(auctionId: number) {
       return { previousData };
     },
 
-    onSuccess: (result, { isActive }) => {
+    onSuccess: (result) => {
       if (result.success) {
-        showSnackbar(
-          isActive ? '入札に参加しました' : '入札から離脱しました',
-          'success'
-        );
+        showSnackbar(result.message || '入札に参加しました', 'success');
       } else {
-        showSnackbar(result.message || '入札の切り替えに失敗しました', 'error');
+        showSnackbar(result.message || '入札に失敗しました', 'error');
       }
     },
 
@@ -64,22 +62,23 @@ export function useBidToggle(auctionId: number) {
         queryClient.setQueryData(LIVE_STATE_QUERY_KEY(auctionId), context.previousData);
       }
       showSnackbar(
-        err?.response?.data?.message || '入札の切り替えに失敗しました',
+        err?.response?.data?.message || '入札に失敗しました',
         'error'
       );
     },
 
-    // 成功・失敗どちらの場合も最新状態を再取得してサーバーと同期
     onSettled: (_data, _err, variables) => {
       unlockBid(variables.itemId);
       queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
     },
   });
 
+  // 旧 API 互換: BidButton から呼ばれる関数名は `toggle` のまま残すが、
+  // 動作は単方向（ON のみ送信）。既に自分が active なら no-op。
   const toggle = (itemId: number, currentStatus: 'active' | 'inactive' | null) => {
-    if (isBidLocked(itemId)) return; // 処理中の二重押し防止
-    const isActive = currentStatus !== 'active';
-    mutation.mutate({ itemId, isActive });
+    if (isBidLocked(itemId)) return;
+    if (currentStatus === 'active') return;
+    mutation.mutate({ itemId });
   };
 
   return {

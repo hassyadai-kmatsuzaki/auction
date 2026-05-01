@@ -57,6 +57,7 @@ class User extends Authenticatable
         'email_complained_at',
         'email_opt_out_at',
         'unsubscribe_token',
+        'is_test',
     ];
 
     /**
@@ -92,6 +93,7 @@ class User extends Authenticatable
             'email_bounced_at' => 'datetime',
             'email_complained_at' => 'datetime',
             'email_opt_out_at' => 'datetime',
+            'is_test' => 'boolean',
         ];
     }
 

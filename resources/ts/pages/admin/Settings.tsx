@@ -15,6 +15,7 @@ import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 import { useSettings } from '../../features/settings/hooks/useSettings';
 import { useNotificationStore } from '../../stores/notificationStore';
+import TestModeCard from '../../features/settings/components/TestModeCard';
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) => (
@@ -241,7 +242,9 @@ export default function AdminSettings() {
 
       {/* システム設定 */}
       <TabPanel value={tabValue} index={0}>
-        <Card>
+        <TestModeCard />
+
+        <Card sx={{ mt: 3 }}>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>基本情報</Typography>
             <Grid container spacing={3}>

@@ -12,9 +12,17 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 入札離脱アクション
+ * 入札離脱アクション（システム経由のみ）
  *
- * 単一責任: 入札OFFのユースケースのみを担当
+ * 単方向入札仕様（リリース vN）以降、ユーザー操作からの離脱動線は廃止された。
+ * 現在この Action が呼ばれるのは下記のシステム経路に限られる:
+ *   - CountdownService::checkBidLimits（指値到達ユーザーの強制離脱）
+ *   - CountdownService::adjustPriceByBidLimits（同上）
+ * BidController@toggle 経由のユーザー要求はコントローラ側で 403 拒否される。
+ *
+ * 旧版にあった「最高入札者は離脱できません」ガードは、システム経由の指値到達離脱で
+ * 唯一の active 参加者を離脱させるケースを誤って弾くため削除済み。
+ * ユーザー要求の遮断は BidController で完結する。
  */
 class LeaveBidAction
 {
@@ -49,12 +57,6 @@ class LeaveBidAction
             $participant = BidParticipant::forItem($locked->id)->forUser($userId)->first();
             if (!$participant || !$participant->is_active) {
                 return ['fail' => '入札に参加していません。'];
-            }
-
-            // 最高入札者（落札権利者）は入札を解除できない
-            $activeBidders = BidParticipant::forItem($locked->id)->active()->count();
-            if ($activeBidders === 1 && $participant->is_active) {
-                return ['fail' => '最高入札者は入札を解除できません。'];
             }
 
             $participant->deactivate();

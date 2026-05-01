@@ -121,6 +121,38 @@ class JoinBidAction
                     return ['fail' => "上限価格（¥" . number_format($limit->limit_price) . "）に達しているため入札できません。上限価格を変更してください。"];
                 }
 
+                // ─── 単方向入札ガード ─────────────────────────────────
+                // 自分が既に active なら冪等成功（フロント disable 漏れ等で同じ意思が二重に届いたケース）。
+                // participate / recordJoin / 価格上昇トリガーは全てスキップして現在状態をそのまま返す。
+                $existingMine = BidParticipant::forItem($locked->id)->forUser($userId)->first();
+                if ($existingMine && $existingMine->is_active) {
+                    return [
+                        'participant'         => $existingMine,
+                        'active_bidder_count' => BidParticipant::forItem($locked->id)->active()->count(),
+                        'current_price'       => (float) $locked->current_price,
+                        'idempotent'          => true,
+                    ];
+                }
+
+                // 指値（is_triggered=false の有効な指値が登録されている商品）では
+                // 「1人目押下＝価格上昇＋フリーズ＋押下者が落札権利者」になる。
+                // 既に他者が active（=落札権利者）の状態でこのコードに到達するのは
+                // freeze cache 反映前の数 ms 窓で滑り込んだケース → 無視して監査ログだけ残す。
+                $hasActiveLimits = BidLimitPrice::where('item_id', $locked->id)
+                    ->where('is_triggered', false)
+                    ->exists();
+                if ($hasActiveLimits) {
+                    $otherActive = BidParticipant::forItem($locked->id)->active()
+                        ->where('user_id', '!=', $userId)
+                        ->count();
+                    if ($otherActive >= 1) {
+                        BidEvent::recordIgnored(
+                            $locked->id, $userId, (float) $locked->current_price, $ipAddress, $userAgent
+                        );
+                        return ['fail' => '既に他のユーザーが落札権利者です。次の金額になるまでお待ちください。'];
+                    }
+                }
+
                 $participant = BidParticipant::participate($locked->id, $userId, true, $ipAddress, $userAgent);
                 BidEvent::recordJoin($locked->id, $userId, (float) $locked->current_price, $ipAddress, $userAgent);
                 $activeBidderCount = BidParticipant::forItem($locked->id)->active()->count();
@@ -129,6 +161,7 @@ class JoinBidAction
                     'participant'         => $participant,
                     'active_bidder_count' => $activeBidderCount,
                     'current_price'       => (float) $locked->current_price,
+                    'has_active_limits'   => $hasActiveLimits,
                 ];
             }, 3);
         } catch (\Exception $e) {
@@ -145,6 +178,21 @@ class JoinBidAction
         try {
             $participant       = $tx['participant'];
             $activeBidderCount = $tx['active_bidder_count'];
+            $isIdempotent      = (bool) ($tx['idempotent'] ?? false);
+            $hasActiveLimits   = (bool) ($tx['has_active_limits'] ?? false);
+
+            // 冪等成功（既に自分が active）の場合、broadcast / 価格上昇トリガーは全てスキップして
+            // 現在状態のスナップショットだけ返す（二重押下を吸収）。
+            if ($isIdempotent) {
+                $freshItem = $item->fresh();
+                return BidResultDto::success([
+                    'participant_id'      => $participant->id,
+                    'item_id'             => $item->id,
+                    'is_active'           => true,
+                    'current_price'       => $freshItem->current_price,
+                    'active_bidder_count' => $activeBidderCount,
+                ], '既に入札中です。');
+            }
 
             // カウントダウンキャッシュに最後の入札者を記録
             if ($lane) {
@@ -165,12 +213,13 @@ class JoinBidAction
                 }
             }
 
-            // 入札者が2人以上になった場合、即座に価格上昇 → フリーズカウントダウン
-            // 最後に入札した人（このユーザー）が落札権利者となり、他の入札者は自動離脱
-            // ★ 重要: handleImmediatePriceIncrement は bidLock を保持したまま実行する。
-            //         ここで release してから IncPrice を走らせると、後続 join が
-            //         「join 成功 → 直後に auto-left」の連鎖を起こす。
-            if ($activeBidderCount >= 2 && $lane) {
+            // 価格上昇＋フリーズの発動閾値（単方向入札仕様）
+            //   指値あり商品: 1人目押下で発動（押下者が落札権利者として確定、滑り込みは無視）
+            //   指値なし商品: 2人目押下で発動（従来動作 — 1人だけ参加で開始価格落札を成立させる）
+            // ★ bidLock は handleImmediatePriceIncrement 中も保持。早期 release は
+            //   「join → auto-left」連鎖の原因。
+            $threshold = $hasActiveLimits ? 1 : 2;
+            if ($activeBidderCount >= $threshold && $lane) {
                 try {
                     $lane->load('auction');
                     $countdownService = app(CountdownService::class);

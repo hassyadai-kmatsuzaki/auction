@@ -49,12 +49,13 @@ interface FormData {
   address_line1: string;
   address_line2: string;
   roles: string[];
+  is_test: boolean;
 }
 
 export default function UserCreate() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -65,6 +66,7 @@ export default function UserCreate() {
     address_line1: '',
     address_line2: '',
     roles: ['participant'],
+    is_test: false,
   });
 
   // URLパラメータからロールを取得して自動選択
@@ -331,6 +333,20 @@ export default function UserCreate() {
                 <FormHelperText>{errors.roles}</FormHelperText>
               )}
             </FormControl>
+            <FormControlLabel
+              sx={{ ml: 1, mt: 1 }}
+              control={
+                <Checkbox
+                  checked={formData.is_test}
+                  onChange={(e) => setFormData({ ...formData, is_test: e.target.checked })}
+                />
+              }
+              label={
+                <span>
+                  テストユーザーとして登録 <Typography component="span" variant="caption" color="text.secondary">（テストモード ON 中もオークションを利用可能）</Typography>
+                </span>
+              }
+            />
           </Box>
 
           {/* 住所情報 */}
