@@ -7,7 +7,6 @@ use App\Models\Auction;
 use App\Models\SellerSettlement;
 use App\Models\WonItem;
 use App\Models\User;
-use App\Services\TestModeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,15 +14,6 @@ use Illuminate\Support\Facades\DB;
 
 class SettlementController extends Controller
 {
-    public function __construct(private readonly TestModeService $testMode) {}
-
-    /**
-     * テストモード中、閉じた世界外の出品者を弾く。各メソッドの先頭で呼ぶ。
-     */
-    private function blockedByTestMode(): bool
-    {
-        return $this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user());
-    }
 
     /**
      * 売上・精算情報取得
@@ -32,10 +22,6 @@ class SettlementController extends Controller
      */
     public function index()
     {
-        if ($this->blockedByTestMode()) {
-            return response()->json(['success' => true, 'data' => ['settlements' => [], 'totals' => []]]);
-        }
-
         $seller = Auth::user();
         $sellerProfile = $seller->sellerProfile;
 
@@ -147,9 +133,6 @@ class SettlementController extends Controller
      */
     public function show($auctionId)
     {
-        if ($this->blockedByTestMode()) {
-            return response()->json(['success' => false, 'message' => '精算情報が見つかりません。'], 404);
-        }
         $sellerProfile = Auth::user()->sellerProfile;
         
         if (!$sellerProfile) {

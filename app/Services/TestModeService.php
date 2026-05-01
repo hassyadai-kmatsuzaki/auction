@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Auth;
 /**
  * テストモード機能のゲート判定とクエリフィルタを提供する。
  *
- * テストモードの世界観:
- * - system_settings.test_mode_enabled が true の間、is_test=true 同士の閉じた世界だけを露出する
- * - 「is_test=true ユーザーから見て、is_test=true 出品者の生体だけが見える」
- * - 非 is_test ユーザーには空一覧を返す（403 ではなくデータレベルで存在しない扱い）
+ * テストモードの世界観（先行公開モード）:
+ * - system_settings.test_mode_enabled が true の間、is_test=true な閲覧者だけがオークション/生体/落札を見られる
+ * - 出品者側の is_test は問わない（既存の出品者は通常運用、is_test を立てる必要はない）
+ * - 非 is_test の閲覧者には空一覧を返す（403 ではなくデータレベルで存在しない扱い）
  * - 管理者（admin ロール）はテストモードの影響を受けない（運営に必要）
  *
  * 用途:
@@ -21,7 +21,6 @@ use Illuminate\Support\Facades\Auth;
  * - 本番環境でのリハーサル運用
  *
  * 利用例:
- *   // 一覧取得時:
  *   $items = Item::query();
  *   app(TestModeService::class)->applyToItemQuery($items);
  *   // ↑ テストモード ON かつ閲覧者が is_test=false なら 0 件返るクエリに変わる
@@ -46,11 +45,11 @@ class TestModeService
     }
 
     /**
-     * テストモード判定で「閉じた世界の住人」かを返す。
+     * テストモード判定で「閲覧を許可されるユーザー」かを返す。
      *
      * - テストモード OFF      → 常に true（誰でも全部見える）
      * - admin ロール          → 常に true（運営に必要）
-     * - is_test=true なユーザー → true（テストユニバースの住人）
+     * - is_test=true なユーザー → true（先行公開対象）
      * - それ以外               → false（空一覧で扱われる）
      */
     public function currentUserCanSeeTestUniverse(?User $user = null): bool
@@ -67,93 +66,138 @@ class TestModeService
     }
 
     /**
-     * 生体（items）クエリにテストモードのフィルタを適用する。
+     * 生体（items）クエリにテストモードのゲートを適用する。
      *
      * - テストモード OFF → 何もしない
-     * - 閲覧者が閉じた世界の住人ではない → whereRaw('1=0') で 0 件確定
-     * - 住人 → 「出品者が is_test=true の生体」だけに絞る
+     * - 閲覧者が許可ユーザーではない → whereRaw('1=0') で 0 件確定
+     * - 許可ユーザー → そのまま通す（出品者の is_test は問わない）
      */
     public function applyToItemQuery(Builder $query, ?User $viewer = null): Builder
     {
-        if (!$this->isEnabled()) return $query;
-
         $viewer ??= Auth::user();
-        if (!$this->currentUserCanSeeTestUniverse($viewer)) {
+
+        if ($this->isEnabled() && !$this->currentUserCanSeeTestUniverse($viewer)) {
             return $query->whereRaw('1=0');
         }
 
-        // admin は閉じた世界フィルタをかけない（全件見る）
-        if ($viewer && method_exists($viewer, 'hasRole') && $viewer->hasRole('admin')) {
-            return $query;
-        }
-
-        // Item -> SellerProfile -> User.is_test の経路で絞り込み
-        return $query->whereHas('sellerProfile.user', function ($q) {
-            $q->where('is_test', true);
-        });
+        // テスト用オークション配下の生体は is_test=true 閲覧者にだけ見せる
+        return $this->applyAuctionVisibilityToItemQuery($query, $viewer);
     }
 
     /**
-     * オークション（auctions）クエリにフィルタを適用する。
+     * オークション（auctions）クエリにゲートを適用する。
      *
-     * 「閲覧者が住人なら、is_test 出品者の生体を 1 件以上含むオークションだけ」
-     * 「住人でないなら 0 件」
+     * - テストモード ON で許可ユーザーでない閲覧者 → 0 件（既存ゲート）
+     * - 「テスト用オークション（auctions.is_test=true）」は閲覧者 is_test=true のときだけ見える
+     *   テストモードの ON/OFF に関係なく、本番買受者からは常に隠す
+     * - admin はすべて見える（運営に必要）
      */
     public function applyToAuctionQuery(Builder $query, ?User $viewer = null): Builder
     {
-        if (!$this->isEnabled()) return $query;
-
         $viewer ??= Auth::user();
-        if (!$this->currentUserCanSeeTestUniverse($viewer)) {
+
+        // テストモードゲート
+        if ($this->isEnabled() && !$this->currentUserCanSeeTestUniverse($viewer)) {
             return $query->whereRaw('1=0');
         }
 
+        // 管理者は全件
         if ($viewer && method_exists($viewer, 'hasRole') && $viewer->hasRole('admin')) {
             return $query;
         }
 
-        return $query->whereHas('items.sellerProfile.user', function ($q) {
-            $q->where('is_test', true);
-        });
+        // is_test オークションは is_test=true 閲覧者にだけ見せる
+        $viewerIsTest = (bool) ($viewer?->is_test ?? false);
+        if (!$viewerIsTest) {
+            $query->where(function ($q) {
+                $q->where('is_test', false)->orWhereNull('is_test');
+            });
+        }
+        return $query;
     }
 
     /**
-     * 落札（won_items）クエリにフィルタを適用する。
-     *
-     * 落札者本人視点では「自分が住人かつ落札商品の出品者も住人」のものだけ表示。
+     * 生体（items）と紐づくオークションの is_test 可視性も透過させる。
+     * Item は seller を介してではなく、auction を介してテスト/本番を判定する。
+     */
+    public function applyAuctionVisibilityToItemQuery(Builder $query, ?User $viewer = null): Builder
+    {
+        $viewer ??= Auth::user();
+        if ($viewer && method_exists($viewer, 'hasRole') && $viewer->hasRole('admin')) {
+            return $query;
+        }
+        $viewerIsTest = (bool) ($viewer?->is_test ?? false);
+        if (!$viewerIsTest) {
+            $query->whereHas('auction', function ($q) {
+                $q->where(function ($qq) {
+                    $qq->where('is_test', false)->orWhereNull('is_test');
+                });
+            });
+        }
+        return $query;
+    }
+
+    /**
+     * 落札（won_items）クエリにゲートを適用する。
+     * 自分の落札なので、閲覧者本人が許可ユーザーかどうかだけで判定。
      */
     public function applyToWonItemQuery(Builder $query, ?User $viewer = null): Builder
     {
-        if (!$this->isEnabled()) return $query;
-
         $viewer ??= Auth::user();
-        if (!$this->currentUserCanSeeTestUniverse($viewer)) {
+
+        if ($this->isEnabled() && !$this->currentUserCanSeeTestUniverse($viewer)) {
             return $query->whereRaw('1=0');
         }
 
+        // 自分の落札は item.auction.is_test を経由して非テスト買受者からテスト落札を隠す
         if ($viewer && method_exists($viewer, 'hasRole') && $viewer->hasRole('admin')) {
             return $query;
         }
-
-        return $query->whereHas('item.sellerProfile.user', function ($q) {
-            $q->where('is_test', true);
-        });
+        $viewerIsTest = (bool) ($viewer?->is_test ?? false);
+        if (!$viewerIsTest) {
+            $query->whereHas('item.auction', function ($q) {
+                $q->where(function ($qq) {
+                    $qq->where('is_test', false)->orWhereNull('is_test');
+                });
+            });
+        }
+        return $query;
     }
 
     /**
-     * 出品者側のクエリ（自分の出品物・売上等）に対するゲート。
+     * 通知（メール/LINE/お知らせ）の宛先 User クエリにテストモードゲートを適用する。
      *
-     * 「閲覧している出品者本人が住人ではない」ならテストモード中は 0 件にする
-     * （非 is_test 出品者は test mode 中は出品履歴も見えない）。
+     * テストモード ON の間は **is_test=true ユーザーへのみ通知**。
+     * テストモード OFF なら何もしない（全員に通知）。
+     *
+     * Notification 系（メール/LINE 通知/オークション開始通知/落札通知 等）の宛先取得 query で呼び出す。
+     */
+    public function applyToUserNotificationQuery(Builder $query): Builder
+    {
+        if (!$this->isEnabled()) return $query;
+        return $query->where('is_test', true);
+    }
+
+    /**
+     * 1 ユーザーへ通知を送ってよいかの個別判定。
+     * 通知 Service が個別 User に対して条件分岐するときに使う。
+     */
+    public function shouldNotifyUser(?User $user): bool
+    {
+        if (!$user) return false;
+        if (!$this->isEnabled()) return true;
+        return (bool) $user->is_test;
+    }
+
+    /**
+     * 出品者側のクエリゲート。
+     *
+     * 案 Y（先行公開モード）では出品者にテストモードの影響を与えない。
+     * ＝ 全出品者は通常通り出品・編集・売上確認ができる。
+     * 互換性のためメソッドは残してあるが、内部では何もしない（呼び出し側を一斉削除しないで済むよう）。
      */
     public function applyToOwnSellerScope(Builder $query, ?User $seller = null): Builder
     {
-        if (!$this->isEnabled()) return $query;
-
-        $seller ??= Auth::user();
-        if (!$this->currentUserCanSeeTestUniverse($seller)) {
-            return $query->whereRaw('1=0');
-        }
         return $query;
     }
 }

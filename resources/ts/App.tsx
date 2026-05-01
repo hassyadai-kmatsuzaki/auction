@@ -51,6 +51,7 @@ const EmailCampaignForm      = lazy(() => import('./pages/admin/EmailCampaignFor
 const EmailCampaignDetail    = lazy(() => import('./pages/admin/EmailCampaignDetail'));
 const AuctionManagement      = lazy(() => import('./pages/admin/AuctionManagement'));
 const AuctionForm            = lazy(() => import('./pages/admin/AuctionForm'));
+const AuctionShipments       = lazy(() => import('./pages/admin/AuctionShipments'));
 const ItemManagement         = lazy(() => import('./pages/admin/ItemManagement'));
 const ItemForm               = lazy(() => import('./pages/admin/ItemForm'));
 const LiveControl            = lazy(() => import('./pages/admin/LiveControl'));
@@ -199,6 +200,7 @@ function App() {
               <Route path="items"        element={<ItemManagement />} />
               <Route path="lanes"        element={<LaneAssignment />} />
               <Route path="seller-order" element={<SellerOrderPage />} />
+              <Route path="shipments"    element={<AuctionShipments />} />
               <Route path="live"         element={<LiveControl />} />
               <Route path="won-items"    element={<WonItemManagement />} />
             </Route>

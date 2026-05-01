@@ -44,6 +44,7 @@ const toLaneItem = (item: ItemData | null): LaneItem | null => {
     countdown_seconds: 0,
     my_bid_status: null,
     is_premium: item.is_premium,
+    is_anonymous: (item as any).is_anonymous ?? false,
     thumbnail_path: item.thumbnail_path ?? '/img/noimage.png',
     phase: 'bidding',
     pre_bid_remaining_seconds: 0,
@@ -161,9 +162,11 @@ export default function AuctionItems() {
     : lanes[selectedLane - 1]?.items ?? [];
 
   // 選択レーンの生産者ユニークリスト（フィルタ候補）
+  // 匿名出品は生産者フィルタの候補から除外する
   const sellerOptions: string[] = Array.from(
     new Set(
       laneFilteredItems
+        .filter((i) => !i.is_anonymous)
         .map((i) => i.seller_name)
         .filter((s): s is string => !!s && s.length > 0)
     )
@@ -331,7 +334,11 @@ export default function AuctionItems() {
                         {item.is_premium && <Chip label="プレミアム" color="warning" size="small" />}
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.seller_name || '—'}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      {item.is_anonymous
+                        ? <Chip label="匿名出品" color="info" size="small" />
+                        : (item.seller_name || '—')}
+                    </TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{item.quantity}匹</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{formatYen(item.start_price)}</TableCell>
                     <TableCell align="center"><Chip label={s.label} color={s.color} size="small" /></TableCell>

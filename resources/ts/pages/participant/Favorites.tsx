@@ -52,12 +52,13 @@ interface FavoriteItem {
   inspection_info?: string;
   individual_info?: string;
   is_premium: boolean;
+  is_anonymous?: boolean;
   thumbnail_path?: string;
   status: string;
   media?: any[];
   seller: {
-    id: number;
-    seller_code: string;
+    id: number | null;
+    seller_code: string | null;
     seller_name: string;
     profile_image_url?: string | null;
   } | null;
@@ -107,11 +108,14 @@ export default function Favorites() {
     fetchFavorites();
   }, [fetchFavorites]);
 
-  // 出品者リスト（フィルター用）
+  // 出品者リスト（フィルター用）。匿名出品は候補に含めない。
   const sellerOptions = useMemo(() => {
     const map = new Map<number, { id: number; name: string }>();
     favorites.forEach((f) => {
-      if (f.seller) map.set(f.seller.id, { id: f.seller.id, name: f.seller.seller_name });
+      if (f.is_anonymous) return;
+      if (f.seller && f.seller.id != null) {
+        map.set(f.seller.id, { id: f.seller.id, name: f.seller.seller_name });
+      }
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   }, [favorites]);
@@ -199,6 +203,7 @@ export default function Favorites() {
       inspection_info: fav.inspection_info,
       individual_info: fav.individual_info,
       is_premium: fav.is_premium,
+      is_anonymous: fav.is_anonymous,
       thumbnail_path: fav.thumbnail_path,
       media: fav.media as LaneItem['media'],
       active_bidders_count: 0,
@@ -354,6 +359,11 @@ export default function Favorites() {
                     sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
                   />
                 )}
+                {item.is_anonymous && (
+                  <Chip label="匿名出品" color="info" size="small"
+                    sx={{ position: 'absolute', top: item.is_premium ? 36 : 8, right: 8, zIndex: 1 }}
+                  />
+                )}
 
                 <CardMedia
                   component="img"
@@ -379,18 +389,24 @@ export default function Favorites() {
                   <Typography variant="subtitle1" fontWeight="bold" noWrap>
                     {item.species_name}
                   </Typography>
-                  {item.seller && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
-                      <Avatar
-                        src={item.seller.profile_image_url || undefined}
-                        sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
-                      >
-                        {!item.seller.profile_image_url && item.seller.seller_name.charAt(0)}
-                      </Avatar>
-                      <Typography variant="caption" color="text.secondary" noWrap>
-                        {item.seller.seller_name}
-                      </Typography>
+                  {item.is_anonymous ? (
+                    <Box sx={{ mt: 0.5 }}>
+                      <Chip label="匿名出品" color="info" size="small" />
                     </Box>
+                  ) : (
+                    item.seller && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+                        <Avatar
+                          src={item.seller.profile_image_url || undefined}
+                          sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+                        >
+                          {!item.seller.profile_image_url && item.seller.seller_name.charAt(0)}
+                        </Avatar>
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          {item.seller.seller_name}
+                        </Typography>
+                      </Box>
+                    )
                   )}
                   {item.inspection_info && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }} noWrap>

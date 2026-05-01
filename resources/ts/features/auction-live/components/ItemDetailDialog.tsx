@@ -169,6 +169,11 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                   <Chip label="プレミアム" color="warning" size="small" />
                 </Box>
               )}
+              {item?.is_anonymous && (
+                <Box sx={{ mb: 1 }}>
+                  <Chip label="匿名出品" color="info" size="small" />
+                </Box>
+              )}
 
               {/* 価格 */}
               <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
@@ -190,18 +195,26 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
 
               {/* 出品者・数量（縦並び） */}
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1, md: 2 }, mb: { xs: 1.5, md: 3 } }}>
-                {item?.seller_name && (
+                {item?.is_anonymous ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    <Avatar
-                      src={item.seller_profile_image_url || undefined}
-                      sx={{ width: { xs: 28, md: 36 }, height: { xs: 28, md: 36 }, fontSize: '0.85rem', bgcolor: 'grey.300' }}
-                    >
-                      {!item.seller_profile_image_url && item.seller_name.charAt(0)}
-                    </Avatar>
                     <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: 'text.primary' }}>
-                      {item.seller_name}
+                      匿名出品
                     </Typography>
                   </Box>
+                ) : (
+                  item?.seller_name && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <Avatar
+                        src={item.seller_profile_image_url || undefined}
+                        sx={{ width: { xs: 28, md: 36 }, height: { xs: 28, md: 36 }, fontSize: '0.85rem', bgcolor: 'grey.300' }}
+                      >
+                        {!item.seller_profile_image_url && item.seller_name.charAt(0)}
+                      </Avatar>
+                      <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: 'text.primary' }}>
+                        {item.seller_name}
+                      </Typography>
+                    </Box>
+                  )
                 )}
                 {item?.quantity != null && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

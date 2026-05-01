@@ -67,6 +67,7 @@ interface Auction {
   start_time: string;
   end_time: string | null;
   status: 'preparing' | 'scheduled' | 'live' | 'finished' | 'cancelled';
+  is_test: boolean;
   description: string | null;
   lane_count: number;
   deposit_required: boolean;
@@ -420,11 +421,16 @@ export default function AuctionManagement() {
                         >
                           <CardContent sx={{ flex: 1, width: '100%' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-                              <Chip
-                                label={getStatusLabel(auction.status)}
-                                size="small"
-                                color={getStatusColor(auction.status)}
-                              />
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Chip
+                                  label={getStatusLabel(auction.status)}
+                                  size="small"
+                                  color={getStatusColor(auction.status)}
+                                />
+                                {auction.is_test && (
+                                  <Chip label="TEST" size="small" color="warning" variant="outlined" />
+                                )}
+                              </Box>
                               <IconButton
                                 size="small"
                                 onClick={(e) => {

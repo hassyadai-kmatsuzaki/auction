@@ -8,6 +8,7 @@ use App\Models\BidParticipant;
 use App\Models\Favorite;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * BidService（スリム版）
@@ -118,19 +119,45 @@ class BidService
                     }
                 }
 
-                $countdownState   = Cache::get("countdown:lane:{$lane->id}");
+                $countdownState = Cache::get("countdown:lane:{$lane->id}");
+
+                // Cache miss 復旧（負荷レビュー C4 指摘）:
+                // Redis LRU eviction や瞬間的な network timeout でレーン単位に
+                // null が返ると、ユーザーごとに「3秒のまま」表示される事故になる。
+                // active レーン × 商品ライブ中 で cache が無い場合は、
+                // CountdownService::startCountdown を呼んで再構築 → 再取得する。
+                // 復旧自体が失敗しても、最後の保険として $defaultCountdown が走るが、
+                // その前に必ず1度復旧を試みる。
+                if (!$countdownState && $lane->status === 'active' && $lane->currentItem && $lane->currentItem->status === 'live') {
+                    try {
+                        app(\App\Services\CountdownService::class)->startCountdown($lane);
+                        $countdownState = Cache::get("countdown:lane:{$lane->id}");
+                        Log::warning('getLiveState: countdown cache miss recovered', [
+                            'lane_id'   => $lane->id,
+                            'item_id'   => $lane->currentItem->id,
+                            'auction_id'=> $auction->id,
+                        ]);
+                    } catch (\Throwable $e) {
+                        Log::error('getLiveState: countdown cache recovery failed', [
+                            'lane_id' => $lane->id,
+                            'error'   => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 $remainingSeconds = $countdownState['remaining_seconds'] ?? $defaultCountdown;
                 $phase            = $countdownState['phase'] ?? 'bidding';
                 $preBidRemaining  = $phase === 'pre_bid' ? ($countdownState['remaining_seconds'] ?? 0) : 0;
                 $freezeTotal      = (float) ($countdownState['freeze_countdown_seconds'] ?? 1);
                 $countdownMode    = $countdownState['countdown_mode'] ?? 'default';
 
+                $isAnonCurrent = (bool) $item->is_anonymous;
                 $laneData['current_item'] = [
                     'id'                       => $item->id,
                     'item_number'              => $item->item_number,
                     'species_name'             => $item->species_name,
-                    'seller_name'              => $item->sellerProfile?->seller_name,
-                    'seller_profile_image_url' => $item->sellerProfile?->profile_image_url,
+                    'seller_name'              => $isAnonCurrent ? '匿名出品' : $item->sellerProfile?->seller_name,
+                    'seller_profile_image_url' => $isAnonCurrent ? null : $item->sellerProfile?->profile_image_url,
                     'quantity'                 => $item->quantity,
                     'quantity_unit'            => $item->quantity_unit ?? 'fish',
                     'current_price'            => $item->current_price,
@@ -138,6 +165,7 @@ class BidService
                     'inspection_info'          => $item->inspection_info,
                     'individual_info'          => $item->individual_info,
                     'is_premium'               => $item->is_premium,
+                    'is_anonymous'             => $isAnonCurrent,
                     'thumbnail_path'           => $item->thumbnail_path,
                     'media'                    => $this->transformMedia($item->media),
                     'active_bidders_count'     => $activeBidderCount,
@@ -173,6 +201,7 @@ class BidService
                             'start_price'    => $i->start_price,
                             'thumbnail_path' => $i->thumbnail_path,
                             'is_premium'     => $i->is_premium,
+                            'is_anonymous'   => (bool) $i->is_anonymous,
                         ];
                         if ($userId) {
                             $limit = $myUpcomingLimits->get($i->id);

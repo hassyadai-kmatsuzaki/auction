@@ -11,6 +11,7 @@ export interface AuctionFormData {
   default_bid_increment: number;
   countdown_seconds: number;
   deposit_required: boolean;
+  is_test: boolean;
   upload_deadline: Date | null;
   payment_deadline_hours: number;
   shipping_deadline_hours: number;
@@ -52,6 +53,7 @@ const DEFAULT_FORM_DATA: AuctionFormData = {
   default_bid_increment: 100,
   countdown_seconds: 3,
   deposit_required: false,
+  is_test: false,
   upload_deadline: null,
   payment_deadline_hours: 24,
   shipping_deadline_hours: 48,
@@ -126,6 +128,7 @@ export function useAuctionForm(auctionId?: number) {
       default_bid_increment: parseFloat(auction.default_bid_increment),
       countdown_seconds: auction.countdown_seconds,
       deposit_required: auction.deposit_required,
+      is_test: !!auction.is_test,
       upload_deadline: auction.upload_deadline ? new Date(auction.upload_deadline) : null,
       payment_deadline_hours: auction.payment_deadline_hours,
       shipping_deadline_hours: auction.shipping_deadline_hours,
@@ -174,6 +177,7 @@ export function useAuctionForm(auctionId?: number) {
       default_bid_increment:    formData.default_bid_increment,
       countdown_seconds:        formData.countdown_seconds,
       deposit_required:         false,
+      is_test:                  formData.is_test,
       upload_deadline:          formatLocalDateTime(formData.upload_deadline),
       payment_deadline_hours:   24,
       shipping_deadline_hours:  48,

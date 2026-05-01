@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\WonItem;
 use App\Services\NotificationService;
-use App\Services\TestModeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -13,17 +12,10 @@ use Illuminate\Support\Facades\Validator;
 class ShippingController extends Controller
 {
     protected $notificationService;
-    protected TestModeService $testMode;
 
-    public function __construct(NotificationService $notificationService, TestModeService $testMode)
+    public function __construct(NotificationService $notificationService)
     {
         $this->notificationService = $notificationService;
-        $this->testMode = $testMode;
-    }
-
-    private function blockedByTestMode(): bool
-    {
-        return $this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user());
     }
     /**
      * 発送待ちアイテム一覧取得
@@ -33,10 +25,6 @@ class ShippingController extends Controller
      */
     public function index(Request $request)
     {
-        if ($this->blockedByTestMode()) {
-            return response()->json(['success' => true, 'data' => ['items' => []]]);
-        }
-
         $user = Auth::user();
         $sellerProfile = $user->sellerProfile;
 
@@ -131,9 +119,6 @@ class ShippingController extends Controller
      */
     public function ship(Request $request, $id)
     {
-        if ($this->blockedByTestMode()) {
-            return response()->json(['success' => false, 'message' => '現在テスト運用中のため、発送操作は受け付けられません。'], 403);
-        }
 
         $validator = Validator::make($request->all(), [
             'shipping_company' => 'required|string|max:100',
@@ -202,9 +187,6 @@ class ShippingController extends Controller
      */
     public function updateTracking(Request $request, $id)
     {
-        if ($this->blockedByTestMode()) {
-            return response()->json(['success' => false, 'message' => '現在テスト運用中のため、操作は受け付けられません。'], 403);
-        }
 
         $validator = Validator::make($request->all(), [
             'shipping_company' => 'required|string|max:100',

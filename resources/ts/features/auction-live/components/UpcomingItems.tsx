@@ -89,6 +89,9 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
                   {item.is_premium && (
                     <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
                   )}
+                  {item.is_anonymous && (
+                    <Chip label="匿名" size="small" color="info" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
+                  )}
                 </Box>
                 <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>
                   {item.species_name}
@@ -159,6 +162,7 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
               <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
                 <Chip label={`レーン ${infoItem.laneNumber}`} size="small" color="primary" />
                 {infoItem.is_premium && <Chip label="プレミアム" size="small" color="warning" />}
+                {infoItem.is_anonymous && <Chip label="匿名出品" size="small" color="info" />}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 No.{infoItem.item_number} / 数量: {infoItem.quantity}

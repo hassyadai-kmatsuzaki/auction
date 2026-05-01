@@ -17,6 +17,7 @@ import {
   Storefront as SellerIcon,
   Gavel as LiveIcon,
   Receipt as WonIcon,
+  LocalShipping as ShipIcon,
 } from '@mui/icons-material';
 import axios from '../lib/axios';
 
@@ -42,6 +43,7 @@ const TABS: { value: string; label: string; icon: React.ReactElement; match: str
   { value: 'items',        label: '商品',         icon: <PetsIcon fontSize="small" />,   match: '/items' },
   { value: 'lanes',        label: 'レーン',       icon: <LaneIcon fontSize="small" />,   match: '/lanes' },
   { value: 'seller-order', label: '出品者順序',   icon: <SellerIcon fontSize="small" />, match: '/seller-order' },
+  { value: 'shipments',    label: '伝票番号',     icon: <ShipIcon fontSize="small" />,   match: '/shipments' },
   { value: 'live',         label: 'ライブ',       icon: <LiveIcon fontSize="small" />,   match: '/live' },
   { value: 'won-items',    label: '落札者',       icon: <WonIcon fontSize="small" />,    match: '/won-items' },
 ];

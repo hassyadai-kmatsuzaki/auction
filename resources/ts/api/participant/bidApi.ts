@@ -13,12 +13,24 @@ export interface BidToggleResult {
 }
 
 export const bidApi = {
-  /** 入札ON/OFF切り替え */
-  toggle: async (itemId: number, isActive: boolean): Promise<BidToggleResult> => {
-    const res = await axios.post('/api/participant/bids', {
-      item_id: itemId,
-      is_active: isActive,
-    });
+  /**
+   * 入札参加（単方向入札仕様）
+   *
+   * - `signal` を渡すと、useBidToggle 側の AbortController で連打中の旧リクエストを
+   *   即時キャンセルできる（負荷レビュー H1 指摘の二重 POST 抑止）。
+   * - 旧 API 互換のため `isActive` は引数として残しているが、サーバーは
+   *   `is_active=false` を 403 拒否する（v1.1 単方向入札仕様）。
+   */
+  toggle: async (
+    itemId: number,
+    isActive: boolean,
+    signal?: AbortSignal,
+  ): Promise<BidToggleResult> => {
+    const res = await axios.post(
+      '/api/participant/bids',
+      { item_id: itemId, is_active: isActive },
+      { signal },
+    );
     return res.data as BidToggleResult;
   },
 

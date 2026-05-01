@@ -283,10 +283,15 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                             $activeCount++;
                         }
                     } catch (\Exception $e) {
+                        // 例外時は activeCount を増やさない（過去の "ghost lane" 事故対策）。
+                        // 旧版は「次のティックで復旧する可能性」で ++ していたが、
+                        // 静かに死んだレーンが永遠に active 扱いされてジョブが終了しない事故を招くため削除。
+                        // 復旧は次イテレーションで「!$state → recovery startCountdown」経路に任せる。
+                        // 一時的な異常で全 lane 死亡判定にならないよう、auction.lanes の DB 再確認は
+                        // L307-318 の終了判定が担う（active_count==0 → DB に active レーンが残っていないか
+                        // exists チェックで二重防御）。
                         Log::error("Countdown tick error for lane {$lane->id}: " . $e->getMessage());
-                        // ★ 例外が発生してもレーンをアクティブとしてカウントする
-                        // （次のティックで復旧する可能性があるため）
-                        $activeCount++;
+                        app(\App\Services\Monitoring\MetricRecorder::class)->jobFailure('CountdownTick', "lane={$lane->id}: " . $e->getMessage());
                     }
                 }
             }

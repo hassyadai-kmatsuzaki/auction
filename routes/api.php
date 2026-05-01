@@ -208,6 +208,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::post('auctions/{auctionId}/lanes/auto-assign', [AdminLaneController::class, 'autoAssign']);
     Route::post('auctions/{auctionId}/lanes/bulk-unassign', [AdminLaneController::class, 'bulkUnassign']);
     
+    // 出品者別 伝票番号一覧
+    Route::get('auctions/{auctionId}/shipments', [\App\Http\Controllers\Admin\ShipmentController::class, 'index']);
+
     // 出品者順序管理
     Route::prefix('auctions/{auctionId}/seller-order')->group(function () {
         Route::get('/', [App\Http\Controllers\Admin\SellerOrderController::class, 'index']);
@@ -399,6 +402,11 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
         Route::delete('/items/{id}', [SellerItemController::class, 'destroy']);
     });
     
+    // 出品申込時の伝票番号登録
+    Route::middleware('check.subscription:sell')->group(function () {
+        Route::post('/auctions/{auctionId}/shipments', [\App\Http\Controllers\Seller\ShipmentController::class, 'bulkUpsert']);
+    });
+
     // 発送管理
     Route::get('/shipping', [SellerShippingController::class, 'index']);
     Route::post('/shipping/{id}/ship', [SellerShippingController::class, 'ship']);

@@ -51,10 +51,24 @@ export default function ParticipantLayout() {
     setDrawerOpen(false);
   }, [location.pathname]);
 
+  // ライブ画面では Reverb が状態を担うため、レイアウト直下のポーリングは不要。
+  // 加えて 100〜300名規模の同時参加時は 30秒同期の一斉ポーリングが PHP-FPM を圧迫する
+  // （負荷レビュー C6 指摘）。pathname で /live 配下を判定して disable し、
+  // ライブ非該当ページではジッターを入れて 30〜34秒に分散させる。
+  const isLivePage = location.pathname.includes('/live');
   useEffect(() => {
+    if (isLivePage) {
+      // ライブ画面に入った瞬間にバナーを消すため、現在の live/scheduled は一度だけ反映してクリアする
+      setLiveAuction(null);
+      setScheduledAuction(null);
+      return;
+    }
+
+    let cancelled = false;
     const fetchAuctions = async () => {
       try {
         const res = await axios.get('/api/participant/auctions');
+        if (cancelled) return;
         if (res.data.success) {
           const auctions: Auction[] = res.data.data.auctions;
           setLiveAuction(auctions.find(a => a.status === 'live') ?? null);
@@ -63,9 +77,15 @@ export default function ParticipantLayout() {
       } catch { /* ignore */ }
     };
     fetchAuctions();
-    const interval = setInterval(fetchAuctions, 30000);
-    return () => clearInterval(interval);
-  }, []);
+
+    // 30000ms + 0〜4000ms のジッターで全ユーザーの同期発火を回避
+    const jitter = Math.floor(Math.random() * 4000);
+    const interval = setInterval(fetchAuctions, 30000 + jitter);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isLivePage]);
 
   const hasMultipleRoles = user
     ? ['admin', 'seller', 'participant'].filter(name => user.roles.some(r => r.name === name)).length >= 2

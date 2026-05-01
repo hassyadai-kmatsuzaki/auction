@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Mail\AuctionPreviewMail;
 use App\Models\Auction;
 use App\Models\User;
+use App\Services\TestModeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,7 +32,7 @@ class SendAuctionPreviewJob implements ShouldQueue
         $this->onQueue('notify');
     }
 
-    public function handle(): void
+    public function handle(TestModeService $testMode): void
     {
         $tomorrow = now()->addDay()->toDateString();
 
@@ -42,11 +43,13 @@ class SendAuctionPreviewJob implements ShouldQueue
         if ($auctions->isEmpty()) return;
 
         foreach ($auctions as $auction) {
-            $this->notifyUsers($auction);
+            // テストモード ON: テストオークションは is_test ユーザーへのみ、本番オークションも is_test ユーザーへのみ
+            // テストモード OFF: 通常運用（テストオークションはそもそもこのジョブの対象になりにくいが念のため弾かない）
+            $this->notifyUsers($auction, $testMode);
         }
     }
 
-    private function notifyUsers(Auction $auction): void
+    private function notifyUsers(Auction $auction, TestModeService $testMode): void
     {
         $startTime = $auction->start_time ? " {$auction->start_time}〜" : '';
         $eventDate = $auction->event_date ? $auction->event_date->format('Y/m/d') : '未定';
@@ -60,9 +63,11 @@ class SendAuctionPreviewJob implements ShouldQueue
             . $auction->title . "\n"
             . "開催日: {$eventDate}{$startTime}";
 
-        // 参加者
-        $participants = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
-            ->approved()->get();
+        // 参加者（テストモード ON 中は is_test=true のみ）
+        $participantQuery = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
+            ->approved();
+        $testMode->applyToUserNotificationQuery($participantQuery);
+        $participants = $participantQuery->get();
 
         $sentCount = 0;
         foreach ($participants as $user) {
@@ -79,9 +84,11 @@ class SendAuctionPreviewJob implements ShouldQueue
             SendLineNotificationJob::dispatch($user->id, 'auction_preview', $participantLineText);
         }
 
-        // 出品者
-        $sellers = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
-            ->approved()->get();
+        // 出品者（テストモード ON 中は is_test=true のみ）
+        $sellerQuery = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
+            ->approved();
+        $testMode->applyToUserNotificationQuery($sellerQuery);
+        $sellers = $sellerQuery->get();
 
         foreach ($sellers as $seller) {
             try {

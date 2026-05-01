@@ -611,10 +611,10 @@ export default function SellerProfile() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="事業者登録番号"
+                      label="事業者登録番号(インボイス登録番号, T+13桁の番号)"
                       value={formData.business_registration_number}
                       onChange={handleChange('business_registration_number')}
-                      helperText="動物取扱業登録番号など"
+                      helperText="※ご登録いただけていない場合、インボイス調整金が発生いたします。"
                     />
                   </Grid>
                 </Grid>

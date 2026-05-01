@@ -464,8 +464,12 @@ class LaneController extends Controller
             ], 422);
         }
 
-        // Step 2: 出品者ごとにグループ化（seller_profile_id = NULL は 0 として扱う）
-        $groups = $unassignedItems->groupBy(fn($item) => $item->seller_profile_id ?? 0);
+        // 匿名出品は通常生体と分離し、レーン末尾にランダム配置する
+        $anonymousItems = $unassignedItems->where('is_anonymous', true)->values();
+        $normalItems = $unassignedItems->where('is_anonymous', false)->values();
+
+        // Step 2: 通常生体を出品者ごとにグループ化（seller_profile_id = NULL は 0 として扱う）
+        $groups = $normalItems->groupBy(fn($item) => $item->seller_profile_id ?? 0);
 
         // Step 3: グループサイズ降順ソート（大きいグループから処理）
         $sortedGroups = $groups->sortByDesc(fn($group) => $group->count())->values();
@@ -508,6 +512,24 @@ class LaneController extends Controller
                 ->values()
                 ->shuffle();
             $laneAssignments[$laneId] = $shuffledGroups->flatten(1);
+        }
+
+        // Step 5.5: 匿名出品をレーン末尾にランダム配置
+        // 通常生体を全て配置し終えた後、匿名生体を「個体単位で」シャッフルし、
+        // 最も空いているレーンへ1個ずつ均等に追加する（出品者グループ化はしない）
+        if ($anonymousItems->isNotEmpty()) {
+            foreach ($anonymousItems->shuffle() as $anonItem) {
+                $targetLaneId = null;
+                $minCount = PHP_INT_MAX;
+                foreach ($laneCounts as $laneId => $count) {
+                    if ($count < $minCount) {
+                        $minCount = $count;
+                        $targetLaneId = $laneId;
+                    }
+                }
+                $laneAssignments[$targetLaneId] = $laneAssignments[$targetLaneId]->push($anonItem);
+                $laneCounts[$targetLaneId]++;
+            }
         }
 
         // Step 6: lane_items に挿入（既存アイテムの後ろに追加）

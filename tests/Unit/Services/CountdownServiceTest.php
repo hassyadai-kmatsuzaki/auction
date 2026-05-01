@@ -161,6 +161,55 @@ class CountdownServiceTest extends TestCase
         $this->assertTrue($state['is_running']);
     }
 
+    /**
+     * 負荷レビュー H5: pause→resume で phase='freeze' が残ると、
+     * 再開後に入札ボタンが永続的に無効化される事故になる。resume 時に
+     * freeze は bidding にリセットされる必要がある。
+     */
+    public function test_resumeCountdown_は_freezeフェーズをbiddingにリセットする(): void
+    {
+        $lane = $this->makeLiveLane();
+        $svc = app(CountdownService::class);
+        $svc->startCountdown($lane);
+
+        // freeze フェーズの状態を手動で再現
+        $state = Cache::get("countdown:lane:{$lane->id}");
+        $state['phase']             = 'freeze';
+        $state['remaining_seconds'] = 1.5;
+        Cache::put("countdown:lane:{$lane->id}", $state, 14400);
+
+        $svc->pauseCountdown($lane->id);
+        $svc->resumeCountdown($lane->id);
+
+        $resumed = Cache::get("countdown:lane:{$lane->id}");
+        $this->assertSame('bidding', $resumed['phase'], 'freeze は再開時に bidding に戻る必要がある');
+        $this->assertGreaterThan(0, $resumed['remaining_seconds'], 'remaining_seconds は bidding 用に再設定される');
+        $this->assertTrue($resumed['is_running']);
+    }
+
+    /**
+     * 同じ resumeCountdown でも、bidding フェーズはそのまま継続される（残秒数を保持）。
+     * pre_bid も商品切替直後の数秒なのでリセットされない。
+     */
+    public function test_resumeCountdown_は_biddingフェーズの残秒数を変更しない(): void
+    {
+        $lane = $this->makeLiveLane();
+        $svc = app(CountdownService::class);
+        $svc->startCountdown($lane);
+
+        $state = Cache::get("countdown:lane:{$lane->id}");
+        $state['phase']             = 'bidding';
+        $state['remaining_seconds'] = 2.5;
+        Cache::put("countdown:lane:{$lane->id}", $state, 14400);
+
+        $svc->pauseCountdown($lane->id);
+        $svc->resumeCountdown($lane->id);
+
+        $resumed = Cache::get("countdown:lane:{$lane->id}");
+        $this->assertSame('bidding', $resumed['phase']);
+        $this->assertSame(2.5, (float) $resumed['remaining_seconds']);
+    }
+
     public function test_getCountdownState_は_キャッシュ内容を返す(): void
     {
         $lane = $this->makeLiveLane();

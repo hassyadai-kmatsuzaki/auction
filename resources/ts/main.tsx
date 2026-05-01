@@ -15,8 +15,12 @@ const queryClient = new QueryClient({
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
       // 5分間キャッシュを新鮮として扱う
       staleTime: 5 * 60 * 1000,
-      // ウィンドウフォーカス時に自動再取得（タブを戻ったときに状態を同期）
-      refetchOnWindowFocus: true,
+      // ウィンドウフォーカス時の自動再取得は無効化。
+      // ライブ中に 100〜300 名がタブ復帰した瞬間、全クエリが一斉 refetch されて
+      // PHP-FPM が枯渇する 502 リスクが現実にある（負荷レビュー C5 指摘）。
+      // ライブ画面は WebSocket（Reverb）が状態同期を担うため、フォーカス復帰でも
+      // 再取得は不要。WS切断時のみ refetchInterval（useAuctionLive.ts L19-23）で復旧する。
+      refetchOnWindowFocus: false,
     },
     mutations: {
       retry: 1,

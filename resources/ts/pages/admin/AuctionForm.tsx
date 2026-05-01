@@ -314,6 +314,24 @@ export default function AuctionForm() {
                     slotProps={{ textField: { fullWidth: true, helperText: '出品者がアップロードできる期限' } }} />
                 </Stack>
               </Box>
+
+              <Divider />
+
+              <Box>
+                <Typography variant="h6" gutterBottom>テスト用オークション</Typography>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.is_test}
+                      onChange={(e) => setAuction({ is_test: e.target.checked })}
+                    />
+                  }
+                  label="テスト用オークションとして作成する"
+                />
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4 }}>
+                  ON にすると is_test=true な出品者だけが出品でき、is_test=true な買受者だけに見えます。本番ユーザーからは完全に隠れます。
+                </Typography>
+              </Box>
             </Stack>
           </Paper>
         </TabPanel>

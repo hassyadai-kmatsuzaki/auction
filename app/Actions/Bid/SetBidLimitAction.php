@@ -164,11 +164,15 @@ class SetBidLimitAction
      *   - JoinBidAction は pre_bid フェーズ中の入札を拒否するため、
      *     ここでは直接 BidParticipant::participate() を使って入札ONにする
      *     （システムによる自動入札なので pre_bid チェックをバイパスする）
-     *   - ロック順序プロトコル準拠: ユーザー単位のトランザクション内で
-     *     items 行ロック → BidParticipant → BidEvent の順で確定。
+     *   - ロック順序プロトコル準拠: items 行ロック → BidParticipant → BidEvent の順で確定。
      *     handlePriceIncrement / adjustPriceByBidLimits と同じ順序なので
      *     今後ライブ中の自動入札パスが追加されても直列化される。
-     *   - broadcast は DB::afterCommit で確定後に流す。
+     *   - broadcast は DB::afterCommit で確定後に1回だけ流す
+     *     （負荷レビュー H2 指摘: foreach 内 afterCommit 多重発火による
+     *      `BidderUpdated` の N 連発と active_bidders_count 過大表示を解消）。
+     *   - 旧版は「ユーザー単位 transaction を foreach で繰り返す + 各々 afterCommit」だったが、
+     *     items 行ロックを毎回取り直す上に broadcast が ユーザー数だけ重複していた。
+     *     現版は「外側 1 transaction + items 行ロック1回 + foreach は participate のみ + afterCommit 1回」。
      */
     public function activatePendingBidLimits(Item $item): int
     {
@@ -181,39 +185,43 @@ class SetBidLimitAction
             return 0;
         }
 
-        $limits = BidLimitPrice::forItem($item->id)
-            ->notTriggered()
-            ->where('limit_price', '>', $item->current_price)
-            ->get();
-
-        \Illuminate\Support\Facades\Log::info("activatePendingBidLimits: item={$item->id}, found " . $limits->count() . " pending limits");
-
-        $activated = 0;
         $auctionId = $item->auction?->id;
         $lane = Lane::where('current_item_id', $item->id)->first();
         $laneId = $lane?->id;
+        $itemId = $item->id;
 
-        foreach ($limits as $limit) {
-            try {
-                $didActivate = DB::transaction(function () use ($item, $limit) {
-                    // 🔒 items 行ロック先取り（プロトコル準拠）
-                    $locked = Item::where('id', $item->id)->lockForUpdate()->first();
-                    if (!$locked || $locked->status !== 'live') {
-                        return false;
-                    }
+        $activatedUserIds = [];
 
-                    // ロック内で価格を再評価：取得待ちの間に上昇していて指値を超えていたら参加させない
-                    $freshLimit = BidLimitPrice::forItem($locked->id)
-                        ->forUser($limit->user_id)
-                        ->where('is_triggered', false)
-                        ->first();
-                    if (!$freshLimit || (float) $locked->current_price >= (float) $freshLimit->limit_price) {
-                        return false;
-                    }
+        try {
+            DB::transaction(function () use ($itemId, $auctionId, $laneId, &$activatedUserIds) {
+                // 🔒 items 行ロックを 1 回だけ取得（旧版の foreach 内 lockForUpdate を排除）
+                $locked = Item::where('id', $itemId)->lockForUpdate()->first();
+                if (!$locked || $locked->status !== 'live') {
+                    return;
+                }
 
-                    $participant = BidParticipant::forItem($locked->id)->forUser($limit->user_id)->first();
-                    if ($participant && $participant->is_active) {
-                        return false;
+                // ロック取得後の最新状態で対象指値を再取得
+                $limits = BidLimitPrice::forItem($locked->id)
+                    ->notTriggered()
+                    ->where('limit_price', '>', $locked->current_price)
+                    ->get();
+
+                if ($limits->isEmpty()) {
+                    return;
+                }
+
+                // 既に active な参加者を一括取得（foreach 内の N+1 を排除）
+                $alreadyActiveUserIds = BidParticipant::forItem($locked->id)
+                    ->active()
+                    ->whereIn('user_id', $limits->pluck('user_id'))
+                    ->pluck('user_id')
+                    ->all();
+                $alreadyActiveSet = array_flip($alreadyActiveUserIds);
+
+                $currentPrice = (float) $locked->current_price;
+                foreach ($limits as $limit) {
+                    if (isset($alreadyActiveSet[$limit->user_id])) {
+                        continue;
                     }
 
                     BidParticipant::participate(
@@ -225,40 +233,36 @@ class SetBidLimitAction
                     );
 
                     \App\Models\BidEvent::recordJoin(
-                        $locked->id, $limit->user_id, (float) $locked->current_price, null, 'auto-bid-from-limit'
+                        $locked->id, $limit->user_id, $currentPrice, null, 'auto-bid-from-limit'
                     );
 
-                    return true;
-                }, 3);
-
-                if ($didActivate) {
-                    $activated++;
-
-                    // 永続化後にブロードキャスト（commit 失敗時に通知が飛ぶのを防ぐ）
-                    if ($laneId && $auctionId) {
-                        $itemId = $item->id;
-                        $userId = $limit->user_id;
-                        DB::afterCommit(function () use ($auctionId, $laneId, $itemId, $userId) {
-                            try {
-                                $activeCount = BidParticipant::forItem($itemId)->active()->count();
-                                broadcast(new BidderUpdated(
-                                    $auctionId, $laneId, $itemId, $activeCount, 'joined'
-                                ));
-                            } catch (\Exception $broadcastErr) {
-                                \Illuminate\Support\Facades\Log::warning("Auto-bid broadcast error: " . $broadcastErr->getMessage(), [
-                                    'item_id' => $itemId, 'user_id' => $userId,
-                                ]);
-                            }
-                        });
-                    }
+                    $activatedUserIds[] = $limit->user_id;
                 }
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning("Auto-bid activation failed: item={$item->id}, user={$limit->user_id} - " . $e->getMessage());
-            }
+
+                // commit 確定後にだけ broadcast を1回流す（多重発火防止）
+                if (!empty($activatedUserIds) && $laneId && $auctionId) {
+                    DB::afterCommit(function () use ($auctionId, $laneId, $itemId, $activatedUserIds) {
+                        try {
+                            $activeCount = BidParticipant::forItem($itemId)->active()->count();
+                            broadcast(new BidderUpdated(
+                                $auctionId, $laneId, $itemId, $activeCount, 'joined'
+                            ));
+                        } catch (\Exception $broadcastErr) {
+                            \Illuminate\Support\Facades\Log::warning("Auto-bid broadcast error: " . $broadcastErr->getMessage(), [
+                                'item_id' => $itemId, 'activated_user_count' => count($activatedUserIds),
+                            ]);
+                        }
+                    });
+                }
+            }, 3);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Auto-bid activation transaction failed: item={$itemId} - " . $e->getMessage());
+            return 0;
         }
 
+        $activated = count($activatedUserIds);
         if ($activated > 0) {
-            \Illuminate\Support\Facades\Log::info("Auto-bid activated: item={$item->id}, count={$activated}");
+            \Illuminate\Support\Facades\Log::info("Auto-bid activated: item={$itemId}, count={$activated}, users=" . implode(',', $activatedUserIds));
         }
 
         return $activated;

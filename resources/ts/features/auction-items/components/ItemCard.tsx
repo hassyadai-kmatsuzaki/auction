@@ -19,6 +19,7 @@ interface ItemData {
   current_price: number;
   inspection_info?: string;
   is_premium: boolean;
+  is_anonymous?: boolean;
   thumbnail_path?: string;
   status: string;
   media?: any[];
@@ -80,6 +81,10 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
         <Chip label="プレミアム" color="warning" size="small"
           sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />
       )}
+      {item.is_anonymous && (
+        <Chip label="匿名出品" color="info" size="small"
+          sx={{ position: 'absolute', top: item.is_premium ? 36 : 8, right: 8, zIndex: 1 }} />
+      )}
 
       <CardMedia component="img" image={optimizedImageUrl(item.thumbnail_path, 'small')}
         alt={item.species_name} loading="lazy" sx={{ aspectRatio: '3/2', objectFit: 'cover' }} />
@@ -90,18 +95,26 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
           {!hideStatus && <Chip label={status.label} color={status.color} size="small" />}
         </Box>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
-        {item.seller_name && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
-            <Avatar
-              src={item.seller_profile_image_url || undefined}
-              sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
-            >
-              {!item.seller_profile_image_url && item.seller_name.charAt(0)}
-            </Avatar>
+        {item.is_anonymous ? (
+          <Box sx={{ mt: 0.5 }}>
             <Typography variant="caption" color="text.secondary" noWrap>
-              {item.seller_name}
+              匿名出品
             </Typography>
           </Box>
+        ) : (
+          item.seller_name && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+              <Avatar
+                src={item.seller_profile_image_url || undefined}
+                sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+              >
+                {!item.seller_profile_image_url && item.seller_name.charAt(0)}
+              </Avatar>
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {item.seller_name}
+              </Typography>
+            </Box>
+          )
         )}
         {item.inspection_info && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }} noWrap>

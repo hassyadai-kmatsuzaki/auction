@@ -63,6 +63,7 @@ export interface Item {
   individual_info?: string;
   notes?: string;
   is_premium: boolean;
+  is_anonymous?: boolean;
   premium_fee?: number;
   thumbnail_path?: string;
   status: 'registered' | 'live' | 'sold' | 'unsold' | 'cancelled';
@@ -152,6 +153,7 @@ export interface LaneItem {
   inspection_info?: string;
   individual_info?: string;
   is_premium: boolean;
+  is_anonymous?: boolean;
   thumbnail_path?: string;
   media?: ItemMedia[];
   active_bidders_count: number;
@@ -175,6 +177,7 @@ export interface UpcomingItem {
   start_price: number;
   thumbnail_path?: string | null;
   is_premium: boolean;
+  is_anonymous?: boolean;
   is_favorited?: boolean;
   my_limit_price?: number | null;
   my_limit_triggered?: boolean;

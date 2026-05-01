@@ -90,6 +90,29 @@ class BidServiceTest extends TestCase
         $this->assertNull($r['lanes'][0]['current_item']['my_bid_status'] ?? null);
     }
 
+    /**
+     * 負荷レビュー C4: Redis LRU eviction 等で countdown:lane:{id} cache が消えると、
+     * 旧仕様ではユーザーごとに「3秒のまま」表示が固まる事故になっていた。
+     * v1.1 では active レーンで cache miss を検知したら startCountdown で復旧 → 再取得する。
+     */
+    public function test_getLiveState_はCacheMiss時にstartCountdownで復旧する(): void
+    {
+        // 事前に cache を空にしておく（LRU eviction 相当の状況を再現）
+        \Illuminate\Support\Facades\Cache::forget("countdown:lane:{$this->lane->id}");
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get("countdown:lane:{$this->lane->id}"));
+
+        $r = $this->bidService->getLiveState($this->auction->fresh(), $this->participant->id);
+
+        // 復旧後の cache が書き込まれていること
+        $recovered = \Illuminate\Support\Facades\Cache::get("countdown:lane:{$this->lane->id}");
+        $this->assertNotNull($recovered, 'cache miss は startCountdown 経由で復旧される必要がある');
+        $this->assertSame($this->lane->id, $recovered['lane_id']);
+        $this->assertSame('bidding', $recovered['phase']);
+
+        // 復旧された残秒数が応答にも反映されている（default の3秒固定ではない）
+        $this->assertGreaterThan(0, $r['lanes'][0]['current_item']['countdown_seconds']);
+    }
+
     public function test_getActiveParticipations_は_自分のアクティブ参加のみ返す(): void
     {
         \App\Models\BidParticipant::create([

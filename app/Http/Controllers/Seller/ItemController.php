@@ -7,7 +7,6 @@ use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
 use App\Services\StorageService;
-use App\Services\TestModeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -15,24 +14,8 @@ use Illuminate\Support\Facades\Validator;
 class ItemController extends Controller
 {
     public function __construct(
-        private readonly StorageService  $storage,
-        private readonly TestModeService $testMode,
+        private readonly StorageService $storage,
     ) {}
-
-    /**
-     * テストモード ON 中に「閉じた世界の住人ではない」出品者のリクエストを 403 で弾く。
-     * 書き込み系（store/update/destroy）の頭で呼ぶ。読み込み系はクエリで 0 件にすることで対応。
-     */
-    private function abortIfBlockedByTestMode(): ?\Illuminate\Http\JsonResponse
-    {
-        if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user())) {
-            return response()->json([
-                'success' => false,
-                'message' => '現在テスト運用中のため、出品操作は受け付けられません。',
-            ], 403);
-        }
-        return null;
-    }
 
     /**
      * 出品履歴一覧を取得
@@ -66,7 +49,6 @@ class ItemController extends Controller
         
         $query = Item::where('seller_profile_id', $sellerProfile->id)
             ->with(['auction:id,title,event_date,status', 'wonItem:item_id,winning_price,quantity,payment_status,delivery_status']);
-        $this->testMode->applyToOwnSellerScope($query, $user);
         
         // ステータスフィルター
         if ($status && $status !== 'all') {
@@ -96,6 +78,7 @@ class ItemController extends Controller
                         'current_price' => $item->current_price,
                         'estimated_price' => $item->estimated_price,
                         'is_premium' => $item->is_premium,
+                        'is_anonymous' => (bool) $item->is_anonymous,
                         'status' => $item->status,
                         'thumbnail_path' => $item->thumbnail_path,
                         'auction' => $item->auction ? [
@@ -130,19 +113,20 @@ class ItemController extends Controller
      */
     public function getAvailableAuctions()
     {
-        // テストモード中は閉じた世界外の出品者には空リストを返す
-        if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user())) {
-            return response()->json(['success' => true, 'data' => ['auctions' => []]]);
-        }
+        // 出品者の is_test 状態に一致するオークションだけを候補に出す。
+        // is_test=true 出品者 → テスト用オークションのみ
+        // is_test=false 出品者 → 通常オークションのみ
+        $sellerIsTest = (bool) (Auth::user()->is_test ?? false);
 
         $auctions = Auction::where('status', 'scheduled')
+            ->where('is_test', $sellerIsTest)
             ->where(function ($query) {
                 $query->whereNull('upload_deadline')
                       ->orWhere('upload_deadline', '>', now());
             })
             ->orderBy('event_date')
-            ->get(['id', 'title', 'event_date', 'status', 'upload_deadline']);
-        
+            ->get(['id', 'title', 'event_date', 'status', 'upload_deadline', 'is_test']);
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -152,6 +136,7 @@ class ItemController extends Controller
                         'title' => $auction->title,
                         'event_date' => $auction->event_date->format('Y-m-d'),
                         'status' => $auction->status,
+                        'is_test' => (bool) $auction->is_test,
                         'upload_deadline' => $auction->upload_deadline?->format('Y-m-d H:i:s'),
                     ];
                 }),
@@ -167,8 +152,6 @@ class ItemController extends Controller
      */
     public function store(Request $request)
     {
-        if ($blocked = $this->abortIfBlockedByTestMode()) return $blocked;
-
         $validator = Validator::make($request->all(), [
             'auction_id' => 'required|exists:auctions,id',
             'species_name' => 'required|string|max:255',
@@ -181,6 +164,7 @@ class ItemController extends Controller
             'individual_info' => 'nullable|string',
             'notes' => 'nullable|string',
             'is_premium' => 'boolean',
+            'is_anonymous' => 'boolean',
             'unsold_action' => 'nullable|in:return,free_pickup,relist',
         ]);
 
@@ -203,17 +187,26 @@ class ItemController extends Controller
 
         $user = Auth::user();
         $sellerProfile = $this->getOrCreateSellerProfile($user);
-        
+
         // オークションの確認
         $auction = Auction::find($request->auction_id);
-        
+
         if ($auction->status !== 'scheduled') {
             return response()->json([
                 'success' => false,
                 'message' => 'このオークションは出品受付を終了しています。',
             ], 422);
         }
-        
+
+        // テスト/本番のクロス出品防止: 出品者と auction の is_test が一致しない場合は弾く
+        // 通常 UI では候補に出さないが、API 直叩きへの防御層として残す
+        if ((bool) $auction->is_test !== (bool) ($user->is_test ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'このオークションは出品対象外です。',
+            ], 422);
+        }
+
         if ($auction->upload_deadline && $auction->upload_deadline < now()) {
             return response()->json([
                 'success' => false,
@@ -251,6 +244,7 @@ class ItemController extends Controller
                 'individual_info' => $request->individual_info,
                 'notes' => $request->notes,
                 'is_premium' => $request->boolean('is_premium', false),
+                'is_anonymous' => $request->boolean('is_anonymous', false),
                 'unsold_action' => $request->unsold_action ?? 'return',
                 'status' => 'draft',
             ]);
@@ -293,11 +287,10 @@ class ItemController extends Controller
             ], 404);
         }
         
-        $itemQuery = Item::where('id', $id)
+        $item = Item::where('id', $id)
             ->where('seller_profile_id', $sellerProfile->id)
-            ->with(['auction:id,title,event_date,status', 'media', 'wonItem']);
-        $this->testMode->applyToOwnSellerScope($itemQuery, $user);
-        $item = $itemQuery->first();
+            ->with(['auction:id,title,event_date,status', 'media', 'wonItem'])
+            ->first();
 
         if (!$item) {
             return response()->json([
@@ -321,6 +314,7 @@ class ItemController extends Controller
                     'individual_info' => $item->individual_info,
                     'notes' => $item->notes,
                     'is_premium' => $item->is_premium,
+                    'is_anonymous' => (bool) $item->is_anonymous,
                     'status' => $item->status,
                     'unsold_action' => $item->unsold_action,
                     'thumbnail_path' => $item->thumbnail_path,
@@ -364,8 +358,6 @@ class ItemController extends Controller
      */
     public function update(Request $request, $id)
     {
-        if ($blocked = $this->abortIfBlockedByTestMode()) return $blocked;
-
         $user = Auth::user();
         $sellerProfile = SellerProfile::where('user_id', $user->id)->first();
         
@@ -406,6 +398,7 @@ class ItemController extends Controller
             'individual_info' => 'nullable|string',
             'notes' => 'nullable|string',
             'is_premium' => 'boolean',
+            'is_anonymous' => 'boolean',
             'unsold_action' => 'nullable|in:return,free_pickup,relist',
         ]);
 
@@ -441,6 +434,7 @@ class ItemController extends Controller
             'individual_info',
             'notes',
             'is_premium',
+            'is_anonymous',
             'unsold_action',
         ]);
         
@@ -476,8 +470,6 @@ class ItemController extends Controller
      */
     public function destroy($id)
     {
-        if ($blocked = $this->abortIfBlockedByTestMode()) return $blocked;
-
         $user = Auth::user();
         $sellerProfile = SellerProfile::where('user_id', $user->id)->first();
         
@@ -524,18 +516,6 @@ class ItemController extends Controller
     public function stats()
     {
         $user = Auth::user();
-        // テストモード中は閉じた世界外の出品者には 0 を返す
-        if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse($user)) {
-            return response()->json([
-                'success' => true,
-                'data' => ['stats' => [
-                    'total_items' => 0, 'items_this_month' => 0,
-                    'total_sales' => 0, 'sales_this_month' => 0,
-                    'pending_items' => 0, 'sold_items' => 0,
-                ]],
-            ]);
-        }
-
         $sellerProfile = SellerProfile::where('user_id', $user->id)->first();
         
         if (!$sellerProfile) {

@@ -113,11 +113,14 @@ class DispatchEmailCampaignJob implements ShouldQueue
 
     /**
      * target_type ごとの宛先クエリを組み立てる。
-     * いずれも `mailable` スコープでバウンス/苦情/opt-out を除外する。
+     * `mailable` スコープでバウンス/苦情/opt-out を除外し、
+     * 論理削除（is_active=false）も除外する。
+     * 未承認ユーザー（status != 'approved'）は管理画面配信の対象として含める。
+     * EmailCampaignController::buildRecipientQuery と完全に同じ条件にすること。
      */
     private function buildRecipientQuery(EmailCampaign $campaign)
     {
-        $base = User::query()->approved()->mailable();
+        $base = User::query()->where('is_active', true)->mailable();
 
         return match ($campaign->target_type) {
             'all' => $base,

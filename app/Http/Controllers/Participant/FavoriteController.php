@@ -25,16 +25,11 @@ class FavoriteController extends Controller
         $includePast = $request->boolean('include_past', false);
 
         $favoritesQuery = Favorite::where('user_id', $userId)
-            ->with(['item.auction', 'item.media', 'item.sellerProfile.user']);
+            ->with(['item.auction', 'item.media', 'item.sellerProfile']);
 
-        // テストモード中はクエリ段階で閉じた世界外を除外
-        if ($this->testMode->isEnabled()) {
-            $viewer = Auth::user();
-            if (!$this->testMode->currentUserCanSeeTestUniverse($viewer)) {
-                $favoritesQuery->whereRaw('1=0');
-            } else {
-                $favoritesQuery->whereHas('item.sellerProfile.user', fn ($q) => $q->where('is_test', true));
-            }
+        // テストモード ON で許可ユーザーでなければ空にする（許可ユーザーには全件見せる）
+        if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user())) {
+            $favoritesQuery->whereRaw('1=0');
         }
 
         $favorites = $favoritesQuery->orderBy('created_at', 'desc')->get();
@@ -43,6 +38,7 @@ class FavoriteController extends Controller
             $item = $fav->item;
             if (!$item) return null;
             $auction = $item->auction;
+            $isAnon = (bool) $item->is_anonymous;
             return [
                 'id' => $fav->id,
                 'item_id' => $item->id,
@@ -55,15 +51,23 @@ class FavoriteController extends Controller
                 'inspection_info' => $item->inspection_info,
                 'individual_info' => $item->individual_info,
                 'is_premium' => $item->is_premium,
+                'is_anonymous' => $isAnon,
                 'thumbnail_path' => $item->thumbnail_path,
                 'status' => $item->status,
                 'media' => $this->transformMedia($item->media),
-                'seller' => $item->sellerProfile ? [
-                    'id'                 => $item->sellerProfile->id,
-                    'seller_code'        => $item->sellerProfile->seller_code,
-                    'seller_name'        => $item->sellerProfile->seller_name,
-                    'profile_image_url'  => $item->sellerProfile->profile_image_url,
-                ] : null,
+                'seller' => $isAnon
+                    ? [
+                        'id'                 => null,
+                        'seller_code'        => null,
+                        'seller_name'        => '匿名出品',
+                        'profile_image_url'  => null,
+                    ]
+                    : ($item->sellerProfile ? [
+                        'id'                 => $item->sellerProfile->id,
+                        'seller_code'        => $item->sellerProfile->seller_code,
+                        'seller_name'        => $item->sellerProfile->seller_name,
+                        'profile_image_url'  => $item->sellerProfile->profile_image_url,
+                    ] : null),
                 'auction' => $auction ? [
                     'id' => $auction->id,
                     'title' => $auction->title,

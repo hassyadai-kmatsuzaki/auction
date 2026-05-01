@@ -939,6 +939,9 @@ class CountdownService
      *
      * ■ 一時停止中に管理画面で設定変更された可能性があるため、
      *   再開時にオークション設定を再読み込みしてキャッシュを更新する
+     * ■ 一時停止前に phase='freeze' だった場合、再開後に freeze が残ったままだと
+     *   入札ボタンが永続的に無効になるため、bidding にリセットする
+     *   （負荷レビュー H5 指摘）。
      */
     public function resumeCountdown(int $laneId): void
     {
@@ -946,6 +949,7 @@ class CountdownService
         if (!$state) return;
 
         $lane = Lane::with('auction')->find($laneId);
+        $newBid = null;
         if ($lane && $lane->auction) {
             $settings      = $lane->auction->getAuctionSettings();
             $newBid        = (float) ($settings['bid_countdown_seconds'] ?? 5);
@@ -959,6 +963,15 @@ class CountdownService
             if ($oldBid !== $newBid) {
                 Log::info("Countdown settings refreshed on resume: lane {$laneId}, bid {$oldBid}→{$newBid}, freeze→{$newFreeze}");
             }
+        }
+
+        // 一時停止中に消化された扱いにして freeze を bidding に戻す。
+        // pre_bid は短時間（数秒）かつ商品切替直後なのでそのまま継続させる。
+        if (($state['phase'] ?? null) === 'freeze') {
+            $previousRemaining = $state['remaining_seconds'] ?? null;
+            $state['phase']             = 'bidding';
+            $state['remaining_seconds'] = (float) ($newBid ?? $state['bid_countdown_seconds'] ?? 5);
+            Log::warning("Countdown phase reset on resume: lane {$laneId}, freeze({$previousRemaining}s) → bidding({$state['remaining_seconds']}s)");
         }
 
         $state['is_running'] = true;

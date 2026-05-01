@@ -30,9 +30,12 @@ export default function TestModeCard() {
   useEffect(() => {
     (async () => {
       try {
+        // GET /api/admin/settings のレスポンス形:
+        //   { success, data: { settings: { <category>: { <key>: { value, type, ... } } } } }
+        // index() で boolean は filter_var(FILTER_VALIDATE_BOOLEAN) を通っているので value は真の bool
         const res = await axios.get('/api/admin/settings');
-        const value = res.data?.data?.general?.test_mode_enabled?.value;
-        // SystemSetting 側は文字列で返ってくるので boolean に正規化
+        const value = res.data?.data?.settings?.general?.test_mode_enabled?.value;
+        // 古いキャッシュ等で文字列が返るケースもあるので念のため両対応
         setEnabled(value === true || value === '1' || value === 'true');
       } catch {
         setEnabled(false);

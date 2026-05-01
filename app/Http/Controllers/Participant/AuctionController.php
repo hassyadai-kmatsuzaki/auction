@@ -62,7 +62,8 @@ class AuctionController extends Controller
         if (!empty($auctionIds)) {
             $rowsQuery = Item::query()
                 ->whereIn('auction_id', $auctionIds)
-                ->whereIn('status', ['registered', 'live', 'sold', 'unsold']);
+                ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
+                ->where('is_anonymous', false);
             $this->testMode->applyToItemQuery($rowsQuery);
             $rows = $rowsQuery
                 ->join('seller_profiles', 'items.seller_profile_id', '=', 'seller_profiles.id')
@@ -287,6 +288,7 @@ class AuctionController extends Controller
                 'lane_name' => "レーン{$lane->lane_number}",
                 'status' => $lane->status,
                 'items' => $laneItems->map(function ($item) {
+                    $isAnon = (bool) $item->is_anonymous;
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
@@ -299,10 +301,11 @@ class AuctionController extends Controller
                         'inspection_info' => $item->inspection_info,
                         'individual_info' => $item->individual_info,
                         'is_premium' => $item->is_premium,
+                        'is_anonymous' => $isAnon,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'seller_name' => $item->sellerProfile?->seller_name,
-                        'seller_profile_image_url' => $item->sellerProfile?->profile_image_url,
+                        'seller_name' => $isAnon ? '匿名出品' : $item->sellerProfile?->seller_name,
+                        'seller_profile_image_url' => $isAnon ? null : $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),
@@ -330,6 +333,7 @@ class AuctionController extends Controller
                 'lane_name' => '未割当',
                 'status' => 'waiting',
                 'items' => $unassignedItems->map(function ($item) {
+                    $isAnon = (bool) $item->is_anonymous;
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
@@ -342,10 +346,11 @@ class AuctionController extends Controller
                         'inspection_info' => $item->inspection_info,
                         'individual_info' => $item->individual_info,
                         'is_premium' => $item->is_premium,
+                        'is_anonymous' => $isAnon,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'seller_name' => $item->sellerProfile?->seller_name,
-                        'seller_profile_image_url' => $item->sellerProfile?->profile_image_url,
+                        'seller_name' => $isAnon ? '匿名出品' : $item->sellerProfile?->seller_name,
+                        'seller_profile_image_url' => $isAnon ? null : $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),

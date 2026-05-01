@@ -59,9 +59,25 @@ interface ItemFormData {
   quantity: string;
   quantity_unit: string;
   is_premium: boolean;
+  is_anonymous: boolean;
   individual_info: string;
   age_months: string;
 }
+
+type Carrier = 'yu_pack' | 'sagawa' | 'yamato';
+
+interface ShipmentInput {
+  carrier: Carrier | '';
+  tracking_number: string;
+}
+
+const CARRIER_OPTIONS: { value: Carrier; label: string }[] = [
+  { value: 'yu_pack', label: 'ゆうパック' },
+  { value: 'sagawa', label: '佐川' },
+  { value: 'yamato', label: 'ヤマト' },
+];
+
+const MAX_SHIPMENTS = 10;
 
 interface SellerSpeciesType {
   id: number;
@@ -79,6 +95,7 @@ const createEmptyItem = (defaults?: { species_type_id?: number; quantity_unit?: 
   quantity: '',
   quantity_unit: defaults?.quantity_unit ?? 'fish',
   is_premium: false,
+  is_anonymous: false,
   individual_info: '',
   age_months: '',
 });
@@ -94,6 +111,27 @@ export default function SubmitItem() {
   const [auctionId, setAuctionId] = useState('');
   const [items, setItems] = useState<ItemFormData[]>([createEmptyItem()]);
   const [speciesTypes, setSpeciesTypes] = useState<SellerSpeciesType[]>([]);
+  const [shipments, setShipments] = useState<ShipmentInput[]>([{ carrier: '', tracking_number: '' }]);
+
+  const updateShipment = (index: number, field: keyof ShipmentInput, value: string) => {
+    setShipments((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
+  };
+  const addShipment = () => {
+    setShipments((prev) => (prev.length >= MAX_SHIPMENTS ? prev : [...prev, { carrier: '', tracking_number: '' }]));
+  };
+  const removeShipment = (index: number) => {
+    setShipments((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+  const validShipments = shipments
+    .map((s) => ({ carrier: s.carrier as Carrier, tracking_number: s.tracking_number.trim() }))
+    .filter((s) => s.carrier && s.tracking_number.length > 0);
+  const isShipmentsValid = validShipments.length > 0
+    && shipments.every((s) => {
+      const hasCarrier = !!s.carrier;
+      const hasNumber = s.tracking_number.trim().length > 0;
+      // どちらか片方だけ入力された不完全行は不可
+      return (hasCarrier && hasNumber) || (!hasCarrier && !hasNumber);
+    });
 
   useEffect(() => {
     fetchAvailableAuctions();
@@ -191,6 +229,7 @@ export default function SubmitItem() {
           quantity_unit: item.quantity_unit,
           start_price: 100,
           is_premium: item.is_premium,
+          is_anonymous: item.is_anonymous,
           individual_info: individualInfo || null,
           inspection_info: null,
           notes: null,
@@ -199,7 +238,22 @@ export default function SubmitItem() {
       });
 
       await Promise.all(promises);
-      
+
+      // 伝票番号の登録（出品作成成功後にまとめて送信）
+      try {
+        await axios.post(`/api/seller/auctions/${parseInt(auctionId)}/shipments`, {
+          shipments: validShipments,
+        });
+      } catch (err: any) {
+        console.error('伝票番号登録エラー:', err);
+        setSnackbar({
+          open: true,
+          message: '出品は登録されましたが、伝票番号の登録に失敗しました。出品履歴から再登録してください。',
+          severity: 'error',
+        });
+        return;
+      }
+
       setSnackbar({
         open: true,
         message: `${items.length}件の出品申込を送信しました！管理者の審査をお待ちください。`,
@@ -420,6 +474,7 @@ export default function SubmitItem() {
                         </FormControl>
                       </Grid>
 
+                      {/* プレミアム機能は将来追加予定のため一旦非表示
                       <Grid item xs={6} md={3}>
                         <FormControlLabel
                           control={
@@ -430,6 +485,20 @@ export default function SubmitItem() {
                             />
                           }
                           label={<Typography variant="body2">プレミアム (+800円)</Typography>}
+                        />
+                      </Grid>
+                      */}
+
+                      <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={item.is_anonymous}
+                              onChange={(e) => updateItem(index, 'is_anonymous', e.target.checked)}
+                              size="small"
+                            />
+                          }
+                          label={<Typography variant="body2">匿名出品（出品者名を非公開にする）</Typography>}
                         />
                       </Grid>
 
@@ -517,7 +586,10 @@ export default function SubmitItem() {
                             <TableCell sx={{ fontWeight: 600 }}>品種名</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>数量</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>月数</TableCell>
+                            {/* プレミアム機能は将来追加予定のため一旦非表示
                             <TableCell sx={{ fontWeight: 600 }}>プレミアム</TableCell>
+                            */}
+                            <TableCell sx={{ fontWeight: 600 }}>匿名出品</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -531,9 +603,16 @@ export default function SubmitItem() {
                                 {unitLabel(item.quantity_unit)}
                               </TableCell>
                               <TableCell>{item.age_months || '—'}</TableCell>
+                              {/* プレミアム機能は将来追加予定のため一旦非表示
                               <TableCell>
                                 {item.is_premium
                                   ? <Chip label="あり" size="small" color="warning" />
+                                  : <Chip label="なし" size="small" variant="outlined" />}
+                              </TableCell>
+                              */}
+                              <TableCell>
+                                {item.is_anonymous
+                                  ? <Chip label="あり" size="small" color="info" />
                                   : <Chip label="なし" size="small" variant="outlined" />}
                               </TableCell>
                             </TableRow>
@@ -548,6 +627,68 @@ export default function SubmitItem() {
 
                     <Divider sx={{ my: 3 }} />
 
+                    {/* 伝票番号 */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                        伝票番号 <Typography component="span" color="error" fontWeight={700}>*</Typography>
+                      </Typography>
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        生体の発送に使用した伝票番号を入力してください。複数の伝票で発送した場合は「+ 伝票を追加」で増やせます（最大{MAX_SHIPMENTS}件）。伝票番号と各生体の紐付けは行いません。
+                      </Alert>
+                      {shipments.map((s, index) => (
+                        <Grid container spacing={1.5} key={index} alignItems="center" sx={{ mb: 1 }}>
+                          <Grid item xs={12} sm={4} md={3}>
+                            <FormControl fullWidth size="small" required>
+                              <InputLabel>配送業者</InputLabel>
+                              <Select
+                                value={s.carrier}
+                                label="配送業者"
+                                onChange={(e) => updateShipment(index, 'carrier', e.target.value as string)}
+                              >
+                                {CARRIER_OPTIONS.map((opt) => (
+                                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={9} sm={6} md={7}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              required
+                              label="伝票番号"
+                              value={s.tracking_number}
+                              onChange={(e) => updateShipment(index, 'tracking_number', e.target.value)}
+                              placeholder="例: 1234-5678-9012"
+                              inputProps={{ maxLength: 50 }}
+                            />
+                          </Grid>
+                          <Grid item xs={3} sm={2} md={2} sx={{ textAlign: 'right' }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => removeShipment(index)}
+                              disabled={shipments.length <= 1}
+                              aria-label="伝票を削除"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Grid>
+                        </Grid>
+                      ))}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={addShipment}
+                        disabled={shipments.length >= MAX_SHIPMENTS}
+                        sx={{ mt: 1 }}
+                      >
+                        伝票を追加 ({shipments.length}/{MAX_SHIPMENTS})
+                      </Button>
+                    </Box>
+
+                    <Divider sx={{ my: 3 }} />
+
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Button onClick={handleBack} startIcon={<EditIcon />}>
                         修正する
@@ -558,7 +699,7 @@ export default function SubmitItem() {
                         size="large"
                         startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckIcon />}
                         onClick={handleSubmit}
-                        disabled={loading}
+                        disabled={loading || !isShipmentsValid}
                       >
                         {items.length}件の出品申込を送信
                       </Button>

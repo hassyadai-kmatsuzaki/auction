@@ -95,6 +95,7 @@ class AuctionController extends Controller
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
+            'is_test' => 'boolean',
             'upload_deadline' => 'nullable|date',
             'payment_deadline_hours' => 'required|integer|min:1',
             'shipping_deadline_hours' => 'required|integer|min:1',
@@ -147,6 +148,7 @@ class AuctionController extends Controller
             'default_bid_increment' => $request->default_bid_increment,
             'countdown_seconds' => $request->countdown_seconds,
             'deposit_required' => $request->boolean('deposit_required', false),
+            'is_test' => $request->boolean('is_test', false),
             'upload_deadline' => $request->upload_deadline,
             'payment_deadline_hours' => $request->payment_deadline_hours,
             'shipping_deadline_hours' => $request->shipping_deadline_hours,
@@ -198,6 +200,7 @@ class AuctionController extends Controller
             'default_bid_increment' => 'required|numeric|min:1',
             'countdown_seconds' => 'required|integer|between:1,60',
             'deposit_required' => 'boolean',
+            'is_test' => 'boolean',
             'upload_deadline' => 'nullable|date',
             'payment_deadline_hours' => 'required|integer|min:1',
             'shipping_deadline_hours' => 'required|integer|min:1',
@@ -214,7 +217,7 @@ class AuctionController extends Controller
         if ($request->upload_deadline) {
             $eventDateTime = \Carbon\Carbon::parse($request->event_date . ' ' . $request->start_time);
             $uploadDeadline = \Carbon\Carbon::parse($request->upload_deadline);
-            
+
             if ($uploadDeadline >= $eventDateTime) {
                 return response()->json([
                     'success' => false,
@@ -234,6 +237,7 @@ class AuctionController extends Controller
             'default_bid_increment' => $request->default_bid_increment,
             'countdown_seconds' => $request->countdown_seconds,
             'deposit_required' => $request->boolean('deposit_required', false),
+            'is_test' => $request->boolean('is_test', false),
             'upload_deadline' => $request->upload_deadline,
             'payment_deadline_hours' => $request->payment_deadline_hours,
             'shipping_deadline_hours' => $request->shipping_deadline_hours,

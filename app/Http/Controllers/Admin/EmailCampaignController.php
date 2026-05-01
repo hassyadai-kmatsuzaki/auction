@@ -221,7 +221,9 @@ class EmailCampaignController extends Controller
 
     private function buildRecipientQuery(string $targetType, array $filter, array $userIds)
     {
-        $base = User::query()->approved()->mailable();
+        // 管理画面のメール配信は未承認ユーザーにも送る運用のため status='approved' は要求しない。
+        // 論理削除（is_active=false）と バウンス/苦情/opt-out は引き続き除外する。
+        $base = User::query()->where('is_active', true)->mailable();
 
         return match ($targetType) {
             'all' => $base,

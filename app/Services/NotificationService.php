@@ -45,6 +45,10 @@ class NotificationService
             if (!$user || !$user->is_active || $user->status !== 'approved') {
                 return;
             }
+            // テストモード ON 中は is_test=true ユーザーにしか LINE 通知を送らない
+            if (!app(TestModeService::class)->shouldNotifyUser($user)) {
+                return;
+            }
             SendLineNotificationJob::dispatch($userId, $type, $text, $flexContent);
         } catch (\Exception $e) {
             Log::warning("LINE notification dispatch failed: {$type} user={$userId} - " . $e->getMessage());
@@ -473,6 +477,9 @@ class NotificationService
         // 未承認/停止アカウントには配信しない（クエリ段で approved() を使っていない個別送信パス対策）。
         if (!$seller->is_active || $seller->status !== 'approved') return false;
 
+        // テストモード ON 中は is_test=true ユーザー以外には送らない（メール・LINE 共通）
+        if (!app(TestModeService::class)->shouldNotifyUser($seller)) return false;
+
         $profile = SellerProfile::where('user_id', $seller->id)->first();
         if (!$profile) return true;
         $settings = $profile->notification_settings ?? [];
@@ -483,6 +490,9 @@ class NotificationService
     {
         // 未承認/停止アカウントには配信しない（クエリ段で approved() を使っていない個別送信パス対策）。
         if (!$participant->is_active || $participant->status !== 'approved') return false;
+
+        // テストモード ON 中は is_test=true ユーザー以外には送らない（メール・LINE 共通）
+        if (!app(TestModeService::class)->shouldNotifyUser($participant)) return false;
 
         $settings = $participant->notification_settings ?? [];
         return $settings[$settingKey] ?? true;
