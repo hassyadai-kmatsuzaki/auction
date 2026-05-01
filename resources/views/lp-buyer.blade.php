@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=29">
+  <link rel="stylesheet" href="/css/lp.css?v=30">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
@@ -104,14 +104,16 @@
       業者間プラットフォームです。
     </p>
 
+    @php $partners = [1, 2, 3, 4, 5, 6]; @endphp
     <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
       <div class="partners-marquee__track">
+        {{-- 同じセットを2回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
         @for ($i = 0; $i < 2; $i++)
-          @for ($j = 0; $j < 12; $j++)
+          @foreach ($partners as $n)
             <div class="partners-marquee__item">
-              <img src="/img/logo.png?v=2" alt="" loading="lazy">
+              <img src="/img/lp/client/{{ $n }}.png" alt="" loading="lazy">
             </div>
-          @endfor
+          @endforeach
         @endfor
       </div>
     </div>
@@ -414,10 +416,11 @@
   <div class="container">
     <div class="solutions-header anim" data-anim="fade-up">
       <h2 class="solutions-header__title">
-        2つの仕入れニーズに、<br class="sp-only"><span class="solutions-header__mark">{{ $brand }} は応えます</span>
+        <span class="solutions-header__mark">落札者の方へ</span>
       </h2>
       <p class="solutions-header__desc">
-        「ここでしか会えない個体」と、「ヤフオクで買えない価格」。<br class="pc-only">
+        2つの仕入れニーズに、{{ $brand }} は応えます。<br>
+        「ここでしか会えない個体」と「ヤフオクで買えない価格」。<br class="pc-only">
         さらに「取引のすべてを代行」と「定期開催で計画的に」。
       </p>
     </div>
@@ -857,7 +860,7 @@
     <div class="footer__top">
       <div class="footer__brand">
         <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="footer__logo">
-        <p class="footer__operator">運営: 株式会社NEP / 母体: 株式会社サバンナ</p>
+        <p class="footer__operator">運営：日本メダカオンライン市場</p>
         <p class="footer__operator">インボイス登録番号: T-XXXXXXXXXXXXX</p>
       </div>
       <nav class="footer__links" aria-label="フッターナビゲーション">

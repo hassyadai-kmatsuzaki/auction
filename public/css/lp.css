@@ -1442,16 +1442,8 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
 .cta-banner {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(110deg, #4dd0a7 0%, #2bb1b7 45%, #1f7d96 100%);
+  background: #2bb1b7;
   color: #ffffff;
-}
-.cta-banner::before {
-  content: "";
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(700px 500px at 100% 100%, rgba(0,30,50,0.18), transparent 65%),
-    radial-gradient(600px 400px at 0% 0%, rgba(255,255,255,0.18), transparent 60%);
-  pointer-events: none;
 }
 
 .cta-banner__inner {
@@ -1699,7 +1691,17 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   transition: transform 0.4s ease;
 }
 .floating-cta.visible { transform: translateY(0); }
-.floating-cta .btn-primary { width: 100%; justify-content: center; }
+.floating-cta .btn-primary {
+  width: 100%;
+  justify-content: center;
+  background: #06C755;
+  background-image: none;
+}
+.floating-cta .btn-primary::before { display: none; }
+.floating-cta .btn-primary:hover {
+  background: #04A846;
+  box-shadow: 0 10px 30px rgba(6,199,85,0.35);
+}
 @media (min-width: 768px) { .floating-cta { display: none; } }
 
 /* ===================================
@@ -1721,9 +1723,7 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   font-size: clamp(2rem, 6vw, 3.4rem);
   line-height: 1.35;
   letter-spacing: 0.02em;
-  background: var(--gradient-main);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #2bb1b7;
   margin-bottom: 1.75rem;
 }
 .mission-lead {
@@ -2067,13 +2067,13 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   transition: width 1.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .takehome-bar__fill--low {
-  background: linear-gradient(90deg, #c5cdd3, #94a3b8);
+  background: #cbd5dc;
 }
 .takehome-bar__fill--mid {
-  background: linear-gradient(90deg, #7fc7d0, #2bb1b7);
+  background: #7fc7d0;
 }
 .takehome-bar__fill--high {
-  background: var(--gradient-main);
+  background: #2bb1b7;
 }
 .takehome-bar--us .takehome-bar__track {
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 0 2px rgba(43,177,183,0.35);
@@ -2135,7 +2135,7 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
    =================================== */
 .section--video {
   position: relative;
-  background: linear-gradient(165deg, #0d4f55 0%, #1f7d96 100%);
+  background: #2bb1b7;
   color: #ffffff;
   padding: 4rem 0;
   overflow: hidden;
@@ -2143,15 +2143,7 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
 @media (min-width: 768px) { .section--video { padding: 5.5rem 0; } }
 @media (min-width: 1024px) { .section--video { padding: 6.5rem 0; } }
 
-.section--video::before {
-  content: '';
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(700px 500px at 100% 0%, rgba(255,255,255,0.10), transparent 60%),
-    radial-gradient(800px 500px at 0% 100%, rgba(43,177,183,0.20), transparent 65%);
-  pointer-events: none;
-}
-.section--video > .container { position: relative; z-index: 1; max-width: 1080px; }
+.section--video > .container { max-width: 1080px; }
 
 .video-header {
   text-align: center;
@@ -2184,25 +2176,23 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   .video-grid { grid-template-columns: repeat(2, 1fr); gap: 18px; }
 }
 .video-card {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: #ffffff;
   border-radius: 14px;
   padding: 1.4rem 1.4rem 1.5rem;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0,30,40,0.18);
 }
 .video-card__index {
   display: inline-block;
   font-family: 'Inter', sans-serif;
   font-size: 0.72rem;
   font-weight: 800;
-  color: #ffe45c;
+  color: #2bb1b7;
   letter-spacing: 0.18em;
   margin-bottom: 0.7rem;
 }
 .video-card__title {
   font-size: 1.1rem;
-  color: #ffffff;
+  color: #0d4f55;
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1.5;
@@ -2210,7 +2200,7 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
 }
 .video-card p {
   font-size: 0.88rem;
-  color: rgba(255,255,255,0.82);
+  color: #4a5568;
   font-weight: 500;
   line-height: 1.9;
 }
