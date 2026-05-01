@@ -91,8 +91,16 @@ class GoogleAuthController extends Controller
 
             if ($user) {
                 // 既存ユーザー: ステータスチェック
-                if ($user->status !== 'approved' || !$user->is_active) {
-                    return $this->redirectWithError('このアカウントは現在ログインできません');
+                if (!$user->is_active) {
+                    return $this->redirectWithError('このアカウントは現在無効化されています。詳しくは info@nep-corp.com までお問い合わせください。');
+                }
+                if ($user->status !== 'approved') {
+                    $messages = [
+                        'pending'   => '現在、アカウントの承認待ちです。運営による承認が完了次第、ログインいただけます。承認には数営業日かかる場合があります。お急ぎの場合は info@nep-corp.com までご連絡ください。',
+                        'rejected'  => '申し訳ございません。アカウントの承認が見送られました。詳しくは info@nep-corp.com までお問い合わせください。',
+                        'suspended' => 'このアカウントは現在ご利用を停止しています。詳しくは info@nep-corp.com までお問い合わせください。',
+                    ];
+                    return $this->redirectWithError($messages[$user->status] ?? 'このアカウントは現在ログインできません。詳しくは info@nep-corp.com までお問い合わせください。');
                 }
 
                 $user->update([

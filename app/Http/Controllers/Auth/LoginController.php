@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
 {
@@ -27,22 +26,30 @@ class LoginController extends Controller
 
         // ユーザーが存在しない、またはパスワードが一致しない
         if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['メールアドレスまたはパスワードが正しくありません'],
-            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'メールアドレスまたはパスワードが正しくありません。ご確認のうえ再度お試しください。',
+            ], 401);
         }
 
         // アカウント状態チェック
         if ($user->status !== 'approved') {
-            throw ValidationException::withMessages([
-                'email' => ['このアカウントは現在ログインできません（ステータス: ' . $user->status . '）'],
-            ]);
+            $messages = [
+                'pending'   => '現在、アカウントの承認待ちです。運営による承認が完了次第、ログインいただけます。承認には数営業日かかる場合があります。お急ぎの場合は info@nep-corp.com までご連絡ください。',
+                'rejected'  => '申し訳ございません。アカウントの承認が見送られました。詳しくは info@nep-corp.com までお問い合わせください。',
+                'suspended' => 'このアカウントは現在ご利用を停止しています。詳しくは info@nep-corp.com までお問い合わせください。',
+            ];
+            return response()->json([
+                'success' => false,
+                'message' => $messages[$user->status] ?? 'このアカウントは現在ログインできません。詳しくは info@nep-corp.com までお問い合わせください。',
+            ], 403);
         }
 
         if (!$user->is_active) {
-            throw ValidationException::withMessages([
-                'email' => ['このアカウントは無効化されています'],
-            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'このアカウントは現在無効化されています。詳しくは info@nep-corp.com までお問い合わせください。',
+            ], 403);
         }
 
         // 2FA が有効な場合はコード入力を要求
