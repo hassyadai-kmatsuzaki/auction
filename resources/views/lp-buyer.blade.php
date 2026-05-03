@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=30">
+  <link rel="stylesheet" href="/css/lp.css?v=31">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
@@ -170,7 +170,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </span>
         <ul class="problem-row__list">
-          <li>個人愛好家との混雑で相場が読めない</li>
+          <li>ヤフオクは個人愛好家が主体で、相場が読めない</li>
           <li>業者向けの卸値で仕入れにくい</li>
         </ul>
       </div>
@@ -208,7 +208,7 @@
         業者の仕入れを、<br class="sp-only"><span class="mechanism-header__mark">3つの仕組みで変えます</span>
       </h2>
       <p class="mechanism-header__desc">
-        個人愛好家を排除した業者専用市場、完全匿名の収納代行、<br class="pc-only">
+        個人愛好家を排除した業者専用市場、完全匿名で取引できる仕組み、<br class="pc-only">
         加工なしの動画品質確認。<br class="sp-only">
         独自の仕組みが、業者間取引を引き上げます。
       </p>
@@ -228,7 +228,7 @@
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">02</span>
         </span>
         <span class="solution-card__body">
-          <span class="solution-card__title">完全匿名の収納代行で、<br>同業者と競合しない</span>
+          <span class="solution-card__title">完全匿名で取引できる仕組みで、<br>同業者と競合しない</span>
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
@@ -425,16 +425,20 @@
       </p>
     </div>
 
-    <div class="solutions-grid">
+    <div class="solutions-grid solutions-grid--2col">
       <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">01</span>
         </span>
         <span class="solution-card__body">
-          <span class="solution-card__title">普段会えないブリーダーの個体に、出会える</span>
-          <span class="solution-card__arrow" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <span class="solution-card__head">
+            <span class="solution-card__title">普段会えないブリーダーの個体に、出会える</span>
+            <span class="solution-card__arrow" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </span>
           </span>
+          <p class="solution-card__desc">厳選されたプロブリーダーの個体が並びます。「ヤフオクには出さない」「個別販売しない」ロットが、{{ $brand }} でだけ流通します。</p>
+          <span class="solution-card__sublabel">希少な個体を求める方へ</span>
         </span>
       </a>
       <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
@@ -442,32 +446,44 @@
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">02</span>
         </span>
         <span class="solution-card__body">
-          <span class="solution-card__title">標準個体も、ヤフオクで買えない卸値で</span>
-          <span class="solution-card__arrow" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <span class="solution-card__head">
+            <span class="solution-card__title">標準個体も、ヤフオクで買えない卸値で</span>
+            <span class="solution-card__arrow" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </span>
           </span>
+          <p class="solution-card__desc">特段稀少でない個体でも、ヤフオクの小売値より明確に安く。業者間の卸値で取引できます。</p>
+          <span class="solution-card__sublabel">安定的な仕入れ量を必要とする方へ</span>
         </span>
       </a>
-      <a href="#flow" class="solution-card anim" data-anim="fade-up">
+      <a href="#flow" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:1.8rem; font-weight:900; color:#2bb1b7;">03</span>
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">03</span>
         </span>
         <span class="solution-card__body">
-          <span class="solution-card__title">取引のすべてを、{{ $brand }} が代行</span>
-          <span class="solution-card__arrow" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <span class="solution-card__head">
+            <span class="solution-card__title">取引のすべてを、{{ $brand }} が代行</span>
+            <span class="solution-card__arrow" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </span>
           </span>
+          <p class="solution-card__desc">落札後の決済は買取再販、配送は直送。出品者と直接やり取りすることはありません。</p>
+          <span class="solution-card__sublabel">業務効率化を求める方へ</span>
         </span>
       </a>
-      <a href="#flow" class="solution-card anim" data-anim="fade-up" data-delay="1">
+      <a href="#flow" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="3">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:1.8rem; font-weight:900; color:#2bb1b7;">04</span>
+          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">04</span>
         </span>
         <span class="solution-card__body">
-          <span class="solution-card__title">月2回の定期開催で、計画的に仕入れられる</span>
-          <span class="solution-card__arrow" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <span class="solution-card__head">
+            <span class="solution-card__title">月2回の定期開催で、計画的に仕入れられる</span>
+            <span class="solution-card__arrow" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </span>
           </span>
+          <p class="solution-card__desc">固定スケジュール＋事前出品リストの公開で、仕入れ予算とロットを先に組めます。「いつ良い個体が出るか分からない」が、終わります。</p>
+          <span class="solution-card__sublabel">計画的な仕入れを求める方へ</span>
         </span>
       </a>
     </div>
@@ -537,12 +553,12 @@
       <div class="step-tile anim" data-anim="fade-up" data-delay="1">
         <span class="step-tile__index">STEP 02</span>
         <h3 class="step-tile__title">オークションに参加・入札</h3>
-        <p class="step-tile__desc">業者会員専用のオンライン会場で、リアルタイム形式に参加。事前入札も可能です。</p>
+        <p class="step-tile__desc">業者会員専用のオンライン会場で、リアルタイム形式に参加。事前入札も可能なので、当日リアルタイムで参加できない場合も入札を残しておけます。忖度や手ゼリの不公平はありません。</p>
       </div>
       <div class="step-tile anim" data-anim="fade-up" data-delay="2">
         <span class="step-tile__index">STEP 03</span>
         <h3 class="step-tile__title">落札・決済</h3>
-        <p class="step-tile__desc">落札確定後、決済は振込で完了。取引のすべてが {{ $brand }} とのやり取りです。</p>
+        <p class="step-tile__desc">落札確定後、決済は振込で完了。取引のすべてが {{ $brand }} とのやり取りで、出品者と直接やり取りすることはありません。</p>
       </div>
       <div class="step-tile anim" data-anim="fade-up" data-delay="3">
         <span class="step-tile__index">STEP 04</span>
@@ -550,6 +566,10 @@
         <p class="step-tile__desc">{{ $brand }} から直送。配送伝票も {{ $brand }} 名義で、相互の住所はやりとりされません。</p>
       </div>
     </div>
+
+    <p class="steps-strong anim" data-anim="fade-up">
+      リストを見て、入札して、待つだけ。<br class="sp-only">仕入れに使う時間を、最小化できます。
+    </p>
   </div>
 </section>
 
@@ -678,32 +698,29 @@
 
     <div class="voice-grid">
       <article class="voice-tile anim" data-anim="fade-up">
-        <p class="voice-tile__quote">ヤフオクに出すには惜しい個体を、業者間でだけ動かしたい。{{ $brand }} はそのニーズに最初に応えてくれる場所だと感じています。</p>
+        <p class="voice-tile__quote">ヤフオクは愛好家相場の上に成り立っているので、業者向けに値段を下げると、相場が一気に崩れてしまう。これまでは個別に相対でやりとりするしかなく、まとまった数量で効率的に卸す場所が業界にありませんでした。{{ $brand }} の業者専門の環境なら、相場を壊さずに、業者さんへ効率的に卸せる。業界に必要だった仕組みです。</p>
         <div class="voice-tile__author">
           <span class="voice-tile__avatar"><img src="/img/lp/voice/01.png" alt="" loading="lazy"></span>
           <span class="voice-tile__info">
-            <strong>屋号 A</strong>
-            <small>代表者名</small>
+            <strong>A社</strong>
           </span>
         </div>
       </article>
       <article class="voice-tile anim" data-anim="fade-up" data-delay="1">
-        <p class="voice-tile__quote">動画撮影を運営側がやってくれるのが大きい。出品作業の手間が劇的に減るので、繁殖と選別に時間を使えるようになります。</p>
+        <p class="voice-tile__quote">個別販売は、撮影・梱包・発送だけでなく、お客様への問い合わせ対応まで、本業の時間を奪い続けてきました。{{ $brand }} なら、業者間の流通が一気に効率化される。作り手はめだかと向き合う時間に集中でき、業者は仕入れに困らない。業界全体の生産性と収益性が、同時に上がる仕組みです。</p>
         <div class="voice-tile__author">
           <span class="voice-tile__avatar"><img src="/img/lp/voice/02.png" alt="" loading="lazy"></span>
           <span class="voice-tile__info">
-            <strong>屋号 B</strong>
-            <small>代表者名</small>
+            <strong>B社</strong>
           </span>
         </div>
       </article>
       <article class="voice-tile anim" data-anim="fade-up" data-delay="2">
-        <p class="voice-tile__quote">匿名で取引できるのは、業者として本当に助かります。地域の同業者と顔を合わせる必要がない、フェアな入札環境はずっと欲しかったものでした。</p>
+        <p class="voice-tile__quote">業者向けの卸ネットワークが整備されることで、新しい作り手も評価される機会が生まれる。全国の小売店・専門店も、もっと多様な個体を扱える。結果としてお客様に届くメダカの幅が広がる。業界全体の市場が大きくなる、業界の未来が楽しみです。</p>
         <div class="voice-tile__author">
           <span class="voice-tile__avatar"><img src="/img/lp/voice/03.png" alt="" loading="lazy"></span>
           <span class="voice-tile__info">
-            <strong>屋号 C</strong>
-            <small>代表者名</small>
+            <strong>C社</strong>
           </span>
         </div>
       </article>
@@ -787,7 +804,21 @@
         </summary>
         <div class="faq-item__a">
           <span class="faq-item__mark faq-item__mark--a">A</span>
-          <p>LINE から申込フォームをご提出ください。所定の審査を経て、業者会員としてご参加いただけます。</p>
+          <div class="faq-item__a-body">
+            <p>
+              LINE から申込フォームにてご提出ください。<br>
+              以下のうち1つ以上を満たすことが、業者会員の参加条件です。
+            </p>
+            <ul class="faq-item__list">
+              <li>ヤフオクの出品評価 50件以上 かつ 評価率 90% 以上</li>
+              <li>ヤフオクストアの運営</li>
+              <li>EC サイトでのメダカ販売 累計取引 50件以上</li>
+              <li>実店舗または無人販売所での販売実績</li>
+              <li>法人登記がある（登記簿にメダカ関連販売の記載がある）</li>
+              <li>メダカ関連イベントへの年 3 回以上の出展実績</li>
+            </ul>
+            <p>所定の審査を経て、業者会員としてご参加いただけます。</p>
+          </div>
         </div>
       </details>
       <details class="faq-item">

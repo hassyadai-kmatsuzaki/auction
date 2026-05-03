@@ -128,11 +128,11 @@ const MEDAKA_SPECIES = [
 ];
 
 /** レーン1のアイテムキュー */
-export const FREE_LANE1_ITEMS = MEDAKA_SPECIES.filter(s => s.id === 101)
+export const FREE_LANE1_ITEMS = MEDAKA_SPECIES.filter(s => [101, 201, 301].includes(s.id))
   .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
 
 /** レーン2のアイテムキュー */
-export const FREE_LANE2_ITEMS = MEDAKA_SPECIES.filter(s => s.id === 201)
+export const FREE_LANE2_ITEMS = MEDAKA_SPECIES.filter(s => [401, 501, 601].includes(s.id))
   .map(s => makeLaneItem({ id: s.id, species_name: s.species_name, current_price: s.price, quantity: s.quantity, is_premium: s.premium, seller_name: s.seller, thumbnail_path: s.thumbnail }));
 
 // ====================================================================
@@ -260,8 +260,8 @@ export const MOCK_ITEMS: ItemData[] = [
 ];
 
 export const MOCK_LANES_LIST = [
-  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter(i => i.id === 1) },
-  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter(i => i.id === 2) },
+  { lane_name: 'レーン 1', items: MOCK_ITEMS.filter(i => [1, 2, 3].includes(i.id)) },
+  { lane_name: 'レーン 2', items: MOCK_ITEMS.filter(i => [4, 5, 6].includes(i.id)) },
 ];
 
 // ====================================================================
