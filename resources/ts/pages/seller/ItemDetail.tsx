@@ -8,7 +8,6 @@ import {
   Button,
   Grid,
   Chip,
-  Divider,
   CircularProgress,
   Alert,
   Table,
@@ -23,7 +22,6 @@ import {
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
   Pets as PetsIcon,
   Event as EventIcon,
@@ -152,7 +150,6 @@ export default function ItemDetail() {
     }
   };
 
-  const canEdit = item && ['draft', 'registered'].includes(item.status);
   const canCancel = item && ['draft', 'registered'].includes(item.status);
 
   if (loading) {
@@ -200,11 +197,6 @@ export default function ItemDetail() {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {canEdit && (
-            <Button variant="outlined" startIcon={<EditIcon />}>
-              編集
-            </Button>
-          )}
           {canCancel && (
             <Button
               variant="outlined"
@@ -433,55 +425,43 @@ export default function ItemDetail() {
         {/* サイドバー */}
         <Grid item xs={12} lg={4}>
           {/* 価格情報 */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                <MoneyIcon sx={{ color: '#F59E0B' }} />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  価格情報
-                </Typography>
-              </Box>
+          {item.won_item && (
+            <Card sx={{ mb: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <MoneyIcon sx={{ color: '#F59E0B' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    価格情報
+                  </Typography>
+                </Box>
 
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  開始価格
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  ¥{formatYen(item.start_price)}
-                </Typography>
-              </Box>
-
-              {item.won_item && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      落札価格
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>
-                      ¥{formatYen(item.won_item.winning_price)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      手数料
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      ¥{formatYen(item.won_item.commission_amount)}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      受取金額
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      ¥{formatYen(item.won_item.seller_amount)}
-                    </Typography>
-                  </Box>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    落札価格
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>
+                    ¥{formatYen(item.won_item.winning_price)}
+                  </Typography>
+                </Box>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    手数料
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    ¥{formatYen(item.won_item.commission_amount)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    受取金額
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    ¥{formatYen(item.won_item.seller_amount)}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 落札情報 */}
           {item.won_item && (

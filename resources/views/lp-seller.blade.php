@@ -493,7 +493,7 @@
       <article class="video-card anim" data-anim="fade-up" data-delay="2">
         <span class="video-card__index">POINT 03</span>
         <h3 class="video-card__title">入金・問い合わせ対応も運営側</h3>
-        <p>落札後の決済は収納代行モデル。買い手とのやり取りも運営が窓口になるため、出品者は連絡対応に時間を取られません。</p>
+        <p>落札後の決済は買取再販モデル。買い手とのやり取りも運営が窓口になるため、出品者は連絡対応に時間を取られません。</p>
       </article>
       <article class="video-card anim" data-anim="fade-up" data-delay="3">
         <span class="video-card__index">POINT 04</span>
@@ -671,32 +671,29 @@
 
     <div class="voice-grid">
       <article class="voice-tile anim" data-anim="fade-up">
-        <p class="voice-tile__quote">ヤフオクに出すには惜しい個体を、業者間でだけ動かしたい。{{ $brand }} はそのニーズに最初に応えてくれる場所だと感じています。</p>
+        <p class="voice-tile__quote">ヤフオクは愛好家相場の上に成り立っているので、業者向けに値段を下げると、相場が一気に崩れてしまう。これまでは個別に相対でやりとりするしかなく、まとまった数量で効率的に卸す場所が業界にありませんでした。{{ $brand }} の業者専門の環境なら、相場を壊さずに、業者さんへ効率的に卸せる。業界に必要だった仕組みです。</p>
         <div class="voice-tile__author">
           <span class="voice-tile__avatar"><img src="/img/lp/voice/01.png" alt="" loading="lazy"></span>
           <span class="voice-tile__info">
-            <strong>屋号 A</strong>
-            <small>代表者名</small>
+            <strong>A社</strong>
           </span>
         </div>
       </article>
       <article class="voice-tile anim" data-anim="fade-up" data-delay="1">
-        <p class="voice-tile__quote">動画撮影を運営側がやってくれるのが大きい。出品作業の手間が劇的に減るので、繁殖と選別に時間を使えるようになります。</p>
+        <p class="voice-tile__quote">個別販売は、撮影・梱包・発送だけでなく、お客様への問い合わせ対応まで、本業の時間を奪い続けてきました。{{ $brand }} なら、業者間の流通が一気に効率化される。作り手はめだかと向き合う時間に集中でき、業者は仕入れに困らない。業界全体の生産性と収益性が、同時に上がる仕組みです。</p>
         <div class="voice-tile__author">
           <span class="voice-tile__avatar"><img src="/img/lp/voice/02.png" alt="" loading="lazy"></span>
           <span class="voice-tile__info">
-            <strong>屋号 B</strong>
-            <small>代表者名</small>
+            <strong>B社</strong>
           </span>
         </div>
       </article>
       <article class="voice-tile anim" data-anim="fade-up" data-delay="2">
-        <p class="voice-tile__quote">匿名で取引できるのは、業者として本当に助かります。地域の同業者と顔を合わせる必要がない、フェアな入札環境はずっと欲しかったものでした。</p>
+        <p class="voice-tile__quote">業者向けの卸ネットワークが整備されることで、新しい作り手も評価される機会が生まれる。全国の小売店・専門店も、もっと多様な個体を扱える。結果としてお客様に届くメダカの幅が広がる。業界全体の市場が大きくなる、業界の未来が楽しみです。</p>
         <div class="voice-tile__author">
           <span class="voice-tile__avatar"><img src="/img/lp/voice/03.png" alt="" loading="lazy"></span>
           <span class="voice-tile__info">
-            <strong>屋号 C</strong>
-            <small>代表者名</small>
+            <strong>C社</strong>
           </span>
         </div>
       </article>

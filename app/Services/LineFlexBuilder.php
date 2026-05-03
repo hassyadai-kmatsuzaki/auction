@@ -359,7 +359,7 @@ class LineFlexBuilder
                 'contents' => [[
                     'type'   => 'button',
                     'style'  => 'primary',
-                    'color'  => self::BRAND_COLOR,
+                    'color'  => $headerColor,
                     'height' => 'sm',
                     'action' => [
                         'type'  => 'uri',

@@ -347,7 +347,6 @@ export default function ItemHistory() {
                       <TableCell>品種名</TableCell>
                       <TableCell>オークション</TableCell>
                       <TableCell align="center">数量</TableCell>
-                      <TableCell align="right">開始価格</TableCell>
                       <TableCell align="right">落札価格</TableCell>
                       <TableCell align="center">ステータス</TableCell>
                       <TableCell align="center">操作</TableCell>
@@ -384,7 +383,6 @@ export default function ItemHistory() {
                           )}
                         </TableCell>
                         <TableCell align="center">{item.quantity}匹</TableCell>
-                        <TableCell align="right">¥{formatYen(item.start_price)}</TableCell>
                         <TableCell align="right">
                           {item.won_item ? (
                             <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>

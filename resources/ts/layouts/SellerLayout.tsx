@@ -31,6 +31,8 @@ import {
   Add as AddIcon,
   History as HistoryIcon,
   Person as PersonIcon,
+  MenuBook as MenuBookIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -116,12 +118,24 @@ export default function SellerLayout() {
     window.location.href = path;
   };
 
-  const menuItems = [
+  const menuItems: Array<{
+    text: string;
+    icon: React.ReactNode;
+    path?: string;
+    external?: boolean;
+    url?: string;
+  }> = [
     { text: 'ダッシュボード', icon: <DashboardIcon />, path: '/seller/dashboard' },
     { text: '出品申込', icon: <AddIcon />, path: '/seller/submit' },
     { text: '出品履歴', icon: <HistoryIcon />, path: '/seller/items' },
     { text: '売上・精算', icon: <ReceiptIcon />, path: '/seller/sales' },
     { text: '配送状況', icon: <ShippingIcon />, path: '/seller/shipping' },
+    {
+      text: '出品マニュアル',
+      icon: <MenuBookIcon />,
+      external: true,
+      url: 'https://www.notion.so/353f8ad1e79180a78787ee4028b323a5#353f8ad1e791800e8e0bc799a98def22',
+    },
   ];
 
   const bottomMenuItems = [
@@ -207,10 +221,16 @@ export default function SellerLayout() {
 
         <List sx={{ px: 1 }}>
           {menuItems.map((item) => (
-            <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+            <ListItem key={item.path ?? item.url} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
-                selected={isPathActive(item.path)}
-                onClick={() => handleMenuNavigate(item.path)}
+                selected={item.path ? isPathActive(item.path) : false}
+                onClick={() => {
+                  if (item.external && item.url) {
+                    window.open(item.url, '_blank', 'noopener,noreferrer');
+                  } else if (item.path) {
+                    handleMenuNavigate(item.path);
+                  }
+                }}
                 sx={{
                   py: 1.2,
                   '&.Mui-selected': {
@@ -231,6 +251,9 @@ export default function SellerLayout() {
                   primary={item.text}
                   primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
                 />
+                {item.external && (
+                  <OpenInNewIcon sx={{ fontSize: 14, color: 'text.secondary', ml: 0.5 }} />
+                )}
               </ListItemButton>
             </ListItem>
           ))}

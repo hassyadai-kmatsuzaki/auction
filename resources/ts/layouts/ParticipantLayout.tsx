@@ -33,7 +33,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
-import TutorialGuide from '../features/tutorial/TutorialGuide';
+// import TutorialGuide from '../features/tutorial/TutorialGuide';
 import axios from '../lib/axios';
 import type { Auction } from '../types';
 
@@ -144,7 +144,7 @@ export default function ParticipantLayout() {
                 display: hasMultipleRoles ? { xs: 'none', lg: 'block' } : 'block',
               }}
             />
-            <TutorialGuide role="participant" />
+            {/* <TutorialGuide role="participant" /> */}
             {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
           </Box>
 
