@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -72,7 +73,7 @@ class TestModeService
      * - 閲覧者が許可ユーザーではない → whereRaw('1=0') で 0 件確定
      * - 許可ユーザー → そのまま通す（出品者の is_test は問わない）
      */
-    public function applyToItemQuery(Builder $query, ?User $viewer = null): Builder
+    public function applyToItemQuery(Builder|Relation $query, ?User $viewer = null): Builder|Relation
     {
         $viewer ??= Auth::user();
 
@@ -120,7 +121,7 @@ class TestModeService
      * 生体（items）と紐づくオークションの is_test 可視性も透過させる。
      * Item は seller を介してではなく、auction を介してテスト/本番を判定する。
      */
-    public function applyAuctionVisibilityToItemQuery(Builder $query, ?User $viewer = null): Builder
+    public function applyAuctionVisibilityToItemQuery(Builder|Relation $query, ?User $viewer = null): Builder|Relation
     {
         $viewer ??= Auth::user();
         if ($viewer && method_exists($viewer, 'hasRole') && $viewer->hasRole('admin')) {

@@ -119,7 +119,7 @@ class DashboardController extends Controller
 
     /**
      * 開催予定オークションを取得
-     * 
+     *
      * 出品者ダッシュボードに表示するオークション:
      * - scheduled（予定/出品受付中）のみを表示
      * - preparing（準備中）は管理者のみ、finished/cancelled/liveは表示しない
@@ -133,16 +133,14 @@ class DashboardController extends Controller
             ->get();
 
         return $auctions->map(function ($auction) {
-            // 出品申込締切日を計算（開催日の5日前をデフォルトとする）
             $deadline = $auction->event_date->copy()->subDays(5);
-            $isAccepting = now()->lessThan($deadline);
 
             return [
                 'id' => $auction->id,
                 'title' => $auction->title,
                 'date' => $auction->event_date->format('Y-m-d'),
                 'deadline' => $deadline->format('Y-m-d'),
-                'status' => $isAccepting ? 'accepting' : 'upcoming',
+                'status' => 'accepting',
             ];
         })->toArray();
     }
