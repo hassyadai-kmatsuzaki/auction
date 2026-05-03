@@ -266,7 +266,7 @@ export default function SellerDashboard() {
       case 'sold': return '落札済み';
       case 'shipping': return '発送待ち';
       case 'registered': return '出品予定';
-      case 'draft': return '下書き';
+      case 'draft': return '審査中';
       case 'unsold': return '不落札';
       case 'cancelled': return 'キャンセル';
       default: return status;
@@ -597,19 +597,20 @@ export default function SellerDashboard() {
                         }}
                       />
                     </Box>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      出品申込締切: {new Date(auction.deadline).toLocaleDateString('ja-JP')}
-                    </Typography>
-                    {auction.status === 'accepting' && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        sx={{ mt: 1.5 }}
-                        onClick={() => navigate('/seller/submit')}
-                      >
-                        出品申込へ
-                      </Button>
-                    )}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, mt: 1 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        出品申込締切: {new Date(auction.deadline).toLocaleDateString('ja-JP')}
+                      </Typography>
+                      {auction.status === 'accepting' && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => navigate('/seller/submit')}
+                        >
+                          出品申込へ
+                        </Button>
+                      )}
+                    </Box>
                   </Box>
                 ))
               )}
