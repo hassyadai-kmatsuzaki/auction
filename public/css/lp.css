@@ -146,7 +146,7 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
 }
 @media (min-width: 768px) {
   .hero {
-    height: clamp(440px, 50vw, 480px);
+    height: clamp(440px, 50vw, 520px);
   }
 }
 
@@ -576,8 +576,8 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  height: 60px;
-  width: 120px;
+  height: 50px;
+  width: 80px;
 }
 .partners-marquee__item img {
   height: 100%;

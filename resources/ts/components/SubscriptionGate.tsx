@@ -8,12 +8,35 @@ import { Backdrop, CircularProgress } from '@mui/material';
 /**
  * 参加者/出品者レイアウトで包んで使う。
  * 承認済みユーザーがまだ年会費に加入していなければ自動で登録モーダルを表示する。
- * 銀行振込で申し込んだが管理者の振込確認待ちのユーザーには、毎ログイン時に振込情報モーダルを表示する。
+ * 銀行振込で申し込んだが管理者の振込確認待ちのユーザーには、1日1回だけ振込情報モーダルを表示する。
  * admin ロールは対象外（admin は年会費なし）。
  */
 interface Props {
   children: React.ReactNode;
 }
+
+const BANK_INFO_SHOWN_KEY = 'bankInfoShownDate';
+
+const todayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const bankInfoShownToday = (userId: number | string): boolean => {
+  try {
+    return localStorage.getItem(`${BANK_INFO_SHOWN_KEY}:${userId}`) === todayKey();
+  } catch {
+    return false;
+  }
+};
+
+const markBankInfoShownToday = (userId: number | string): void => {
+  try {
+    localStorage.setItem(`${BANK_INFO_SHOWN_KEY}:${userId}`, todayKey());
+  } catch {
+    // localStorage 不可（プライベートモード等）でも処理を続行
+  }
+};
 
 export default function SubscriptionGate({ children }: Props) {
   const { user, hasRole } = useAuth();
@@ -32,7 +55,10 @@ export default function SubscriptionGate({ children }: Props) {
         setModalOpen(true);
         setBankInfoOpen(false);
       } else if (d.bank_transfer_pending) {
-        setBankInfoOpen(true);
+        if (!bankInfoShownToday(user.id)) {
+          setBankInfoOpen(true);
+          markBankInfoShownToday(user.id);
+        }
         setModalOpen(false);
       }
     } catch (e) {

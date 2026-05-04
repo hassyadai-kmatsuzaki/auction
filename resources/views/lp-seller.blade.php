@@ -106,8 +106,8 @@
     @php $partners = [1, 2, 3, 4, 5, 6]; @endphp
     <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
       <div class="partners-marquee__track">
-        {{-- 同じセットを2回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
-        @for ($i = 0; $i < 2; $i++)
+        {{-- 同じセットを4回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
+        @for ($i = 0; $i < 4; $i++)
           @foreach ($partners as $n)
             <div class="partners-marquee__item">
               <img src="/img/lp/client/{{ $n }}.png" alt="" loading="lazy">
