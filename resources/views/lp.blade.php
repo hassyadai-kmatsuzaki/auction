@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ config('app.name', '日本メダカオンライン市場') }} | 信頼できるめだか専門オークション</title>
+  <title>{{ config('app.name', 'MEDAICHI') }} | 信頼できるめだか専門オークション</title>
   <meta name="description" content="審査制出品者のみ。プロ品質の選魚、めだか専門のオンラインオークションプラットフォーム。">
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +26,7 @@
 <header class="header" id="header">
   <div class="header__inner">
     <a href="/" class="header__logo">
-      <img src="/img/logo.png?v=2" alt="日本メダカオンライン市場" class="header__logo-img">
+      <img src="/img/logo.png?v=2" alt="MEDAICHI" class="header__logo-img">
     </a>
     <div class="header__right">
       <a href="/login" class="header__btn header__btn--login">ログイン</a>
@@ -214,7 +214,7 @@
   <div class="container">
     <div class="solutions-header anim" data-anim="fade-up">
       <h2 class="solutions-header__title">
-        <span class="solutions-header__mark">課題を解決するなら、<br class="sp-only"></span>日本メダカオンライン市場
+        <span class="solutions-header__mark">課題を解決するなら、<br class="sp-only"></span>MEDAICHI（日本メダカオンライン市場）
       </h2>
       <p class="solutions-header__desc">
         個体の品質から梱包・配送まで、<br class="sp-only">めだか取引のあらゆる課題を解決に導きます
@@ -571,8 +571,8 @@
   <div class="container">
     <div class="footer__top">
       <div class="footer__brand">
-        <img src="/img/logo.png?v=2" alt="日本メダカオンライン市場" class="footer__logo">
-        <p class="footer__operator">運営: 日本メダカオンライン市場運営事務局</p>
+        <img src="/img/logo.png?v=2" alt="MEDAICHI" class="footer__logo">
+        <p class="footer__operator">運営: MEDAICHI運営事務局</p>
       </div>
       <nav class="footer__links" aria-label="フッターナビゲーション">
         <a href="/legal/tokushoho">特定商取引法に基づく表記</a>
@@ -580,7 +580,7 @@
         <a href="/legal/terms">利用規約</a>
       </nav>
     </div>
-    <p class="footer__copy">&copy; 2026 日本メダカオンライン市場運営事務局 All Rights Reserved.</p>
+    <p class="footer__copy">&copy; 2026 MEDAICHI運営事務局 All Rights Reserved.</p>
   </div>
 </footer>
 

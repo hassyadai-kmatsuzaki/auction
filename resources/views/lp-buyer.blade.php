@@ -1,5 +1,5 @@
 @php
-  $brand = '日本メダカオンライン市場';
+  $brand = 'MEDAICHI';
   $lineUrl = 'https://lin.ee/XXXXXXX';
 @endphp
 <!DOCTYPE html>
@@ -58,7 +58,7 @@
       <p class="hero__desc">
         審査を通過したプロ出品者のメダカを、<br class="pc-only">
         匿名・卸値で仕入れられる場所。<br>
-        業者だけのオンラインオークション、それが {{ $brand }} です。
+        業者だけのオンラインオークション、それが {{ $brand }}（日本メダカオンライン市場）です。
       </p>
     </div>
 
@@ -855,7 +855,7 @@
     <div class="footer__top">
       <div class="footer__brand">
         <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="footer__logo">
-        <p class="footer__operator">運営：日本メダカオンライン市場</p>
+        <p class="footer__operator">運営：MEDAICHI</p>
         <p class="footer__operator">インボイス登録番号: T-XXXXXXXXXXXXX</p>
       </div>
       <nav class="footer__links" aria-label="フッターナビゲーション">

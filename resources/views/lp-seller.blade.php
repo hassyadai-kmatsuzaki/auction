@@ -1,6 +1,6 @@
 @php
   // ⚠ 出品者向け LP の仮文言版です。確定文言が出たら差し替えてください。
-  $brand = '日本メダカオンライン市場';
+  $brand = 'MEDAICHI';
   $lineUrl = 'https://lin.ee/XXXXXXX';
 @endphp
 <!DOCTYPE html>
@@ -59,7 +59,7 @@
       <p class="hero__desc">
         撮影・梱包・発送はすべて運営が代行。<br class="pc-only">
         匿名・卸値で、安定した相場のなか出品できる業者専用オンラインオークション、<br>
-        それが {{ $brand }} です。
+        それが {{ $brand }}（日本メダカオンライン市場）です。
       </p>
     </div>
 
@@ -822,7 +822,7 @@
     <div class="footer__top">
       <div class="footer__brand">
         <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="footer__logo">
-        <p class="footer__operator">運営：日本メダカオンライン市場</p>
+        <p class="footer__operator">運営：MEDAICHI</p>
         <p class="footer__operator">インボイス登録番号: T-XXXXXXXXXXXXX</p>
       </div>
       <nav class="footer__links" aria-label="フッターナビゲーション">
