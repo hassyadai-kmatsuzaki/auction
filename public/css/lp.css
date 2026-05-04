@@ -146,7 +146,7 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
 }
 @media (min-width: 768px) {
   .hero {
-    height: clamp(440px, 50vw, 560px);
+    height: clamp(440px, 50vw, 480px);
   }
 }
 
@@ -491,10 +491,8 @@ h1, h2, h3, h4 { font-family: "corporate-logo-ver2", 'Noto Sans JP', sans-serif;
    =================================== */
 .section--partners {
   background: #f7f9fa;
-  padding: 4rem 0;
+  padding: 20px 0;
 }
-@media (min-width: 768px) { .section--partners { padding: 5rem 0; } }
-@media (min-width: 1024px) { .section--partners { padding: 6rem 0; } }
 
 .partners-header {
   text-align: center;
