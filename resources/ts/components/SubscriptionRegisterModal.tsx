@@ -380,7 +380,11 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
 
             {!replaceCardOnly && paymentMethod === 'bank_transfer' && (
               <Alert severity="info" variant="outlined">
-                お申し込み後に振込先情報をご案内します。振込手数料はお客様負担となります。管理者の入金確認後にご利用可能となります。
+                お申し込み後に振込先情報をご案内します。振込手数料はお客様負担となります。
+                <br />
+                【銀行振込で申し込む】を押していただけると、すぐに使えるようになります。
+                <br />
+                5月18日までに指定の口座へお振込ください。
               </Alert>
             )}
           </Stack>

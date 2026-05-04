@@ -13,6 +13,8 @@ import {
   Paper,
   Stack,
   Divider,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -80,6 +82,8 @@ export default function NotificationPreferencesPanel({
   onNotify,
 }: Props) {
   const queryClient = useQueryClient();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [localEmail, setLocalEmail] = useState<Record<string, boolean>>(emailSettings);
   const [saving, setSaving] = useState(false);
   const [testSending, setTestSending] = useState<string | null>(null);
@@ -311,48 +315,50 @@ export default function NotificationPreferencesPanel({
 
       {/* マトリクス表 */}
       <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-        {/* ヘッダー行 */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 90px 90px 100px',
-            alignItems: 'center',
-            px: 2.5,
-            py: 1.5,
-            bgcolor: '#F8FAFC',
-            borderBottom: 1,
-            borderColor: 'divider',
-            fontWeight: 600,
-            fontSize: '0.8125rem',
-            color: 'text.secondary',
-          }}
-        >
-          <Box>通知内容</Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-            <EmailIcon sx={{ fontSize: 16 }} />
-            メール
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-            <Box
-              sx={{
-                width: 14,
-                height: 14,
-                borderRadius: 0.5,
-                bgcolor: '#06C755',
-                color: '#fff',
-                fontSize: 9,
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              L
+        {/* ヘッダー行（PCのみ） */}
+        {!isMobile && (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 90px 90px 100px',
+              alignItems: 'center',
+              px: 2.5,
+              py: 1.5,
+              bgcolor: '#F8FAFC',
+              borderBottom: 1,
+              borderColor: 'divider',
+              fontWeight: 600,
+              fontSize: '0.8125rem',
+              color: 'text.secondary',
+            }}
+          >
+            <Box>通知内容</Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+              <EmailIcon sx={{ fontSize: 16 }} />
+              メール
             </Box>
-            LINE
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+              <Box
+                sx={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 0.5,
+                  bgcolor: '#06C755',
+                  color: '#fff',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                L
+              </Box>
+              LINE
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>テスト</Box>
           </Box>
-          <Box sx={{ textAlign: 'center' }}>テスト</Box>
-        </Box>
+        )}
 
         {(Object.keys(grouped) as NotificationCategory[]).map((cat) => {
           const items = grouped[cat];
@@ -380,6 +386,145 @@ export default function NotificationPreferencesPanel({
                 const lineDisabled = !lineLinked || !row.lineType;
                 const lineOn = !!lineSetting?.is_enabled;
 
+                const emailSwitchEl = row.emailKey ? (
+                  <Switch
+                    size="small"
+                    checked={emailOn}
+                    onChange={(e) => handleToggleEmail(row.emailKey!, e.target.checked)}
+                  />
+                ) : (
+                  <Typography variant="caption" sx={{ color: 'text.disabled' }}>—</Typography>
+                );
+
+                const emailTestEl = row.emailTestType ? (
+                  <Tooltip title="メール テスト送信" placement="top">
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!emailOn || testSending !== null}
+                        onClick={() => handleTestEmail(row.emailTestType!)}
+                        sx={{ color: '#3B82F6' }}
+                      >
+                        {testSending === row.emailTestType ? (
+                          <CircularProgress size={14} />
+                        ) : (
+                          <EmailIcon sx={{ fontSize: 16 }} />
+                        )}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                ) : null;
+
+                const lineSwitchEl = row.lineType ? (
+                  <Tooltip
+                    title={!lineLinked ? 'LINE連携が必要です' : ''}
+                    placement="top"
+                    disableHoverListener={lineLinked}
+                  >
+                    <span>
+                      <Switch
+                        size="small"
+                        color="success"
+                        checked={lineLinked && lineOn}
+                        disabled={lineDisabled}
+                        onChange={(e) => handleToggleLine(row.lineType!, e.target.checked)}
+                      />
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <Typography variant="caption" sx={{ color: 'text.disabled' }}>—</Typography>
+                );
+
+                const lineTestEl = row.lineType ? (
+                  <Tooltip
+                    title={!lineLinked ? 'LINE連携が必要です' : 'LINE テスト送信'}
+                    placement="top"
+                  >
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!lineLinked || !lineOn || lineTestSending !== null}
+                        onClick={() => handleTestLine(row.lineType!)}
+                        sx={{ color: '#06C755' }}
+                      >
+                        {lineTestSending === row.lineType ? (
+                          <CircularProgress size={14} />
+                        ) : (
+                          <SendIcon sx={{ fontSize: 16 }} />
+                        )}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                ) : null;
+
+                if (isMobile) {
+                  return (
+                    <Box
+                      key={`${cat}-${row.label}-${idx}`}
+                      sx={{
+                        px: 2,
+                        py: 1.75,
+                        borderBottom: 1,
+                        borderColor: 'divider',
+                        '&:last-child': { borderBottom: 0 },
+                      }}
+                    >
+                      <Box sx={{ mb: 1.25 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
+                          {row.label}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                          {row.description}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          spacing={0.25}
+                          sx={{ flex: 1, minWidth: 0 }}
+                        >
+                          <EmailIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          <Typography variant="caption" sx={{ color: 'text.secondary', mr: 0.25 }}>
+                            メール
+                          </Typography>
+                          {emailSwitchEl}
+                          {emailTestEl}
+                        </Stack>
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          spacing={0.25}
+                          sx={{ flex: 1, minWidth: 0 }}
+                        >
+                          <Box
+                            sx={{
+                              width: 14,
+                              height: 14,
+                              borderRadius: 0.5,
+                              bgcolor: '#06C755',
+                              color: '#fff',
+                              fontSize: 9,
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            L
+                          </Box>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', mr: 0.25 }}>
+                            LINE
+                          </Typography>
+                          {lineSwitchEl}
+                          {lineTestEl}
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  );
+                }
+
                 return (
                   <Box
                     key={`${cat}-${row.label}-${idx}`}
@@ -392,7 +537,6 @@ export default function NotificationPreferencesPanel({
                       borderBottom: 1,
                       borderColor: 'divider',
                       '&:last-child': { borderBottom: 0 },
-                      '&:hover': { bgcolor: '#FAFAFA' },
                     }}
                   >
                     <Box>
@@ -404,85 +548,14 @@ export default function NotificationPreferencesPanel({
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                      {row.emailKey ? (
-                        <Switch
-                          size="small"
-                          checked={emailOn}
-                          onChange={(e) => handleToggleEmail(row.emailKey!, e.target.checked)}
-                        />
-                      ) : (
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                          —
-                        </Typography>
-                      )}
+                      {emailSwitchEl}
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                      {row.lineType ? (
-                        <Tooltip
-                          title={!lineLinked ? 'LINE連携が必要です' : ''}
-                          placement="top"
-                          disableHoverListener={lineLinked}
-                        >
-                          <span>
-                            <Switch
-                              size="small"
-                              color="success"
-                              checked={lineLinked && lineOn}
-                              disabled={lineDisabled}
-                              onChange={(e) => handleToggleLine(row.lineType!, e.target.checked)}
-                            />
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                          —
-                        </Typography>
-                      )}
+                      {lineSwitchEl}
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                      {row.emailTestType ? (
-                        <Tooltip title="メール テスト送信" placement="top">
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={!emailOn || testSending !== null}
-                              onClick={() => handleTestEmail(row.emailTestType!)}
-                              sx={{ color: '#3B82F6' }}
-                            >
-                              {testSending === row.emailTestType ? (
-                                <CircularProgress size={14} />
-                              ) : (
-                                <EmailIcon sx={{ fontSize: 16 }} />
-                              )}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <Box sx={{ width: 30 }} />
-                      )}
-                      {row.lineType ? (
-                        <Tooltip
-                          title={!lineLinked ? 'LINE連携が必要です' : 'LINE テスト送信'}
-                          placement="top"
-                        >
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={!lineLinked || !lineOn || lineTestSending !== null}
-                              onClick={() => handleTestLine(row.lineType!)}
-                              sx={{ color: '#06C755' }}
-                            >
-                              {lineTestSending === row.lineType ? (
-                                <CircularProgress size={14} />
-                              ) : (
-                                <SendIcon sx={{ fontSize: 16 }} />
-                              )}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <Box sx={{ width: 30 }} />
-                      )}
+                      {emailTestEl ?? <Box sx={{ width: 30 }} />}
+                      {lineTestEl ?? <Box sx={{ width: 30 }} />}
                     </Box>
                   </Box>
                 );
@@ -500,7 +573,12 @@ export default function NotificationPreferencesPanel({
 
       <Divider />
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        justifyContent="space-between"
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+      >
         <Typography variant="caption" sx={{ color: emailDirty ? 'warning.main' : 'text.secondary' }}>
           {emailDirty ? '※ メール通知設定に未保存の変更があります' : 'メール通知設定は保存されています'}
         </Typography>
@@ -512,7 +590,7 @@ export default function NotificationPreferencesPanel({
         >
           メール設定を保存
         </Button>
-      </Box>
+      </Stack>
     </Stack>
   );
 }

@@ -33,7 +33,6 @@ const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('ja-JP'
 export default function SubscriptionStatusCard() {
   const [sub, setSub] = useState<Subscription | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer' | null>(null);
-  const [bankTransferPending, setBankTransferPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [planModalOpen, setPlanModalOpen] = useState(false);
@@ -46,7 +45,6 @@ export default function SubscriptionStatusCard() {
       const res = await axios.get('/api/me/subscription');
       const d = res.data.data;
       setSub(d.subscription);
-      setBankTransferPending(!!d.bank_transfer_pending);
 
       // 直近の payment から決済手段を判定（subscription レスポンスに付随）
       const lastPayment = d.subscription?.payments?.[0];
@@ -134,11 +132,6 @@ export default function SubscriptionStatusCard() {
             </Stack>
           )}
 
-          {bankTransferPending && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              お振込みの確認待ちです。管理者の入金確認後にご利用可能となります。
-            </Alert>
-          )}
           {!isBankTransfer && sub.status === 'past_due' && (
             <Alert severity="warning">年会費のお支払いに失敗しました。カード情報を更新してください。</Alert>
           )}
