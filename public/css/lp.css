@@ -628,7 +628,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
    SOLUTIONS
    =================================== */
 .section--solutions {
-  background: #ffffff;
+  background: #f7f9fa;
   padding: 4rem 0;
 }
 @media (min-width: 768px) { .section--solutions { padding: 5.5rem 0; } }

@@ -133,13 +133,11 @@ class DashboardController extends Controller
             ->get();
 
         return $auctions->map(function ($auction) {
-            $deadline = $auction->event_date->copy()->subDays(5);
-
             return [
                 'id' => $auction->id,
                 'title' => $auction->title,
                 'date' => $auction->event_date->format('Y-m-d'),
-                'deadline' => $deadline->format('Y-m-d'),
+                'deadline' => $auction->upload_deadline->toIso8601String(),
                 'status' => 'accepting',
             ];
         })->toArray();

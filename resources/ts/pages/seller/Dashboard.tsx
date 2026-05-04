@@ -590,7 +590,7 @@ export default function SellerDashboard() {
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, mt: 1 }}>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        出品申込締切: {new Date(auction.deadline).toLocaleDateString('ja-JP')}
+                        出品申込締切: {new Date(auction.deadline).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </Typography>
                       {auction.status === 'accepting' && (
                         <Button

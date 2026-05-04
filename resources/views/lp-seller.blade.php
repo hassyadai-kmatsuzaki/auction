@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=32">
+  <link rel="stylesheet" href="/css/lp.css?v=33">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
