@@ -1,6 +1,6 @@
 @php
   $brand = 'MEDAICHI';
-  $lineUrl = 'https://lin.ee/XXXXXXX';
+  $lineUrl = 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD';
 @endphp
 <!DOCTYPE html>
 <html lang="ja">
@@ -30,7 +30,7 @@
       <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="header__logo-img">
     </a>
     <div class="header__right">
-      <a href="/seller" class="header__btn header__btn--login">出品者の方へ</a>
+      <a href="https://medaka-ichiba.com" class="header__btn header__btn--login">出品者の方へ</a>
       <a href="{{ $lineUrl }}" target="_blank" rel="noopener noreferrer" class="header__cta">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
         <span>LINE登録</span>
@@ -75,15 +75,6 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </span>
       </a>
-      <div class="hero__cta-card hero__cta-card--secondary">
-        <span class="hero__cta-card__icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6h6"/><path d="M19 9V21H5V3h9z"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
-        </span>
-        <span class="hero__cta-card__body">
-          <span class="hero__cta-card__title">出品者の方へ</span>
-          <span class="hero__cta-card__sub">出品もご検討の方はこちら</span>
-        </span>
-      </div>
     </div>
   </div>
 </section>
@@ -145,7 +136,7 @@
       </div>
 
       <div class="mission-close">
-        <p class="mission-close__line">このプラットフォームを、<br class="sp-only">皆さんと一緒につくっていきたい。</p>
+        <p class="mission-close__line mission-close__line--quoted">このプラットフォームを、<br class="sp-only">皆さんと一緒につくっていきたい。</p>
         <p class="mission-close__sign">── それが、{{ $brand }} の出発点です。</p>
       </div>
     </div>
@@ -392,17 +383,17 @@
       <article class="takehome-reason anim" data-anim="fade-up">
         <span class="takehome-reason__index">理由 01</span>
         <h3 class="takehome-reason__title">仕入価格</h3>
-        <p>"ヤフオクは個人向けの小売値、オフラインは安いが地域内競合のみ。{{ $brand }} は業者専用の卸値で取引できます。"</p>
+        <p>ヤフオクは個人向けの小売値、オフラインは安いが地域内競合のみ。{{ $brand }} は業者専用の卸値で取引できます。</p>
       </article>
       <article class="takehome-reason anim" data-anim="fade-up" data-delay="1">
         <span class="takehome-reason__index">理由 02</span>
         <h3 class="takehome-reason__title">時間・移動コスト</h3>
-        <p>"オフラインは現地までの交通費・宿泊・拘束時間が利益を圧迫。{{ $brand }} はオンライン完結、移動ゼロで参加できます。"</p>
+        <p>オフラインは現地までの交通費・宿泊・拘束時間が利益を圧迫。{{ $brand }} はオンライン完結、移動ゼロで参加できます。</p>
       </article>
       <article class="takehome-reason anim" data-anim="fade-up" data-delay="2">
         <span class="takehome-reason__index">理由 03</span>
         <h3 class="takehome-reason__title">品質ロス</h3>
-        <p>"ヤフオクの自己申告、オフラインの現地短時間判断では見落としが発生。{{ $brand }} は加工なし動画を前日からゆっくり確認、判断ミスを最小化します。"</p>
+        <p>ヤフオクの自己申告、オフラインの現地短時間判断では見落としが発生。{{ $brand }} は加工なし動画を前日からゆっくり確認、判断ミスを最小化します。</p>
       </article>
     </div>
   </div>
@@ -455,7 +446,7 @@
           <span class="solution-card__head">
             <span class="solution-card__title">取引はすべて、{{ $brand }} とのやり取りだけ</span>
           </span>
-          <p class="solution-card__desc">落札後の決済は買取再販、配送は直送。出品者と直接やり取りすることはありません。</p>
+          <p class="solution-card__desc">落札後の決済は振込で完了。配送は {{ $brand }} から直送。出品者と直接やり取りすることはありません。落札者は「決めて、待つ」だけで完結します。</p>
           <span class="solution-card__sublabel">業務効率化を求める方へ</span>
         </span>
       </div>
@@ -578,7 +569,7 @@
       </div>
       <span class="pricing-plus" aria-hidden="true">/</span>
       <div class="pricing-card">
-        <span class="pricing-card__tag">業者会員（出品兼）</span>
+        <span class="pricing-card__tag">業者会員（出品兼落札）</span>
         <span class="pricing-card__price"><em>11,000</em><small>円</small></span>
         <span class="pricing-card__note">年 / 税込</span>
       </div>
@@ -586,25 +577,44 @@
 
     <div class="pricing-detail anim" data-anim="fade-up">
       <p class="pricing-detail__title">プランの内訳</p>
-      <div class="pricing-detail__table">
-        <div class="pricing-detail__row">
-          <span class="pricing-detail__label">業者会員（落札）</span>
-          <span class="pricing-detail__value">オークション閲覧 / 入札・落札 / 申込→審査</span>
+      <div class="pricing-compare">
+        <div class="pricing-compare__row pricing-compare__row--head">
+          <span class="pricing-compare__feature"></span>
+          <span class="pricing-compare__plan">業者会員<br class="sp-only">（落札）</span>
+          <span class="pricing-compare__plan">業者会員<br class="sp-only">（出品兼落札）</span>
         </div>
-        <div class="pricing-detail__row">
-          <span class="pricing-detail__label">業者会員（出品兼）</span>
-          <span class="pricing-detail__value">出品 + 入札・落札 / より厳格な審査</span>
+        <div class="pricing-compare__row">
+          <span class="pricing-compare__feature">オークション閲覧</span>
+          <span class="pricing-compare__cell pricing-compare__cell--check" aria-label="対応">✓</span>
+          <span class="pricing-compare__cell pricing-compare__cell--check" aria-label="対応">✓</span>
         </div>
-        <div class="pricing-detail__row">
-          <span class="pricing-detail__label">成約時手数料</span>
-          <span class="pricing-detail__value">落札額の 10%</span>
+        <div class="pricing-compare__row">
+          <span class="pricing-compare__feature">入札・落札</span>
+          <span class="pricing-compare__cell pricing-compare__cell--check" aria-label="対応">✓</span>
+          <span class="pricing-compare__cell pricing-compare__cell--check" aria-label="対応">✓</span>
+        </div>
+        <div class="pricing-compare__row">
+          <span class="pricing-compare__feature">出品</span>
+          <span class="pricing-compare__cell pricing-compare__cell--muted" aria-label="非対応">─</span>
+          <span class="pricing-compare__cell pricing-compare__cell--check" aria-label="対応">✓</span>
+        </div>
+        <div class="pricing-compare__row">
+          <span class="pricing-compare__feature">審査</span>
+          <span class="pricing-compare__cell">審査</span>
+          <span class="pricing-compare__cell">厳格な審査</span>
+        </div>
+        <div class="pricing-compare__row">
+          <span class="pricing-compare__feature">成約時手数料</span>
+          <span class="pricing-compare__cell">落札額の 10%</span>
+          <span class="pricing-compare__cell">落札額の 10%</span>
         </div>
       </div>
     </div>
 
     <p class="pricing-note anim" data-anim="fade-up">
-      ※ 出品兼プランには、買い手として落札する権利も含まれます。<br>
-      ※ 出品兼プランは、より厳格な審査を経てご加入いただけます。
+      ※ 出品兼落札プランは、落札プランの全機能を含みます（買い手として落札する権利も含まれます）。<br>
+      ※ 出品兼落札プランは、より厳格な審査を経てご加入いただけます。<br>
+      ※ 落札プランの参加条件: ヤフオク評価・ヤフオクストア・EC実績・店舗・法人登記・イベント出展実績のいずれか1つ以上をクリア（詳細は FAQ 参照）。
     </p>
   </div>
 </section>
