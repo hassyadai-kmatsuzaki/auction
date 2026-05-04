@@ -691,7 +691,7 @@
         <span class="voice-header__mark">お客様</span>の声
       </h2>
       <p class="voice-header__desc">
-        ローンチに先立ち、出品予定のブリーダー様からコメントをいただきました。<br class="pc-only">
+        ローンチに先立ち、出品予定の事業者様からコメントをいただきました。<br class="pc-only">
         業界の最前線で活動する皆さまの、率直な声をご覧ください。
       </p>
     </div>
