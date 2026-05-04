@@ -69,7 +69,19 @@
         </span>
         <span class="hero__cta-card__body">
           <span class="hero__cta-card__title">LINE追加でデモを試す</span>
-          <span class="hero__cta-card__sub">落札したい方はこちら</span>
+          <span class="hero__cta-card__sub">次回開催情報もお届け</span>
+        </span>
+        <span class="hero__cta-card__arrow" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
+      </a>
+      <a href="#contact" class="hero__cta-card hero__cta-card--secondary">
+        <span class="hero__cta-card__icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+        </span>
+        <span class="hero__cta-card__body">
+          <span class="hero__cta-card__title">メールで問い合わせる</span>
+          <span class="hero__cta-card__sub">メール・お電話どちらでも対応</span>
         </span>
         <span class="hero__cta-card__arrow" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -115,29 +127,31 @@
   <div class="container">
     <div class="mission-inner anim" data-anim="fade-up">
       <h2 class="mission-title">メダカ業界を、<br class="sp-only">もう一段。</h2>
-      <p class="mission-lead">
-        日本のメダカ業界には、業者だけの場所が必要だと、<br class="sp-only">
-        私たちは考えています。
-      </p>
+      <div class="mission-quote">
+        <p class="mission-lead">
+          日本のメダカ業界には、業者だけの場所が必要だと、<br class="sp-only">
+          私たちは考えています。
+        </p>
 
-      <div class="mission-body">
-        <p>ヤフオクは便利。でも、個人愛好家との混雑で、
-          業者間の相場は読みにくく、丹精込めた個体が値崩れすることもある。<br>
-          オフライン競りは信頼できる。でも、地域に縛られ、
-          参加できる業者は限られる。<br>
-          業者間の卸取引は、業界の根幹であるはずなのに、
-          それに見合うインフラが、これまでありませんでした。</p>
-      </div>
+        <div class="mission-body">
+          <p>ヤフオクは便利。でも、個人愛好家との混雑で、
+            業者間の相場は読みにくく、丹精込めた個体が値崩れすることもある。<br>
+            オフライン競りは信頼できる。でも、地域に縛られ、
+            参加できる業者は限られる。<br>
+            業者間の卸取引は、業界の根幹であるはずなのに、
+            それに見合うインフラが、これまでありませんでした。</p>
+        </div>
 
-      <div class="mission-pledge">
-        <p>{{ $brand }} は、業者だけが集まれる<br class="sp-only">オンラインオークションです。</p>
-        <p>信頼できるブリーダーから、信頼できる業者へ。<br>
-          相場と収益を守りながら、業界全体を、もう一段引き上げる。</p>
-      </div>
+        <div class="mission-pledge">
+          <p>{{ $brand }} は、業者だけが集まれる<br class="sp-only">オンラインオークションです。</p>
+          <p>信頼できるブリーダーから、信頼できる業者へ。<br>
+            相場と収益を守りながら、業界全体を、もう一段引き上げる。</p>
+        </div>
 
-      <div class="mission-close">
-        <p class="mission-close__line mission-close__line--quoted">このプラットフォームを、<br class="sp-only">皆さんと一緒につくっていきたい。</p>
-        <p class="mission-close__sign">── それが、{{ $brand }} の出発点です。</p>
+        <div class="mission-close">
+          <p class="mission-close__line">このプラットフォームを、<br class="sp-only">皆さんと一緒につくっていきたい。</p>
+          <p class="mission-close__sign">── それが、{{ $brand }} の出発点です。</p>
+        </div>
       </div>
     </div>
   </div>
@@ -422,8 +436,8 @@
           <span class="solution-card__head">
             <span class="solution-card__title">個人愛好家がいないので、落札相場が業者向けに収まる</span>
           </span>
-          <p class="solution-card__desc">厳選されたプロブリーダーの個体が並びます。「ヤフオクには出さない」「個別販売しない」ロットが、{{ $brand }} でだけ流通します。</p>
-          <span class="solution-card__sublabel">希少な個体を求める方へ</span>
+          <p class="solution-card__desc">ヤフオクは個人入札で価格が高騰しますが、{{ $brand }} は業者だけが入札する仕組み。業者として利益が取れる卸値で落札できます。</p>
+          <span class="solution-card__sublabel">業者向けの仕入れ価格を求める方へ</span>
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
@@ -844,16 +858,104 @@
             </span>
             <span class="cta-banner__btn-sub">落札したい方はこちら</span>
           </a>
-          <div class="cta-banner__btn cta-banner__btn--accent">
+          <a href="#contact" class="cta-banner__btn cta-banner__btn--accent">
             <span class="cta-banner__btn-main">
-              出品者の方へ
+              メールで問い合わせる
+              <span class="cta-banner__chev" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </span>
             </span>
-            <span class="cta-banner__btn-sub">出品もご検討の方はこちら</span>
-          </div>
+            <span class="cta-banner__btn-sub">メール・お電話どちらでも対応</span>
+          </a>
         </div>
       </div>
       <div class="cta-banner__visual anim" data-anim="fade-up" data-delay="1" aria-hidden="true">
         <img src="/img/lp/cta.png" alt="" loading="lazy">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ⑮ お問い合わせ ===== -->
+<section class="section section--contact" id="contact">
+  <div class="container">
+    <div class="contact-header anim" data-anim="fade-up">
+      <h2 class="contact-header__title">お問い合わせ</h2>
+      <p class="contact-header__desc">
+        ご質問・ご相談・取材依頼など、<br class="sp-only">下記フォームまたはお電話よりお気軽にお問い合わせください。
+      </p>
+    </div>
+
+    <div class="contact-grid">
+      <aside class="contact-info anim" data-anim="fade-up">
+        <div class="contact-info__block">
+          <span class="contact-info__label">お電話でのお問い合わせ</span>
+          <a class="contact-info__phone" href="tel:00-0000-0000">00-0000-0000</a>
+          <span class="contact-info__sub">受付時間: 平日 10:00〜18:00</span>
+        </div>
+        <div class="contact-info__block">
+          <span class="contact-info__label">運営</span>
+          <span class="contact-info__text">{{ $brand }} 運営事務局</span>
+        </div>
+      </aside>
+
+      <div class="contact-form-wrap anim" data-anim="fade-up" data-delay="1">
+        @if (session('contact_status') === 'success')
+          <div class="contact-alert contact-alert--success" role="status">
+            お問い合わせありがとうございます。確認メールを送信しましたので、ご確認ください。
+          </div>
+        @elseif (session('contact_status') === 'error')
+          <div class="contact-alert contact-alert--error" role="alert">
+            送信中にエラーが発生しました。お手数ですが、しばらく時間をおいて再度お試しください。
+          </div>
+        @endif
+
+        <form class="contact-form" method="POST" action="{{ route('contact.store') }}#contact" novalidate>
+          @csrf
+          {{-- ハニーポット: 通常の利用者には見えないフィールド --}}
+          <div class="contact-form__hp" aria-hidden="true">
+            <label>Webサイト<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+          </div>
+
+          <div class="contact-form__row">
+            <label class="contact-form__field">
+              <span class="contact-form__label">お名前 <span class="contact-form__required">必須</span></span>
+              <input type="text" name="name" required maxlength="100" value="{{ old('name') }}" autocomplete="name">
+              @error('name')<span class="contact-form__error">{{ $message }}</span>@enderror
+            </label>
+            <label class="contact-form__field">
+              <span class="contact-form__label">会社名 / 屋号</span>
+              <input type="text" name="company" maxlength="200" value="{{ old('company') }}" autocomplete="organization">
+              @error('company')<span class="contact-form__error">{{ $message }}</span>@enderror
+            </label>
+          </div>
+
+          <div class="contact-form__row">
+            <label class="contact-form__field">
+              <span class="contact-form__label">メールアドレス <span class="contact-form__required">必須</span></span>
+              <input type="email" name="email" required maxlength="255" value="{{ old('email') }}" autocomplete="email">
+              @error('email')<span class="contact-form__error">{{ $message }}</span>@enderror
+            </label>
+            <label class="contact-form__field">
+              <span class="contact-form__label">お電話番号</span>
+              <input type="tel" name="phone" maxlength="30" value="{{ old('phone') }}" autocomplete="tel">
+              @error('phone')<span class="contact-form__error">{{ $message }}</span>@enderror
+            </label>
+          </div>
+
+          <label class="contact-form__field">
+            <span class="contact-form__label">お問い合わせ内容 <span class="contact-form__required">必須</span></span>
+            <textarea name="message" required rows="6" maxlength="5000">{{ old('message') }}</textarea>
+            @error('message')<span class="contact-form__error">{{ $message }}</span>@enderror
+          </label>
+
+          <div class="contact-form__actions">
+            <button type="submit" class="contact-form__submit">
+              送信する
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -866,7 +968,6 @@
       <div class="footer__brand">
         <img src="/img/logo.png?v=2" alt="{{ $brand }}" class="footer__logo">
         <p class="footer__operator">運営：MEDAICHI</p>
-        <p class="footer__operator">インボイス登録番号: T-XXXXXXXXXXXXX</p>
       </div>
       <nav class="footer__links" aria-label="フッターナビゲーション">
         <a href="/legal/tokushoho">特定商取引法に基づく表記</a>

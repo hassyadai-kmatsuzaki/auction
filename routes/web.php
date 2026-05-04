@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\Webhook\SesEventController;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +24,11 @@ $noindexLp = function (string $view) {
 };
 Route::get('/buyer', fn () => $noindexLp('lp-buyer'));
 Route::get('/seller', fn () => $noindexLp('lp-seller'));
+
+// LP の問い合わせフォーム送信。スパム抑止のためレートリミットを併用。
+Route::post('/contact', [ContactController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('contact.store');
 
 // 配信停止リンク。catch-all より先に登録する必要あり。
 Route::get('/unsubscribe/{token}', [UnsubscribeController::class, 'show'])
