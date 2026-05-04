@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=36">
+  <link rel="stylesheet" href="/css/lp.css?v=37">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
@@ -890,7 +890,7 @@
       <aside class="contact-info anim" data-anim="fade-up">
         <div class="contact-info__block">
           <span class="contact-info__label">お電話でのお問い合わせ</span>
-          <a class="contact-info__phone" href="tel:00-0000-0000">00-0000-0000</a>
+          <a class="contact-info__phone" href="tel:08046499385">080-4649-9385</a>
           <span class="contact-info__sub">受付時間: 平日 10:00〜18:00</span>
         </div>
         <div class="contact-info__block">
@@ -942,6 +942,18 @@
               @error('phone')<span class="contact-form__error">{{ $message }}</span>@enderror
             </label>
           </div>
+
+          <label class="contact-form__field">
+            <span class="contact-form__label">お問い合わせ種別 <span class="contact-form__required">必須</span></span>
+            <select name="category" required>
+              <option value="" disabled @selected(old('category', '') === '')>選択してください</option>
+              <option value="apply" @selected(old('category') === 'apply')>申込をしたい</option>
+              <option value="demo" @selected(old('category') === 'demo')>デモを使いたい</option>
+              <option value="question" @selected(old('category') === 'question')>質問したい</option>
+              <option value="other" @selected(old('category') === 'other')>その他</option>
+            </select>
+            @error('category')<span class="contact-form__error">{{ $message }}</span>@enderror
+          </label>
 
           <label class="contact-form__field">
             <span class="contact-form__label">お問い合わせ内容 <span class="contact-form__required">必須</span></span>

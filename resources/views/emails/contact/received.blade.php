@@ -11,6 +11,8 @@ MEDAICHI LP のお問い合わせフォームから新しい問い合わせが�
 
 **会社名 / 屋号:** {{ $payload['company'] ?? '（未入力）' }}
 
+**お問い合わせ種別:** {{ $payload['category_label'] ?? '（未指定）' }}
+
 **お問い合わせ内容:**
 
 {!! nl2br(e($payload['message'])) !!}

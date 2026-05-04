@@ -5,9 +5,9 @@ namespace App\Mail;
 use App\Mail\Concerns\RoutesToPriorityQueue;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Mail\Mailables\ReplyTo;
 use Illuminate\Queue\SerializesModels;
 
 class ContactReceivedMail extends Mailable
@@ -26,7 +26,7 @@ class ContactReceivedMail extends Mailable
     {
         return new Envelope(
             subject: '【MEDAICHI】LP からお問い合わせを受け付けました',
-            replyTo: [new ReplyTo($this->payload['email'], $this->payload['name'] ?? '')],
+            replyTo: [new Address($this->payload['email'], $this->payload['name'] ?? '')],
         );
     }
 

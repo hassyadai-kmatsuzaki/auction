@@ -15,6 +15,13 @@ class ContactController extends Controller
         'k.matsuzaki@beer-o-clock.jp',
     ];
 
+    private const CATEGORY_LABELS = [
+        'apply'    => '申込をしたい',
+        'demo'     => 'デモを使いたい',
+        'question' => '質問したい',
+        'other'    => 'その他',
+    ];
+
     public function store(Request $request)
     {
         // ハニーポット: 通常の利用者には見えないフィールド。値が入っていたらボット扱いで握りつぶす。
@@ -25,12 +32,16 @@ class ContactController extends Controller
         }
 
         $validated = $request->validate([
-            'name'    => 'required|string|max:100',
-            'email'   => 'required|email:rfc|max:255',
-            'phone'   => 'nullable|string|max:30',
-            'company' => 'nullable|string|max:200',
-            'message' => 'required|string|max:5000',
+            'name'     => 'required|string|max:100',
+            'email'    => 'required|email:rfc|max:255',
+            'phone'    => 'nullable|string|max:30',
+            'company'  => 'nullable|string|max:200',
+            'category' => 'required|string|in:' . implode(',', array_keys(self::CATEGORY_LABELS)),
+            'message'  => 'required|string|max:5000',
         ]);
+
+        // 表示用の日本語ラベルを併せて渡す
+        $validated['category_label'] = self::CATEGORY_LABELS[$validated['category']];
 
         try {
             Mail::to(self::ADMIN_RECIPIENTS)->send(new ContactReceivedMail($validated));

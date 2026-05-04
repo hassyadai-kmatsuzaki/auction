@@ -2715,6 +2715,7 @@ a.solution-card:hover .solution-card__arrow {
 .contact-form input[type="text"],
 .contact-form input[type="email"],
 .contact-form input[type="tel"],
+.contact-form select,
 .contact-form textarea {
   font: inherit;
   width: 100%;
@@ -2725,7 +2726,17 @@ a.solution-card:hover .solution-card__arrow {
   color: #1a2533;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+.contact-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%231a2533' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='1 2 6 7 11 2'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
 .contact-form input:focus,
+.contact-form select:focus,
 .contact-form textarea:focus {
   outline: none;
   border-color: #2bb1b7;
