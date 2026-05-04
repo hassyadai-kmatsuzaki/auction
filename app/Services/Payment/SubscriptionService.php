@@ -2,12 +2,15 @@
 
 namespace App\Services\Payment;
 
+use App\Mail\SubscriptionPaidAdminMail;
+use App\Mail\SubscriptionPaidMail;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -21,6 +24,11 @@ use RuntimeException;
  */
 class SubscriptionService
 {
+    private const ADMIN_NOTIFICATION_EMAILS = [
+        'tshort.m.nakakita@gmail.com',
+        'k.matsuzaki@beer-o-clock.jp',
+    ];
+
     public function __construct(
         private readonly SquareClient $square,
     ) {}
@@ -99,7 +107,7 @@ class SubscriptionService
         }
 
         // 4) DB に subscription + payment を保存
-        return DB::transaction(function () use ($user, $plan, $customerId, $cardId, $card, $payment, $idempotencyKey, $squarePaymentId, $amount) {
+        [$subscription, $paymentRecord] = DB::transaction(function () use ($user, $plan, $customerId, $cardId, $card, $payment, $idempotencyKey, $squarePaymentId, $amount) {
             $now = now();
             $subscription = Subscription::updateOrCreate(
                 ['user_id' => $user->id],
@@ -120,7 +128,7 @@ class SubscriptionService
                 ]
             );
 
-            Payment::create([
+            $paymentRecord = Payment::create([
                 'subscription_id'  => $subscription->id,
                 'user_id'          => $user->id,
                 'plan_id'          => $plan->id,
@@ -143,8 +151,12 @@ class SubscriptionService
                 'bank_transfer_confirmed_at' => null,
             ])->save();
 
-            return $subscription->fresh('plan');
+            return [$subscription->fresh('plan'), $paymentRecord];
         });
+
+        $this->sendPaidNotifications($user, $subscription, $paymentRecord, 'new');
+
+        return $subscription;
     }
 
     /**
@@ -347,7 +359,16 @@ class SubscriptionService
      */
     public function renew(Subscription $subscription): Payment
     {
-        return $this->charge($subscription, 'renewal');
+        $payment = $this->charge($subscription, 'renewal');
+
+        if ($payment->status === Payment::STATUS_COMPLETED) {
+            $fresh = $subscription->fresh('plan', 'user');
+            if ($fresh && $fresh->user) {
+                $this->sendPaidNotifications($fresh->user, $fresh, $payment, 'renewal');
+            }
+        }
+
+        return $payment;
     }
 
     /**
@@ -495,6 +516,39 @@ class SubscriptionService
         $user = $subscription->user;
         if ($user) {
             $user->forceFill(['is_active' => true, 'status' => 'approved'])->save();
+        }
+    }
+
+    /**
+     * クレジット決済完了通知（本人 + 管理者）
+     *
+     * @param 'new'|'renewal' $kind
+     */
+    private function sendPaidNotifications(User $user, Subscription $subscription, Payment $payment, string $kind): void
+    {
+        if (!empty($user->email)) {
+            try {
+                Mail::to($user->email)->queue(new SubscriptionPaidMail($user, $subscription, $payment, $kind));
+            } catch (\Throwable $e) {
+                Log::warning('failed to queue subscription paid mail (user)', [
+                    'user_id' => $user->id,
+                    'kind'    => $kind,
+                    'err'     => $e->getMessage(),
+                ]);
+            }
+        }
+
+        foreach (self::ADMIN_NOTIFICATION_EMAILS as $adminEmail) {
+            try {
+                Mail::to($adminEmail)->queue(new SubscriptionPaidAdminMail($user, $subscription, $payment, $kind));
+            } catch (\Throwable $e) {
+                Log::warning('failed to queue subscription paid mail (admin)', [
+                    'user_id' => $user->id,
+                    'admin'   => $adminEmail,
+                    'kind'    => $kind,
+                    'err'     => $e->getMessage(),
+                ]);
+            }
         }
     }
 }

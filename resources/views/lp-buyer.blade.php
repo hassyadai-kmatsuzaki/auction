@@ -75,7 +75,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </span>
       </a>
-      <a href="/seller" class="hero__cta-card hero__cta-card--secondary">
+      <div class="hero__cta-card hero__cta-card--secondary">
         <span class="hero__cta-card__icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6h6"/><path d="M19 9V21H5V3h9z"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
         </span>
@@ -83,10 +83,7 @@
           <span class="hero__cta-card__title">出品者の方へ</span>
           <span class="hero__cta-card__sub">出品もご検討の方はこちら</span>
         </span>
-        <span class="hero__cta-card__arrow" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </span>
-      </a>
+      </div>
     </div>
   </div>
 </section>
@@ -849,15 +846,12 @@
             </span>
             <span class="cta-banner__btn-sub">落札したい方はこちら</span>
           </a>
-          <a href="/seller" class="cta-banner__btn cta-banner__btn--accent">
+          <div class="cta-banner__btn cta-banner__btn--accent">
             <span class="cta-banner__btn-main">
               出品者の方へ
-              <span class="cta-banner__chev" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </span>
             </span>
             <span class="cta-banner__btn-sub">出品もご検討の方はこちら</span>
-          </a>
+          </div>
         </div>
       </div>
       <div class="cta-banner__visual anim" data-anim="fade-up" data-delay="1" aria-hidden="true">
