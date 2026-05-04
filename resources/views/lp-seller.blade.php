@@ -417,58 +417,46 @@
     </div>
 
     <div class="solutions-grid solutions-grid--2col">
-      <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up">
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">01</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">業者間の相場で、安定した売上</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
         </span>
-      </a>
-      <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">02</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">「ヤフオクには出さない」個体を、ここで</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
         </span>
-      </a>
-      <a href="#flow" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">03</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">撮影・梱包・発送を、運営が代行</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
         </span>
-      </a>
-      <a href="#flow" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="3">
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="3">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">04</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">月2回の定期開催で、計画的に出品</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
         </span>
-      </a>
+      </div>
     </div>
   </div>
 </section>
