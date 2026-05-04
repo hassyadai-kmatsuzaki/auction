@@ -1900,7 +1900,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
    COMPARE TABLE
    =================================== */
 .section--compare {
-  background: #ffffff;
+  background: #f7f9fa;
   padding: 4rem 0;
 }
 @media (min-width: 768px) { .section--compare { padding: 5.5rem 0; } }
