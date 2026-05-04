@@ -243,7 +243,7 @@
         業者の販路、<span class="compare-header__mark">選択肢は3つ</span>
       </h2>
       <p class="compare-header__desc">
-        これまでメダカ業界で、業者の出品先は3つのチャネルに分かれていました。<br class="pc-only">
+        これまでメダカ業界で、業者の出品先は3つの場所に分かれていました。<br class="pc-only">
         それぞれに長所と限界があります。
       </p>
     </div>
@@ -657,7 +657,7 @@
         <span class="voice-header__mark">お客様</span>の声
       </h2>
       <p class="voice-header__desc">
-        ローンチに先立ち、出品予定の事業者様からコメントをいただきました。<br class="pc-only">
+        スタートに先立ち、出品予定の事業者様からコメントをいただきました。<br class="pc-only">
         業界の最前線で活動する皆さまの、率直な声をご覧ください。
       </p>
     </div>
@@ -697,7 +697,7 @@
         </summary>
         <div class="faq-item__a">
           <span class="faq-item__mark faq-item__mark--a">A</span>
-          <p>しません。ヤフオクは個人愛好家主体の小売チャネル、{{ $brand }} は業者専用の卸チャネルです。使い分けることで手取り全体が増える設計です。</p>
+          <p>しません。ヤフオクは個人愛好家主体の小売場所、{{ $brand }} は業者専用の卸場所です。使い分けることで手取り全体が増える設計です。</p>
         </div>
       </details>
       <details class="faq-item">

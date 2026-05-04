@@ -27,9 +27,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  List,
-  ListItem,
-  ListItemText,
+  Avatar,
+  Link,
+  Stack,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -37,6 +37,11 @@ import {
   Refresh as RefreshIcon,
   PersonAdd as PersonAddIcon,
   Store as StoreIcon,
+  Instagram as InstagramIcon,
+  Twitter as TwitterIcon,
+  YouTube as YouTubeIcon,
+  Language as LanguageIcon,
+  Public as PublicIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -44,6 +49,15 @@ interface Role {
   id: number;
   name: string;
   display_name: string;
+}
+
+interface SellerProfile {
+  profile_image_url?: string | null;
+  instagram?: string | null;
+  twitter?: string | null;
+  youtube?: string | null;
+  website?: string | null;
+  other_sns?: string | null;
 }
 
 interface User {
@@ -56,6 +70,8 @@ interface User {
   roles: Role[];
   last_login_at: string | null;
   created_at: string;
+  profile_image_url?: string | null;
+  seller_profile?: SellerProfile | null;
 }
 
 interface PaginatedResponse {
@@ -65,6 +81,92 @@ interface PaginatedResponse {
   per_page: number;
   last_page: number;
 }
+
+const buildSnsHref = (kind: 'instagram' | 'twitter' | 'youtube' | 'website', value: string): string => {
+  const v = value.trim();
+  if (/^https?:\/\//i.test(v)) return v;
+  const handle = v.replace(/^@/, '');
+  switch (kind) {
+    case 'instagram':
+      return `https://www.instagram.com/${handle}`;
+    case 'twitter':
+      return `https://twitter.com/${handle}`;
+    case 'youtube':
+      return v.startsWith('@') ? `https://www.youtube.com/${v}` : `https://www.youtube.com/${handle}`;
+    case 'website':
+      return `https://${v}`;
+  }
+};
+
+const SnsCell: React.FC<{ profile?: SellerProfile | null }> = ({ profile }) => {
+  if (!profile) {
+    return <Typography variant="body2" color="text.disabled">-</Typography>;
+  }
+  const items: Array<{ key: string; icon: React.ReactNode; value: string | null | undefined; href?: string; label: string }> = [
+    {
+      key: 'instagram',
+      icon: <InstagramIcon fontSize="small" sx={{ color: '#E4405F' }} />,
+      value: profile.instagram,
+      href: profile.instagram ? buildSnsHref('instagram', profile.instagram) : undefined,
+      label: profile.instagram ? `Instagram: ${profile.instagram}` : '',
+    },
+    {
+      key: 'twitter',
+      icon: <TwitterIcon fontSize="small" sx={{ color: '#1DA1F2' }} />,
+      value: profile.twitter,
+      href: profile.twitter ? buildSnsHref('twitter', profile.twitter) : undefined,
+      label: profile.twitter ? `X / Twitter: ${profile.twitter}` : '',
+    },
+    {
+      key: 'youtube',
+      icon: <YouTubeIcon fontSize="small" sx={{ color: '#FF0000' }} />,
+      value: profile.youtube,
+      href: profile.youtube ? buildSnsHref('youtube', profile.youtube) : undefined,
+      label: profile.youtube ? `YouTube: ${profile.youtube}` : '',
+    },
+    {
+      key: 'website',
+      icon: <LanguageIcon fontSize="small" sx={{ color: '#1976d2' }} />,
+      value: profile.website,
+      href: profile.website ? buildSnsHref('website', profile.website) : undefined,
+      label: profile.website ? `Web: ${profile.website}` : '',
+    },
+    {
+      key: 'other_sns',
+      icon: <PublicIcon fontSize="small" sx={{ color: '#757575' }} />,
+      value: profile.other_sns,
+      href: profile.other_sns && /^https?:\/\//i.test(profile.other_sns.trim()) ? profile.other_sns.trim() : undefined,
+      label: profile.other_sns ? `その他: ${profile.other_sns}` : '',
+    },
+  ];
+
+  const visible = items.filter((item) => !!item.value);
+  if (visible.length === 0) {
+    return <Typography variant="body2" color="text.disabled">-</Typography>;
+  }
+
+  return (
+    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'nowrap' }}>
+      {visible.map((item) => (
+        <Tooltip key={item.key} title={item.label} arrow>
+          {item.href ? (
+            <Link
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ display: 'inline-flex', alignItems: 'center' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {item.icon}
+            </Link>
+          ) : (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>{item.icon}</Box>
+          )}
+        </Tooltip>
+      ))}
+    </Stack>
+  );
+};
 
 export default function BuyerManagement() {
   const navigate = useNavigate();
@@ -265,21 +367,23 @@ export default function BuyerManagement() {
       </Paper>
 
       {/* ユーザー一覧テーブル */}
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
           </Box>
         ) : (
           <>
-            <Table>
+            <Table sx={{ minWidth: 1500 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
+                  <TableCell align="center">アイコン</TableCell>
                   <TableCell>名前</TableCell>
                   <TableCell>メールアドレス</TableCell>
                   <TableCell>ロール</TableCell>
                   <TableCell align="center">ステータス</TableCell>
+                  <TableCell align="center">SNS</TableCell>
                   <TableCell>最終ログイン</TableCell>
                   <TableCell>登録日</TableCell>
                   <TableCell align="center">操作</TableCell>
@@ -288,23 +392,34 @@ export default function BuyerManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">
                         買受者が見つかりませんでした
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((user) => (
+                  users.map((user) => {
+                    const iconSrc =
+                      user.profile_image_url || user.seller_profile?.profile_image_url || undefined;
+                    return (
                     <TableRow key={user.id} hover>
                       <TableCell>{user.id}</TableCell>
+                      <TableCell align="center">
+                        <Avatar
+                          src={iconSrc}
+                          sx={{ width: 36, height: 36, mx: 'auto' }}
+                        >
+                          {!iconSrc && user.name?.charAt(0)}
+                        </Avatar>
+                      </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
+                        <Typography variant="body2" fontWeight="medium" sx={{ whiteSpace: 'nowrap' }}>
                           {user.name}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                           {user.email}
                         </Typography>
                       </TableCell>
@@ -328,7 +443,10 @@ export default function BuyerManagement() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
+                        <SnsCell profile={user.seller_profile} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                           {user.last_login_at
                             ? new Date(user.last_login_at).toLocaleString('ja-JP', {
                                 year: 'numeric',
@@ -341,7 +459,7 @@ export default function BuyerManagement() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                           {new Date(user.created_at).toLocaleString('ja-JP', {
                             year: 'numeric',
                             month: '2-digit',
@@ -375,7 +493,8 @@ export default function BuyerManagement() {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

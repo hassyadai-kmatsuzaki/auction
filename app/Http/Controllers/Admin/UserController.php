@@ -61,6 +61,16 @@ class UserController extends Controller
         // ページネーション
         $users = $query->paginate(20);
 
+        // アイコン URL を一覧用に明示的に付与（accessor は $appends 未設定のため toArray に含まれない）
+        $users->getCollection()->transform(function ($user) {
+            $userArr = $user->toArray();
+            $userArr['profile_image_url'] = $user->profile_image_url;
+            if ($user->sellerProfile) {
+                $userArr['seller_profile']['profile_image_url'] = $user->sellerProfile->profile_image_url;
+            }
+            return $userArr;
+        });
+
         return response()->json([
             'success' => true,
             'data' => $users,

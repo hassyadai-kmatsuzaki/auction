@@ -248,7 +248,7 @@
         業者の仕入れ、<span class="compare-header__mark">選択肢は3つ</span>
       </h2>
       <p class="compare-header__desc">
-        これまでメダカ業界で、業者間の仕入れは3つのチャネルに分かれていました。<br class="pc-only">
+        これまでメダカ業界で、業者間の仕入れは3つの場所に分かれていました。<br class="pc-only">
         それぞれに長所と限界があります。
       </p>
     </div>
@@ -273,13 +273,13 @@
           <tr>
             <th scope="row">審査</th>
             <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">なし</span></td>
-            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">紹介ベース</span></td>
-            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">申込ベース<br>（明文化された審査）</span></td>
+            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">紹介制</span></td>
+            <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">申込制<br>（明文化された審査）</span></td>
           </tr>
           <tr>
             <th scope="row">仕入後の手取り</th>
             <td><span class="compare-mark compare-mark--bad">×</span><span class="compare-cell__note">薄利</span></td>
-            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">時間／地理コスト大</span></td>
+            <td><span class="compare-mark compare-mark--mid">△</span><span class="compare-cell__note">時間／移動コスト大</span></td>
             <td class="compare-td--us"><span class="compare-mark compare-mark--good">◎</span><span class="compare-cell__note">卸値＋コストなし</span></td>
           </tr>
           <tr>
@@ -365,7 +365,7 @@
         仕入後の手取りに、<span class="takehome-header__mark">3つの差が集まります</span>
       </h2>
       <p class="takehome-header__desc">
-        仕入価格・時間／地理コスト・品質ロス。<br class="pc-only">
+        仕入価格・時間／移動コスト・品質ロス。<br class="pc-only">
         3つの違いが、最後の「手取り」を決めます。
       </p>
     </div>
@@ -396,7 +396,7 @@
       </article>
       <article class="takehome-reason anim" data-anim="fade-up" data-delay="1">
         <span class="takehome-reason__index">理由 02</span>
-        <h3 class="takehome-reason__title">時間・地理コスト</h3>
+        <h3 class="takehome-reason__title">時間・移動コスト</h3>
         <p>オフラインは現地までの交通費・宿泊・拘束時間が利益を圧迫。{{ $brand }} はオンライン完結、移動ゼロで参加できます。</p>
       </article>
       <article class="takehome-reason anim" data-anim="fade-up" data-delay="2">
@@ -688,7 +688,7 @@
         <span class="voice-header__mark">お客様</span>の声
       </h2>
       <p class="voice-header__desc">
-        ローンチに先立ち、出品予定の事業者様からコメントをいただきました。<br class="pc-only">
+        スタートに先立ち、出品予定の事業者様からコメントをいただきました。<br class="pc-only">
         業界の最前線で活動する皆さまの、率直な声をご覧ください。
       </p>
     </div>
@@ -728,7 +728,7 @@
         </summary>
         <div class="faq-item__a">
           <span class="faq-item__mark faq-item__mark--a">A</span>
-          <p>しません。ヤフオクは個人愛好家主体の小売チャネル、{{ $brand }} は業者専用の卸チャネルです。使い分けることで手取り全体が増える設計です。</p>
+          <p>しません。ヤフオクは個人愛好家主体の小売場所、{{ $brand }} は業者専用の卸場所です。使い分けることで手取り全体が増える設計です。</p>
         </div>
       </details>
       <details class="faq-item">
