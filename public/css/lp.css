@@ -1956,12 +1956,12 @@ a.solution-card:hover .solution-card__arrow {
   pointer-events: none;
 }
 .mission-quote::before {
-  content: '"';
+  content: '\201C';
   top: 0;
   left: -0.25rem;
 }
 .mission-quote::after {
-  content: '"';
+  content: '\201D';
   bottom: 0;
   right: -0.25rem;
 }
@@ -1972,8 +1972,11 @@ a.solution-card:hover .solution-card__arrow {
   color: #6b7280;
 }
 .mission-quote .mission-pledge {
-  background: #f8fafc;
-  border-left-color: #94a3b8;
+  background: transparent;
+  border-left: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 .mission-quote .mission-pledge p {
   color: #4b5563;
@@ -1983,6 +1986,7 @@ a.solution-card:hover .solution-card__arrow {
 }
 .mission-quote .mission-close__sign {
   color: #6b7280;
+  padding-right: 40px;
 }
 @media (max-width: 640px) {
   .mission-quote { padding: 2rem 0.5rem 2.5rem; }
