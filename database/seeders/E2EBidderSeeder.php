@@ -42,7 +42,7 @@ class E2EBidderSeeder extends Seeder
 {
     public function run(): void
     {
-        $count        = (int) (env('E2E_BIDDER_COUNT', 100));
+        $count        = (int) (env('E2E_BIDDER_COUNT', 200));
         $emailPrefix  = (string) env('E2E_BIDDER_EMAIL_PREFIX', 'e2e-bidder');
         $emailDomain  = (string) env('E2E_BIDDER_EMAIL_DOMAIN', 'medaka-test.local');
         $password     = (string) env('E2E_BIDDER_PASSWORD', 'E2eBidder!2026');
