@@ -43,14 +43,14 @@
 <!-- ===== HERO ===== -->
 <section class="hero">
   <div class="hero__inner">
-    <p class="hero__eyebrow sp-only hero-anim" data-hero-delay="1">FOR BREEDERS × 業者向けオンラインオークション</p>
+    <p class="hero__eyebrow sp-only hero-anim" data-hero-delay="1">業界歴20年 × プロ選魚 × 審査制出品者</p>
 
     <div class="hero__visual hero-anim" data-hero-delay="2">
       <img src="/img/lp/fv-okada-yui.png" alt="" class="hero__visual-img" loading="eager">
     </div>
 
     <div class="hero__copy hero-anim" data-hero-delay="3">
-      <p class="hero__eyebrow hero__eyebrow--inline pc-only">FOR BREEDERS × 業者向けオンラインオークション</p>
+      <p class="hero__eyebrow hero__eyebrow--inline pc-only">業界歴20年 × プロ選魚 × 審査制出品者</p>
       <h1 class="hero__title">
         <span class="hero__title-line">出品の手間も値崩れも、</span>
         <span class="hero__title-line hero__title-line--strong">これで終わり。</span>

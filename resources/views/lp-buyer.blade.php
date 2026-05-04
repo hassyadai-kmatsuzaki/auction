@@ -42,14 +42,14 @@
 <!-- ===== HERO ===== -->
 <section class="hero">
   <div class="hero__inner">
-    <p class="hero__eyebrow sp-only hero-anim" data-hero-delay="1">MEMBERS ONLY × 業者向けオンラインオークション</p>
+    <p class="hero__eyebrow sp-only hero-anim" data-hero-delay="1">業界歴20年 × プロ選魚 × 審査制出品者</p>
 
     <div class="hero__visual hero-anim" data-hero-delay="2">
       <img src="/img/lp/fv-okada-yui.png" alt="" class="hero__visual-img" loading="eager">
     </div>
 
     <div class="hero__copy hero-anim" data-hero-delay="3">
-      <p class="hero__eyebrow hero__eyebrow--inline pc-only">MEMBERS ONLY × 業者向けオンラインオークション</p>
+      <p class="hero__eyebrow hero__eyebrow--inline pc-only">業界歴20年 × プロ選魚 × 審査制出品者</p>
       <h1 class="hero__title">
         <span class="hero__title-line">業界初、業者専用</span>
         <span class="hero__title-line hero__title-line--strong">オンラインオークション。</span>
@@ -128,16 +128,16 @@
     <div class="mission-inner anim" data-anim="fade-up">
       <h2 class="mission-title">メダカ業界を、<br class="sp-only">もう一段。</h2>
       <p class="mission-lead">
-        日本のメダカ業界には、業者だけの場所が必要だと、<br class="pc-only">
+        日本のメダカ業界には、業者だけの場所が必要だと、<br class="sp-only">
         私たちは考えています。
       </p>
 
       <div class="mission-body">
-        <p>ヤフオクは便利。でも、個人愛好家との混雑で、<br class="pc-only">
-          業者間の相場は読みにくく、丹精込めた個体が値崩れすることもある。</p>
-        <p>オフライン競りは信頼できる。でも、地域に縛られ、<br class="pc-only">
-          参加できる業者は限られる。</p>
-        <p>業者間の卸取引は、業界の根幹であるはずなのに、<br class="pc-only">
+        <p>ヤフオクは便利。でも、個人愛好家との混雑で、
+          業者間の相場は読みにくく、丹精込めた個体が値崩れすることもある。<br>
+          オフライン競りは信頼できる。でも、地域に縛られ、
+          参加できる業者は限られる。<br>
+          業者間の卸取引は、業界の根幹であるはずなのに、
           それに見合うインフラが、これまでありませんでした。</p>
       </div>
 
