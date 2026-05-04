@@ -685,7 +685,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   color: #1a2533;
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-.solution-card:hover {
+a.solution-card:hover {
   border-color: #2bb1b7;
   transform: translateY(-2px);
   box-shadow: 0 10px 24px rgba(43,177,183,0.18);
@@ -731,7 +731,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   transition: background 0.2s ease, color 0.2s ease;
 }
 .solution-card__arrow svg { stroke: currentColor; }
-.solution-card:hover .solution-card__arrow {
+a.solution-card:hover .solution-card__arrow {
   background: #2bb1b7;
   color: #fff;
 }
@@ -2112,8 +2112,8 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   background: #ffffff;
   padding: 4rem 0;
 }
-@media (min-width: 768px) { .section--takehome { padding: 5.5rem 0; padding-top: 0; } }
-@media (min-width: 1024px) { .section--takehome { padding: 6.5rem 0; padding-top: 0; } }
+@media (min-width: 768px) { .section--takehome { padding: 5.5rem 0; } }
+@media (min-width: 1024px) { .section--takehome { padding: 6.5rem 0; } }
 
 .section--takehome > .container { max-width: 960px; }
 

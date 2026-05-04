@@ -392,17 +392,17 @@
       <article class="takehome-reason anim" data-anim="fade-up">
         <span class="takehome-reason__index">理由 01</span>
         <h3 class="takehome-reason__title">仕入価格</h3>
-        <p>ヤフオクは個人向けの小売値、オフラインは安いが地域内競合のみ。{{ $brand }} は業者専用の卸値で取引できます。</p>
+        <p>"ヤフオクは個人向けの小売値、オフラインは安いが地域内競合のみ。{{ $brand }} は業者専用の卸値で取引できます。"</p>
       </article>
       <article class="takehome-reason anim" data-anim="fade-up" data-delay="1">
         <span class="takehome-reason__index">理由 02</span>
         <h3 class="takehome-reason__title">時間・移動コスト</h3>
-        <p>オフラインは現地までの交通費・宿泊・拘束時間が利益を圧迫。{{ $brand }} はオンライン完結、移動ゼロで参加できます。</p>
+        <p>"オフラインは現地までの交通費・宿泊・拘束時間が利益を圧迫。{{ $brand }} はオンライン完結、移動ゼロで参加できます。"</p>
       </article>
       <article class="takehome-reason anim" data-anim="fade-up" data-delay="2">
         <span class="takehome-reason__index">理由 03</span>
         <h3 class="takehome-reason__title">品質ロス</h3>
-        <p>ヤフオクの自己申告、オフラインの現地短時間判断では見落としが発生。{{ $brand }} は加工なし動画を前日からゆっくり確認、判断ミスを最小化します。</p>
+        <p>"ヤフオクの自己申告、オフラインの現地短時間判断では見落としが発生。{{ $brand }} は加工なし動画を前日からゆっくり確認、判断ミスを最小化します。"</p>
       </article>
     </div>
   </div>
@@ -418,71 +418,59 @@
       <p class="solutions-header__desc">
         2つの仕入れニーズに、{{ $brand }} は応えます。<br>
         「ここでしか会えない個体」と「ヤフオクで買えない価格」。<br class="pc-only">
-        さらに「取引のすべてを代行」と「定期開催で計画的に」。
+        さらに『取引は {{ $brand }} とだけ』と『定期開催で計画的に』。
       </p>
     </div>
 
     <div class="solutions-grid solutions-grid--2col">
-      <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up">
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">01</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">個人愛好家がいないので、落札相場が業者向けに収まる</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
           <p class="solution-card__desc">厳選されたプロブリーダーの個体が並びます。「ヤフオクには出さない」「個別販売しない」ロットが、{{ $brand }} でだけ流通します。</p>
           <span class="solution-card__sublabel">希少な個体を求める方へ</span>
         </span>
-      </a>
-      <a href="#mechanism" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">02</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">標準個体も、ヤフオクで買えない卸値で</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
           <p class="solution-card__desc">特段稀少でない個体でも、ヤフオクの小売値より明確に安く。業者間の卸値で取引できます。</p>
           <span class="solution-card__sublabel">安定的な仕入れ量を必要とする方へ</span>
         </span>
-      </a>
-      <a href="#flow" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">03</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
-            <span class="solution-card__title">取引のすべてを、{{ $brand }} が代行</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
+            <span class="solution-card__title">取引はすべて、{{ $brand }} とのやり取りだけ</span>
           </span>
           <p class="solution-card__desc">落札後の決済は買取再販、配送は直送。出品者と直接やり取りすることはありません。</p>
           <span class="solution-card__sublabel">業務効率化を求める方へ</span>
         </span>
-      </a>
-      <a href="#flow" class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="3">
+      </div>
+      <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="3">
         <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">04</span>
         </span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">月2回の定期開催で、計画的に仕入れられる</span>
-            <span class="solution-card__arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </span>
           </span>
           <p class="solution-card__desc">固定スケジュール＋事前出品リストの公開で、仕入れ予算とロットを先に組めます。「いつ良い個体が出るか分からない」が、終わります。</p>
           <span class="solution-card__sublabel">計画的な仕入れを求める方へ</span>
         </span>
-      </a>
+      </div>
     </div>
   </div>
 </section>
