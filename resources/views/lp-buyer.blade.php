@@ -46,6 +46,7 @@
 
     <div class="hero__visual hero-anim" data-hero-delay="2">
       <img src="/img/lp/fv-okada-yui.png" alt="" class="hero__visual-img" loading="eager">
+      <span class="hero__visual-credit">岡田結実</span>
     </div>
 
     <div class="hero__copy hero-anim" data-hero-delay="3">
@@ -90,18 +91,17 @@
   </div>
 </section>
 
-<!-- ===== ② 協賛企業・協力ブリーダー ロゴ帯 ===== -->
+<!-- ===== ② 協賛企業・出品企業 ロゴ帯 ===== -->
 <section class="section section--partners" id="partners">
   <div class="container">
     <div class="partners-header anim" data-anim="fade-up">
       <h2 class="partners-header__title">
-        協賛企業・<span class="partners-header__num">協力ブリーダー</span>
+        協賛企業・<span class="partners-header__num">出品企業</span>
       </h2>
     </div>
 
-    <p class="partners-header__desc anim" data-anim="fade-up" style="text-align:center; max-width:680px; margin:0 auto 1.75rem; color:#4a5568; font-weight:500; line-height:1.85; font-size:clamp(0.92rem, 1.6vw, 1rem);">
-      日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、<br class="pc-only">
-      業者間プラットフォームです。
+    <p class="partners-header__desc anim visible" data-anim="fade-up" style="text-align:center;max-width: 100%;margin:0 auto 1.75rem;color:#4a5568;font-weight:500;line-height:1.85;font-size:clamp(0.92rem, 1.6vw, 1rem);">
+      日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、業者間プラットフォームです。
     </p>
 
     @php $partners = [1, 2, 3, 4, 5, 6]; @endphp
@@ -118,7 +118,7 @@
       </div>
     </div>
 
-    <p class="partners-note anim" data-anim="fade-up">※ 協賛企業・協力ブリーダーのロゴは順次掲載予定です。</p>
+    <p class="partners-note anim" data-anim="fade-up">※ 協賛企業・出品企業のロゴは順次掲載予定です。</p>
   </div>
 </section>
 
@@ -683,12 +683,12 @@
   </div>
 </section>
 
-<!-- ===== ⑫ 協力ブリーダーの声 ===== -->
+<!-- ===== ⑫ お客様の声 ===== -->
 <section class="section section--voice" id="voice">
   <div class="container">
     <div class="voice-header anim" data-anim="fade-up">
       <h2 class="voice-header__title">
-        <span class="voice-header__mark">協力ブリーダー</span>から
+        <span class="voice-header__mark">お客様</span>の声
       </h2>
       <p class="voice-header__desc">
         ローンチに先立ち、出品予定のブリーダー様からコメントをいただきました。<br class="pc-only">
@@ -699,30 +699,12 @@
     <div class="voice-grid">
       <article class="voice-tile anim" data-anim="fade-up">
         <p class="voice-tile__quote">ヤフオクは愛好家相場の上に成り立っているので、業者向けに値段を下げると、相場が一気に崩れてしまう。これまでは個別に相対でやりとりするしかなく、まとまった数量で効率的に卸す場所が業界にありませんでした。{{ $brand }} の業者専門の環境なら、相場を壊さずに、業者さんへ効率的に卸せる。業界に必要だった仕組みです。</p>
-        <div class="voice-tile__author">
-          <span class="voice-tile__avatar"><img src="/img/lp/voice/01.png" alt="" loading="lazy"></span>
-          <span class="voice-tile__info">
-            <strong>A社</strong>
-          </span>
-        </div>
       </article>
       <article class="voice-tile anim" data-anim="fade-up" data-delay="1">
         <p class="voice-tile__quote">個別販売は、撮影・梱包・発送だけでなく、お客様への問い合わせ対応まで、本業の時間を奪い続けてきました。{{ $brand }} なら、業者間の流通が一気に効率化される。作り手はめだかと向き合う時間に集中でき、業者は仕入れに困らない。業界全体の生産性と収益性が、同時に上がる仕組みです。</p>
-        <div class="voice-tile__author">
-          <span class="voice-tile__avatar"><img src="/img/lp/voice/02.png" alt="" loading="lazy"></span>
-          <span class="voice-tile__info">
-            <strong>B社</strong>
-          </span>
-        </div>
       </article>
       <article class="voice-tile anim" data-anim="fade-up" data-delay="2">
         <p class="voice-tile__quote">業者向けの卸ネットワークが整備されることで、新しい作り手も評価される機会が生まれる。全国の小売店・専門店も、もっと多様な個体を扱える。結果としてお客様に届くメダカの幅が広がる。業界全体の市場が大きくなる、業界の未来が楽しみです。</p>
-        <div class="voice-tile__author">
-          <span class="voice-tile__avatar"><img src="/img/lp/voice/03.png" alt="" loading="lazy"></span>
-          <span class="voice-tile__info">
-            <strong>C社</strong>
-          </span>
-        </div>
       </article>
     </div>
   </div>

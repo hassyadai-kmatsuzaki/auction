@@ -46,6 +46,7 @@
 
     <div class="hero__visual hero-anim" data-hero-delay="2">
       <img src="/img/lp/fv-okada-yui.png" alt="" class="hero__visual-img" loading="eager">
+      <span class="hero__visual-credit">岡田結実</span>
     </div>
 
     <div class="hero__copy hero-anim" data-hero-delay="3">

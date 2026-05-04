@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Mail\BankTransferRequestedAdminMail;
 use App\Models\Plan;
 use App\Services\Payment\SquareApiException;
 use App\Services\Payment\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 class SubscriptionController extends Controller
@@ -84,6 +86,18 @@ class SubscriptionController extends Controller
         try {
             if ($paymentMethod === 'bank_transfer') {
                 $subscription = $this->service->subscribeWithBankTransfer($user, $plan);
+
+                foreach (['tshort.m.nakakita@gmail.com', 'k.matsuzaki@beer-o-clock.jp'] as $adminEmail) {
+                    try {
+                        Mail::to($adminEmail)->queue(new BankTransferRequestedAdminMail($user, $plan));
+                    } catch (\Throwable $e) {
+                        Log::warning('failed to queue bank transfer admin notification', [
+                            'user_id' => $user->id,
+                            'admin'   => $adminEmail,
+                            'err'     => $e->getMessage(),
+                        ]);
+                    }
+                }
 
                 return response()->json([
                     'success' => true,

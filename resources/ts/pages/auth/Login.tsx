@@ -20,7 +20,7 @@ import {
   VisibilityOff,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
-import GoogleLoginButton from '../../features/auth/GoogleLoginButton';
+// import GoogleLoginButton from '../../features/auth/GoogleLoginButton'; // 一旦非公開
 
 const BG_IMAGE = '/img/regist-bg.avif?v=1';
 
@@ -319,6 +319,7 @@ export default function Login() {
           </Button>
         </Box>
 
+        {/* Googleログインは一旦非公開
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2.5 }}>
           <Box sx={{ flex: 1, height: '1px', bgcolor: 'rgba(255,255,255,0.18)' }} />
           <Typography sx={{ fontSize: '0.75rem', color: '#000' }}>
@@ -342,6 +343,7 @@ export default function Login() {
         >
           <GoogleLoginButton />
         </Box>
+        */}
 
         <Typography
           sx={{

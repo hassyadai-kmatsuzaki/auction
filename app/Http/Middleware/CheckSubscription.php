@@ -40,7 +40,14 @@ class CheckSubscription
 
         $subscription = $user->subscription()->with('plan')->first();
 
-        if (!$subscription || !$subscription->isActive()) {
+        // 銀行振込で申込済み・管理者の入金確認待ちのユーザーは、subscription が pending のままだが
+        // プラン機能（落札/出品）の利用は仮許可する。プラン capability の判定は通常どおり下で行う。
+        $bankTransferPending = $subscription
+            && $user->payment_method_preference === 'bank_transfer'
+            && $user->bank_transfer_confirmed_at === null
+            && $subscription->status === \App\Models\Subscription::STATUS_PENDING;
+
+        if (!$bankTransferPending && (!$subscription || !$subscription->isActive())) {
             return response()->json([
                 'success' => false,
                 'message' => '有効な年会費プランへの加入が必要です',

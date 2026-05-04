@@ -64,7 +64,7 @@ export default function BankTransferInfoModal({ open, onClose, dismissible = tru
           </Alert>
 
           <Typography variant="body2" color="text.secondary">
-            下記の口座にご入金ください。管理者が入金確認を行うまで、サービスはご利用いただけません。
+            下記の口座に<Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>4月18日までに</Box>ご入金ください。
           </Typography>
 
           <Box

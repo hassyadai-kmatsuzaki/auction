@@ -31,16 +31,8 @@ interface SponsoredAd {
   advertiser: string;
 }
 
-const sponsoredAds: SponsoredAd[] = [
-  {
-    id: 1,
-    title: '高品質メダカ用飼料「極」新発売！',
-    description: '色揚げ効果抜群！プロブリーダー推奨の最高級飼料。今なら初回購入20%OFF',
-    image_url: '/img/noimage.png',
-    link_url: 'https://example.com/feed',
-    advertiser: 'メダカフード株式会社',
-  },
-];
+// スポンサー広告は一旦非公開
+const sponsoredAds: SponsoredAd[] = [];
 
 function getDaysUntil(dateString: string): string {
   const target = new Date(dateString + 'T00:00:00');
