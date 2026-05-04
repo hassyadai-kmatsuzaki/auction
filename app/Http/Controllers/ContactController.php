@@ -37,7 +37,7 @@ class ContactController extends Controller
             'phone'    => 'nullable|string|max:30',
             'company'  => 'nullable|string|max:200',
             'category' => 'required|string|in:' . implode(',', array_keys(self::CATEGORY_LABELS)),
-            'message'  => 'required|string|max:5000',
+            'message'  => 'nullable|string|max:5000',
         ]);
 
         // 表示用の日本語ラベルを併せて渡す

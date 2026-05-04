@@ -956,8 +956,8 @@
           </label>
 
           <label class="contact-form__field">
-            <span class="contact-form__label">お問い合わせ内容 <span class="contact-form__required">必須</span></span>
-            <textarea name="message" required rows="6" maxlength="5000">{{ old('message') }}</textarea>
+            <span class="contact-form__label">お問い合わせ内容</span>
+            <textarea name="message" rows="6" maxlength="5000">{{ old('message') }}</textarea>
             @error('message')<span class="contact-form__error">{{ $message }}</span>@enderror
           </label>
 

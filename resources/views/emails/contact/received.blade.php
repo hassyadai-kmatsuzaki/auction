@@ -15,7 +15,7 @@ MEDAICHI LP のお問い合わせフォームから新しい問い合わせが�
 
 **お問い合わせ内容:**
 
-{!! nl2br(e($payload['message'])) !!}
+{!! filled($payload['message'] ?? null) ? nl2br(e($payload['message'])) : '（未入力）' !!}
 
 ---
 

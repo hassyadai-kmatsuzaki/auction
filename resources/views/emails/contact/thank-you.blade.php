@@ -7,6 +7,18 @@
 
 下記内容で受付いたしました。担当より追ってご連絡いたします。
 
+@if (in_array($payload['category'] ?? null, ['apply', 'demo'], true))
+---
+
+**デモはこちらからご利用いただけます:**
+
+<x-mail::button :url="'https://medaka-ichiba.com/presentation'">
+デモを試す
+</x-mail::button>
+
+URL: https://medaka-ichiba.com/presentation
+@endif
+
 ---
 
 **お名前:** {{ $payload['name'] }}
@@ -21,7 +33,7 @@
 
 **お問い合わせ内容:**
 
-{!! nl2br(e($payload['message'])) !!}
+{!! filled($payload['message'] ?? null) ? nl2br(e($payload['message'])) : '（未入力）' !!}
 
 ---
 
