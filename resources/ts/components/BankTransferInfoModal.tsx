@@ -64,7 +64,7 @@ export default function BankTransferInfoModal({ open, onClose, dismissible = tru
           </Alert>
 
           <Typography variant="body2" color="text.secondary">
-            下記の口座に<Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>4月18日までに</Box>ご入金ください。
+            下記の口座に<Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>5月18日までに</Box>ご入金ください。
           </Typography>
 
           <Box

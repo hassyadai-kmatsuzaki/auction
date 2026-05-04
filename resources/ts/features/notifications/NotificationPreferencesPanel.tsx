@@ -230,55 +230,91 @@ export default function NotificationPreferencesPanel({
         sx={{
           p: 2.5,
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
           gap: 2,
           borderColor: lineLinked ? '#06C755' : 'divider',
           bgcolor: lineLinked ? '#F0FDF4' : 'transparent',
         }}
       >
-        <Box
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            bgcolor: '#06C755',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: 18,
-            flexShrink: 0,
-          }}
-        >
-          LINE
-        </Box>
         {lineStatusQuery.isLoading ? (
-          <CircularProgress size={20} />
+          <Stack direction="row" alignItems="center" spacing={2} sx={{ flex: 1 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                bgcolor: '#06C755',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 18,
+                flexShrink: 0,
+              }}
+            >
+              LINE
+            </Box>
+            <CircularProgress size={20} />
+          </Stack>
         ) : lineLinked ? (
           <>
-            {lineStatusQuery.data?.picture_url && (
-              <Avatar src={lineStatusQuery.data.picture_url} sx={{ width: 36, height: 36 }} />
-            )}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                  {lineStatusQuery.data?.display_name || 'LINEユーザー'}
-                </Typography>
-                <Chip
-                  size="small"
-                  icon={<CheckIcon sx={{ fontSize: 14 }} />}
-                  label="連携済み"
-                  sx={{ bgcolor: '#06C755', color: '#fff', fontWeight: 600 }}
-                />
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.5}
+              sx={{ flex: 1, minWidth: 0 }}
+            >
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  bgcolor: '#06C755',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 18,
+                  flexShrink: 0,
+                }}
+              >
+                LINE
               </Box>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                連携日:{' '}
-                {lineStatusQuery.data?.linked_at
-                  ? new Date(lineStatusQuery.data.linked_at).toLocaleDateString('ja-JP')
-                  : '-'}
-              </Typography>
-            </Box>
+              {lineStatusQuery.data?.picture_url && (
+                <Avatar src={lineStatusQuery.data.picture_url} sx={{ width: 36, height: 36, flexShrink: 0 }} />
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 700,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {lineStatusQuery.data?.display_name || 'LINEユーザー'}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    icon={<CheckIcon sx={{ fontSize: 14 }} />}
+                    label="連携済み"
+                    sx={{ bgcolor: '#06C755', color: '#fff', fontWeight: 600 }}
+                  />
+                </Box>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  連携日:{' '}
+                  {lineStatusQuery.data?.linked_at
+                    ? new Date(lineStatusQuery.data.linked_at).toLocaleDateString('ja-JP')
+                    : '-'}
+                </Typography>
+              </Box>
+            </Stack>
             <Button
               size="small"
               variant="outlined"
@@ -286,26 +322,53 @@ export default function NotificationPreferencesPanel({
               startIcon={<LinkOffIcon />}
               onClick={() => unlinkMutation.mutate()}
               disabled={unlinkMutation.isPending}
+              fullWidth={isMobile}
+              sx={{ flexShrink: 0 }}
             >
               連携解除
             </Button>
           </>
         ) : (
           <>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
-                LINEと連携してプッシュ通知を受け取る
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                連携すると、重要な通知をLINEですぐに受け取れます
-              </Typography>
-            </Box>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={2}
+              sx={{ flex: 1, minWidth: 0 }}
+            >
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  bgcolor: '#06C755',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 18,
+                  flexShrink: 0,
+                }}
+              >
+                LINE
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  LINEと連携してプッシュ通知を受け取る
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  連携すると、重要な通知をLINEですぐに受け取れます
+                </Typography>
+              </Box>
+            </Stack>
             <Button
               variant="contained"
               startIcon={<LinkIcon />}
               onClick={() => linkMutation.mutate()}
               disabled={linkMutation.isPending}
-              sx={{ bgcolor: '#06C755', '&:hover': { bgcolor: '#05B04C' } }}
+              fullWidth={isMobile}
+              sx={{ bgcolor: '#06C755', flexShrink: 0, '&:hover': { bgcolor: '#05B04C' } }}
             >
               {linkMutation.isPending ? <CircularProgress size={20} color="inherit" /> : 'LINEと連携する'}
             </Button>
