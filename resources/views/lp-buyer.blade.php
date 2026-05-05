@@ -222,7 +222,7 @@
           <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">01</span>
         </span>
         <span class="solution-card__body">
-          <span class="solution-card__title">業者専用の入札市場で、<br>感情入札による値崩れがない</span>
+          <span class="solution-card__title">個人愛好家がいないので、<br>落札相場が業者向けに収まる</span>
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
