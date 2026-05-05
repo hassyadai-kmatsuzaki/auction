@@ -218,25 +218,19 @@
 
     <div class="solutions-grid">
       <div class="solution-card solution-card--featured anim" data-anim="fade-up">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">01</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/mechanism/01.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__title">個人愛好家がいないので、<br>落札相場が業者向けに収まる</span>
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">02</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/mechanism/02.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__title">完全匿名で取引できる仕組みで、<br>同業者と競合しない</span>
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7; letter-spacing:0.04em;">03</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/mechanism/03.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__title">加工なしの動画で、<br>現物をじっくり確認</span>
         </span>
