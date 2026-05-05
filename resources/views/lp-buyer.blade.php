@@ -46,7 +46,7 @@
 
     <div class="hero__visual hero-anim" data-hero-delay="2">
       <img src="/img/lp/fv-okada-yui.png" alt="" class="hero__visual-img" loading="eager">
-      <span class="hero__visual-credit">岡田結実</span>
+      {{-- <span class="hero__visual-credit">岡田結実</span> --}}
     </div>
 
     <div class="hero__copy hero-anim" data-hero-delay="3">
@@ -429,9 +429,7 @@
 
     <div class="solutions-grid solutions-grid--2col">
       <div class="solution-card solution-card--featured anim" data-anim="fade-up">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">01</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/for-buyer/01.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">個人愛好家がいないので、落札相場が業者向けに収まる</span>
@@ -441,9 +439,7 @@
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="1">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">02</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/for-buyer/02.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">標準個体も、ヤフオクで買えない卸値で</span>
@@ -453,9 +449,7 @@
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="2">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">03</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/for-buyer/03.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">取引はすべて、{{ $brand }} とのやり取りだけ</span>
@@ -465,9 +459,7 @@
         </span>
       </div>
       <div class="solution-card solution-card--featured anim" data-anim="fade-up" data-delay="3">
-        <span class="solution-card__visual" style="background:#e6f4f5; display:flex; align-items:center; justify-content:center;">
-          <span style="font-family:'Inter',sans-serif; font-size:2.2rem; font-weight:900; color:#2bb1b7;">04</span>
-        </span>
+        <span class="solution-card__visual"><img src="/img/lp/for-buyer/04.png" alt="" loading="lazy"></span>
         <span class="solution-card__body">
           <span class="solution-card__head">
             <span class="solution-card__title">月2回の定期開催で、計画的に仕入れられる</span>
