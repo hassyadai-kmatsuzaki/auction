@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=37">
+  <link rel="stylesheet" href="/css/lp.css?v=38">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
@@ -110,7 +110,51 @@
   </div>
 </section>
 
-<!-- ===== ② 協賛企業・出品企業 ロゴ帯 ===== -->
+<!-- ===== ② 協賛企業・出品ブリーダー ロゴ帯 ===== -->
+<section class="section section--partners" id="partners">
+  <div class="container">
+    <div class="partners-header anim" data-anim="fade-up">
+      <h2 class="partners-header__title">
+        協賛企業・<span class="partners-header__num">出品ブリーダー</span>
+      </h2>
+    </div>
+
+    <p class="partners-header__desc anim visible" data-anim="fade-up" style="text-align:center;max-width: 100%;margin:0 auto 1.5rem;color:#4a5568;font-weight:500;line-height:1.85;font-size:clamp(0.92rem, 1.6vw, 1rem);">
+      日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、業者間プラットフォームです。
+    </p>
+
+    {{-- 協賛企業（2社・静止） --}}
+    <p class="partners-row__label anim" data-anim="fade-up">協賛企業</p>
+    <div class="partners-supporters anim" data-anim="fade-up">
+      <div class="partners-supporters__item">
+        <img src="/img/lp/supporter/01.png" alt="" loading="lazy">
+      </div>
+      <div class="partners-supporters__item">
+        <img src="/img/lp/supporter/02.png" alt="" loading="lazy">
+      </div>
+    </div>
+
+    {{-- 出品ブリーダー（横スクロール） --}}
+    <p class="partners-row__label anim" data-anim="fade-up">出品ブリーダー</p>
+    @php $breeders = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]; @endphp
+    <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
+      <div class="partners-marquee__track">
+        {{-- 同じセットを3回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
+        @for ($i = 0; $i < 3; $i++)
+          @foreach ($breeders as $n)
+            <div class="partners-marquee__item">
+              <img src="/img/lp/seller/{{ $n }}.png" alt="" loading="lazy">
+            </div>
+          @endforeach
+        @endfor
+      </div>
+    </div>
+
+    <p class="partners-note anim" data-anim="fade-up">※ 協賛企業・出品ブリーダーのロゴは順次掲載予定です。</p>
+  </div>
+</section>
+
+{{-- ===== 旧サポーターセクション（一旦コメントアウト）=====
 <section class="section section--partners" id="partners">
   <div class="container">
     <div class="partners-header anim" data-anim="fade-up">
@@ -126,7 +170,6 @@
     @php $partners = [1, 2, 3, 4, 6]; @endphp
     <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
       <div class="partners-marquee__track">
-        {{-- 同じセットを5回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
         @for ($i = 0; $i < 5; $i++)
           @foreach ($partners as $n)
             <div class="partners-marquee__item">
@@ -140,6 +183,7 @@
     <p class="partners-note anim" data-anim="fade-up">※ 協賛企業・出品企業のロゴは順次掲載予定です。</p>
   </div>
 </section>
+--}}
 
 <!-- ===== ③ メダカ業界を、もう一段。 ===== -->
 <section class="section section--mission">
