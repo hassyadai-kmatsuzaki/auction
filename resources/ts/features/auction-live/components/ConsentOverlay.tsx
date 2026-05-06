@@ -30,8 +30,10 @@ export const ConsentOverlay = React.memo(({ onAgree, priceIncrementTiers, countd
     <Box
       sx={{
         position: 'fixed', inset: 0,
-        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-        bgcolor: 'rgba(0,0,0,0.4)',
+        // 旧 12px は GPU 負荷が高く、旧端末でモーダル表示時に固まる報告。
+        // 4px でも視認上のコントラストは十分確保できる。
+        backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+        bgcolor: 'rgba(0,0,0,0.5)',
       }}
     />
     <Paper

@@ -8,6 +8,7 @@ use App\Actions\Bid\LeaveBidAction;
 use App\Actions\Bid\SetBidLimitAction;
 use App\Jobs\NotifyFavoriteApproachingJob;
 use App\Models\Auction;
+use App\Models\BidEvent;
 use App\Models\BidLimitPrice;
 use App\Models\Item;
 use App\Models\Lane;
@@ -679,8 +680,16 @@ class CountdownService
      * 価格上昇後に呼び出し、上限に達した参加者を自動離脱させる
      *
      * ■ N+1対策: whereIn サブクエリで1回のSQLに集約
-     * ■ 競合対策: markAsTriggered() に楽観的ロックを使用
-     *             → 複数の価格上昇が同時に来ても二重発動しない
+     * ■ 競合対策: items.lockForUpdate + bulk update で楽観的ロックなしで安全
+     *
+     * ■ H1 + H3 修正（実装書 B2 + B7 + B8 + B9 を本パスにも適用）:
+     *   旧版は foreach 内で「markAsTriggered → DB::transaction → deactivate →
+     *   個別 BidLimitReached broadcast → 同期 LINE/Mail 通知」を 1 件ずつ実行していた。
+     *   25 名同時 hit 時:
+     *     - DB::transaction × 25 = items 行ロック取得 25 回（直列化で長期化）
+     *     - 個別 BidLimitReached × 25 = 120 接続なら 3,000 msg/秒の WS バースト
+     *     - 同期 sendBidLimitReachedNotification × 25 = 5〜10 秒間 tick worker 詰まり
+     *   新版は adjustPriceByBidLimits と完全に同じ集約パターンで処理する。
      */
     protected function checkBidLimits(Lane $lane, Item $item, Auction $auction, array $protectedUserIds = []): void
     {
@@ -699,51 +708,175 @@ class CountdownService
             return;
         }
 
-        // アクティブな入札者のIDを一括取得
-        $activeBidderUserIds = BidParticipant::where('item_id', $item->id)
-            ->where('is_active', true)
-            ->pluck('user_id')
-            ->toArray();
+        $auctionId   = $auction->id;
+        $laneId      = $lane->id;
+        $itemId      = $item->id;
+        $speciesName = $item->species_name ?? '';
 
-        foreach ($limits as $limit) {
-            try {
-                $triggered = $limit->markAsTriggered();
-                if (!$triggered) {
-                    continue;
+        $batchTriggered  = [];
+        $newActiveCount  = null;
+        $broadcastPrice  = (float) $item->current_price;
+
+        // ─── 単一 transaction + items 行ロックで全件まとめて処理（B7） ──
+        //   foreach 内の DB::transaction × N → 1 回の transaction にまとめる。
+        //   親（handlePriceIncrement）は既に commit 済みのため、入れ子にならない。
+        try {
+            DB::transaction(function () use (
+                $limits, $itemId, &$batchTriggered, &$newActiveCount, &$broadcastPrice
+            ) {
+                $locked = Item::where('id', $itemId)->lockForUpdate()->first();
+                if (!$locked || $locked->status !== 'live') {
+                    return;
+                }
+                $broadcastPrice = (float) $locked->current_price;
+
+                // bulk update is_triggered=true（lock 保持時間短縮）
+                $idsToTrigger = $limits->pluck('id')->toArray();
+                if (!empty($idsToTrigger)) {
+                    BidLimitPrice::whereIn('id', $idsToTrigger)
+                        ->where('is_triggered', false)
+                        ->update([
+                            'is_triggered' => true,
+                            'triggered_at' => now(),
+                            'updated_at'   => now(),
+                        ]);
                 }
 
-                $limitPrice = $limit->limit_price;
-                $limitUserId = $limit->user_id;
-                $isActiveBidder = in_array($limitUserId, $activeBidderUserIds);
+                // ロック取得後の最新 active 入札者を一括取得
+                $activeBidderUserIds = BidParticipant::where('item_id', $locked->id)
+                    ->where('is_active', true)
+                    ->pluck('user_id')
+                    ->toArray();
 
-                // アクティブ入札者のみ離脱処理
-                if ($isActiveBidder) {
-                    $this->leaveBidAction->execute($item, $limitUserId);
+                foreach ($limits as $limit) {
+                    try {
+                        $userId         = $limit->user_id;
+                        $limitPrice     = (float) $limit->limit_price;
+                        $isActiveBidder = in_array($userId, $activeBidderUserIds);
+
+                        if ($isActiveBidder) {
+                            $p = BidParticipant::forItem($locked->id)
+                                ->forUser($userId)->first();
+                            if ($p && $p->is_active) {
+                                $p->deactivate();
+                                BidEvent::recordLeave(
+                                    $locked->id, $userId, $broadcastPrice
+                                );
+                            }
+                        }
+
+                        $limit->delete();
+
+                        $batchTriggered[] = [
+                            'user_id'         => $userId,
+                            'limit_price'     => $limitPrice,
+                            'action'          => $isActiveBidder ? 'cancelled' : 'triggered',
+                            'protected'       => false,
+                            // 通知 chunk 用（broadcast 前に剥がす）
+                            '_notify_user_id' => $userId,
+                            '_notify_limit'   => $limitPrice,
+                        ];
+                    } catch (\Exception $e) {
+                        Log::error("checkBidLimits row error: item={$locked->id}, user={$limit->user_id} - " . $e->getMessage());
+                    }
                 }
 
-                // 指値レコードを削除 → ユーザーは指値なしの状態になり手動入札可能
-                $limit->delete();
+                $newActiveCount = BidParticipant::forItem($locked->id)
+                    ->active()->count();
+            }, 3);
+        } catch (\Throwable $txErr) {
+            Log::error("checkBidLimits transaction error: item={$itemId} - " . $txErr->getMessage());
+            return;
+        }
 
-                broadcast(new BidLimitReached(
-                    $auction->id, $lane->id, $item->id,
-                    $limitUserId, $item->current_price, $limitPrice,
-                    $item->species_name ?? ''
-                ));
+        if (empty($batchTriggered)) {
+            return;
+        }
 
+        // ─── B2 + B8: 件数別 broadcast 戦略 ─────────────────────────
+        //   - 件数 < 5: 個別 BidLimitReached を発火（旧フロント互換、軽量）
+        //   - 件数 >= 5: 個別を skip し batch 1 個に集約
+        //   25 名同時 hit 時: 25 broadcast → 1 broadcast（96% 削減）
+        $cancelledItems = array_values(array_filter(
+            $batchTriggered,
+            fn($t) => !$t['protected'] && $t['action'] === 'cancelled'
+        ));
+        $cancelCount = count($cancelledItems);
+
+        $publicBatch = array_values(array_map(function ($t) {
+            unset($t['_notify_user_id'], $t['_notify_limit']);
+            return $t;
+        }, $batchTriggered));
+
+        if ($cancelCount > 0 && $cancelCount < 5) {
+            foreach ($cancelledItems as $bt) {
                 try {
-                    app(NotificationService::class)->sendBidLimitReachedNotification(
-                        $limitUserId, $item->species_name ?? '商品',
-                        $limitPrice, $item->current_price
-                    );
-                } catch (\Exception $lineErr) {
-                    Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
+                    broadcast(new BidLimitReached(
+                        $auctionId, $laneId, $itemId,
+                        $bt['user_id'], $broadcastPrice, $bt['limit_price'],
+                        $speciesName
+                    ));
+                } catch (\Exception $brErr) {
+                    Log::warning("BidLimitReached broadcast error: " . $brErr->getMessage());
                 }
-
-                Log::info("BidLimit triggered & cancelled: item={$item->id}, user={$limitUserId}, active={$isActiveBidder}, price={$item->current_price}, limit={$limitPrice}");
-            } catch (\Exception $e) {
-                Log::error("BidLimit check error: item={$item->id}, user={$limit->user_id} - " . $e->getMessage());
             }
         }
+
+        try {
+            broadcast(new \App\Events\BidLimitsBatchTriggered(
+                $auctionId, $laneId, $itemId,
+                $broadcastPrice,
+                $publicBatch
+            ));
+        } catch (\Exception $batchErr) {
+            Log::warning("BidLimitsBatchTriggered broadcast error: " . $batchErr->getMessage());
+        }
+
+        // active count 同期（25 個の BidderUpdated → 1 個に集約）
+        if ($newActiveCount !== null && $cancelCount > 0) {
+            try {
+                broadcast(new BidderUpdated(
+                    $auctionId, $laneId, $itemId,
+                    $newActiveCount, 'left'
+                ))->toOthers();
+            } catch (\Exception $brErr) {
+                BroadcastFailureLogger::warn('BidderUpdated', $brErr->getMessage(), [
+                    'item_id' => $itemId, 'lane_id' => $laneId,
+                    'event_type' => 'bid_limit_left',
+                ]);
+            }
+        }
+
+        // ─── B9 + C2: LINE/Mail 通知を chunk 単位で queue 送信 ─────────
+        //   25 名同時 hit でも tick worker は同期 send で詰まらない。
+        $notifyTargets = array_values(array_filter(
+            $batchTriggered,
+            fn($t) => isset($t['_notify_user_id']) && !$t['protected']
+        ));
+        if (!empty($notifyTargets)) {
+            $notifySpeciesName = $item->species_name ?? '商品';
+            foreach (array_chunk($notifyTargets, 20) as $chunk) {
+                try {
+                    \App\Jobs\NotifyBidLimitChunkJob::dispatch(
+                        $itemId, $notifySpeciesName, $broadcastPrice, $chunk
+                    );
+                } catch (\Throwable $jobErr) {
+                    Log::warning("checkBidLimits notify dispatch failed, falling back to sync: " . $jobErr->getMessage());
+                    foreach ($chunk as $t) {
+                        try {
+                            app(NotificationService::class)->sendBidLimitReachedNotification(
+                                $t['_notify_user_id'], $notifySpeciesName,
+                                $t['_notify_limit'], $broadcastPrice
+                            );
+                        } catch (\Throwable $lineErr) {
+                            Log::warning("BidLimit notify fallback failed: " . $lineErr->getMessage());
+                        }
+                    }
+                }
+            }
+        }
+
+        Log::info("checkBidLimits batched: item={$itemId}, total=" . count($batchTriggered) . ", cancelled={$cancelCount}");
     }
 
     /**
@@ -760,13 +893,27 @@ class CountdownService
         $this->stopCountdown($lane->id);
 
         // Step 1: 落札/流札のDB処理（トランザクション内）
+        //
+        // ■ H2 修正: FinalizeBidAction の戻り値を必ず検査する
+        //   $activeBidderCount は tick() L278 で items lock 外で読まれているため、
+        //   FinalizeBidAction が internal で再 read した時点で「実は 2+ active」だった
+        //   ケースが起こりうる。その場合 FinalizeBidAction は failure DTO を返すが、
+        //   旧版は戻り値を捨てていたため item.status が live のまま moveToNextItem が走り、
+        //   レーンだけ次商品に進む「ゴーストアイテム」化を招いていた。
+        //   失敗時は throw → 上位 tick() の catch で 'bidding' phase に reset され、
+        //   次サイクルで正しい active count を見て price increment 経路に入る。
         DB::beginTransaction();
         try {
             if ($activeBidderCount === 0) {
                 $item->update(['status' => 'unsold']);
                 Log::info("Item {$item->id} unsold");
             } elseif ($activeBidderCount === 1) {
-                $this->finalizeBidAction->execute($item);
+                $finalizeResult = $this->finalizeBidAction->execute($item);
+                if (!$finalizeResult->success) {
+                    DB::rollBack();
+                    Log::warning("handleCountdownEnd: finalize failed for item {$item->id}, treating as race - " . ($finalizeResult->message ?? ''));
+                    throw new \RuntimeException('finalize_race_detected: ' . ($finalizeResult->message ?? ''));
+                }
                 Log::info("Item {$item->id} sold");
             }
             DB::commit();
@@ -1239,7 +1386,24 @@ class CountdownService
                     }
 
                     if ($isActiveBidder) {
-                        $this->leaveBidAction->execute($freshItem, $tlUserId);
+                        // ─── R1 fix: bid_inflight Cache::lock 入れ子取得回避 ──────
+                        //   親（JoinBidAction.execute）が "bid_inflight:item:{id}" を
+                        //   保持している間にここから LeaveBidAction を呼ぶと、
+                        //   LeaveBidAction が同名キーを別 owner token で
+                        //   ->get()（ノンブロッキング）→ false → silent fail し、
+                        //   BidLimitPrice は削除されるのに BidParticipant が active のまま残る。
+                        //   既に items.lockForUpdate 配下なので Cache::lock を経由せず
+                        //   handlePriceIncrement(L559) と同じく直接 deactivate する。
+                        $tlParticipant = BidParticipant::forItem($freshItem->id)
+                            ->forUser($tlUserId)->first();
+                        if ($tlParticipant && $tlParticipant->is_active) {
+                            $tlParticipant->deactivate();
+                            BidEvent::recordLeave(
+                                $freshItem->id,
+                                $tlUserId,
+                                (float) $freshItem->current_price
+                            );
+                        }
                         $autoLeftUserIds[] = $tlUserId;
                     }
 
@@ -1264,79 +1428,83 @@ class CountdownService
                 }
             }
 
-            // ─── B2 + B8: 件数別 broadcast 戦略 ─────────────────────────
-            //   - 件数 < 5: 個別 BidLimitReached を発火（旧フロント互換、軽量）
-            //   - 件数 >= 5: 個別 broadcast を skip し batch 1 個に集約
-            //   100 名同価格指値時: 100 broadcast → 1 broadcast（99% 削減）
-            $cancelledItems = array_filter(
+            // ─── C1 + B2 + B8 + B9: 全 broadcast / 通知 dispatch を afterCommit へ集約 ─────
+            //   旧版は items.lockForUpdate 保持中（commit 前）に broadcast を発火していたため、
+            //   commit が deadlock / lock_wait_timeout で失敗するとフロントには「指値発動」が
+            //   届いた後で DB がロールバックされる整合崩壊を起こしていた。
+            //   FinalizeBidAction が DB::afterCommit() を使うのと同じ理由で、外部に出る
+            //   「BidLimitReached / BidLimitsBatchTriggered / 通知 Job」は commit 確定後に流す。
+            $cancelledItems = array_values(array_filter(
                 $batchTriggered,
                 fn($t) => !$t['protected'] && $t['action'] === 'cancelled'
-            );
+            ));
             $cancelCount = count($cancelledItems);
 
-            if ($cancelCount > 0 && $cancelCount < 5) {
-                // 小規模: 後方互換のため個別 broadcast を発火
-                foreach ($cancelledItems as $bt) {
-                    try {
-                        broadcast(new BidLimitReached(
-                            $auction->id, $lane->id, $item->id,
-                            $bt['user_id'], (float) $freshItem->current_price, $bt['limit_price'],
-                            $freshItem->species_name ?? ''
-                        ));
-                    } catch (\Exception $brErr) {
-                        Log::warning("BidLimitReached broadcast error: " . $brErr->getMessage());
-                    }
-                }
-            }
+            $publicBatch = array_values(array_map(function ($t) {
+                unset($t['_notify_user_id'], $t['_notify_limit']);
+                return $t;
+            }, $batchTriggered));
 
-            // batch broadcast は常に発火（フロントの主要ハンドラ）
-            // 内部用 _notify_* フィールドはレスポンスに含めない
-            if (!empty($batchTriggered)) {
-                $publicBatch = array_map(function ($t) {
-                    unset($t['_notify_user_id'], $t['_notify_limit']);
-                    return $t;
-                }, $batchTriggered);
-                try {
-                    broadcast(new \App\Events\BidLimitsBatchTriggered(
-                        $auction->id,
-                        $lane->id,
-                        $item->id,
-                        (float) $freshItem->current_price,
-                        array_values($publicBatch)
-                    ));
-                } catch (\Exception $batchErr) {
-                    Log::warning("BidLimitsBatchTriggered broadcast error: " . $batchErr->getMessage());
-                }
-            }
-
-            // ─── B9: LINE/Mail 通知を queue で chunk 化 ─────────────────
-            //   100 名同時 cancel 時に 100 件の同期 sendBidLimitReachedNotification
-            //   が走ると items lock 保持時間が長期化 → afterCommit + queue で逃がす
             $notifyTargets = array_values(array_filter(
                 $batchTriggered,
                 fn($t) => isset($t['_notify_user_id']) && !$t['protected']
             ));
-            if (!empty($notifyTargets)) {
-                $itemId        = $item->id;
-                $speciesName   = $freshItem->species_name ?? '商品';
-                $currentPrice  = (float) $freshItem->current_price;
 
-                DB::afterCommit(function () use ($notifyTargets, $itemId, $speciesName, $currentPrice) {
+            $auctionId           = $auction->id;
+            $laneId              = $lane->id;
+            $itemId              = $item->id;
+            $broadcastPrice      = (float) $freshItem->current_price;
+            $broadcastSpecies    = $freshItem->species_name ?? '';
+            $notifySpeciesName   = $freshItem->species_name ?? '商品';
+
+            DB::afterCommit(function () use (
+                $cancelCount, $cancelledItems, $publicBatch,
+                $auctionId, $laneId, $itemId, $broadcastPrice, $broadcastSpecies,
+                $notifyTargets, $notifySpeciesName
+            ) {
+                // 件数 < 5: 旧フロント互換のため個別 BidLimitReached も発火
+                // 件数 >= 5: batch 1 発のみ（120 名負荷時に 100 broadcast → 1 broadcast）
+                if ($cancelCount > 0 && $cancelCount < 5) {
+                    foreach ($cancelledItems as $bt) {
+                        try {
+                            broadcast(new BidLimitReached(
+                                $auctionId, $laneId, $itemId,
+                                $bt['user_id'], $broadcastPrice, $bt['limit_price'],
+                                $broadcastSpecies
+                            ));
+                        } catch (\Exception $brErr) {
+                            Log::warning("BidLimitReached broadcast error: " . $brErr->getMessage());
+                        }
+                    }
+                }
+
+                if (!empty($publicBatch)) {
+                    try {
+                        broadcast(new \App\Events\BidLimitsBatchTriggered(
+                            $auctionId, $laneId, $itemId,
+                            $broadcastPrice,
+                            $publicBatch
+                        ));
+                    } catch (\Exception $batchErr) {
+                        Log::warning("BidLimitsBatchTriggered broadcast error: " . $batchErr->getMessage());
+                    }
+                }
+
+                // ─── B9 + C2: 通知 dispatch（PendingDispatch ラップを排除して正しい API に）
+                if (!empty($notifyTargets)) {
                     foreach (array_chunk($notifyTargets, 20) as $chunk) {
                         try {
-                            // 既存 NotificationService を queue に逃がす（同期実行抑制）
-                            \Illuminate\Support\Facades\Bus::dispatch(
-                                new \Illuminate\Bus\PendingDispatch(
-                                    new \App\Jobs\NotifyBidLimitChunkJob($itemId, $speciesName, $currentPrice, $chunk)
-                                )
+                            \App\Jobs\NotifyBidLimitChunkJob::dispatch(
+                                $itemId, $notifySpeciesName, $broadcastPrice, $chunk
                             );
                         } catch (\Throwable $jobErr) {
-                            // Job クラス未存在 / dispatch 失敗時は同期 fallback
+                            // dispatch 失敗時のみ同期 fallback（commit 後なので items lock 影響なし）
+                            Log::warning("NotifyBidLimitChunkJob dispatch failed, falling back to sync: " . $jobErr->getMessage());
                             foreach ($chunk as $t) {
                                 try {
                                     app(NotificationService::class)->sendBidLimitReachedNotification(
-                                        $t['_notify_user_id'], $speciesName,
-                                        $t['_notify_limit'], $currentPrice
+                                        $t['_notify_user_id'], $notifySpeciesName,
+                                        $t['_notify_limit'], $broadcastPrice
                                     );
                                 } catch (\Throwable $lineErr) {
                                     Log::warning("BidLimit notify fallback failed: " . $lineErr->getMessage());
@@ -1344,8 +1512,8 @@ class CountdownService
                             }
                         }
                     }
-                });
-            }
+                }
+            });
         } catch (\Exception $e) {
             Log::error("adjustPriceByBidLimits checkBidLimits error: " . $e->getMessage());
         }

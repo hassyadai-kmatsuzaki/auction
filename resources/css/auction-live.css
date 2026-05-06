@@ -139,3 +139,17 @@
   animation: badgePulse 2s ease-in-out infinite;
   will-change: transform;
 }
+
+/* ─── CelebrationOverlay: 落札ポップ ───────────────────────────
+ * 旧: sx 内に @keyframes 直書き → MUI styled-component が毎レンダー再生成
+ * 新: static CSS で GPU 合成（transform/opacity のみ） */
+@keyframes celebrationPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  50%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+.celebration-pop {
+  animation: celebrationPop 0.5s ease-out;
+  will-change: transform, opacity;
+}

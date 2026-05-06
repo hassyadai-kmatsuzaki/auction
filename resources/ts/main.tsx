@@ -23,6 +23,10 @@ const queryClient = new QueryClient({
       // ライブ画面は WebSocket（Reverb）が状態同期を担うため、フォーカス復帰でも
       // 再取得は不要。WS切断時のみ refetchInterval（useAuctionLive.ts L19-23）で復旧する。
       refetchOnWindowFocus: false,
+      // 会場 Wi-Fi 瞬断 → 120 名一斉ネット復帰時に全クエリが同時 refetch されると
+      // PHP-FPM が枯渇する。Window focus と同じ理由で抑止。
+      // WS 切断中は useAuctionLive 側の refetchInterval (5s) が fallback を担う。
+      refetchOnReconnect: false,
     },
     mutations: {
       retry: 1,

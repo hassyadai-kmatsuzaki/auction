@@ -78,7 +78,7 @@ export function useBidToggle(auctionId: number) {
     onSuccess: (result) => {
       if (result.success) {
         showSnackbar(result.message || '入札に参加しました', 'success');
-      } else {
+      } else if (!result.silent) {
         showSnackbar(result.message || '入札に失敗しました', 'error');
       }
     },
@@ -92,12 +92,17 @@ export function useBidToggle(auctionId: number) {
       if (context?.previousData) {
         queryClient.setQueryData(LIVE_STATE_QUERY_KEY(auctionId), context.previousData);
       }
-      showSnackbar(
-        err?.response?.data?.message || '入札に失敗しました',
-        'error'
-      );
-      // 失敗時のみサーバーと再同期（成功時は WS 経由で更新されるので不要）
-      queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
+      // silent=true: サーバー再検証で正常に弾かれた競合（pre_bid/freeze/価格不一致/他者権利者）。
+      //   ユーザー誤操作ではないのでトースト出さず、invalidate もしない（WS イベントで UI 同期）。
+      const silent = err?.response?.data?.silent === true;
+      if (!silent) {
+        showSnackbar(
+          err?.response?.data?.message || '入札に失敗しました',
+          'error'
+        );
+        // 失敗時のみサーバーと再同期（成功時は WS 経由で更新されるので不要）
+        queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
+      }
     },
 
     // 成功・失敗どちらでも lock は解除する。ただし invalidate は onError 限定（負荷削減）

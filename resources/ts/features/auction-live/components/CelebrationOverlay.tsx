@@ -14,7 +14,10 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
     const end = Date.now() + duration;
     const colors = ['#ff0000', '#ff6600', '#ffcc00', '#00cc00', '#0066ff', '#9900ff', '#ff69b4'];
 
-    // canvas-confettiが生成するcanvasをオーバーレイより上に表示
+    let cancelled = false;
+    let rafId: number | null = null;
+
+    // canvas-confetti が生成する canvas をオーバーレイより上に表示
     const fixCanvasZIndex = () => {
       document.querySelectorAll('canvas').forEach(c => {
         if (c.style.position === 'fixed' && c.style.pointerEvents === 'none') {
@@ -24,14 +27,32 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
     };
 
     const frame = () => {
+      if (cancelled) return;
       confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0, y: 0.7 }, colors });
       confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors });
       fixCanvasZIndex();
-      if (Date.now() < end) requestAnimationFrame(frame);
+      if (Date.now() < end) {
+        rafId = requestAnimationFrame(frame);
+      }
     };
     frame();
     confetti({ particleCount: 150, spread: 100, origin: { x: 0.5, y: 0.5 }, colors });
     fixCanvasZIndex();
+
+    // unmount 時に rAF チェーンを停止し、孤児 confetti が次の lane に被さらないよう reset
+    // 連続落札時に CelebrationOverlay が複数 mount/unmount するケースで canvas が積み上がるのを防ぐ
+    return () => {
+      cancelled = true;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      try {
+        confetti.reset();
+      } catch {
+        // canvas-confetti の reset 失敗は致命ではないので握る
+      }
+    };
   }, []);
 
   return (
@@ -44,15 +65,10 @@ export const CelebrationOverlay = React.memo(({ speciesName, winningPrice }: Pro
     >
       <Paper
         elevation={12}
+        className="celebration-pop"
         sx={{
           p: 4, borderRadius: 3, textAlign: 'center',
           bgcolor: 'rgba(255,255,255,0.95)', border: '3px solid', borderColor: 'warning.main',
-          animation: 'celebrationPop 0.5s ease-out',
-          '@keyframes celebrationPop': {
-            '0%': { transform: 'scale(0.5)', opacity: 0 },
-            '50%': { transform: 'scale(1.1)' },
-            '100%': { transform: 'scale(1)', opacity: 1 },
-          },
         }}
       >
         <Typography variant="h2" sx={{ mb: 1 }}>🎉</Typography>

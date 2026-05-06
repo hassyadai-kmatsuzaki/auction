@@ -3,6 +3,12 @@ import axios from '@/lib/axios';
 export interface BidToggleResult {
   success: boolean;
   message: string;
+  /**
+   * true=トースト非表示。サーバー再検証で正常に弾かれた競合
+   * （pre_bid/freeze 中の滑り込み・価格不一致・他者が落札権利者）の合図。
+   * UI は WS イベント (price.updated / bidder.updated) で同期される。
+   */
+  silent?: boolean;
   data?: {
     item_id: number;
     is_active: boolean;

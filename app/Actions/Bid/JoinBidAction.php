@@ -41,6 +41,10 @@ class JoinBidAction
         }
 
         // 入札開始待機フェーズ・フリーズフェーズ中は入札不可
+        // silent=true: フロントは phase に応じてボタンを disabled にしているので、ここに到達するのは
+        //   WS 取り逃し / 時計ズレ / phase 切替の数百 ms 窓 などサーバーの最終ガードに引っかかったケース。
+        //   ユーザー誤操作ではないのでトースト表示は誤解を招く。次の price.updated / countdown.tick で
+        //   UI が自然に同期される。
         $lane = Lane::where('current_item_id', $item->id)->first();
         if ($lane) {
             $countdownState = Cache::get("countdown:lane:{$lane->id}");
@@ -48,13 +52,15 @@ class JoinBidAction
             if ($countdownState && $phase === 'pre_bid') {
                 return BidResultDto::failure(
                     '入札開始待機中です。もう少々お待ちください。',
-                    ['pre_bid_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0]
+                    ['pre_bid_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0],
+                    silent: true,
                 );
             }
             if ($countdownState && $phase === 'freeze') {
                 return BidResultDto::failure(
                     '誤タップ防止中です。もう少々お待ちください。',
-                    ['freeze_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0]
+                    ['freeze_remaining_seconds' => $countdownState['remaining_seconds'] ?? 0],
+                    silent: true,
                 );
             }
         }
@@ -99,20 +105,22 @@ class JoinBidAction
                 }
 
                 // ロック取得後に phase 再判定（先行 IncPrice の freeze書き込みを取りこぼさない）
+                // silent=true: フロントが phase 切替を取り逃した稀なケース。WS イベントで UI 同期される。
                 if ($lane) {
                     $cs = Cache::get("countdown:lane:{$lane->id}");
                     $phase = $cs['phase'] ?? 'bidding';
                     if ($cs && $phase === 'pre_bid') {
-                        return ['fail' => '入札開始待機中です。もう少々お待ちください。'];
+                        return ['fail' => '入札開始待機中です。もう少々お待ちください。', 'silent' => true];
                     }
                     if ($cs && $phase === 'freeze') {
-                        return ['fail' => '誤タップ防止中です。もう少々お待ちください。'];
+                        return ['fail' => '誤タップ防止中です。もう少々お待ちください。', 'silent' => true];
                     }
                 }
 
                 // 価格不一致 → 直前に他者の入札が確定 → 入札中の自分の意思とズレるため拒否
+                // silent=true: 直後に届く price.updated で UI が新価格に更新されるため、エラー表示は不要。
                 if ((float) $locked->current_price !== (float) $item->current_price) {
-                    return ['fail' => '価格が更新されました。最新の価格をご確認のうえ再度入札してください。'];
+                    return ['fail' => '価格が更新されました。最新の価格をご確認のうえ再度入札してください。', 'silent' => true];
                 }
 
                 // 上限価格 (bid_limit) を最新価格で再評価
@@ -149,7 +157,9 @@ class JoinBidAction
                         BidEvent::recordIgnored(
                             $locked->id, $userId, (float) $locked->current_price, $ipAddress, $userAgent
                         );
-                        return ['fail' => '既に他のユーザーが落札権利者です。次の金額になるまでお待ちください。'];
+                        // silent=true: 指値あり商品で1人目押下の数 ms 後に滑り込んだ正常な競合。
+                        // 直後に届く price.updated で UI が新価格に更新される。
+                        return ['fail' => '既に他のユーザーが落札権利者です。次の金額になるまでお待ちください。', 'silent' => true];
                     }
                 }
 
@@ -172,7 +182,7 @@ class JoinBidAction
 
         if (isset($tx['fail'])) {
             optional($bidLock)->release();
-            return BidResultDto::failure($tx['fail']);
+            return BidResultDto::failure($tx['fail'], [], silent: (bool) ($tx['silent'] ?? false));
         }
 
         try {

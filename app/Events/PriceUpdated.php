@@ -19,7 +19,11 @@ class PriceUpdated implements ShouldBroadcastNow
     public int $itemId;
     public float $newPrice;
     public int $activeBiddersCount;
-    public int $countdownSeconds;
+    /**
+     * tier テーブルで小数秒（例: 5.5）を許容するため float。
+     * 旧版は int 宣言で silent 切り捨て → 5.5 が 5 として届く事故あり。
+     */
+    public float $countdownSeconds;
     public array $autoLeftUserIds;
 
     public function __construct(
@@ -28,7 +32,7 @@ class PriceUpdated implements ShouldBroadcastNow
         int $itemId,
         float $newPrice,
         int $activeBiddersCount,
-        int $countdownSeconds,
+        float $countdownSeconds,
         array $autoLeftUserIds = []
     ) {
         $this->auctionId = $auctionId;

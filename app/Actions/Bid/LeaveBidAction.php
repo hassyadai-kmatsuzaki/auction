@@ -8,6 +8,7 @@ use App\Models\BidEvent;
 use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -37,8 +38,14 @@ class LeaveBidAction
         }
 
         // 同じ item に対する同時 Join/Leave を Redis レベルで直列化
+        // JoinBidAction と同じ block(0.3) で揃える。
+        // ノンブロッキング get() はロック保持中の処理が一瞬で終わるケースで silent fail
+        // しやすく、SetBidLimitAction の即発動経路で「指値レコードは triggered=true 化されたのに
+        // BidParticipant が active のまま残る」競合の発生源になる（M1 修正）。
         $bidLock = Cache::lock("bid_inflight:item:{$item->id}", 5);
-        if (!$bidLock->get()) {
+        try {
+            $bidLock->block(0.3);
+        } catch (LockTimeoutException $e) {
             return BidResultDto::failure('現在他のユーザーの入札を処理中です。少しお待ちください。');
         }
 
