@@ -694,7 +694,14 @@ class CountdownService
      *     - 同期 sendBidLimitReachedNotification × 25 = 5〜10 秒間 tick worker 詰まり
      *   新版は adjustPriceByBidLimits と完全に同じ集約パターンで処理する。
      */
-    protected function checkBidLimits(Lane $lane, Item $item, Auction $auction, array $protectedUserIds = []): void
+    /**
+     * 指値の発動チェック・bulk trigger・broadcast まとめ
+     *
+     * 通常は handlePriceIncrement / adjustPriceByBidLimits の直後に内部呼び出しされるが、
+     * AdjustPriceAction（管理者の手動価格調整）など外部の price update 経路からも呼べるよう public にしてある。
+     * 呼び出し側は items の current_price を最新化してから渡すこと。
+     */
+    public function checkBidLimits(Lane $lane, Item $item, Auction $auction, array $protectedUserIds = []): void
     {
         // 価格超過した全指値レコードを取得（アクティブ/非アクティブ問わず）
         // limit_price < current_price: 包含的上限のため、現在価格 == 指値ちょうどでは発動させない（その指値者は耐える扱い）

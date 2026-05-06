@@ -8,6 +8,8 @@ use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\PriceEvent;
+use App\Services\CountdownService;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 管理者による手動価格調整アクション
@@ -39,6 +41,15 @@ class AdjustPriceAction
                 $newPrice, $activeBidderCount,
                 $item->auction->countdown_seconds
             ));
+
+            // 包含的上限の整合: 手動調整で「current_price > limit_price」となる指値者を一括発動・削除する。
+            // 通常の price increment 経路では handlePriceIncrement が checkBidLimits を呼ぶが、
+            // AdjustPriceAction はそこを通らないため指値レコードがクリーンアップされない事故が起きていた。
+            try {
+                app(CountdownService::class)->checkBidLimits($lane, $item->fresh(), $item->auction);
+            } catch (\Exception $e) {
+                Log::warning("checkBidLimits after AdjustPrice failed: item={$item->id} - " . $e->getMessage());
+            }
         }
 
         return AuctionResultDto::success('価格を調整しました。', [

@@ -87,27 +87,43 @@ class SetBidLimitAction
                 // JoinBidAction と同じロック順序プロトコルを守る
                 $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                 if (!$participant || !$participant->is_active) {
-                    $autoBidded = DB::transaction(function () use ($item, $userId) {
+                    // tx 内で「ロック取得時点の current_price」を確定し、外側の競合判定にも使う。
+                    // $item->current_price はリクエスト処理開始時のスナップショットなので、
+                    // その後に他者の入札で価格が上昇していた場合に「指値超え」を取り逃す事故が起きていた。
+                    $txResult = DB::transaction(function () use ($item, $userId) {
                         $locked = Item::where('id', $item->id)->lockForUpdate()->first();
                         if (!$locked || $locked->status !== 'live') {
-                            return false;
+                            return ['outcome' => 'aborted'];
                         }
-                        // 価格再評価（ロック内）: ロック取得待ちの間に他者の入札で価格が上限"超え"た場合のみ拒否
-                        // 包含的上限: 現在価格 == 指値 はまだ払える扱いなので auto-bid 続行
                         $freshLimit = BidLimitPrice::forItem($locked->id)->forUser($userId)->first();
+                        // 包含的上限: current_price == limit_price はまだ払える扱いなので auto-bid 続行
                         if ($freshLimit && $locked->current_price > $freshLimit->limit_price) {
-                            return false;
+                            // ロック取得待ちの間に他者の入札で価格が上限"超え"た
+                            // → 旧版は単に return false で auto-bid をブロックするだけだったため、
+                            //   bid_limit_prices に is_triggered=false の行が放置されてフロントの
+                            //   「上限: ¥X」チップが消えない事故になっていた。
+                            // → 即発動扱いに揃える: markAsTriggered + delete + 後続で broadcast。
+                            $freshLimit->markAsTriggered();
+                            $freshLimit->delete();
+                            return [
+                                'outcome'     => 'triggered_after_lock',
+                                'limit_price' => (float) $freshLimit->limit_price,
+                                'current_price' => (float) $locked->current_price,
+                            ];
                         }
                         $existing = BidParticipant::forItem($locked->id)->forUser($userId)->first();
                         if ($existing && $existing->is_active) {
-                            return false;
+                            return ['outcome' => 'already_active'];
                         }
                         BidParticipant::participate($locked->id, $userId, true, null, 'auto-bid-from-limit');
                         \App\Models\BidEvent::recordJoin($locked->id, $userId, (float) $locked->current_price, null, 'auto-bid-from-limit');
-                        return true;
+                        return ['outcome' => 'auto_bidded'];
                     }, 3);
 
-                    if ($autoBidded) {
+                    $outcome = $txResult['outcome'] ?? 'aborted';
+
+                    if ($outcome === 'auto_bidded') {
+                        $autoBidded = true;
                         $lane = Lane::where('current_item_id', $item->id)->first();
                         if ($lane && $item->auction) {
                             $activeCount = BidParticipant::forItem($item->id)->active()->count();
@@ -117,6 +133,10 @@ class SetBidLimitAction
                                 \Illuminate\Support\Facades\Log::warning("Auto-bid broadcast: " . $e->getMessage());
                             }
                         }
+                    } elseif ($outcome === 'triggered_after_lock') {
+                        // 競合発動: 入札参加なし／レコード削除済み／ユーザーへ「上限到達」通知を出す
+                        $triggered = true;
+                        $this->broadcastLimitReached($item, $userId, $limitPrice);
                     }
                 }
 
@@ -148,6 +168,27 @@ class SetBidLimitAction
                                 \Illuminate\Support\Facades\Log::error("Immediate price increment on limit set: " . $e->getMessage());
                             }
                         }
+                    }
+                }
+            }
+
+            // 最終漏れガード: ここまでに発動処理が走っていないにもかかわらず
+            // 「実際の current_price > limit_price」の状態が残っていれば一括クリーンアップする。
+            //
+            // 該当ケース:
+            //   - 既に active なユーザーが指値を「現在価格より低い金額」に更新した場合
+            //     （上の if/else は「$participant->is_active」を理由に auto-bid tx をスキップする）
+            //   - $item->current_price がリクエスト処理中に他者入札で上書きされていた場合
+            // checkBidLimits は「limit_price < current_price」の行を bulk で is_triggered+delete し、
+            // BidLimitReached / BidLimitsBatchTriggered で対象ユーザーへ通知してくれる。
+            if (!$triggered) {
+                $lane = $lane ?? Lane::where('current_item_id', $item->id)->first();
+                $freshItem = $item->fresh();
+                if ($lane && $freshItem && $item->auction && $freshItem->current_price > $limitPrice) {
+                    try {
+                        app(CountdownService::class)->checkBidLimits($lane, $freshItem, $item->auction);
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::warning("checkBidLimits cleanup after SetBidLimit failed: item={$item->id} - " . $e->getMessage());
                     }
                 }
             }
@@ -279,6 +320,20 @@ class SetBidLimitAction
         $activated = count($activatedUserIds);
         if ($activated > 0) {
             \Illuminate\Support\Facades\Log::info("Auto-bid activated: item={$itemId}, count={$activated}, users=" . implode(',', $activatedUserIds));
+        }
+
+        // 商品ライブ化時点で「current_price > limit_price」の指値者がいた場合、
+        // ここでまとめて発動・削除して BidLimitReached を流す。
+        // 旧版は「>= current_price」の行だけ auto-bid して、over-limit の行は無視していたため、
+        // フロントの「上限: ¥X」チップが消えない事故になっていた。
+        // checkBidLimits は items 行ロック内で bulk update + delete を実施し、
+        // 件数別に BidLimitReached / BidLimitsBatchTriggered を流してくれる。
+        if ($lane && $item->auction) {
+            try {
+                app(CountdownService::class)->checkBidLimits($lane, $item->fresh(), $item->auction);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("checkBidLimits cleanup in activatePendingBidLimits failed: item={$itemId} - " . $e->getMessage());
+            }
         }
 
         return $activated;
