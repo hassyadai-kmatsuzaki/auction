@@ -63,6 +63,7 @@ interface SellerProfile {
 interface User {
   id: number;
   name: string;
+  trade_name: string | null;
   email: string;
   phone: string | null;
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
@@ -415,9 +416,14 @@ export default function SellerManagement() {
                         </Avatar>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight="medium" sx={{ whiteSpace: 'nowrap' }}>
-                          {user.name}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap' }}>
+                          <Typography variant="body2" fontWeight="medium">
+                            {user.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            （屋号: {user.trade_name || '-'}）
+                          </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
