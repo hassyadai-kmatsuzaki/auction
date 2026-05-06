@@ -36,7 +36,7 @@ class BidService
         //   getLiveState は polling fallback で 5 秒ごとに呼ばれる可能性があり、
         //   120 接続 × 5 秒 = 24 req/秒 で 300 件読むのは DB 負荷大
         $lanes            = $auction->lanes()
-            ->with(['currentItem.media', 'currentItem.sellerProfile'])
+            ->with(['currentItem.media', 'currentItem.sellerProfile', 'currentItem.sellerProfile.user:id,trade_name'])
             ->orderBy('lane_number')
             ->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
@@ -197,7 +197,8 @@ class BidService
                     'id'                       => $item->id,
                     'item_number'              => $item->item_number,
                     'species_name'             => $item->species_name,
-                    'seller_name'              => $isAnonCurrent ? '匿名出品' : $item->sellerProfile?->seller_name,
+                    // 屋号（users.trade_name）を直参照。未設定は null（フロントで「-」表示）。
+                    'seller_name'              => $isAnonCurrent ? '匿名出品' : ($item->sellerProfile?->user?->trade_name ?? null),
                     'seller_profile_image_url' => $isAnonCurrent ? null : $item->sellerProfile?->profile_image_url,
                     'quantity'                 => $item->quantity,
                     'quantity_unit'            => $item->quantity_unit ?? 'fish',

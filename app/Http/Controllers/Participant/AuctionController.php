@@ -65,14 +65,16 @@ class AuctionController extends Controller
                 ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
                 ->where('is_anonymous', false);
             $this->testMode->applyToItemQuery($rowsQuery);
+            // 表示は users.trade_name（屋号）を直参照。未設定の出品者はチップから除外。
             $rows = $rowsQuery
                 ->join('seller_profiles', 'items.seller_profile_id', '=', 'seller_profiles.id')
-                ->select('items.auction_id', 'seller_profiles.seller_name')
+                ->join('users', 'seller_profiles.user_id', '=', 'users.id')
+                ->select('items.auction_id', 'users.trade_name')
                 ->distinct()
                 ->get();
             foreach ($rows as $row) {
-                if (!empty($row->seller_name)) {
-                    $sellersByAuction[$row->auction_id][] = $row->seller_name;
+                if (!empty($row->trade_name)) {
+                    $sellersByAuction[$row->auction_id][] = $row->trade_name;
                 }
             }
         }
@@ -276,7 +278,8 @@ class AuctionController extends Controller
                     'media' => function ($query) {
                         $query->orderBy('display_order');
                     },
-                    'sellerProfile:id,seller_name,profile_image_path',
+                    'sellerProfile:id,user_id,profile_image_path',
+                    'sellerProfile.user:id,trade_name',
                 ]);
             $this->testMode->applyToItemQuery($laneItemsQuery);
             $laneItems = $laneItemsQuery
@@ -304,7 +307,7 @@ class AuctionController extends Controller
                         'is_anonymous' => $isAnon,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'seller_name' => $isAnon ? '匿名出品' : $item->sellerProfile?->seller_name,
+                        'seller_name' => $isAnon ? '匿名出品' : ($item->sellerProfile?->user?->trade_name ?? null),
                         'seller_profile_image_url' => $isAnon ? null : $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
                     ];
@@ -320,7 +323,8 @@ class AuctionController extends Controller
                 'media' => function ($query) {
                     $query->orderBy('display_order');
                 },
-                'sellerProfile:id,seller_name',
+                'sellerProfile:id,user_id',
+                'sellerProfile.user:id,trade_name',
             ]);
         $this->testMode->applyToItemQuery($unassignedItemsQuery);
         $unassignedItems = $unassignedItemsQuery
@@ -349,14 +353,14 @@ class AuctionController extends Controller
                         'is_anonymous' => $isAnon,
                         'thumbnail_path' => $item->thumbnail_path,
                         'status' => $item->status,
-                        'seller_name' => $isAnon ? '匿名出品' : $item->sellerProfile?->seller_name,
+                        'seller_name' => $isAnon ? '匿名出品' : ($item->sellerProfile?->user?->trade_name ?? null),
                         'seller_profile_image_url' => $isAnon ? null : $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
                     ];
                 }),
             ];
         }
-        
+
         // 総アイテム数を計算
         $totalItems = array_sum(array_map(fn($l) => count($l['items']), $lanesData));
         

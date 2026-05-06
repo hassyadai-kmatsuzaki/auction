@@ -98,19 +98,17 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
             </Typography>
           </Box>
         ) : (
-          item.seller_name && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
-              <Avatar
-                src={item.seller_profile_image_url || undefined}
-                sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
-              >
-                {!item.seller_profile_image_url && item.seller_name.charAt(0)}
-              </Avatar>
-              <Typography variant="caption" color="text.secondary" noWrap>
-                {item.seller_name}
-              </Typography>
-            </Box>
-          )
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+            <Avatar
+              src={item.seller_profile_image_url || undefined}
+              sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+            >
+              {!item.seller_profile_image_url && (item.seller_name?.charAt(0) ?? '-')}
+            </Avatar>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {item.seller_name || '-'}
+            </Typography>
+          </Box>
         )}
         {item.inspection_info && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }} noWrap>

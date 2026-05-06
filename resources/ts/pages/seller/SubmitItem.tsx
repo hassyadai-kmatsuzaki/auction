@@ -114,31 +114,69 @@ export default function SubmitItem() {
   const [items, setItems] = useState<ItemFormData[]>([createEmptyItem()]);
   const [speciesTypes, setSpeciesTypes] = useState<SellerSpeciesType[]>([]);
   const [shipments, setShipments] = useState<ShipmentInput[]>([{ carrier: '', tracking_number: '' }]);
+  // 当該オークションで既に登録済みの自分の伝票（追加登録時に重複チェック・上限管理に利用）
+  const [existingShipments, setExistingShipments] = useState<{ id: number; carrier: Carrier; carrier_label: string; tracking_number: string }[]>([]);
+
+  const remainingShipmentSlots = Math.max(0, MAX_SHIPMENTS - existingShipments.length);
 
   const updateShipment = (index: number, field: keyof ShipmentInput, value: string) => {
     setShipments((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
   };
   const addShipment = () => {
-    setShipments((prev) => (prev.length >= MAX_SHIPMENTS ? prev : [...prev, { carrier: '', tracking_number: '' }]));
+    setShipments((prev) => (prev.length >= remainingShipmentSlots ? prev : [...prev, { carrier: '', tracking_number: '' }]));
   };
   const removeShipment = (index: number) => {
-    setShipments((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+    // 既に登録済みの伝票がある場合は新規入力欄を全削除可能（任意化）。なければ最低1行を残す。
+    const minRows = existingShipments.length > 0 ? 0 : 1;
+    setShipments((prev) => (prev.length <= minRows ? prev : prev.filter((_, i) => i !== index)));
   };
   const validShipments = shipments
     .map((s) => ({ carrier: s.carrier as Carrier, tracking_number: s.tracking_number.trim() }))
     .filter((s) => s.carrier && s.tracking_number.length > 0);
-  const isShipmentsValid = validShipments.length > 0
-    && shipments.every((s) => {
-      const hasCarrier = !!s.carrier;
-      const hasNumber = s.tracking_number.trim().length > 0;
-      // どちらか片方だけ入力された不完全行は不可
-      return (hasCarrier && hasNumber) || (!hasCarrier && !hasNumber);
-    });
+  // 既存伝票が1件以上あれば新規入力は任意。なければ従来通り最低1件必須。
+  // 空行（carrier/tracking_number どちらも空）は許容するが、片方だけ入力された不完全行は不可。
+  const allRowsConsistent = shipments.every((s) => {
+    const hasCarrier = !!s.carrier;
+    const hasNumber = s.tracking_number.trim().length > 0;
+    return (hasCarrier && hasNumber) || (!hasCarrier && !hasNumber);
+  });
+  const isShipmentsValid = allRowsConsistent && (
+    existingShipments.length > 0 || validShipments.length > 0
+  );
 
   useEffect(() => {
     fetchAvailableAuctions();
     fetchSpeciesTypes();
   }, []);
+
+  // auction が選択されたら既存伝票を取得（同一オークションへの再出品時に過去登録分を表示・上限計算に使う）
+  useEffect(() => {
+    if (!auctionId) {
+      setExistingShipments([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`/api/seller/auctions/${parseInt(auctionId)}/shipments`);
+        if (cancelled) return;
+        const list = res.data?.data?.shipments ?? [];
+        setExistingShipments(list);
+        // 既存が10件に達している場合は新規入力欄を消す
+        if (list.length >= MAX_SHIPMENTS) {
+          setShipments([]);
+        } else if (list.length > 0) {
+          // 既存が1件以上あれば新規入力は任意なので、空の初期行も削除（必要なら「+ 伝票を追加」で増やせる）
+          setShipments([]);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('既存伝票の取得に失敗:', err);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [auctionId]);
 
   const fetchSpeciesTypes = async () => {
     try {
@@ -244,19 +282,22 @@ export default function SubmitItem() {
 
       await Promise.all(promises);
 
-      // 伝票番号の登録（出品作成成功後にまとめて送信）
-      try {
-        await axios.post(`/api/seller/auctions/${parseInt(auctionId)}/shipments`, {
-          shipments: validShipments,
-        });
-      } catch (err: any) {
-        console.error('伝票番号登録エラー:', err);
-        setSnackbar({
-          open: true,
-          message: '出品は登録されましたが、伝票番号の登録に失敗しました。出品履歴から再登録してください。',
-          severity: 'error',
-        });
-        return;
+      // 伝票番号の登録（出品作成成功後にまとめて送信）。既存伝票のみで新規ゼロなら送信スキップ。
+      if (validShipments.length > 0) {
+        try {
+          await axios.post(`/api/seller/auctions/${parseInt(auctionId)}/shipments`, {
+            shipments: validShipments,
+          });
+        } catch (err: any) {
+          console.error('伝票番号登録エラー:', err);
+          setSnackbar({
+            open: true,
+            message: err.response?.data?.message
+              || '出品は登録されましたが、伝票番号の登録に失敗しました。出品履歴から再登録してください。',
+            severity: 'error',
+          });
+          return;
+        }
       }
 
       setSnackbar({
@@ -637,11 +678,32 @@ export default function SubmitItem() {
                     {/* 伝票番号 */}
                     <Box sx={{ mb: 3 }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        伝票番号 <Typography component="span" color="error" fontWeight={700}>*</Typography>
+                        伝票番号 {existingShipments.length === 0 && (
+                          <Typography component="span" color="error" fontWeight={700}>*</Typography>
+                        )}
                       </Typography>
                       <Alert severity="info" sx={{ mb: 2 }}>
-                        生体の発送に使用した伝票番号を入力してください。複数の伝票で発送した場合は「+ 伝票を追加」で増やせます（最大{MAX_SHIPMENTS}件）。伝票番号と各生体の紐付けは行いません。
+                        {existingShipments.length > 0
+                          ? `このオークションには既に${existingShipments.length}件の伝票番号を登録済みです。追加で発送した分があれば下に入力してください（合計最大${MAX_SHIPMENTS}件まで）。新規追加が無い場合は空のまま送信できます。`
+                          : `生体の発送に使用した伝票番号を入力してください。複数の伝票で発送した場合は「+ 伝票を追加」で増やせます（最大${MAX_SHIPMENTS}件）。伝票番号と各生体の紐付けは行いません。`}
                       </Alert>
+                      {existingShipments.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                            登録済み（{existingShipments.length}/{MAX_SHIPMENTS}）
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {existingShipments.map((es) => (
+                              <Chip
+                                key={es.id}
+                                size="small"
+                                label={`${es.carrier_label} / ${es.tracking_number}`}
+                                variant="outlined"
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
                       {shipments.map((s, index) => (
                         <Grid container spacing={1.5} key={index} alignItems="center" sx={{ mb: 1 }}>
                           <Grid item xs={12} sm={4} md={3}>
@@ -674,7 +736,7 @@ export default function SubmitItem() {
                             <IconButton
                               size="small"
                               onClick={() => removeShipment(index)}
-                              disabled={shipments.length <= 1}
+                              disabled={shipments.length <= (existingShipments.length > 0 ? 0 : 1)}
                               aria-label="伝票を削除"
                             >
                               <DeleteIcon />
@@ -687,10 +749,10 @@ export default function SubmitItem() {
                         size="small"
                         startIcon={<AddIcon />}
                         onClick={addShipment}
-                        disabled={shipments.length >= MAX_SHIPMENTS}
+                        disabled={shipments.length >= remainingShipmentSlots}
                         sx={{ mt: 1 }}
                       >
-                        伝票を追加 ({shipments.length}/{MAX_SHIPMENTS})
+                        伝票を追加 ({existingShipments.length + shipments.length}/{MAX_SHIPMENTS})
                       </Button>
                     </Box>
 

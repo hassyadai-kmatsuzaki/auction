@@ -404,6 +404,7 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     
     // 出品申込時の伝票番号登録
     Route::middleware('check.subscription:sell')->group(function () {
+        Route::get('/auctions/{auctionId}/shipments', [\App\Http\Controllers\Seller\ShipmentController::class, 'index']);
         Route::post('/auctions/{auctionId}/shipments', [\App\Http\Controllers\Seller\ShipmentController::class, 'bulkUpsert']);
     });
 

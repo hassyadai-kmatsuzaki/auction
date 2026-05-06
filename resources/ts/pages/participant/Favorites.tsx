@@ -59,7 +59,7 @@ interface FavoriteItem {
   seller: {
     id: number | null;
     seller_code: string | null;
-    seller_name: string;
+    seller_name: string | null;
     profile_image_url?: string | null;
   } | null;
   auction: {
@@ -114,7 +114,7 @@ export default function Favorites() {
     favorites.forEach((f) => {
       if (f.is_anonymous) return;
       if (f.seller && f.seller.id != null) {
-        map.set(f.seller.id, { id: f.seller.id, name: f.seller.seller_name });
+        map.set(f.seller.id, { id: f.seller.id, name: f.seller.seller_name || '-' });
       }
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
@@ -397,10 +397,10 @@ export default function Favorites() {
                           src={item.seller.profile_image_url || undefined}
                           sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
                         >
-                          {!item.seller.profile_image_url && item.seller.seller_name.charAt(0)}
+                          {!item.seller.profile_image_url && (item.seller.seller_name?.charAt(0) ?? '-')}
                         </Avatar>
                         <Typography variant="caption" color="text.secondary" noWrap>
-                          {item.seller.seller_name}
+                          {item.seller.seller_name || '-'}
                         </Typography>
                       </Box>
                     )

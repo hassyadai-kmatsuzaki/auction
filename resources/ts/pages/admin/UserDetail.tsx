@@ -87,6 +87,8 @@ interface SellerProfile {
 interface User {
   id: number;
   name: string;
+  trade_name: string | null;
+  company_name: string | null;
   email: string;
   phone: string | null;
   postal_code: string | null;
@@ -130,6 +132,8 @@ export default function UserDetail() {
   // 編集フォーム
   const [editForm, setEditForm] = useState({
     name: '',
+    trade_name: '',
+    company_name: '',
     phone: '',
     postal_code: '',
     prefecture: '',
@@ -166,6 +170,8 @@ export default function UserDetail() {
         setUser(userData);
         setEditForm({
           name: userData.name || '',
+          trade_name: userData.trade_name || '',
+          company_name: userData.company_name || '',
           phone: userData.phone || '',
           postal_code: userData.postal_code || '',
           prefecture: userData.prefecture || '',
@@ -355,6 +361,24 @@ export default function UserDetail() {
               </Typography>
               <Typography variant="body1">
                 {user.name}
+              </Typography>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                屋号
+              </Typography>
+              <Typography variant="body1">
+                {user.trade_name || '-'}
+              </Typography>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                会社名
+              </Typography>
+              <Typography variant="body1">
+                {user.company_name || '-'}
               </Typography>
             </Box>
 
@@ -972,6 +996,21 @@ export default function UserDetail() {
             label="名前"
             value={editForm.name}
             onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="屋号"
+            value={editForm.trade_name}
+            onChange={(e) => setEditForm({ ...editForm, trade_name: e.target.value })}
+            margin="normal"
+            helperText="出品者として表示される屋号。未入力の場合は「-」表示になります。"
+          />
+          <TextField
+            fullWidth
+            label="会社名"
+            value={editForm.company_name}
+            onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
             margin="normal"
           />
           <TextField

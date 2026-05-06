@@ -250,6 +250,8 @@ class UserController extends Controller
 
         $request->validate([
             'name' => 'string|max:255',
+            'trade_name' => 'nullable|string|max:255',
+            'company_name' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
             'postal_code' => 'nullable|string|max:10',
             'prefecture' => 'nullable|string|max:50',
@@ -269,7 +271,8 @@ class UserController extends Controller
         try {
             // ユーザー情報更新
             $user->update($request->only([
-                'name', 'phone', 'postal_code', 'prefecture',
+                'name', 'trade_name', 'company_name',
+                'phone', 'postal_code', 'prefecture',
                 'city', 'address_line1', 'address_line2', 'status', 'is_active', 'is_test'
             ]));
 

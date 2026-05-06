@@ -40,6 +40,11 @@ export function useBidToggle(auctionId: number) {
       return bidApi.toggle(itemId, true, controller.signal);
     },
 
+    // 実装書 F12: retry: 0 でリトライ抑制
+    //   旧: TanStack Query デフォルトの retry が走る → 120 名 × 失敗 × N 回 = サーバー連鎖過負荷
+    //   新: 失敗したら 1 回で諦める。WebSocket イベントで状態は同期される
+    retry: 0,
+
     // 楽観的更新: APIレスポンスを待たずに UI を 'active' に切り替える
     onMutate: async ({ itemId }) => {
       lockBid(itemId);

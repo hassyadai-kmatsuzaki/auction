@@ -159,23 +159,21 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
               匿名出品
             </Typography>
           ) : (
-            item.seller_name && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Avatar
-                  src={item.seller_profile_image_url || undefined}
-                  sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
-                >
-                  {!item.seller_profile_image_url && item.seller_name.charAt(0)}
-                </Avatar>
-                <Typography variant="caption" color="text.secondary">
-                  {item.seller_name}
-                </Typography>
-              </Box>
-            )
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Avatar
+                src={item.seller_profile_image_url || undefined}
+                sx={{ width: 20, height: 20, fontSize: '0.7rem', bgcolor: 'grey.300' }}
+              >
+                {!item.seller_profile_image_url && (item.seller_name?.charAt(0) ?? '-')}
+              </Avatar>
+              <Typography variant="caption" color="text.secondary">
+                {item.seller_name || '-'}
+              </Typography>
+            </Box>
           )}
           {item.quantity != null && (
             <Typography variant="caption" color="text.secondary">
-              {(item.is_anonymous || item.seller_name) ? '/ ' : ''}数量：{item.quantity}{item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}
+              / 数量：{item.quantity}{item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}
             </Typography>
           )}
         </Box>

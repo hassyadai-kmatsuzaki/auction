@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
 import { subscribeWithSelector, devtools } from 'zustand/middleware';
 
 interface AuctionLiveStore {
@@ -13,27 +13,39 @@ interface AuctionLiveStore {
   isBidLocked: (itemId: number) => boolean;
 }
 
-export const useAuctionLiveStore = create<AuctionLiveStore>()(
-  devtools(
-    subscribeWithSelector((set, get) => ({
-      socketConnected: false,
-      setSocketConnected: (v) => set({ socketConnected: v }, false, 'setSocketConnected'),
+// 実装書 F11: Zustand devtools を本番で無効化（メモリリーク対策）
+//   旧: 常時 devtools 有効 → state mutation を Redux DevTools へ送信
+//      120名 × 数千 mutation を全部 history 蓄積 → メモリ圧迫
+//   新: dev 時のみ devtools 有効、production は subscribeWithSelector のみ
+const IS_DEV = import.meta.env.DEV;
 
-      bidLockMap: {},
-      lockBid: (itemId) =>
-        set(
-          (s) => ({ bidLockMap: { ...s.bidLockMap, [itemId]: true } }),
-          false,
-          'lockBid'
-        ),
-      unlockBid: (itemId) =>
-        set(
-          (s) => ({ bidLockMap: { ...s.bidLockMap, [itemId]: false } }),
-          false,
-          'unlockBid'
-        ),
-      isBidLocked: (itemId) => get().bidLockMap[itemId] ?? false,
-    })),
-    { name: 'AuctionLiveStore' }
-  )
-);
+const storeCreator: StateCreator<AuctionLiveStore, [['zustand/subscribeWithSelector', never]], []> = (set, get) => ({
+  socketConnected: false,
+  setSocketConnected: (v) => set({ socketConnected: v }, false, 'setSocketConnected' as any),
+
+  bidLockMap: {},
+  lockBid: (itemId) =>
+    set(
+      (s) => ({ bidLockMap: { ...s.bidLockMap, [itemId]: true } }),
+      false,
+      'lockBid' as any
+    ),
+  unlockBid: (itemId) =>
+    set(
+      (s) => ({ bidLockMap: { ...s.bidLockMap, [itemId]: false } }),
+      false,
+      'unlockBid' as any
+    ),
+  isBidLocked: (itemId) => get().bidLockMap[itemId] ?? false,
+});
+
+export const useAuctionLiveStore = IS_DEV
+  ? create<AuctionLiveStore>()(
+      devtools(
+        subscribeWithSelector(storeCreator) as any,
+        { name: 'AuctionLiveStore' }
+      )
+    )
+  : create<AuctionLiveStore>()(
+      subscribeWithSelector(storeCreator)
+    );

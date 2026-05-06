@@ -25,7 +25,7 @@ class FavoriteController extends Controller
         $includePast = $request->boolean('include_past', false);
 
         $favoritesQuery = Favorite::where('user_id', $userId)
-            ->with(['item.auction', 'item.media', 'item.sellerProfile']);
+            ->with(['item.auction', 'item.media', 'item.sellerProfile', 'item.sellerProfile.user:id,trade_name']);
 
         // テストモード ON で許可ユーザーでなければ空にする（許可ユーザーには全件見せる）
         if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user())) {
@@ -65,7 +65,8 @@ class FavoriteController extends Controller
                     : ($item->sellerProfile ? [
                         'id'                 => $item->sellerProfile->id,
                         'seller_code'        => $item->sellerProfile->seller_code,
-                        'seller_name'        => $item->sellerProfile->seller_name,
+                        // 屋号（users.trade_name）を直参照。未設定は null（フロントで「-」表示）。
+                        'seller_name'        => $item->sellerProfile->user?->trade_name,
                         'profile_image_url'  => $item->sellerProfile->profile_image_url,
                     ] : null),
                 'auction' => $auction ? [

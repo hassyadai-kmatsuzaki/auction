@@ -157,47 +157,50 @@ export function useAuctionSocket({
     }
 
     const channelName = `auction.${auctionId}.live`;
-    console.log('[Socket] Subscribing to channel:', channelName);
+    // 実装書 W3: production では console.log を全停止（ブラウザメモリ圧力対策）
+    // 120 名 × 毎秒数件 × 3 時間 = 数十万行の console 蓄積で GC 圧迫が起きる
+    const IS_DEV = import.meta.env.DEV;
+    if (IS_DEV) console.log('[Socket] Subscribing to channel:', channelName);
 
     try {
       const channel = echo.channel(channelName);
       channelRef.current = channel;
       setIsConnected(true);
-      console.log('[Socket] Channel subscribed successfully');
+      if (IS_DEV) console.log('[Socket] Channel subscribed successfully');
 
       // 価格更新イベント
       channel.listen('.price.updated', (event: PriceUpdatedEvent) => {
-        console.log('[Socket] price.updated:', event);
+        if (IS_DEV) console.log('[Socket] price.updated:', event);
         callbacksRef.current.onPriceUpdated?.(event);
       });
 
       // 入札者更新イベント
       channel.listen('.bidder.updated', (event: BidderUpdatedEvent) => {
-        console.log('[Socket] bidder.updated:', event);
+        if (IS_DEV) console.log('[Socket] bidder.updated:', event);
         callbacksRef.current.onBidderUpdated?.(event);
       });
 
       // レーン変更イベント
       channel.listen('.lane.changed', (event: LaneChangedEvent) => {
-        console.log('[Socket] lane.changed:', event);
+        if (IS_DEV) console.log('[Socket] lane.changed:', event);
         callbacksRef.current.onLaneChanged?.(event);
       });
 
       // 落札イベント
       channel.listen('.item.sold', (event: ItemSoldEvent) => {
-        console.log('[Socket] item.sold:', event);
+        if (IS_DEV) console.log('[Socket] item.sold:', event);
         callbacksRef.current.onItemSold?.(event);
       });
 
       // オークションステータス変更イベント
       channel.listen('.auction.status', (event: AuctionStatusEvent) => {
-        console.log('[Socket] auction.status:', event);
+        if (IS_DEV) console.log('[Socket] auction.status:', event);
         callbacksRef.current.onAuctionStatus?.(event);
       });
 
-      // カウントダウンティックイベント
+      // カウントダウンティックイベント（毎秒のため特に重要）
       channel.listen('.countdown.tick', (event: CountdownTickEvent) => {
-        console.log('[Socket] countdown.tick:', event);
+        if (IS_DEV) console.log('[Socket] countdown.tick:', event);
         callbacksRef.current.onCountdownTick?.(event);
       });
 
