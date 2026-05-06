@@ -64,8 +64,9 @@ class SetBidLimitAction
         $autoBidded = false;
 
         if ($item->status === 'live') {
-            if ($item->current_price >= $limitPrice) {
-                // 既に上限以上 → 入札せず即発動 → 指値レコード削除
+            if ($item->current_price > $limitPrice) {
+                // 既に上限超え → 入札せず即発動 → 指値レコード削除
+                // 包含的上限: 現在価格 == 指値 のときは「ちょうど耐える」扱いで auto-bid に進む
                 $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
                 if ($participant && $participant->is_active) {
                     $didTrigger = $limit->markAsTriggered();
@@ -91,9 +92,10 @@ class SetBidLimitAction
                         if (!$locked || $locked->status !== 'live') {
                             return false;
                         }
-                        // 価格再評価（ロック内）: ロック取得待ちの間に他者の入札で価格が上限超えた場合
+                        // 価格再評価（ロック内）: ロック取得待ちの間に他者の入札で価格が上限"超え"た場合のみ拒否
+                        // 包含的上限: 現在価格 == 指値 はまだ払える扱いなので auto-bid 続行
                         $freshLimit = BidLimitPrice::forItem($locked->id)->forUser($userId)->first();
-                        if ($freshLimit && $locked->current_price >= $freshLimit->limit_price) {
+                        if ($freshLimit && $locked->current_price > $freshLimit->limit_price) {
                             return false;
                         }
                         $existing = BidParticipant::forItem($locked->id)->forUser($userId)->first();
@@ -121,9 +123,10 @@ class SetBidLimitAction
                 // 指値2名以上 → 価格を自動調整（既に入札中のユーザーが指値を設定した場合も含む）
                 $lane = $lane ?? Lane::where('current_item_id', $item->id)->first();
                 if ($lane && $item->auction) {
+                    // 包含的上限: 現在価格と同額の指値者も「まだ払える」競合者として数える
                     $activeLimitCount = BidLimitPrice::where('item_id', $item->id)
                         ->where('is_triggered', false)
-                        ->where('limit_price', '>', $item->current_price)
+                        ->where('limit_price', '>=', $item->current_price)
                         ->count();
 
                     if ($activeLimitCount >= 2) {
@@ -213,9 +216,10 @@ class SetBidLimitAction
                 }
 
                 // ロック取得後の最新状態で対象指値を再取得
+                // 包含的上限: 現在価格と同額の指値者も auto-bid 対象に含める
                 $limits = BidLimitPrice::forItem($locked->id)
                     ->notTriggered()
-                    ->where('limit_price', '>', $locked->current_price)
+                    ->where('limit_price', '>=', $locked->current_price)
                     ->get();
 
                 if ($limits->isEmpty()) {

@@ -519,9 +519,11 @@ class CountdownService
 
             \App\Models\PriceEvent::recordAutoIncrement($item->id, $oldPrice, $newPrice, $activeBidderCount);
 
-            // 価格上昇時の入札者整理:
-            // - 有効な指値（limit_price > 新価格）を持つユーザー → 入札継続
+            // 価格上昇時の入札者整理（指値=包含的上限の仕様）:
+            // - 有効な指値（limit_price >= 新価格）を持つユーザー → 入札継続
             //   └ 指値が最も高いユーザーが落札権利者
+            //   └ 指値ちょうど（limit_price == newPrice）でも保護対象に含める。
+            //     「指値X円 = X円まで払う（X円含む）」の包含解釈。
             // - 有効な指値ユーザーがいる場合 → 手動入札者は全員離脱
             // - 有効な指値ユーザーがいない場合 → lastBidder が1回分残る（従来動作）
             $autoLeftUserIds = [];
@@ -529,7 +531,7 @@ class CountdownService
             // 有効な指値を持つユーザーを指値の高い順に取得
             $validLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
-                ->where('limit_price', '>', $newPrice)
+                ->where('limit_price', '>=', $newPrice)
                 ->orderBy('limit_price', 'desc')
                 ->orderBy('created_at', 'asc')
                 ->get();
@@ -631,9 +633,10 @@ class CountdownService
 
         // 指値ユーザーが2名以上残っている場合、一気に価格調整
         // （1段階ずつの無限ループを防止。フリーズは既に開始済みなので再開始しない）
+        // limit_price >= current_price: 包含的上限のため、現在価格と同額の指値者も「まだ払える」として残す
         $remainingLimits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('limit_price', '>', $freshItem->current_price)
+            ->where('limit_price', '>=', $freshItem->current_price)
             ->count();
 
         if ($remainingLimits >= 2) {
@@ -694,9 +697,10 @@ class CountdownService
     protected function checkBidLimits(Lane $lane, Item $item, Auction $auction, array $protectedUserIds = []): void
     {
         // 価格超過した全指値レコードを取得（アクティブ/非アクティブ問わず）
+        // limit_price < current_price: 包含的上限のため、現在価格 == 指値ちょうどでは発動させない（その指値者は耐える扱い）
         $query = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('limit_price', '<=', $item->current_price);
+            ->where('limit_price', '<', $item->current_price);
 
         if (!empty($protectedUserIds)) {
             $query->whereNotIn('user_id', $protectedUserIds);
@@ -1211,9 +1215,10 @@ class CountdownService
         $item = $locked;
         $currentPrice = $item->current_price;
 
+        // 包含的上限: limit_price >= currentPrice の指値者を「まだ有効」として競合解消対象に含める
         $limits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('limit_price', '>', $currentPrice)
+            ->where('limit_price', '>=', $currentPrice)
             ->orderBy('limit_price', 'asc')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -1341,9 +1346,10 @@ class CountdownService
         $autoLeftUserIds = [];
         $batchTriggered  = []; // BidLimitsBatchTriggered 用集約データ
         try {
+            // 包含的上限: limit_price < current_price のみ発動。指値ちょうど（==）の指値者は耐える扱い。
             $allTriggeredLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
-                ->where('limit_price', '<=', $freshItem->current_price)
+                ->where('limit_price', '<', $freshItem->current_price)
                 ->get();
 
             // アクティブな入札者のIDを一括取得
@@ -1523,9 +1529,10 @@ class CountdownService
         // 反映しておかないと、後続 join がフリーズ中なのに通り抜けてしまう。
         $effectiveHolder = null;
 
+        // 包含的上限: limit_price >= current_price で「まだ払える」指値者のうち最高額を holder にする
         $highestLimitUser = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('limit_price', '>', $freshItem->current_price)
+            ->where('limit_price', '>=', $freshItem->current_price)
             ->orderBy('limit_price', 'desc')
             ->orderBy('created_at', 'asc')
             ->first();

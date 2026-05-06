@@ -85,7 +85,9 @@ class FinalizeBidAction
                 'seller_amount'    => $sellerAmt,
                 'payment_status'   => 'pending',
                 'delivery_status'  => 'pending',
-                'payment_deadline' => now()->addHours($auction->payment_deadline_hours),
+                // 開催が木・金前提のため、落札時点から見た「次の水曜 23:59」を一律期限とする。
+                // auctions.payment_deadline_hours は当面参照しない（営業日対応するまでの暫定運用）。
+                'payment_deadline' => now()->next(\Carbon\Carbon::WEDNESDAY)->endOfDay(),
             ], $shippingData));
 
             BidEvent::recordWin($item->id, $winnerId, $finalPrice);

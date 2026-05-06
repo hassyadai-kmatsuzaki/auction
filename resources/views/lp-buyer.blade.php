@@ -123,14 +123,19 @@
       日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、業者間プラットフォームです。
     </p>
 
-    {{-- 協賛企業（2社・静止） --}}
+    {{-- 協賛企業（横スクロール） --}}
     <p class="partners-row__label anim" data-anim="fade-up">協賛企業</p>
-    <div class="partners-supporters anim" data-anim="fade-up">
-      <div class="partners-supporters__item">
-        <img src="/img/lp/supporter/01.png" alt="" loading="lazy">
-      </div>
-      <div class="partners-supporters__item">
-        <img src="/img/lp/supporter/02.png" alt="" loading="lazy">
+    @php $supporters = [1, 2, 3, 4, 5, 6, 7]; @endphp
+    <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
+      <div class="partners-marquee__track">
+        {{-- 同じセットを3回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
+        @for ($i = 0; $i < 3; $i++)
+          @foreach ($supporters as $n)
+            <div class="partners-marquee__item">
+              <img src="/img/lp/supporter/{{ $n }}.png" alt="" loading="lazy">
+            </div>
+          @endforeach
+        @endfor
       </div>
     </div>
 

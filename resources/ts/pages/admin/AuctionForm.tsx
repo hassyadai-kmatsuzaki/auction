@@ -317,6 +317,10 @@ export default function AuctionForm() {
                   <DateTimePicker label="商品アップロード期限" value={formData.upload_deadline}
                     onChange={(d) => setAuction({ upload_deadline: d })}
                     slotProps={{ textField: { fullWidth: true, helperText: '出品者がアップロードできる期限' } }} />
+                  <Alert severity="info">
+                    落札後の<strong>お支払い期限は「翌水曜 23:59」固定</strong>です（オークション側では変更できません）。<br />
+                    例：木曜開催 → 翌週水曜 23:59 まで／金曜開催 → 翌週水曜 23:59 まで。
+                  </Alert>
                 </Stack>
               </Box>
 

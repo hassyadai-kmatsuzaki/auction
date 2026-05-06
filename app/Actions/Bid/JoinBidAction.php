@@ -65,13 +65,14 @@ class JoinBidAction
             }
         }
 
-        // 指値（上限価格）が設定されており、現在価格が既に上限以上なら入札を拒否
+        // 指値（上限価格）が設定されており、現在価格が既に上限を「超えて」いるなら入札を拒否
+        // 包含的上限: 現在価格 == 指値 のときは「ちょうど耐える」のでまだ入札可能
         // ※ 指値発動時にレコードは削除されるため、ここに到達するのは
-        //    発動前（limit_price > current_price）の指値のみ
+        //    発動前（limit_price >= current_price）の指値のみ
         $limit = BidLimitPrice::forItem($item->id)->forUser($userId)->first();
-        if ($limit && $item->current_price >= $limit->limit_price) {
+        if ($limit && $item->current_price > $limit->limit_price) {
             return BidResultDto::failure(
-                "上限価格（¥" . number_format($limit->limit_price) . "）に達しているため入札できません。上限価格を変更してください。",
+                "上限価格（¥" . number_format($limit->limit_price) . "）を超えているため入札できません。上限価格を変更してください。",
                 ['limit_price' => $limit->limit_price]
             );
         }
@@ -124,9 +125,10 @@ class JoinBidAction
                 }
 
                 // 上限価格 (bid_limit) を最新価格で再評価
+                // 包含的上限: 現在価格 == 指値 では入札可。現在価格 > 指値 のときのみ拒否。
                 $limit = BidLimitPrice::forItem($locked->id)->forUser($userId)->first();
-                if ($limit && $locked->current_price >= $limit->limit_price) {
-                    return ['fail' => "上限価格（¥" . number_format($limit->limit_price) . "）に達しているため入札できません。上限価格を変更してください。"];
+                if ($limit && $locked->current_price > $limit->limit_price) {
+                    return ['fail' => "上限価格（¥" . number_format($limit->limit_price) . "）を超えているため入札できません。上限価格を変更してください。"];
                 }
 
                 // ─── 単方向入札ガード ─────────────────────────────────
