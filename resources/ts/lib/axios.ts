@@ -86,7 +86,13 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     const status = error.response?.status;
-    const silent = (error.config as InternalAxiosRequestConfig & { silent?: boolean })?.silent === true;
+    // silent はリクエスト側オプション（config.silent）と
+    // サーバー応答ボディ（response.data.silent）の両方を尊重する。
+    // 後者は BidResultDto::failure(..., silent: true) のように
+    // サーバー側が「正常な競合なのでトーストを出さないでほしい」と返してくるケース。
+    const configSilent = (error.config as InternalAxiosRequestConfig & { silent?: boolean })?.silent === true;
+    const responseSilent = (error.response?.data as { silent?: boolean } | undefined)?.silent === true;
+    const silent = configSilent || responseSilent;
 
     if (status === 401) {
       const currentPath = window.location.pathname;

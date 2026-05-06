@@ -142,26 +142,15 @@ class JoinBidAction
                     ];
                 }
 
-                // 指値（is_triggered=false の有効な指値が登録されている商品）では
-                // 「1人目押下＝価格上昇＋フリーズ＋押下者が落札権利者」になる。
-                // 既に他者が active（=落札権利者）の状態でこのコードに到達するのは
-                // freeze cache 反映前の数 ms 窓で滑り込んだケース → 無視して監査ログだけ残す。
+                // 指値の有無は handleImmediatePriceIncrement の閾値判定で使うので保持。
+                // ここで「他者activeなら無視」とはしない:
+                //   A単独指値 → A だけ active（価格未上昇）の状態で B が押すケースを弾くと、
+                //   価格が刻み上昇しないまま countdown 終了 → A が start_price で落札してしまう。
+                //   thundering herd は freeze cache（pre-bidLock の line 48-66 / tx 内 line 109-117）
+                //   で十分弾けるので、ここでの ignored ガードは不要。
                 $hasActiveLimits = BidLimitPrice::where('item_id', $locked->id)
                     ->where('is_triggered', false)
                     ->exists();
-                if ($hasActiveLimits) {
-                    $otherActive = BidParticipant::forItem($locked->id)->active()
-                        ->where('user_id', '!=', $userId)
-                        ->count();
-                    if ($otherActive >= 1) {
-                        BidEvent::recordIgnored(
-                            $locked->id, $userId, (float) $locked->current_price, $ipAddress, $userAgent
-                        );
-                        // silent=true: 指値あり商品で1人目押下の数 ms 後に滑り込んだ正常な競合。
-                        // 直後に届く price.updated で UI が新価格に更新される。
-                        return ['fail' => '既に他のユーザーが落札権利者です。次の金額になるまでお待ちください。', 'silent' => true];
-                    }
-                }
 
                 $participant = BidParticipant::participate($locked->id, $userId, true, $ipAddress, $userAgent);
                 BidEvent::recordJoin($locked->id, $userId, (float) $locked->current_price, $ipAddress, $userAgent);
@@ -224,7 +213,8 @@ class JoinBidAction
             }
 
             // 価格上昇＋フリーズの発動閾値（単方向入札仕様）
-            //   指値あり商品: 1人目押下で発動（押下者が落札権利者として確定、滑り込みは無視）
+            //   指値あり商品: 1人目押下で発動。handlePriceIncrement 内で指値者が落札権利者として保護され、
+            //                 押下者（指値なしの手動入札者）は自動離脱する。
             //   指値なし商品: 2人目押下で発動（従来動作 — 1人だけ参加で開始価格落札を成立させる）
             // ★ bidLock は handleImmediatePriceIncrement 中も保持。早期 release は
             //   「join → auto-left」連鎖の原因。

@@ -24,11 +24,6 @@ class BidEvent extends BaseModel
     const TYPE_MANUAL_RAISE = 'manual_raise';
     const TYPE_WIN = 'win';
     const TYPE_LOSE = 'lose';
-    /**
-     * 落札権利者が確定済みの状態で押下された入札を「無視」した監査ログ。
-     * 単方向入札仕様（離脱不可）下で、フリーズ判定をすり抜けた滑り込みタップを記録するために使う。
-     */
-    const TYPE_IGNORED = 'ignored';
 
     /**
      * The attributes that are mass assignable.
@@ -130,19 +125,6 @@ class BidEvent extends BaseModel
         ?string $userAgent = null
     ): BidEvent {
         return static::record($itemId, $userId, self::TYPE_LEAVE, $currentPrice, null, $ipAddress, $userAgent);
-    }
-
-    /**
-     * 落札権利者確定済みの瞬間に滑り込みで届いた入札を「無視」したことを監査ログとして記録する
-     */
-    public static function recordIgnored(
-        int $itemId,
-        int $userId,
-        float $currentPrice,
-        ?string $ipAddress = null,
-        ?string $userAgent = null
-    ): BidEvent {
-        return static::record($itemId, $userId, self::TYPE_IGNORED, $currentPrice, null, $ipAddress, $userAgent);
     }
 
     /**

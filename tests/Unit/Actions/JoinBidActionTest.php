@@ -168,24 +168,31 @@ class JoinBidActionTest extends TestCase
 
     /**
      * @test
-     * 単方向入札仕様（指値あり商品）: 既に他者が落札権利者として active な状態に滑り込んだ
-     * 入札は無視される。bid_events に TYPE_IGNORED として監査ログだけ残す。
+     * 指値あり商品で他者（指値者）が active な状態でも、後続の入札は受理される。
+     *
+     * 旧仕様は「他者active時は ignored で弾く」だったが、A が指値登録だけで auto-active 化された
+     * （価格上昇/freeze 未発火）状態で B が弾かれると、価格が刻み上昇しないまま countdown が
+     * 終了し A が start_price 落札してしまうバグがあった。修正後は B のクリックを受け入れ、
+     * handleImmediatePriceIncrement で価格上昇＋指値者保護の対抗フローに乗せる。
+     *
+     * ※ 価格上昇/holder保護のロジックは Lane 必須なので CountdownService 側のテストに委ね、
+     *    本テストは「入口で弾かない／TYPE_IGNORED を残さない」だけに絞る。
      */
-    public function test_指値あり商品で他者が権利者中の滑り込み入札は無視されignored記録される(): void
+    public function test_指値あり商品でも他者の入札は受理されignoredは記録されない(): void
     {
         $auction = Auction::factory()->create(['status' => 'live']);
         $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
 
-        // 指値（is_triggered=false）が登録されている前提
+        // 指値（is_triggered=false）が A 名義で登録されている前提
+        $userA = 10;
         BidLimitPrice::create([
             'item_id'      => $item->id,
-            'user_id'      => 99,
+            'user_id'      => $userA,
             'limit_price'  => 99999,
             'is_triggered' => false,
         ]);
 
-        // 既存の落札権利者 A
-        $userA = 10;
+        // SetBidLimitAction の auto-bid 経路で A が active 化された状態を再現
         BidParticipant::create([
             'item_id'    => $item->id,
             'user_id'    => $userA,
@@ -193,19 +200,18 @@ class JoinBidActionTest extends TestCase
             'activated_at' => now(),
         ]);
 
-        // 滑り込んできた B
+        // 後続の B が入札ボタンを押す
         $userB = 20;
         $result = $this->action->execute($item, $userB);
 
-        $this->assertFalse($result->success);
-        $this->assertStringContainsString('既に他のユーザーが落札権利者', $result->message);
-        $this->assertDatabaseMissing('bid_participants', [
+        $this->assertTrue($result->success);
+        $this->assertDatabaseHas('bid_participants', [
             'item_id' => $item->id, 'user_id' => $userB, 'is_active' => true,
         ]);
-        $this->assertDatabaseHas('bid_events', [
+        $this->assertDatabaseMissing('bid_events', [
             'item_id'    => $item->id,
             'user_id'    => $userB,
-            'event_type' => BidEvent::TYPE_IGNORED,
+            'event_type' => 'ignored',
         ]);
     }
 
