@@ -63,6 +63,21 @@ export interface BidLimitReachedEvent {
   message: string;
 }
 
+// 実装書 B2/B3: 同価格 bid_limit 集約イベント
+//   100 名同価格指値時に N 個の BidLimitReached を 1 個に集約
+export interface BidLimitsBatchTriggeredEvent {
+  lane_id: number;
+  item_id: number;
+  current_price: number;
+  count: number;
+  triggered: Array<{
+    user_id: number;
+    limit_price: number;
+    action: 'cancelled' | 'triggered';
+    protected: boolean;
+  }>;
+}
+
 interface UseAuctionSocketOptions {
   auctionId: number;
   onPriceUpdated?: (event: PriceUpdatedEvent) => void;
@@ -72,6 +87,7 @@ interface UseAuctionSocketOptions {
   onAuctionStatus?: (event: AuctionStatusEvent) => void;
   onCountdownTick?: (event: CountdownTickEvent) => void;
   onBidLimitReached?: (event: BidLimitReachedEvent) => void;
+  onBidLimitsBatchTriggered?: (event: BidLimitsBatchTriggeredEvent) => void;
   onConnectionError?: (error: unknown) => void;
 }
 
@@ -92,6 +108,7 @@ export function useAuctionSocket({
   onAuctionStatus,
   onCountdownTick,
   onBidLimitReached,
+  onBidLimitsBatchTriggered,
   onConnectionError,
 }: UseAuctionSocketOptions): UseAuctionSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
@@ -100,27 +117,29 @@ export function useAuctionSocket({
   // コールバックをrefで保持（再購読を防ぐ）
   const callbacksRef = useRef<Required<UseAuctionSocketOptions>>({
     auctionId,
-    onPriceUpdated:     onPriceUpdated      ?? (() => {}),
-    onBidderUpdated:    onBidderUpdated     ?? (() => {}),
-    onLaneChanged:      onLaneChanged       ?? (() => {}),
-    onItemSold:         onItemSold          ?? (() => {}),
-    onAuctionStatus:    onAuctionStatus     ?? (() => {}),
-    onCountdownTick:    onCountdownTick     ?? (() => {}),
-    onBidLimitReached:  onBidLimitReached   ?? (() => {}),
-    onConnectionError:  onConnectionError   ?? (() => {}),
+    onPriceUpdated:           onPriceUpdated            ?? (() => {}),
+    onBidderUpdated:          onBidderUpdated           ?? (() => {}),
+    onLaneChanged:            onLaneChanged             ?? (() => {}),
+    onItemSold:               onItemSold                ?? (() => {}),
+    onAuctionStatus:          onAuctionStatus           ?? (() => {}),
+    onCountdownTick:          onCountdownTick           ?? (() => {}),
+    onBidLimitReached:        onBidLimitReached         ?? (() => {}),
+    onBidLimitsBatchTriggered: onBidLimitsBatchTriggered ?? (() => {}),
+    onConnectionError:        onConnectionError         ?? (() => {}),
   });
-  
+
   // コールバックを最新に更新
   callbacksRef.current = {
     auctionId,
-    onPriceUpdated:     onPriceUpdated      ?? (() => {}),
-    onBidderUpdated:    onBidderUpdated     ?? (() => {}),
-    onLaneChanged:      onLaneChanged       ?? (() => {}),
-    onItemSold:         onItemSold          ?? (() => {}),
-    onAuctionStatus:    onAuctionStatus     ?? (() => {}),
-    onCountdownTick:    onCountdownTick     ?? (() => {}),
-    onBidLimitReached:  onBidLimitReached   ?? (() => {}),
-    onConnectionError:  onConnectionError   ?? (() => {}),
+    onPriceUpdated:           onPriceUpdated            ?? (() => {}),
+    onBidderUpdated:          onBidderUpdated           ?? (() => {}),
+    onLaneChanged:            onLaneChanged             ?? (() => {}),
+    onItemSold:               onItemSold                ?? (() => {}),
+    onAuctionStatus:          onAuctionStatus           ?? (() => {}),
+    onCountdownTick:          onCountdownTick           ?? (() => {}),
+    onBidLimitReached:        onBidLimitReached         ?? (() => {}),
+    onBidLimitsBatchTriggered: onBidLimitsBatchTriggered ?? (() => {}),
+    onConnectionError:        onConnectionError         ?? (() => {}),
   };
 
   // WebSocket が有効かどうか
@@ -182,10 +201,15 @@ export function useAuctionSocket({
         callbacksRef.current.onCountdownTick?.(event);
       });
 
-      // 指値自動オフイベント
+      // 指値自動オフイベント（個別、後方互換）
       channel.listen('.bid.limit.reached', (event: BidLimitReachedEvent) => {
-        console.log('[Socket] bid.limit.reached:', event);
         callbacksRef.current.onBidLimitReached?.(event);
+      });
+
+      // 実装書 B2/B3: 指値同時発動の集約イベント（100名同価格対応）
+      //   N 件の bid.limit.reached を 1 件で集約。フロントは triggered 配列を一括処理。
+      channel.listen('.bid.limits.batch.triggered', (event: BidLimitsBatchTriggeredEvent) => {
+        callbacksRef.current.onBidLimitsBatchTriggered?.(event);
       });
     } catch (error) {
       setIsConnected(false);

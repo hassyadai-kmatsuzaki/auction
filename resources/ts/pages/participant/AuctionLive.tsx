@@ -230,6 +230,44 @@ export default function AuctionLive() {
         queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
       }
     },
+    // 実装書 B2/B3: 指値同時発動の集約イベント（100名同価格対応）
+    //   個別 bid.limit.reached が N 個飛んでくる代わりに、1 個の集約イベントで
+    //   triggered[] 配列を受け取って自分が含まれている時だけ UI 反映する
+    onBidLimitsBatchTriggered: (e) => {
+      if (!user?.id) return;
+      // 自分の cancellation を triggered 配列から探す
+      const myCancellation = e.triggered.find(
+        (t) => t.user_id === user.id && t.action === 'cancelled' && !t.protected
+      );
+      if (!myCancellation) return; // 自分が cancel されていなければ何もしない
+
+      showSnackbar(
+        `上限価格 ¥${myCancellation.limit_price.toLocaleString()} に達したため離脱しました`,
+        'warning'
+      );
+      // setQueryData で my_bid_status / my_limit_price をローカルで即時無効化
+      queryClient.setQueryData(['auction-live', auctionId], (prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lanes: prev.lanes.map((lane: any) =>
+            lane.current_item?.id === e.item_id
+              ? {
+                  ...lane,
+                  current_item: {
+                    ...lane.current_item,
+                    my_bid_status: 'inactive',
+                    my_limit_price: null,
+                    my_limit_triggered: false,
+                  },
+                }
+              : lane
+          ),
+        };
+      });
+      // 指値レコードキャッシュは batch なので必ず削除済 → invalidate
+      queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
+    },
   });
 
   // 価格・カウントダウン等で lanes の参照だけ変わることがあるため、current_item.id の集合が変わったときだけキーが更新されるようにする

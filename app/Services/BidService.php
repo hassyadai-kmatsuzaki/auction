@@ -30,11 +30,59 @@ class BidService
      */
     public function getLiveState(Auction $auction, ?int $userId = null): array
     {
-        $lanes            = $auction->lanes()->with(['currentItem.media', 'currentItem.sellerProfile', 'items'])->orderBy('lane_number')->get();
+        // 実装書 N1: lane.items の eager load を削除（過剰ロード対策）
+        //   修正前: 'items' を with() で全件ロード → 1 lane に 100 件あれば 300 件 SELECT
+        //   修正後: current_item と upcoming のみ別クエリで最小取得
+        //   getLiveState は polling fallback で 5 秒ごとに呼ばれる可能性があり、
+        //   120 接続 × 5 秒 = 24 req/秒 で 300 件読むのは DB 負荷大
+        $lanes            = $auction->lanes()
+            ->with(['currentItem.media', 'currentItem.sellerProfile'])
+            ->orderBy('lane_number')
+            ->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;
 
         // ★ N+1解消: 全アクティブアイテムのデータを一括取得
         $currentItemIds = $lanes->pluck('currentItem.id')->filter()->values()->toArray();
+
+        // 実装書 N1: 各レーンの current_item の sequence_order を一括取得
+        //   旧: $lane->items->where('id', $currentItemId)->first()?->pivot?->sequence_order
+        //       → 全 items をロードする前提のロジック
+        //   新: lane_items テーブルから直接 (lane_id, item_id) で sequence_order を取る
+        $currentSeqByLane = !empty($currentItemIds)
+            ? \DB::table('lane_items')
+                ->whereIn('lane_id', $lanes->pluck('id'))
+                ->whereIn('item_id', $currentItemIds)
+                ->select('lane_id', 'sequence_order')
+                ->get()
+                ->keyBy('lane_id')
+            : collect();
+
+        // 実装書 N1: 各レーンの upcoming items（current より後の sequence_order の上位 3 件）を
+        //   per-lane に最小取得。3 レーンなら計 3 クエリだが、各 9 行以下で軽量。
+        $upcomingByLane = [];
+        foreach ($lanes as $lane) {
+            $currentSeqRow = $currentSeqByLane->get($lane->id);
+            if (!$currentSeqRow) {
+                $upcomingByLane[$lane->id] = collect();
+                continue;
+            }
+            $currentSeq = (int) $currentSeqRow->sequence_order;
+
+            $upcomingByLane[$lane->id] = \DB::table('lane_items')
+                ->join('items', 'items.id', '=', 'lane_items.item_id')
+                ->where('lane_items.lane_id', $lane->id)
+                ->where('lane_items.sequence_order', '>', $currentSeq)
+                ->where('items.status', 'registered')
+                ->orderBy('lane_items.sequence_order', 'asc')
+                ->limit(3)
+                ->select(
+                    'items.id', 'items.item_number', 'items.species_name', 'items.quantity',
+                    'items.start_price', 'items.thumbnail_path', 'items.is_premium',
+                    'items.is_anonymous',
+                    'lane_items.sequence_order'
+                )
+                ->get();
+        }
 
         // 入札者数を一括取得（GROUP BY item_id）
         $bidderCounts = !empty($currentItemIds)
@@ -62,18 +110,11 @@ class BidService
                 ->keyBy('item_id')
             : collect();
 
-        // upcoming_items 用: 全レーンの upcoming item ID を収集
+        // upcoming_items 用: 全レーンの upcoming item ID を収集（実装書 N1: $upcomingByLane を使用）
         $upcomingItemIds = [];
-        foreach ($lanes as $lane) {
-            if ($lane->currentItem) {
-                $currentSeq = $lane->items
-                    ->where('id', $lane->currentItem->id)
-                    ->first()?->pivot?->sequence_order ?? 0;
-                $lane->items
-                    ->filter(fn ($i) => ($i->pivot->sequence_order ?? 0) > $currentSeq && $i->status === 'registered')
-                    ->sortBy(fn ($i) => $i->pivot->sequence_order)
-                    ->take(3)
-                    ->each(function ($i) use (&$upcomingItemIds) { $upcomingItemIds[] = $i->id; });
+        foreach ($upcomingByLane as $items) {
+            foreach ($items as $i) {
+                $upcomingItemIds[] = (int) $i->id;
             }
         }
 
@@ -181,38 +222,27 @@ class BidService
                 ];
             }
 
-            // upcoming items: items after the current one in sequence order
+            // upcoming items: 実装書 N1: 事前取得した $upcomingByLane を整形
             $upcomingItems = [];
-            if ($lane->currentItem) {
-                $currentSeq = $lane->items
-                    ->where('id', $lane->currentItem->id)
-                    ->first()?->pivot?->sequence_order ?? 0;
-
-                $upcomingItems = $lane->items
-                    ->filter(fn ($i) => ($i->pivot->sequence_order ?? 0) > $currentSeq && $i->status === 'registered')
-                    ->sortBy(fn ($i) => $i->pivot->sequence_order)
-                    ->take(3)
-                    ->map(function ($i) use ($userId, $myUpcomingLimits, $myUpcomingFavorites) {
-                        $data = [
-                            'id'             => $i->id,
-                            'item_number'    => $i->item_number,
-                            'species_name'   => $i->species_name,
-                            'quantity'       => $i->quantity,
-                            'start_price'    => $i->start_price,
-                            'thumbnail_path' => $i->thumbnail_path,
-                            'is_premium'     => $i->is_premium,
-                            'is_anonymous'   => (bool) $i->is_anonymous,
-                        ];
-                        if ($userId) {
-                            $limit = $myUpcomingLimits->get($i->id);
-                            $data['is_favorited']       = $myUpcomingFavorites->has($i->id);
-                            $data['my_limit_price']     = $limit?->limit_price;
-                            $data['my_limit_triggered'] = $limit?->is_triggered ?? false;
-                        }
-                        return $data;
-                    })
-                    ->values()
-                    ->toArray();
+            $laneUpcoming = $upcomingByLane[$lane->id] ?? collect();
+            foreach ($laneUpcoming as $i) {
+                $data = [
+                    'id'             => (int) $i->id,
+                    'item_number'    => $i->item_number,
+                    'species_name'   => $i->species_name,
+                    'quantity'       => $i->quantity,
+                    'start_price'    => $i->start_price,
+                    'thumbnail_path' => $i->thumbnail_path,
+                    'is_premium'     => (bool) $i->is_premium,
+                    'is_anonymous'   => (bool) $i->is_anonymous,
+                ];
+                if ($userId) {
+                    $limit = $myUpcomingLimits->get($i->id);
+                    $data['is_favorited']       = $myUpcomingFavorites->has($i->id);
+                    $data['my_limit_price']     = $limit?->limit_price;
+                    $data['my_limit_triggered'] = $limit?->is_triggered ?? false;
+                }
+                $upcomingItems[] = $data;
             }
             $laneData['upcoming_items'] = $upcomingItems;
 

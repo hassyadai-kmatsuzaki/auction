@@ -1245,29 +1245,18 @@ class CountdownService
 
                     $tl->delete();
 
-                    // 旧フロント互換のため個別 broadcast は維持（実装書注: 段階移行）
-                    broadcast(new BidLimitReached(
-                        $auction->id, $lane->id, $item->id,
-                        $tlUserId, $freshItem->current_price, $tlLimitPrice,
-                        $freshItem->species_name ?? ''
-                    ));
-
-                    // 新フロント用 batch データを蓄積
+                    // 新フロント用 batch データを蓄積（個別 broadcast は最後に件数判断）
                     $batchTriggered[] = [
-                        'user_id'     => $tlUserId,
-                        'limit_price' => (float) $tlLimitPrice,
-                        'action'      => $isActiveBidder ? 'cancelled' : 'triggered',
-                        'protected'   => false,
+                        'user_id'      => $tlUserId,
+                        'limit_price'  => (float) $tlLimitPrice,
+                        'action'       => $isActiveBidder ? 'cancelled' : 'triggered',
+                        'protected'    => false,
+                        // notify_user_ids 用に保持（後段で chunk dispatch する）
+                        '_notify_user_id' => $tlUserId,
+                        '_notify_limit'   => $tlLimitPrice,
                     ];
-
-                    try {
-                        app(NotificationService::class)->sendBidLimitReachedNotification(
-                            $tlUserId, $freshItem->species_name ?? '商品',
-                            $tlLimitPrice, $freshItem->current_price
-                        );
-                    } catch (\Exception $lineErr) {
-                        Log::warning("BidLimit LINE notify error: " . $lineErr->getMessage());
-                    }
+                    // ※ LINE/Mail 通知は同期 INSERT/外部 API call が重いため、
+                    //   loop 末で afterCommit + queue dispatch でチャンク化（B9）
 
                     Log::info("adjustPriceByBidLimits: limit triggered & cancelled user={$tlUserId}, active={$isActiveBidder}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
                 } catch (\Exception $e) {
@@ -1275,20 +1264,87 @@ class CountdownService
                 }
             }
 
-            // ─── B2: batch broadcast 1 回で集約 ────────────────────
-            // 25〜120 ユーザー分の cancel をフロントへ 1 メッセージで届ける
+            // ─── B2 + B8: 件数別 broadcast 戦略 ─────────────────────────
+            //   - 件数 < 5: 個別 BidLimitReached を発火（旧フロント互換、軽量）
+            //   - 件数 >= 5: 個別 broadcast を skip し batch 1 個に集約
+            //   100 名同価格指値時: 100 broadcast → 1 broadcast（99% 削減）
+            $cancelledItems = array_filter(
+                $batchTriggered,
+                fn($t) => !$t['protected'] && $t['action'] === 'cancelled'
+            );
+            $cancelCount = count($cancelledItems);
+
+            if ($cancelCount > 0 && $cancelCount < 5) {
+                // 小規模: 後方互換のため個別 broadcast を発火
+                foreach ($cancelledItems as $bt) {
+                    try {
+                        broadcast(new BidLimitReached(
+                            $auction->id, $lane->id, $item->id,
+                            $bt['user_id'], (float) $freshItem->current_price, $bt['limit_price'],
+                            $freshItem->species_name ?? ''
+                        ));
+                    } catch (\Exception $brErr) {
+                        Log::warning("BidLimitReached broadcast error: " . $brErr->getMessage());
+                    }
+                }
+            }
+
+            // batch broadcast は常に発火（フロントの主要ハンドラ）
+            // 内部用 _notify_* フィールドはレスポンスに含めない
             if (!empty($batchTriggered)) {
+                $publicBatch = array_map(function ($t) {
+                    unset($t['_notify_user_id'], $t['_notify_limit']);
+                    return $t;
+                }, $batchTriggered);
                 try {
                     broadcast(new \App\Events\BidLimitsBatchTriggered(
                         $auction->id,
                         $lane->id,
                         $item->id,
                         (float) $freshItem->current_price,
-                        $batchTriggered
+                        array_values($publicBatch)
                     ));
                 } catch (\Exception $batchErr) {
                     Log::warning("BidLimitsBatchTriggered broadcast error: " . $batchErr->getMessage());
                 }
+            }
+
+            // ─── B9: LINE/Mail 通知を queue で chunk 化 ─────────────────
+            //   100 名同時 cancel 時に 100 件の同期 sendBidLimitReachedNotification
+            //   が走ると items lock 保持時間が長期化 → afterCommit + queue で逃がす
+            $notifyTargets = array_values(array_filter(
+                $batchTriggered,
+                fn($t) => isset($t['_notify_user_id']) && !$t['protected']
+            ));
+            if (!empty($notifyTargets)) {
+                $itemId        = $item->id;
+                $speciesName   = $freshItem->species_name ?? '商品';
+                $currentPrice  = (float) $freshItem->current_price;
+
+                DB::afterCommit(function () use ($notifyTargets, $itemId, $speciesName, $currentPrice) {
+                    foreach (array_chunk($notifyTargets, 20) as $chunk) {
+                        try {
+                            // 既存 NotificationService を queue に逃がす（同期実行抑制）
+                            \Illuminate\Support\Facades\Bus::dispatch(
+                                new \Illuminate\Bus\PendingDispatch(
+                                    new \App\Jobs\NotifyBidLimitChunkJob($itemId, $speciesName, $currentPrice, $chunk)
+                                )
+                            );
+                        } catch (\Throwable $jobErr) {
+                            // Job クラス未存在 / dispatch 失敗時は同期 fallback
+                            foreach ($chunk as $t) {
+                                try {
+                                    app(NotificationService::class)->sendBidLimitReachedNotification(
+                                        $t['_notify_user_id'], $speciesName,
+                                        $t['_notify_limit'], $currentPrice
+                                    );
+                                } catch (\Throwable $lineErr) {
+                                    Log::warning("BidLimit notify fallback failed: " . $lineErr->getMessage());
+                                }
+                            }
+                        }
+                    }
+                });
             }
         } catch (\Exception $e) {
             Log::error("adjustPriceByBidLimits checkBidLimits error: " . $e->getMessage());
