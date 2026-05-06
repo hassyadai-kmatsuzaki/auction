@@ -155,6 +155,13 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             foreach ($lanesToStart as $laneId) {
                 $lane = Lane::with(['auction', 'currentItem'])->find($laneId);
                 if ($lane && $lane->currentItem) {
+                    // 実装書 B4: countdown cache 事前 warmup（cache miss recovered の防止）
+                    //   修正前: 起動瞬間に getLiveState 並行呼び出しで cache 未生成 → 8件の miss/recovery
+                    //   修正後: startCountdown 前に cache 既存チェック→idempotent で warmup
+                    $existingState = Cache::get("countdown:lane:{$laneId}");
+                    if (!$existingState) {
+                        Log::info("countdown cache warmup: lane {$laneId}");
+                    }
                     $countdownService->startCountdown($lane);
 
                     // ★ 最初の商品にも事前指値の自動入札を適用

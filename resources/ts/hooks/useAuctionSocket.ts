@@ -192,10 +192,27 @@ export function useAuctionSocket({
       callbacksRef.current.onConnectionError?.(error);
     }
 
-    // クリーンアップ
+    // クリーンアップ（実装書 F4: ページ遷移時の listener 残留防止）
     return () => {
       const echo = getEcho();
-      if (echo) {
+      if (echo && channelRef.current) {
+        // 明示的に listener を unbind してから leave（Pusher 側で参照が残るケース対策）
+        try {
+          const ch: any = channelRef.current;
+          if (typeof ch.stopListening === 'function') {
+            ch.stopListening('.price.updated');
+            ch.stopListening('.bidder.updated');
+            ch.stopListening('.lane.changed');
+            ch.stopListening('.countdown.tick');
+            ch.stopListening('.item.sold');
+            ch.stopListening('.item.unsold');
+            ch.stopListening('.auction.status.changed');
+            ch.stopListening('.bid.limit.reached');
+            ch.stopListening('.bid.limits.batch.triggered');
+          }
+        } catch (e) {
+          console.warn('[Socket] stopListening failed:', e);
+        }
         echo.leave(channelName);
       }
       channelRef.current = null;

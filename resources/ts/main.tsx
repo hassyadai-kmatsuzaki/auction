@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import theme from './theme';
 import { SnackbarProvider } from './contexts/SnackbarContext';
+// 実装書 F6: ライブ画面のアニメーション CSS（GPU 合成可能な static class）
+import '../css/auction-live.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

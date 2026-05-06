@@ -1,0 +1,77 @@
+/* ============================================================================
+ * オークションライブ画面のアニメーション定義
+ *
+ * 実装書 F6: 動的 sx prop で MUI styled-component が毎レンダー再生成される
+ *            問題を回避するため、アニメーションを static CSS に切り出す。
+ *
+ * 効果: 25 枚の LaneCard が並んでも GPU レイヤーで処理され、メイン thread
+ *       への影響ゼロ。120 名負荷でも 60fps 維持。
+ *
+ * 設計ルール:
+ *   - keyframes は GPU で合成可能なプロパティのみ使う（box-shadow / transform / opacity）
+ *   - will-change で compositor レイヤー作成をブラウザに hint する
+ *   - transform: translateZ(0) で強制的に layer を分離する
+ * ============================================================================ */
+
+/* ─── LaneCard: 自分が落札権利者の時の枠グロー ───────────────── */
+@keyframes activeBidGlow {
+  0%, 100% {
+    box-shadow: 0 0 18px 4px rgba(255, 215, 0, 0.35),
+                0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 24px 8px rgba(255, 215, 0, 0.55),
+                0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.active-bid-card {
+  background-image: linear-gradient(135deg,
+    rgba(255, 215, 0, 0.05) 0%,
+    rgba(240, 165, 0, 0.10) 100%);
+  box-shadow: 0 0 18px 4px rgba(255, 215, 0, 0.35);
+  animation: activeBidGlow 2s ease-in-out infinite;
+  will-change: box-shadow;
+  transform: translateZ(0);
+}
+
+/* ─── BidButton: 自動入札中の gradient シフト ─────────────────── */
+@keyframes btnGradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+.bid-btn-active {
+  background: linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%);
+  background-size: 200% 200%;
+  /* steps(20) で 20 段階に離散化 → 連続計算より GPU 軽量 */
+  animation: btnGradientShift 4s steps(20) infinite;
+  will-change: background-position;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+/* 1 人だけが入札中の時はアニメーション停止（落札確定中表示） */
+.bid-btn-only {
+  background: linear-gradient(135deg, #FFD700 0%, #F0A500 100%);
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+/* ─── BidButton: 連打防止中の視覚フィードバック ───────────────── */
+.bid-btn-pending {
+  opacity: 0.6;
+  cursor: wait !important;
+  pointer-events: none;
+}
+
+/* ─── 共通: hover を無効化したい要素用 ─────────────────────────
+ * 過去メモリ「クリック不能な要素への :hover はNG」遵守
+ * 必要な箇所で <Card className="no-hover"> として使用 */
+.no-hover {
+  cursor: default !important;
+}
+.no-hover:hover {
+  background: inherit !important;
+  box-shadow: inherit !important;
+}

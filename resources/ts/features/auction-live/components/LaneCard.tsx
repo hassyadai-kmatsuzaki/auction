@@ -51,7 +51,12 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
   const isMyBidActive = item.my_bid_status === 'active';
 
   return (
+    // 実装書 F2/F6: 動的 sx animation を static CSS class に切替
+    //   修正前: isMyBidActive 切替時に sx 全体が再評価 → MUI styled-component
+    //           再生成 → DOM style tag 再挿入 → 25 枚並列で paint 過熱
+    //   修正後: className で切替（GPU 合成可能、メイン thread 影響なし）
     <Card
+      className={isMyBidActive ? 'active-bid-card' : ''}
       sx={{
         height: '100%',
         position: 'relative',
@@ -59,23 +64,8 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         border: isMyBidActive ? '2px solid transparent' : 1,
         borderColor: isMyBidActive ? undefined : 'divider',
         borderRadius: 2,
-        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-        transform: isMyBidActive ? 'translateY(-2px)' : 'none',
-        ...(isMyBidActive && {
-          backgroundImage: 'linear-gradient(#fff, #fff), linear-gradient(135deg, #FFD700, #FFA500, #FFD700, #DAA520, #FFD700)',
-          backgroundOrigin: 'border-box',
-          backgroundClip: 'padding-box, border-box',
-          boxShadow: '0 0 18px 4px rgba(255, 215, 0, 0.35), 0 0 40px 8px rgba(255, 165, 0, 0.15)',
-          animation: 'activeBidGlow 2s ease-in-out infinite',
-          '@keyframes activeBidGlow': {
-            '0%, 100%': {
-              boxShadow: '0 0 18px 4px rgba(255, 215, 0, 0.35), 0 0 40px 8px rgba(255, 165, 0, 0.15)',
-            },
-            '50%': {
-              boxShadow: '0 0 24px 8px rgba(255, 215, 0, 0.55), 0 0 56px 12px rgba(255, 165, 0, 0.25)',
-            },
-          },
-        }),
+        transition: 'border 0.3s ease',
+        // ※ 動的 boxShadow / animation / backgroundImage は active-bid-card クラスに移動
       }}
     >
       {/* 入札権利時のシマー（光の走査線）エフェクト */}

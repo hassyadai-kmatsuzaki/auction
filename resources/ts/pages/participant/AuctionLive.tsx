@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Grid, CircularProgress, Alert, Button,
@@ -96,6 +96,24 @@ export default function AuctionLive() {
   // 入札ロジック（楽観的更新 + 自動ロールバック）
   const { toggle: handleBidToggle, isLocked } = useBidToggle(auctionId);
 
+  // 実装書 F5: phase ガード付きの bid toggle ハンドラを useCallback で固定参照化
+  //   inline lambda だと毎レンダーで関数 ref が変わり、LaneCard の React.memo が効かない
+  //   この handler は (itemId, status, phase) を受け取り、phase 別ガードのみ担当
+  const handleBidToggleWithGuard = useCallback(
+    (itemId: number, status: 'active' | 'inactive' | null, phase?: string) => {
+      if (phase === 'pre_bid') {
+        showSnackbar('入札開始待機中です。もう少々お待ちください。', 'error');
+        return;
+      }
+      if (phase === 'freeze') {
+        showSnackbar('誤タップ防止中です。もう少々お待ちください。', 'error');
+        return;
+      }
+      handleBidToggle(itemId, status);
+    },
+    [handleBidToggle, showSnackbar]
+  );
+
   // 落札一覧
   const { items: wonItems, totalAmount: wonTotalAmount, refetch: refetchWon } = useWonItems(auctionId);
 
@@ -126,7 +144,8 @@ export default function AuctionLive() {
     onPriceUpdated: (e) => {
       applyPriceUpdated(e);
       if (user?.id && e.auto_left_user_ids?.includes(user.id)) {
-        // 即座にキャッシュを更新（UIの即時反映）
+        // 実装書 F1: invalidateQueries は除去（120 名負荷で全 client 同時 refetch によりサーバー過負荷）
+        // setQueryData による楽観的更新で十分（WebSocket イベントが最新値を運んでくる）
         queryClient.setQueryData(['auction-live', auctionId], (prev: any) => {
           if (!prev) return prev;
           return {
@@ -138,16 +157,12 @@ export default function AuctionLive() {
             ),
           };
         });
-        // サーバーからも再取得して確実に同期
-        queryClient.invalidateQueries({ queryKey: ['auction-live', auctionId] });
         showSnackbar('金額が上昇しました。再度入札してください。', 'info');
       }
     },
     onBidderUpdated: (e) => {
       applyBidderUpdated(e);
-      if (e.event_type === 'left') {
-        queryClient.invalidateQueries({ queryKey: ['auction-live', auctionId] });
-      }
+      // 実装書 F1: invalidateQueries は除去。bidder_updated イベント自体に最新カウントが含まれる
     },
     onLaneChanged: (e) => { applyLaneChanged(e); },
     onCountdownTick: (e) => { applyCountdownTick(e); },
@@ -209,8 +224,11 @@ export default function AuctionLive() {
           ),
         };
       });
-      // 指値のキャッシュも無効化（レコード削除済みなので再取得で null になる）
-      queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
+      // 実装書 F1: 指値レコード削除時のみ invalidateQueries（限定的な再取得）
+      // 旧版は無条件 invalidate で全 client が refetch していたが、limit_cancelled=true の時のみに絞る
+      if (e.limit_cancelled) {
+        queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(e.item_id) });
+      }
     },
   });
 
@@ -541,18 +559,9 @@ export default function AuctionLive() {
               <LaneCard
                 lane={lane}
                 isLoading={lane.current_item ? isLocked(lane.current_item.id) : false}
-                onBidToggle={(itemId, status) => {
-                  const item = lane.current_item;
-                  if (item?.phase === 'pre_bid') {
-                    showSnackbar('入札開始待機中です。もう少々お待ちください。', 'error');
-                    return;
-                  }
-                  if (item?.phase === 'freeze') {
-                    showSnackbar('誤タップ防止中です。もう少々お待ちください。', 'error');
-                    return;
-                  }
-                  handleBidToggle(itemId, status);
-                }}
+                onBidToggle={(itemId, status) =>
+                  handleBidToggleWithGuard(itemId, status, lane.current_item?.phase)
+                }
                 onDetailOpen={(l) => setDetailLane(l)}
                 onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
                 onLimitRemove={(itemId) => {
@@ -616,17 +625,8 @@ export default function AuctionLive() {
         onClose={() => setDetailLane(null)}
         isLoading={detailLane?.current_item ? isLocked(detailLane.current_item.id) : false}
         onBidToggle={(itemId, status) => {
-          const lane = liveState.lanes.find(l => l.current_item?.id === itemId);
-          const item = lane?.current_item;
-          if (item?.phase === 'pre_bid') {
-            showSnackbar('入札開始待機中です。もう少々お待ちください。', 'error');
-            return;
-          }
-          if (item?.phase === 'freeze') {
-            showSnackbar('誤タップ防止中です。もう少々お待ちください。', 'error');
-            return;
-          }
-          handleBidToggle(itemId, status);
+          const item = liveState.lanes.find(l => l.current_item?.id === itemId)?.current_item;
+          handleBidToggleWithGuard(itemId, status, item?.phase);
         }}
         onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
         onLimitRemove={(itemId) => setLimitModalItemId(itemId)}

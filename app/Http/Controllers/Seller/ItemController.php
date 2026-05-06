@@ -223,9 +223,10 @@ class ItemController extends Controller
         // トランザクションと行ロックで生体番号の重複を防ぐ
         \DB::beginTransaction();
         try {
-            // 行ロックを使用して最大item_numberを取得
+            // 親 auction 行をロックして同一オークション内の item 採番を直列化（ギャップロック由来のデッドロック回避）
+            Auction::whereKey($auction->id)->lockForUpdate()->first();
+
             $maxItemNumber = Item::where('auction_id', $auction->id)
-                ->lockForUpdate()
                 ->max('item_number') ?? 0;
             $itemNumber = $maxItemNumber + 1;
             

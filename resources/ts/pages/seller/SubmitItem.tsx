@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -105,6 +105,8 @@ export default function SubmitItem() {
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
+  // 連打ガード: state は React のバッチング待ちで一瞬空くため、ref で同期的に弾く
+  const submittingRef = useRef(false);
   const [availableAuctions, setAvailableAuctions] = useState<AvailableAuction[]>([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   
@@ -212,9 +214,12 @@ export default function SubmitItem() {
   };
 
   const handleSubmit = async () => {
+    // 同期ガード: 1 回目の onClick がまだ state 反映前でも、2 回目以降は即座に弾く
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       setLoading(true);
-      
+
       const promises = items.map(item => {
         const individualInfo = [
           item.age_months ? `生体月数: ${item.age_months}` : '',
@@ -264,12 +269,14 @@ export default function SubmitItem() {
       }, 2000);
     } catch (err: any) {
       console.error('出品申込エラー:', err);
-      setSnackbar({ 
-        open: true, 
-        message: err.response?.data?.message || '出品申込に失敗しました', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || '出品申込に失敗しました',
+        severity: 'error'
       });
-    } finally {
+      // 出品作成自体が失敗した場合のみ再送可能にする。
+      // 成功 / shipments 失敗（早期 return）パスでは loading/ガードとも維持し、navigate まで disabled を保つ。
+      submittingRef.current = false;
       setLoading(false);
     }
   };

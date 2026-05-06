@@ -41,10 +41,22 @@ class SetBidLimitAction
 
         $item->loadMissing('auction');
 
-        $limit = BidLimitPrice::updateOrCreate(
-            ['item_id' => $item->id, 'user_id' => $userId],
-            ['limit_price' => $limitPrice, 'is_triggered' => false, 'triggered_at' => null]
-        );
+        // ─── items 先行ロックでデッドロック・FK lock wait timeout を回避 ──
+        // 修正前: BidLimitPrice::updateOrCreate を直接実行 → MySQL が FK 整合性確認のため
+        //         items.id の SHARED LOCK を暗黙取得 → adjustPriceByBidLimits の
+        //         EXCLUSIVE LOCK と衝突 → innodb_lock_wait_timeout (50秒) で死亡
+        // 修正後: items.lockForUpdate() を先に取得して順序付け（実装書 B5）。
+        //         過去事故メモ「入札系は items 先行ロック必須」のルールに準拠。
+        $limit = DB::transaction(function () use ($item, $userId, $limitPrice) {
+            $locked = Item::where('id', $item->id)->lockForUpdate()->first();
+            if (!$locked) {
+                throw new \RuntimeException('item not found');
+            }
+            return BidLimitPrice::updateOrCreate(
+                ['item_id' => $locked->id, 'user_id' => $userId],
+                ['limit_price' => $limitPrice, 'is_triggered' => false, 'triggered_at' => null]
+            );
+        }, 3);
 
         Favorite::firstOrCreate(['user_id' => $userId, 'item_id' => $item->id]);
 

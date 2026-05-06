@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, CircularProgress, Box } from '@mui/material';
 import { PlayArrow as PlayArrowIcon, Pause as PauseIcon, Timer as TimerIcon } from '@mui/icons-material';
 
@@ -109,13 +109,35 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
   // active 中は単方向仕様で押せない。「最高入札者」は表示ラベルの出し分けのみに使う
   const isOnlyBidder = isActive && activeBidderCount === 1;
 
+  // 実装書 F3: クリック throttle + inflight ガード（連打防止 = サーバー負荷軽減）
+  // 25 名同時クリック時、ローカル側で 800ms 内の再 click を破棄するだけで、
+  // 実際にサーバーまで届くリクエストを 1 ユーザーあたり 1 件に絞れる
+  const lastClickRef = useRef<number>(0);
+  const inflightRef = useRef<boolean>(false);
+  const handleClickThrottled = useCallback(() => {
+    const now = Date.now();
+    if (now - lastClickRef.current < 800) return; // 800ms 以内の連打を破棄
+    if (inflightRef.current) return;               // API 呼び出し中は弾く
+    lastClickRef.current = now;
+    inflightRef.current = true;
+    try {
+      onToggle();
+    } finally {
+      // 600ms 後に再有効化（楽観的更新が反映される時間）
+      setTimeout(() => { inflightRef.current = false; }, 600);
+    }
+  }, [onToggle]);
+
   if (isActive) {
+    // 実装書 F2/F6: 動的 sx animation を static CSS class に切替
+    // GPU 合成可能なため 25 枚並んでも 60fps 維持
     return (
       <Button
         fullWidth
         variant="contained"
         size="large"
         disabled={true}
+        className={isOnlyBidder ? 'bid-btn-only' : 'bid-btn-active'}
         startIcon={
           isLoading
             ? <CircularProgress size={20} color="inherit" />
@@ -124,40 +146,13 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
         sx={{
           position: 'relative',
           overflow: 'hidden',
-          background: 'linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%)',
-          backgroundSize: '200% 200%',
-          color: '#5D3A00',
           fontWeight: 800,
           fontSize: '1rem',
           letterSpacing: '0.03em',
           border: '1px solid rgba(255, 215, 0, 0.6)',
-          animation: isOnlyBidder ? 'none' : 'btnGradientShift 3s ease-in-out infinite',
-          '@keyframes btnGradientShift': {
-            '0%, 100%': { backgroundPosition: '0% 50%' },
-            '50%':      { backgroundPosition: '100% 50%' },
-          },
-          '&:hover': {
-            background: isOnlyBidder 
-              ? 'linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%)'
-              : 'linear-gradient(135deg, #FFC800 0%, #E09400 50%, #FFC800 100%)',
-            backgroundSize: '200% 200%',
-          },
           '&.Mui-disabled': {
-            background: 'linear-gradient(135deg, #FFD700 0%, #F0A500 50%, #FFD700 100%)',
             color: '#5D3A00',
-            opacity: 0.8,
-          },
-          '&::after': isOnlyBidder ? {} : {
-            content: '""',
-            position: 'absolute',
-            top: 0, left: '-100%',
-            width: '60%', height: '100%',
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
-            animation: 'btnShimmer 2.5s ease-in-out infinite',
-            '@keyframes btnShimmer': {
-              '0%':   { left: '-100%' },
-              '100%': { left: '200%' },
-            },
+            opacity: 0.85,
           },
         }}
       >
@@ -172,7 +167,7 @@ export const BidButton = React.memo(({ myBidStatus, isPreBid, isFreeze, freezeRe
       variant="outlined"
       color="primary"
       size="large"
-      onClick={onToggle}
+      onClick={handleClickThrottled}
       disabled={isLoading}
       startIcon={
         isLoading

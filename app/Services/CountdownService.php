@@ -289,15 +289,20 @@ class CountdownService
         // カウントダウンを0.5秒減らす
         $state['remaining_seconds'] = max(0, $state['remaining_seconds'] - self::TICK_INTERVAL);
 
-        try {
-            broadcast(new CountdownTick(
-                $auction->id, $lane->id, $item->id,
-                (float) $state['remaining_seconds'],
-                $activeBidderCount, $item->current_price,
-                'bidding'
-            ));
-        } catch (\Exception $e) {
-            BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'bidding']);
+        // 1秒粒度に間引いて broadcast（120名負荷対策・実装書 B1）
+        // フロント側は秒単位表示なので 0.5秒粒度は冗長。
+        // ※ 本ガード追加前は3 lanes × 0.5秒粒度 × 120接続 = 360 msg/秒の負荷だった。
+        if ($this->shouldBroadcastLowFrequency($state['remaining_seconds'])) {
+            try {
+                broadcast(new CountdownTick(
+                    $auction->id, $lane->id, $item->id,
+                    (float) $state['remaining_seconds'],
+                    $activeBidderCount, $item->current_price,
+                    'bidding'
+                ));
+            } catch (\Exception $e) {
+                BroadcastFailureLogger::warn('CountdownTick', $e->getMessage(), ['lane_id' => $laneId, 'phase' => 'bidding']);
+            }
         }
 
         $this->metrics->countdownTick($laneId, 'bidding', (float) $state['remaining_seconds']);
@@ -1181,7 +1186,13 @@ class CountdownService
         // 指値発動チェック: 価格超過した全指値レコードを処理
         // アクティブ入札者 → 離脱 + 削除 + 通知
         // 非アクティブ入札者 → 削除のみ（再入札をブロックしないため）
+        //
+        // 実装書 B2 + B7: bulk SQL 化 + batch broadcast 集約
+        //   - markAsTriggered() の N 回 UPDATE → 1 回の whereIn UPDATE に集約
+        //   - BidLimitReached の N 回 broadcast → batch broadcast 1 回 + 既存個別 broadcast を維持
+        //   - items.lockForUpdate 保持下なので楽観的ロックは不要（並行更新は来ない）
         $autoLeftUserIds = [];
+        $batchTriggered  = []; // BidLimitsBatchTriggered 用集約データ
         try {
             $allTriggeredLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
@@ -1194,11 +1205,21 @@ class CountdownService
                 ->pluck('user_id')
                 ->toArray();
 
+            // ─── B7: bulk update でロック保持時間を短縮 ──────────
+            //   修正前: foreach 内で markAsTriggered → 1 件ずつ UPDATE (N 回)
+            //   修正後: whereIn で全件を 1 SQL で UPDATE
+            //   item 636 で発生した「lock wait timeout 50秒」級の lock 保持を防ぐ
+            $idsToTrigger = $allTriggeredLimits->pluck('id')->toArray();
+            if (!empty($idsToTrigger)) {
+                BidLimitPrice::whereIn('id', $idsToTrigger)->update([
+                    'is_triggered' => true,
+                    'triggered_at' => now(),
+                    'updated_at'   => now(),
+                ]);
+            }
+
             foreach ($allTriggeredLimits as $tl) {
                 try {
-                    $triggered = $tl->markAsTriggered();
-                    if (!$triggered) continue;
-
                     $tlLimitPrice = $tl->limit_price;
                     $tlUserId = $tl->user_id;
                     $isProtected = in_array($tlUserId, $protectedUserIds);
@@ -1207,6 +1228,13 @@ class CountdownService
                     if ($isProtected) {
                         $tl->delete();
                         Log::info("adjustPriceByBidLimits: limit triggered & cancelled, user PROTECTED (stays active): user={$tlUserId}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
+                        // batch にも記録（フロント側で表示制御のため）
+                        $batchTriggered[] = [
+                            'user_id'     => $tlUserId,
+                            'limit_price' => (float) $tlLimitPrice,
+                            'action'      => 'triggered',
+                            'protected'   => true,
+                        ];
                         continue;
                     }
 
@@ -1217,11 +1245,20 @@ class CountdownService
 
                     $tl->delete();
 
+                    // 旧フロント互換のため個別 broadcast は維持（実装書注: 段階移行）
                     broadcast(new BidLimitReached(
                         $auction->id, $lane->id, $item->id,
                         $tlUserId, $freshItem->current_price, $tlLimitPrice,
                         $freshItem->species_name ?? ''
                     ));
+
+                    // 新フロント用 batch データを蓄積
+                    $batchTriggered[] = [
+                        'user_id'     => $tlUserId,
+                        'limit_price' => (float) $tlLimitPrice,
+                        'action'      => $isActiveBidder ? 'cancelled' : 'triggered',
+                        'protected'   => false,
+                    ];
 
                     try {
                         app(NotificationService::class)->sendBidLimitReachedNotification(
@@ -1235,6 +1272,22 @@ class CountdownService
                     Log::info("adjustPriceByBidLimits: limit triggered & cancelled user={$tlUserId}, active={$isActiveBidder}, price={$freshItem->current_price}, limit={$tlLimitPrice}");
                 } catch (\Exception $e) {
                     Log::error("adjustPriceByBidLimits checkBidLimit error: user={$tl->user_id} - " . $e->getMessage());
+                }
+            }
+
+            // ─── B2: batch broadcast 1 回で集約 ────────────────────
+            // 25〜120 ユーザー分の cancel をフロントへ 1 メッセージで届ける
+            if (!empty($batchTriggered)) {
+                try {
+                    broadcast(new \App\Events\BidLimitsBatchTriggered(
+                        $auction->id,
+                        $lane->id,
+                        $item->id,
+                        (float) $freshItem->current_price,
+                        $batchTriggered
+                    ));
+                } catch (\Exception $batchErr) {
+                    Log::warning("BidLimitsBatchTriggered broadcast error: " . $batchErr->getMessage());
                 }
             }
         } catch (\Exception $e) {
