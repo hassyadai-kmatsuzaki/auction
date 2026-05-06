@@ -81,10 +81,6 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
         <Chip label="プレミアム" color="warning" size="small"
           sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />
       )}
-      {item.is_anonymous && (
-        <Chip label="匿名出品" color="info" size="small"
-          sx={{ position: 'absolute', top: item.is_premium ? 36 : 8, right: 8, zIndex: 1 }} />
-      )}
 
       <CardMedia component="img" image={optimizedImageUrl(item.thumbnail_path, 'small')}
         alt={item.species_name} loading="lazy" sx={{ aspectRatio: '3/2', objectFit: 'cover' }} />

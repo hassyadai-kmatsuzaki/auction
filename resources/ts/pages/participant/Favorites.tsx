@@ -359,11 +359,6 @@ export default function Favorites() {
                     sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
                   />
                 )}
-                {item.is_anonymous && (
-                  <Chip label="匿名出品" color="info" size="small"
-                    sx={{ position: 'absolute', top: item.is_premium ? 36 : 8, right: 8, zIndex: 1 }}
-                  />
-                )}
 
                 <CardMedia
                   component="img"
@@ -391,7 +386,9 @@ export default function Favorites() {
                   </Typography>
                   {item.is_anonymous ? (
                     <Box sx={{ mt: 0.5 }}>
-                      <Chip label="匿名出品" color="info" size="small" />
+                      <Typography variant="caption" color="text.secondary" noWrap>
+                        匿名出品
+                      </Typography>
                     </Box>
                   ) : (
                     item.seller && (

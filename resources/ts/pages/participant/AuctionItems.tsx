@@ -335,9 +335,7 @@ export default function AuctionItems() {
                       </Box>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      {item.is_anonymous
-                        ? <Chip label="匿名出品" color="info" size="small" />
-                        : (item.seller_name || '—')}
+                      {item.is_anonymous ? '匿名出品' : (item.seller_name || '—')}
                     </TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{item.quantity}匹</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>¥{formatYen(item.start_price)}</TableCell>

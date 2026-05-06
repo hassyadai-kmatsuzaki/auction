@@ -89,9 +89,6 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
                   {item.is_premium && (
                     <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
                   )}
-                  {item.is_anonymous && (
-                    <Chip label="匿名" size="small" color="info" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
-                  )}
                 </Box>
                 <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>
                   {item.species_name}

@@ -146,9 +146,6 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         {item.is_premium && (
           <Chip label="プレミアム" color="warning" size="small" />
         )}
-        {item.is_anonymous && (
-          <Chip label="匿名出品" color="info" size="small" />
-        )}
       </Box>
 
       <CardMedia
