@@ -61,9 +61,9 @@ class AuctionController extends Controller
         $sellersByAuction = [];
         if (!empty($auctionIds)) {
             $rowsQuery = Item::query()
-                ->whereIn('auction_id', $auctionIds)
-                ->whereIn('status', ['registered', 'live', 'sold', 'unsold'])
-                ->where('is_anonymous', false);
+                ->whereIn('items.auction_id', $auctionIds)
+                ->whereIn('items.status', ['registered', 'live', 'sold', 'unsold'])
+                ->where('items.is_anonymous', false);
             $this->testMode->applyToItemQuery($rowsQuery);
             // 表示は users.trade_name（屋号）を直参照。未設定の出品者はチップから除外。
             $rows = $rowsQuery
