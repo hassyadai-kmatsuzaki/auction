@@ -145,6 +145,10 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::post('users/{id}/restore', [UserController::class, 'restore']);
     Route::post('users/{id}/confirm-bank-transfer', [UserController::class, 'confirmBankTransfer']);
     Route::post('users/{id}/renew-bank-transfer', [UserController::class, 'renewBankTransfer']);
+    Route::post('users/{id}/profile-image', [UserController::class, 'uploadProfileImage']);
+    Route::delete('users/{id}/profile-image', [UserController::class, 'deleteProfileImage']);
+    Route::post('users/{id}/seller-profile-image', [UserController::class, 'uploadSellerProfileImage']);
+    Route::delete('users/{id}/seller-profile-image', [UserController::class, 'deleteSellerProfileImage']);
     
     // お知らせ管理
     Route::apiResource('announcements', AdminAnnouncementController::class);

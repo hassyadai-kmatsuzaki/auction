@@ -75,3 +75,67 @@
   background: inherit !important;
   box-shadow: inherit !important;
 }
+
+/* ============================================================================
+ * 実装書 C2: LaneCard 子要素のアニメーション CSS 化
+ *   旧: shimmer/badge が sx 内に @keyframes 直書き
+ *   新: 静的 CSS class に切り出して emotion の <style> 注入を抑制
+ * ============================================================================ */
+
+/* ─── LaneCard: 入札権利時の光の走査線 ─────────────────────── */
+@keyframes shimmerSweep {
+  0%   { left: -100%; }
+  100% { left: 200%; }
+}
+
+.active-bid-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.active-bid-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 215, 0, 0.12),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 215, 0, 0.12),
+    transparent);
+  animation: shimmerSweep 3s ease-in-out infinite;
+  will-change: left;
+}
+
+/* ─── LaneCard: 「最高入札者」バッジの脈動 ─────────────────── */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+.active-bid-badge {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  z-index: 3;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #5D3A00;
+  padding: 3.2px 12px;       /* py: 0.4, px: 1.5 (MUI = 8px unit) */
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 8px rgba(255, 165, 0, 0.5);
+  animation: badgePulse 2s ease-in-out infinite;
+  will-change: transform;
+}

@@ -25,25 +25,46 @@ const FreezeButton = React.memo(({ freezeRemainingSeconds = 0, freezeTotalSecond
   const total = freezeTotalSeconds || 1;
   const animRef = useRef<number>(0);
   const startRef = useRef<{ time: number; remaining: number } | null>(null);
+  const lastProgressRef = useRef<number>(-1); // 実装書 H1: 前回 progress を保持
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     const remaining = freezeRemainingSeconds ?? 0;
     startRef.current = { time: performance.now(), remaining };
 
+    // 実装書 H1: 既に走っている rAF chain を確実にキャンセルしてから新規起動
+    //   旧: cleanup で cancel するが、新しい useEffect で即時 RAF 起動するため、
+    //       freezeRemainingSeconds が頻繁に変化すると複数 chain が並走する可能性
+    //   新: useEffect 冒頭で既存をキャンセル + diff 比較で setProgress を間引き
+    if (animRef.current) {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = 0;
+    }
+
     const tick = () => {
       if (!startRef.current) return;
       const elapsed = (performance.now() - startRef.current.time) / 1000;
       const currentRemaining = Math.max(0, startRef.current.remaining - elapsed);
       const pct = ((total - currentRemaining) / total) * 100;
-      setProgress(Math.min(100, Math.max(0, pct)));
+      const newProgress = Math.min(100, Math.max(0, pct));
+
+      // 実装書 H1: 前回値と差が 0.5% 未満なら setProgress スキップ（render 削減）
+      if (Math.abs(newProgress - lastProgressRef.current) >= 0.5) {
+        lastProgressRef.current = newProgress;
+        setProgress(newProgress);
+      }
       if (currentRemaining > 0) {
         animRef.current = requestAnimationFrame(tick);
       }
     };
 
     animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
+    return () => {
+      if (animRef.current) {
+        cancelAnimationFrame(animRef.current);
+        animRef.current = 0;
+      }
+    };
   }, [freezeRemainingSeconds, total]);
 
   const progressIcon = (

@@ -93,6 +93,14 @@ export default function AuctionLive() {
     applyLaneChanged,
   } = useAuctionLive(auctionId);
 
+  // 実装書 H2: liveState を ref で保持し、useCallback ハンドラから常に最新値を参照
+  //   useCallback の依存配列に liveState を入れると毎レンダーで関数 ref が変わってしまうため、
+  //   ref 経由で参照することで関数 ref を固定しつつ最新値にアクセスできる
+  const liveStateRef = useRef(liveState);
+  useEffect(() => {
+    liveStateRef.current = liveState;
+  }, [liveState]);
+
   // 入札ロジック（楽観的更新 + 自動ロールバック）
   const { toggle: handleBidToggle, isLocked } = useBidToggle(auctionId);
 
@@ -113,6 +121,19 @@ export default function AuctionLive() {
     },
     [handleBidToggle, showSnackbar]
   );
+
+  // 実装書 H2: ItemDetailDialog 用ハンドラも useCallback で固定参照化
+  const handleDetailClose = useCallback(() => setDetailLane(null), []);
+  const handleDetailBidToggle = useCallback(
+    (itemId: number, status: 'active' | 'inactive' | null) => {
+      // liveState はクロージャで毎回最新を参照するために liveStateRef を使う
+      const item = liveStateRef.current?.lanes.find(l => l.current_item?.id === itemId)?.current_item;
+      handleBidToggleWithGuard(itemId, status, item?.phase);
+    },
+    [handleBidToggleWithGuard]
+  );
+  // detailLane.current_item.id が favoriteIds に含まれているかを memo 化
+  // ※ favoriteIds の宣言は L79、ここで参照するため後段で useMemo で算出する
 
   // 落札一覧
   const { items: wonItems, totalAmount: wonTotalAmount, refetch: refetchWon } = useWonItems(auctionId);
@@ -181,7 +202,29 @@ export default function AuctionLive() {
         // カウントダウンが既に完了済みなら無視
         if (countdownFinishedRef.current) return;
         // サーバーの残り秒数から「終了時刻」を計算（タイムスタンプ方式）
-        setStartingEndsAt(Date.now() + e.countdown_seconds * 1000);
+        const newEndsAt = Date.now() + e.countdown_seconds * 1000;
+
+        // 実装書 X3: 「10秒カウントダウンの途中で 10 がまた表示」事象の修正
+        //
+        // 原因: ProcessAuctionCountdownJob は late joiner 対応のため、pre-start 中に
+        //       毎秒 AuctionStatusChanged(starting) を broadcast している。
+        //       早期に接続済みのクライアントでは、ネットワーク遅延で broadcast が遅れて
+        //       届くと ends_at が後ろにズレ、一瞬残り秒数が増えて見える。
+        //
+        // 修正: 既に startingEndsAt が設定されている場合、new の ends_at が
+        //       既存値と「大きく異なる」時のみ採用。±1.5秒以内のズレは無視（duplicate）。
+        //       これにより:
+        //         - 初回受信 (prev=null): 採用 → late joiner も countdown を見られる
+        //         - 毎秒の duplicate broadcast: 無視 → 表示の blip 防止
+        //         - 大きく違う場合（再開等）: 採用 → recovery 機能維持
+        setStartingEndsAt((prev) => {
+          if (prev === null) return newEndsAt;
+          const diff = Math.abs(newEndsAt - prev);
+          // 1.5 秒以内のズレ = duplicate broadcast の遅延ジッター → 無視
+          if (diff < 1500) return prev;
+          // 大幅に異なる = 別セッション開始 or 時計補正 → 採用
+          return newEndsAt;
+        });
       } else if (e.status === 'live') {
         setStartingEndsAt(null);
         setStartingCountdown(null);
@@ -280,13 +323,36 @@ export default function AuctionLive() {
   }, [liveState?.lanes]);
 
   // 現在商品のお気に入り状態を取得（詳細モーダルのハート表示用）
+  //
+  // 実装書 H3: AbortController で in-flight 重複リクエストを破棄し、サーバー負荷削減
+  //   旧: liveCurrentItemIdsKey 変化のたびに POST、キャンセルなし
+  //       → 商品切替 N 回が短時間に重なると N 件の同時 POST が走る
+  //   新: 前リクエストを abort してから新規 POST を発行
+  //       商品切替が 1 秒未満で連続しても、サーバーへ届くのは最後の 1 件
+  const favoritesCheckAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!liveCurrentItemIdsKey) return;
+    favoritesCheckAbortRef.current?.abort();
+    const controller = new AbortController();
+    favoritesCheckAbortRef.current = controller;
     const itemIds = liveCurrentItemIdsKey.split(',').map(Number);
-    axios.post('/api/participant/favorites/check', { item_ids: itemIds })
+    axios.post(
+      '/api/participant/favorites/check',
+      { item_ids: itemIds },
+      { signal: controller.signal }
+    )
       .then((r) => { if (r.data.success) setFavoriteIds(new Set(r.data.data.favorite_item_ids)); })
       .catch(() => {});
+    return () => { controller.abort(); };
   }, [liveCurrentItemIdsKey]);
+
+  // 実装書 H2: ItemDetailDialog の isFavorited を useMemo で memo 化
+  //   旧: IIFE で毎レンダー再計算
+  //   新: detailLane / favoriteIds 変化時のみ再算出
+  const detailIsFavorited = useMemo(() => {
+    const id = detailLane?.current_item?.id;
+    return id ? favoriteIds.has(id) : false;
+  }, [detailLane, favoriteIds]);
 
   const handleCurrentItemFavoriteToggle = async (itemId: number) => {
     try {
@@ -594,17 +660,15 @@ export default function AuctionLive() {
         <Grid container spacing={2}>
           {liveState.lanes.map((lane) => (
             <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+              {/* 実装書 H2: inline lambda を削除して固定 ref ハンドラを渡す
+                   →  LaneCard の React.memo が浅比較で正しく機能する */}
               <LaneCard
                 lane={lane}
                 isLoading={lane.current_item ? isLocked(lane.current_item.id) : false}
-                onBidToggle={(itemId, status) =>
-                  handleBidToggleWithGuard(itemId, status, lane.current_item?.phase)
-                }
-                onDetailOpen={(l) => setDetailLane(l)}
-                onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
-                onLimitRemove={(itemId) => {
-                  setLimitModalItemId(itemId);
-                }}
+                onBidToggle={handleBidToggleWithGuard}
+                onDetailOpen={setDetailLane}
+                onLimitEdit={setLimitModalItemId}
+                onLimitRemove={setLimitModalItemId}
               />
             </Grid>
           ))}
@@ -660,18 +724,12 @@ export default function AuctionLive() {
             ? liveState.lanes.find(l => l.lane_id === detailLane.lane_id)?.current_item
             : null) as LaneItem | null
         }
-        onClose={() => setDetailLane(null)}
+        onClose={handleDetailClose}
         isLoading={detailLane?.current_item ? isLocked(detailLane.current_item.id) : false}
-        onBidToggle={(itemId, status) => {
-          const item = liveState.lanes.find(l => l.current_item?.id === itemId)?.current_item;
-          handleBidToggleWithGuard(itemId, status, item?.phase);
-        }}
-        onLimitEdit={(itemId) => setLimitModalItemId(itemId)}
-        onLimitRemove={(itemId) => setLimitModalItemId(itemId)}
-        isFavorited={(() => {
-          const id = detailLane?.current_item?.id;
-          return id ? favoriteIds.has(id) : false;
-        })()}
+        onBidToggle={handleDetailBidToggle}
+        onLimitEdit={setLimitModalItemId}
+        onLimitRemove={setLimitModalItemId}
+        isFavorited={detailIsFavorited}
         onFavoriteToggle={handleCurrentItemFavoriteToggle}
       />
 

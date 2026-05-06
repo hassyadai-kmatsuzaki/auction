@@ -15,7 +15,13 @@ import { formatYen } from '@/lib/formatPrice';
 interface Props {
   lane: LiveLane;
   isLoading: boolean;
-  onBidToggle: (itemId: number, currentStatus: 'active' | 'inactive' | null) => void;
+  /**
+   * 実装書 H2: phase を引数に追加
+   *   旧シグネチャでは parent の inline lambda で phase を取得していた
+   *   ため React.memo が無効化されていた。phase を ここで渡すことで
+   *   parent は固定 ref ハンドラをそのまま渡せる。
+   */
+  onBidToggle: (itemId: number, currentStatus: 'active' | 'inactive' | null, phase?: string) => void;
   onDetailOpen: (lane: LiveLane) => void;
   onLimitEdit?: (itemId: number) => void;
   onLimitRemove?: (itemId: number) => void;
@@ -68,55 +74,13 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         // ※ 動的 boxShadow / animation / backgroundImage は active-bid-card クラスに移動
       }}
     >
-      {/* 入札権利時のシマー（光の走査線）エフェクト */}
-      {isMyBidActive && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: 0,
-            borderRadius: 'inherit',
-            overflow: 'hidden',
-            pointerEvents: 'none',
-            zIndex: 2,
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0, left: '-100%',
-              width: '60%', height: '100%',
-              background: 'linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.12), rgba(255, 255, 255, 0.18), rgba(255, 215, 0, 0.12), transparent)',
-              animation: 'shimmerSweep 3s ease-in-out infinite',
-              '@keyframes shimmerSweep': {
-                '0%':   { left: '-100%' },
-                '100%': { left: '200%' },
-              },
-            },
-          }}
-        />
-      )}
+      {/* 入札権利時のシマー（光の走査線）エフェクト
+          実装書 C2: sx 内 @keyframes → static CSS class（auction-live.css）に移管 */}
+      {isMyBidActive && <Box className="active-bid-shimmer" />}
 
-      {/* 入札権利バッジ */}
-      {isMyBidActive && (
-        <Box
-          sx={{
-            position: 'absolute', top: -10, right: -6, zIndex: 3,
-            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-            color: '#5D3A00',
-            px: 1.5, py: 0.4,
-            borderRadius: '12px',
-            fontSize: '0.7rem',
-            fontWeight: 800,
-            letterSpacing: '0.04em',
-            boxShadow: '0 2px 8px rgba(255, 165, 0, 0.5)',
-            animation: 'badgePulse 2s ease-in-out infinite',
-            '@keyframes badgePulse': {
-              '0%, 100%': { transform: 'scale(1)' },
-              '50%':      { transform: 'scale(1.08)' },
-            },
-          }}
-        >
-          最高入札者
-        </Box>
-      )}
+      {/* 入札権利バッジ
+          実装書 C2: sx 内 @keyframes → static CSS class（auction-live.css）に移管 */}
+      {isMyBidActive && <Box className="active-bid-badge">最高入札者</Box>}
 
       {/* レーン番号バッジ + プレミアムバッジ */}
       <Box
@@ -232,7 +196,7 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
           isLoading={isLoading}
           isTopBidder={item.my_bid_status === 'active' && item.active_bidders_count === 1}
           activeBidderCount={item.active_bidders_count}
-          onToggle={() => onBidToggle(item.id, item.my_bid_status)}
+          onToggle={() => onBidToggle(item.id, item.my_bid_status, item.phase)}
         />
         <IconButton color="primary" onClick={() => onDetailOpen(lane)}
           disabled={disableDetail}

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  Avatar,
   Box,
   Typography,
   Paper,
@@ -37,6 +38,7 @@ import {
   Delete as DeleteIcon,
   AccountBalance as AccountBalanceIcon,
   Email as EmailIcon,
+  PhotoCamera as PhotoCameraIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -82,6 +84,8 @@ interface SellerProfile {
   commission_rate: number | null;
   notes: string | null;
   is_active: boolean;
+  profile_image_path: string | null;
+  profile_image_url: string | null;
 }
 
 interface User {
@@ -109,6 +113,8 @@ interface User {
   bank_transfer_confirmed_at: string | null;
   last_login_at: string | null;
   created_at: string;
+  profile_image_path: string | null;
+  profile_image_url: string | null;
   roles: Role[];
   seller_profile: SellerProfile | null;
 }
@@ -153,6 +159,56 @@ export default function UserDetail() {
   // ステータス変更
   const [newStatus, setNewStatus] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // アイコン編集
+  const userImageInputRef = useRef<HTMLInputElement | null>(null);
+  const sellerImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageUploading, setImageUploading] = useState<'user' | 'seller' | null>(null);
+
+  const handleImageUpload = async (
+    target: 'user' | 'seller',
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+    const path = target === 'user' ? 'profile-image' : 'seller-profile-image';
+
+    setImageUploading(target);
+    try {
+      const response = await axios.post(`/api/admin/users/${id}/${path}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (response.data.success) {
+        setSuccess(target === 'user' ? 'アイコンを更新しました' : '出品者アイコンを更新しました');
+        fetchUser();
+      }
+    } catch (err: any) {
+      const messages = err?.response?.data?.errors?.image;
+      setError(messages?.[0] || err?.response?.data?.message || 'アイコンの更新に失敗しました');
+    } finally {
+      setImageUploading(null);
+    }
+  };
+
+  const handleImageDelete = async (target: 'user' | 'seller') => {
+    const path = target === 'user' ? 'profile-image' : 'seller-profile-image';
+    setImageUploading(target);
+    try {
+      const response = await axios.delete(`/api/admin/users/${id}/${path}`);
+      if (response.data.success) {
+        setSuccess(target === 'user' ? 'アイコンを削除しました' : '出品者アイコンを削除しました');
+        fetchUser();
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'アイコンの削除に失敗しました');
+    } finally {
+      setImageUploading(null);
+    }
+  };
 
   useEffect(() => {
     fetchUser();
@@ -354,7 +410,54 @@ export default function UserDetail() {
               基本情報
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                アイコン
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar
+                  src={user.profile_image_url || undefined}
+                  sx={{ width: 72, height: 72 }}
+                >
+                  {user.name?.charAt(0)}
+                </Avatar>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <input
+                    ref={userImageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={(e) => handleImageUpload('user', e)}
+                  />
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<PhotoCameraIcon />}
+                      onClick={() => userImageInputRef.current?.click()}
+                      disabled={imageUploading === 'user'}
+                    >
+                      {user.profile_image_url ? '画像を変更' : '画像を設定'}
+                    </Button>
+                    {user.profile_image_url && (
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleImageDelete('user')}
+                        disabled={imageUploading === 'user'}
+                      >
+                        削除
+                      </Button>
+                    )}
+                  </Box>
+                  <Typography variant="caption" color="text.secondary">
+                    JPEG/PNG/GIF/WebP・5MB まで
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" color="text.secondary">
                 名前
@@ -615,7 +718,55 @@ export default function UserDetail() {
                   出品者情報
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
-                
+
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    出品者アイコン
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar
+                      src={user.seller_profile.profile_image_url || undefined}
+                      sx={{ width: 72, height: 72 }}
+                    >
+                      {(user.seller_profile.seller_name || user.name)?.charAt(0)}
+                    </Avatar>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <input
+                        ref={sellerImageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleImageUpload('seller', e)}
+                      />
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<PhotoCameraIcon />}
+                          onClick={() => sellerImageInputRef.current?.click()}
+                          disabled={imageUploading === 'seller'}
+                        >
+                          {user.seller_profile.profile_image_url ? '画像を変更' : '画像を設定'}
+                        </Button>
+                        {user.seller_profile.profile_image_url && (
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => handleImageDelete('seller')}
+                            disabled={imageUploading === 'seller'}
+                          >
+                            削除
+                          </Button>
+                        )}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        出品者ページに表示される画像。JPEG/PNG/GIF/WebP・5MB まで
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={4}>
                     <Typography variant="body2" color="text.secondary">

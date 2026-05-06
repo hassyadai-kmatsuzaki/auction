@@ -14,6 +14,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class UserController extends Controller
@@ -89,6 +91,7 @@ class UserController extends Controller
 
         // 出品者プロフィールがある場合は口座情報も含める（管理者用）
         $userData = $user->toArray();
+        $userData['profile_image_url'] = $user->profile_image_url;
         if ($user->sellerProfile) {
             $userData['seller_profile'] = $user->sellerProfile->getWithBankInfo();
         }
@@ -459,6 +462,138 @@ class UserController extends Controller
                 'user' => $user->fresh(['roles']),
                 'subscription' => $subscription,
             ],
+        ]);
+    }
+
+    /**
+     * ユーザーアイコン（users.profile_image_path）アップロード
+     */
+    public function uploadProfileImage(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($user->profile_image_path) {
+            Storage::disk('public')->delete($user->profile_image_path);
+        }
+
+        $file = $request->file('image');
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs("avatars/user/{$user->id}", $filename, 'public');
+
+        $user->profile_image_path = $path;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィール画像を更新しました。',
+            'data' => [
+                'profile_image_path' => $user->profile_image_path,
+                'profile_image_url' => $user->profile_image_url,
+            ],
+        ]);
+    }
+
+    /**
+     * ユーザーアイコン削除
+     */
+    public function deleteProfileImage($id)
+    {
+        $user = User::findOrFail($id);
+
+        if ($user->profile_image_path) {
+            Storage::disk('public')->delete($user->profile_image_path);
+            $user->profile_image_path = null;
+            $user->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'プロフィール画像を削除しました。',
+        ]);
+    }
+
+    /**
+     * 出品者プロフィールアイコン（seller_profiles.profile_image_path）アップロード
+     */
+    public function uploadSellerProfileImage(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+        $profile = $user->sellerProfile;
+
+        if (!$profile) {
+            return response()->json([
+                'success' => false,
+                'message' => '出品者プロフィールが存在しません。',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($profile->profile_image_path) {
+            Storage::disk('public')->delete($profile->profile_image_path);
+        }
+
+        $file = $request->file('image');
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs("avatars/seller/{$profile->id}", $filename, 'public');
+
+        $profile->profile_image_path = $path;
+        $profile->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => '出品者アイコンを更新しました。',
+            'data' => [
+                'profile_image_path' => $profile->profile_image_path,
+                'profile_image_url' => $profile->profile_image_url,
+            ],
+        ]);
+    }
+
+    /**
+     * 出品者プロフィールアイコン削除
+     */
+    public function deleteSellerProfileImage($id)
+    {
+        $user = User::findOrFail($id);
+        $profile = $user->sellerProfile;
+
+        if (!$profile) {
+            return response()->json([
+                'success' => false,
+                'message' => '出品者プロフィールが存在しません。',
+            ], 404);
+        }
+
+        if ($profile->profile_image_path) {
+            Storage::disk('public')->delete($profile->profile_image_path);
+            $profile->profile_image_path = null;
+            $profile->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => '出品者アイコンを削除しました。',
         ]);
     }
 

@@ -227,13 +227,16 @@ export function useAuctionSocket({
         try {
           const ch: any = channelRef.current;
           if (typeof ch.stopListening === 'function') {
+            // 実装書 C1: stopListening のイベント名を listen と一致させる
+            //   旧: '.auction.status.changed' は実際の broadcastAs と不一致 → 空振り
+            //   旧: '.item.unsold' は listen していない dead code → 削除
+            //   修正: サーバーの broadcastAs と完全一致するように
             ch.stopListening('.price.updated');
             ch.stopListening('.bidder.updated');
             ch.stopListening('.lane.changed');
             ch.stopListening('.countdown.tick');
             ch.stopListening('.item.sold');
-            ch.stopListening('.item.unsold');
-            ch.stopListening('.auction.status.changed');
+            ch.stopListening('.auction.status');
             ch.stopListening('.bid.limit.reached');
             ch.stopListening('.bid.limits.batch.triggered');
           }
