@@ -76,6 +76,7 @@ interface Item {
   start_price: number;
   current_price: number;
   is_premium: boolean;
+  is_anonymous?: boolean;
   status: string;
   thumbnail_path: string | null;
   seller: {
@@ -568,9 +569,14 @@ export default function ItemManagement() {
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>
                           {item.species_name}
                         </Typography>
-                        {item.is_premium && (
-                          <Chip label="プレミアム" color="warning" size="small" sx={{ height: 18, fontSize: '0.65rem' }} />
-                        )}
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.25 }}>
+                          {item.is_premium && (
+                            <Chip label="プレミアム" color="warning" size="small" sx={{ height: 18, fontSize: '0.65rem' }} />
+                          )}
+                          {item.is_anonymous && (
+                            <Chip label="匿名" color="default" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
+                          )}
+                        </Box>
                       </Box>
                     </Box>
                   </TableCell>

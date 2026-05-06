@@ -88,6 +88,7 @@ class ItemController extends Controller
                         'start_price' => $item->start_price,
                         'current_price' => $item->current_price,
                         'is_premium' => $item->is_premium,
+                        'is_anonymous' => (bool) $item->is_anonymous,
                         'status' => $item->status,
                         'thumbnail_path' => $item->thumbnail_path,
                         'seller' => $item->sellerProfile ? [
