@@ -82,6 +82,7 @@ interface Item {
   seller: {
     id: number;
     name: string;
+    trade_name?: string | null;
   } | null;
   media_count: number;
   created_at: string;
@@ -586,6 +587,11 @@ export default function ItemManagement() {
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                       {item.seller?.name || '-'}
                     </Typography>
+                    {item.seller?.trade_name && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1.2 }}>
+                        {item.seller.trade_name}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>

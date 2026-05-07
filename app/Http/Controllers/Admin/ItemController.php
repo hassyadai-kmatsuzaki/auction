@@ -42,7 +42,7 @@ class ItemController extends Controller
         $search = $request->input('search');
         
         $query = Item::where('auction_id', $auctionId)
-            ->with(['sellerProfile:id,seller_name,user_id', 'media', 'speciesType:id,code,name']);
+            ->with(['sellerProfile:id,seller_name,user_id', 'sellerProfile.user:id,trade_name', 'media', 'speciesType:id,code,name']);
 
         // 種別フィルタ
         if ($request->filled('species_type_id')) {
@@ -94,6 +94,7 @@ class ItemController extends Controller
                         'seller' => $item->sellerProfile ? [
                             'id' => $item->sellerProfile->id,
                             'name' => $item->sellerProfile->seller_name,
+                            'trade_name' => $item->sellerProfile->user?->trade_name,
                         ] : null,
                         'media_count' => $item->media->count(),
                         'created_at' => $item->created_at->format('Y-m-d H:i:s'),
