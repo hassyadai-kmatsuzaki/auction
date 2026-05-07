@@ -153,8 +153,8 @@ export default function AuctionLive() {
   const limitModalItem: { id: number; species_name: string; current_price: number; isUpcoming: boolean } | null = (() => {
     if (!limitModalItemId || !liveState) return null;
     for (const lane of liveState.lanes) {
-      if (lane.current_item?.id === limitModalItemId) {
-        const ci = lane.current_item;
+      const ci = lane.current_item;
+      if (ci && ci.id === limitModalItemId) {
         return { id: ci.id, species_name: ci.species_name, current_price: ci.current_price, isUpcoming: false };
       }
       const upcoming = lane.upcoming_items?.find(u => u.id === limitModalItemId);
