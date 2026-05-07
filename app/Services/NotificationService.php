@@ -217,10 +217,14 @@ class NotificationService
     {
         $sentCount = 0;
         try {
+            $testMode = app(TestModeService::class);
             $participants = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
                 ->approved()->get();
 
             foreach ($participants as $participant) {
+                // テストオークションは is_test=true ユーザー以外には送らない（メール・LINE 共通）
+                if (!$testMode->shouldNotifyForAuction($participant, $auction)) continue;
+
                 if ($this->shouldSendParticipantNotification($participant, 'email_auction_start')) {
                     Mail::to($participant->email)->queue(new AuctionStartNotificationMail($auction, $participant));
                     $sentCount++;
@@ -246,9 +250,13 @@ class NotificationService
     {
         $sentCount = 0;
         try {
+            $testMode = app(TestModeService::class);
             $sellers = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
                 ->approved()->get();
             foreach ($sellers as $seller) {
+                // テストオークションは is_test=true ユーザー以外には送らない（メール・LINE 共通）
+                if (!$testMode->shouldNotifyForAuction($seller, $auction)) continue;
+
                 if ($this->shouldSendSellerNotification($seller, 'email_new_auction')) {
                     Mail::to($seller->email)->queue(new NewAuctionNotificationMail($auction, $seller));
                     $sentCount++;
@@ -264,6 +272,9 @@ class NotificationService
                 ->whereDoesntHave('roles', fn($q) => $q->where('name', 'seller'))
                 ->approved()->get();
             foreach ($participants as $participant) {
+                // テストオークションは is_test=true ユーザー以外には送らない（メール・LINE 共通）
+                if (!$testMode->shouldNotifyForAuction($participant, $auction)) continue;
+
                 if ($this->shouldSendParticipantNotification($participant, 'email_new_auction')) {
                     Mail::to($participant->email)->queue(new NewAuctionNotificationMail($auction, $participant));
                     $sentCount++;
@@ -452,9 +463,13 @@ class NotificationService
     public function sendSellerAuctionStartNotification(Auction $auction): void
     {
         try {
+            $testMode = app(TestModeService::class);
             $sellers = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
                 ->approved()->get();
             foreach ($sellers as $seller) {
+                // テストオークションは is_test=true ユーザー以外には送らない（メール・LINE 共通）
+                if (!$testMode->shouldNotifyForAuction($seller, $auction)) continue;
+
                 // メール
                 if ($seller->email && $this->shouldSendSellerNotification($seller, 'email_auction_start')) {
                     Mail::to($seller->email)->queue(new SellerAuctionStartMail($auction, $seller->name ?? ''));

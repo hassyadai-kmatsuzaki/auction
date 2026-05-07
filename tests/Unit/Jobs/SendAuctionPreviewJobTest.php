@@ -101,6 +101,47 @@ class SendAuctionPreviewJobTest extends TestCase
         Bus::assertNotDispatched(SendLineNotificationJob::class);
     }
 
+    public function test_handle_filters_test_auction_to_test_users_only(): void
+    {
+        // テストオークション（auctions.is_test=true）は test mode の状態と独立して
+        // is_test=true ユーザーにしか通知が飛ばないこと
+        $admin = $this->createAdmin();
+
+        $prodParticipant = $this->createParticipant();
+        $prodParticipant->update([
+            'is_active' => true,
+            'is_test' => false,
+            'notification_settings' => ['email_auction_start' => true],
+        ]);
+
+        $testParticipant = $this->createParticipant();
+        $testParticipant->update([
+            'is_active' => true,
+            'is_test' => true,
+            'notification_settings' => ['email_auction_start' => true],
+        ]);
+
+        Auction::factory()->scheduled()->create([
+            'event_date' => now()->addDay()->toDateString(),
+            'created_by' => $admin->id,
+            'is_test' => true,
+        ]);
+
+        (new SendAuctionPreviewJob())->handle(app(\App\Services\TestModeService::class));
+
+        // is_test=true 1名分のみ queue されること
+        Mail::assertQueued(AuctionPreviewMail::class, 1);
+        Mail::assertQueued(AuctionPreviewMail::class, function ($mail) use ($testParticipant) {
+            return $mail->hasTo($testParticipant->email);
+        });
+        // 本番ユーザー宛には届かないこと
+        Mail::assertNotQueued(AuctionPreviewMail::class, function ($mail) use ($prodParticipant) {
+            return $mail->hasTo($prodParticipant->email);
+        });
+        // LINE も is_test=true 1名分のみ
+        Bus::assertDispatched(SendLineNotificationJob::class, 1);
+    }
+
     public function test_handle_ignores_non_scheduled_auctions(): void
     {
         $admin = $this->createAdmin();

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Auction;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -188,6 +189,30 @@ class TestModeService
         if (!$user) return false;
         if (!$this->isEnabled()) return true;
         return (bool) $user->is_test;
+    }
+
+    /**
+     * オークション文脈での通知可否。global test mode ゲートに加えて、
+     * auctions.is_test=true なオークションは is_test=true ユーザー以外には送らない。
+     * （test mode の ON/OFF と独立。テストオークションが本番ユーザーに漏出するのを防ぐ）
+     */
+    public function shouldNotifyForAuction(?User $user, Auction $auction): bool
+    {
+        if (!$this->shouldNotifyUser($user)) return false;
+        if ($auction->is_test && !$user->is_test) return false;
+        return true;
+    }
+
+    /**
+     * 通知の宛先 User クエリに「テストオークション → is_test=true ユーザーのみ」絞りを適用する。
+     * applyToUserNotificationQuery（global test mode 由来）と独立に重ねがけ可能。
+     */
+    public function applyAuctionGateToUserQuery(Builder $query, Auction $auction): Builder
+    {
+        if ($auction->is_test) {
+            $query->where('is_test', true);
+        }
+        return $query;
     }
 
     /**

@@ -63,10 +63,11 @@ class SendAuctionPreviewJob implements ShouldQueue
             . $auction->title . "\n"
             . "開催日: {$eventDate}{$startTime}";
 
-        // 参加者（テストモード ON 中は is_test=true のみ）
+        // 参加者（テストモード ON 中は is_test=true のみ。さらにテストオークションなら test mode と独立して is_test=true のみ）
         $participantQuery = User::whereHas('roles', fn($q) => $q->where('name', 'participant'))
             ->approved();
         $testMode->applyToUserNotificationQuery($participantQuery);
+        $testMode->applyAuctionGateToUserQuery($participantQuery, $auction);
         $participants = $participantQuery->get();
 
         $sentCount = 0;
@@ -84,10 +85,11 @@ class SendAuctionPreviewJob implements ShouldQueue
             SendLineNotificationJob::dispatch($user->id, 'auction_preview', $participantLineText);
         }
 
-        // 出品者（テストモード ON 中は is_test=true のみ）
+        // 出品者（テストモード ON 中は is_test=true のみ。さらにテストオークションなら test mode と独立して is_test=true のみ）
         $sellerQuery = User::whereHas('roles', fn($q) => $q->where('name', 'seller'))
             ->approved();
         $testMode->applyToUserNotificationQuery($sellerQuery);
+        $testMode->applyAuctionGateToUserQuery($sellerQuery, $auction);
         $sellers = $sellerQuery->get();
 
         foreach ($sellers as $seller) {

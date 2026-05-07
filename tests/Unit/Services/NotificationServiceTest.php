@@ -211,6 +211,69 @@ class NotificationServiceTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $count);
     }
 
+    public function test_test_auction_start_notification_skips_non_test_users(): void
+    {
+        // 本番ユーザー（is_test=false）には届かず、テストユーザー（is_test=true）にのみ届くこと
+        $this->participant->update([
+            'is_test' => false,
+            'notification_settings' => ['email_auction_start' => true],
+        ]);
+        $testUser = $this->createParticipant();
+        $testUser->update([
+            'is_test' => true,
+            'notification_settings' => ['email_auction_start' => true],
+        ]);
+
+        $testAuction = Auction::factory()->finished()->create([
+            'created_by' => $this->admin->id,
+            'is_test' => true,
+        ]);
+
+        $count = $this->notificationService->sendAuctionStartNotification($testAuction);
+
+        // 本番ユーザー宛は queue されないこと
+        Mail::assertNotQueued(\App\Mail\AuctionStartNotificationMail::class, function ($mail) {
+            return $mail->hasTo($this->participant->email);
+        });
+        // テストユーザー宛は queue されること
+        Mail::assertQueued(\App\Mail\AuctionStartNotificationMail::class, function ($mail) use ($testUser) {
+            return $mail->hasTo($testUser->email);
+        });
+        $this->assertGreaterThanOrEqual(1, $count);
+    }
+
+    public function test_test_auction_new_notification_skips_non_test_users(): void
+    {
+        // sendNewAuctionNotification（seller / participant 両ループ）も同じゲートが効くこと
+        $this->participant->update([
+            'is_test' => false,
+            'notification_settings' => ['email_new_auction' => true],
+        ]);
+        $this->seller->update([
+            'is_test' => false,
+            'notification_settings' => ['email_new_auction' => true],
+        ]);
+        $testParticipant = $this->createParticipant();
+        $testParticipant->update([
+            'is_test' => true,
+            'notification_settings' => ['email_new_auction' => true],
+        ]);
+
+        $testAuction = Auction::factory()->scheduled()->create([
+            'created_by' => $this->admin->id,
+            'is_test' => true,
+        ]);
+
+        $this->notificationService->sendNewAuctionNotification($testAuction);
+
+        Mail::assertNotQueued(\App\Mail\NewAuctionNotificationMail::class, function ($mail) {
+            return $mail->hasTo($this->participant->email) || $mail->hasTo($this->seller->email);
+        });
+        Mail::assertQueued(\App\Mail\NewAuctionNotificationMail::class, function ($mail) use ($testParticipant) {
+            return $mail->hasTo($testParticipant->email);
+        });
+    }
+
     public function test_send_item_sold_notification(): void
     {
         $wonItem = WonItem::factory()->create([
