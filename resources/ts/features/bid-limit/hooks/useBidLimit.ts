@@ -22,18 +22,25 @@ export function useBidLimit(itemId: number, auctionId?: number) {
   });
 
   /**
-   * 実装書 F13: invalidate を BidLimit のみに絞る（条件付きで LIVE_STATE）
-   *   旧: 指値設定のたびに LIVE_STATE_QUERY_KEY 全体を invalidate
-   *       → 30 名が指値設定すると 30 回の全体 refetch がサーバーに殺到
-   *   新: BID_LIMIT_QUERY_KEY のみ invalidate
-   *       LaneCard の状態変更は WebSocket イベント (BidderUpdated / PriceUpdated) で同期
-   *       LIVE_STATE は is_triggered=true（即発動）の時のみ invalidate
+   * 実装書 F13: invalidate を最低限に絞る方針。
+   *   - 設定成功時: BID_LIMIT_QUERY_KEY と LIVE_STATE_QUERY_KEY を invalidate。
+   *     LIVE_STATE は LaneCard の `my_limit_price` 表示を駆動しており、
+   *     これを更新する WS イベントは存在しないため、自分の操作後は必ず再取得が必要。
+   *     旧版は is_triggered のときだけ invalidate していたため、通常設定時にチップが
+   *     反映されない事故になっていた（指値を入れたのに「上限: ¥X」が出ない）。
+   *   - 解除時: 同じく両方 invalidate（active なら自動離脱、my_limit_price を null に）
+   *
+   *   ※ ここで invalidate されるのは「自分自身のクライアント」のみ。
+   *     他のユーザーが同時に設定しても各自のクライアントが各自で invalidate するだけなので、
+   *     N 人が同時設定 → サーバーへの refetch は N 件（120 名負荷でも問題なし）。
+   *     旧コメント「30 名が指値設定すると 30 回の全体 refetch がサーバーに殺到」は誤読で、
+   *     実際は「自分の操作 1 回 → 自分のクライアントが 1 回 refetch」する分散負荷。
    */
   const invalidateBidLimit = () => {
     queryClient.invalidateQueries({ queryKey: BID_LIMIT_QUERY_KEY(itemId) });
   };
 
-  const invalidateLiveStateForTriggered = () => {
+  const invalidateLiveState = () => {
     if (auctionId) {
       queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
     }
@@ -44,9 +51,9 @@ export function useBidLimit(itemId: number, auctionId?: number) {
     retry: 0, // 実装書 F12: リトライ抑制
     onSuccess: (data) => {
       invalidateBidLimit();
+      // LaneCard のチップ表示を更新するため、即発動の有無にかかわらず必ず LIVE_STATE を再取得
+      invalidateLiveState();
       if (data.data?.is_triggered) {
-        // 即発動 → 自動離脱が走るので LIVE_STATE を再取得して反映
-        invalidateLiveStateForTriggered();
         showSnackbar(
           `現在価格が上限に達しているため入札オフ・上限設定が解除されました`,
           'warning'
@@ -66,7 +73,7 @@ export function useBidLimit(itemId: number, auctionId?: number) {
     onSuccess: () => {
       invalidateBidLimit();
       // 解除時は active なら自動離脱するため LIVE_STATE も再取得
-      invalidateLiveStateForTriggered();
+      invalidateLiveState();
       showSnackbar('上限価格の設定を解除しました', 'info');
     },
     onError: () => {

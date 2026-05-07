@@ -278,14 +278,23 @@ export default function AuctionLive() {
     //   triggered[] 配列を受け取って自分が含まれている時だけ UI 反映する
     onBidLimitsBatchTriggered: (e) => {
       if (!user?.id) return;
-      // 自分の cancellation を triggered 配列から探す
-      const myCancellation = e.triggered.find(
-        (t) => t.user_id === user.id && t.action === 'cancelled' && !t.protected
+      // 自分の指値発動を triggered 配列から探す。
+      //
+      // action 値の意味:
+      //   - 'cancelled' = 発動時に active だった（手動入札中 → 自動離脱）
+      //   - 'triggered' = 発動時に active でなかった（指値だけ持っていた / handlePriceIncrement で
+      //                  先に deactivate された後に checkBidLimits が走ったケース）
+      //
+      // 旧版は 'cancelled' のみマッチしていたため、handlePriceIncrement → checkBidLimits の
+      // 経路で自動離脱した自分の指値が「triggered」扱いになって UI 更新を取りこぼす事故になっていた。
+      // protected=true は「指値が現在価格以上で保護された」状態なので除外する。
+      const myEntry = e.triggered.find(
+        (t) => t.user_id === user.id && !t.protected && (t.action === 'cancelled' || t.action === 'triggered')
       );
-      if (!myCancellation) return; // 自分が cancel されていなければ何もしない
+      if (!myEntry) return;
 
       showSnackbar(
-        `上限価格 ¥${myCancellation.limit_price.toLocaleString()} に達したため離脱しました`,
+        `上限価格 ¥${myEntry.limit_price.toLocaleString()} に達したため指値を解除しました`,
         'warning'
       );
       // setQueryData で my_bid_status / my_limit_price をローカルで即時無効化

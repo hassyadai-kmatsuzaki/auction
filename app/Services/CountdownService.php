@@ -808,19 +808,28 @@ class CountdownService
         //   - 件数 < 5: 個別 BidLimitReached を発火（旧フロント互換、軽量）
         //   - 件数 >= 5: 個別を skip し batch 1 個に集約
         //   25 名同時 hit 時: 25 broadcast → 1 broadcast（96% 削減）
-        $cancelledItems = array_values(array_filter(
+        //
+        // $emitItems: フロントのチップ表示更新が必要な発動者（cancelled + triggered の両方）。
+        //   旧版は 'cancelled' のみ broadcast していたため、handlePriceIncrement → checkBidLimits
+        //   の流れで先に deactivate されたユーザーが 'triggered' 扱いになって UI 更新を
+        //   取りこぼす事故（指値チップが消えない）になっていた。
+        // $cancelCount: 実際に active → inactive になった人数。後段の BidderUpdated 'left' 判定に使う。
+        $emitItems = array_values(array_filter(
+            $batchTriggered,
+            fn($t) => !$t['protected'] && in_array($t['action'], ['cancelled', 'triggered'], true)
+        ));
+        $cancelCount = count(array_filter(
             $batchTriggered,
             fn($t) => !$t['protected'] && $t['action'] === 'cancelled'
         ));
-        $cancelCount = count($cancelledItems);
 
         $publicBatch = array_values(array_map(function ($t) {
             unset($t['_notify_user_id'], $t['_notify_limit']);
             return $t;
         }, $batchTriggered));
 
-        if ($cancelCount > 0 && $cancelCount < 5) {
-            foreach ($cancelledItems as $bt) {
+        if (count($emitItems) > 0 && count($emitItems) < 5) {
+            foreach ($emitItems as $bt) {
                 try {
                     broadcast(new BidLimitReached(
                         $auctionId, $laneId, $itemId,
@@ -1447,11 +1456,17 @@ class CountdownService
             //   届いた後で DB がロールバックされる整合崩壊を起こしていた。
             //   FinalizeBidAction が DB::afterCommit() を使うのと同じ理由で、外部に出る
             //   「BidLimitReached / BidLimitsBatchTriggered / 通知 Job」は commit 確定後に流す。
-            $cancelledItems = array_values(array_filter(
+            // $emitItems: フロントのチップ表示更新が必要な発動者（cancelled + triggered の両方）。
+            //   旧版は 'cancelled' のみで、'triggered' を取りこぼしていた（チップが消えない事故）。
+            // $cancelCount: 実際に active → inactive になった数。BidderUpdated 'left' 判定用。
+            $emitItems = array_values(array_filter(
+                $batchTriggered,
+                fn($t) => !$t['protected'] && in_array($t['action'], ['cancelled', 'triggered'], true)
+            ));
+            $cancelCount = count(array_filter(
                 $batchTriggered,
                 fn($t) => !$t['protected'] && $t['action'] === 'cancelled'
             ));
-            $cancelCount = count($cancelledItems);
 
             $publicBatch = array_values(array_map(function ($t) {
                 unset($t['_notify_user_id'], $t['_notify_limit']);
@@ -1471,14 +1486,14 @@ class CountdownService
             $notifySpeciesName   = $freshItem->species_name ?? '商品';
 
             DB::afterCommit(function () use (
-                $cancelCount, $cancelledItems, $publicBatch,
+                $cancelCount, $emitItems, $publicBatch,
                 $auctionId, $laneId, $itemId, $broadcastPrice, $broadcastSpecies,
                 $notifyTargets, $notifySpeciesName
             ) {
-                // 件数 < 5: 旧フロント互換のため個別 BidLimitReached も発火
+                // 件数 < 5: 旧フロント互換のため個別 BidLimitReached も発火（cancelled+triggered 両方）
                 // 件数 >= 5: batch 1 発のみ（120 名負荷時に 100 broadcast → 1 broadcast）
-                if ($cancelCount > 0 && $cancelCount < 5) {
-                    foreach ($cancelledItems as $bt) {
+                if (count($emitItems) > 0 && count($emitItems) < 5) {
+                    foreach ($emitItems as $bt) {
                         try {
                             broadcast(new BidLimitReached(
                                 $auctionId, $laneId, $itemId,
