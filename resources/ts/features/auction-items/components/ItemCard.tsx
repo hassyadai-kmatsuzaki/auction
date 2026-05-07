@@ -92,9 +92,10 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
         </Box>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
         {item.is_anonymous ? (
-          <Box sx={{ mt: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+            <Avatar sx={{ width: 20, height: 20, bgcolor: 'grey.300' }} />
             <Typography variant="caption" color="text.secondary" noWrap>
-              匿名出品
+              -
             </Typography>
           </Box>
         ) : (

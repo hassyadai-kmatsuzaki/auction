@@ -385,9 +385,10 @@ export default function Favorites() {
                     {item.species_name}
                   </Typography>
                   {item.is_anonymous ? (
-                    <Box sx={{ mt: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+                      <Avatar sx={{ width: 20, height: 20, bgcolor: 'grey.300' }} />
                       <Typography variant="caption" color="text.secondary" noWrap>
-                        匿名出品
+                        -
                       </Typography>
                     </Box>
                   ) : (

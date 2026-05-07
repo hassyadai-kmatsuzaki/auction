@@ -119,9 +119,12 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, mt: 0.5, mb: 0.5 }}>
           {item.is_anonymous ? (
-            <Typography variant="caption" color="text.secondary">
-              匿名出品
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Avatar sx={{ width: 20, height: 20, bgcolor: 'grey.300' }} />
+              <Typography variant="caption" color="text.secondary">
+                -
+              </Typography>
+            </Box>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Avatar
