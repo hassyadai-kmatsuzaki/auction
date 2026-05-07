@@ -419,7 +419,7 @@ export default function Favorites() {
                       </Typography>
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {item.quantity}匹セット
+                      {item.quantity}匹
                     </Typography>
                   </Box>
                   <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>

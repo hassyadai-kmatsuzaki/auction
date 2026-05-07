@@ -123,7 +123,7 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
               /匹
             </Typography>
           </Typography>
-          <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
+          <Typography variant="caption" color="text.secondary">{item.quantity}匹</Typography>
         </Box>
         {onInfoClick && (
           <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>

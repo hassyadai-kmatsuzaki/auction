@@ -155,7 +155,7 @@ export function DemoFavorites({ onNavigateToAuctions, onLimitSetCallback, blockN
                       <Typography variant="h6" color="primary.main" fontWeight="bold">
                         ¥{Number(item.start_price).toLocaleString()}〜
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
+                      <Typography variant="caption" color="text.secondary">{item.quantity}匹</Typography>
                     </Box>
                   </CardContent>
                 </Card>
