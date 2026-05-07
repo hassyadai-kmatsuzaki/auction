@@ -1285,6 +1285,11 @@ class CountdownService
                 $targetPrice += $increment;
                 if (++$safetyCounter > 10000) {
                     Log::error("adjustPriceByBidLimits: safety counter exceeded at price={$targetPrice}");
+                    $this->metrics->jobFailure(
+                        'AdjustPriceSafetyCounter',
+                        "first loop exceeded",
+                        ['item_id' => (string) $item->id, 'price' => (string) $targetPrice, 'lowest_limit' => (string) $lowestLimit]
+                    );
                     break;
                 }
             }
@@ -1306,6 +1311,11 @@ class CountdownService
                     $targetPrice = $nextPrice;
                     if (++$safetyCounter > 10000) {
                         Log::error("adjustPriceByBidLimits: safety counter exceeded in second loop at price={$targetPrice}");
+                        $this->metrics->jobFailure(
+                            'AdjustPriceSafetyCounter',
+                            "second loop exceeded",
+                            ['item_id' => (string) $item->id, 'price' => (string) $targetPrice, 'second_limit' => (string) $secondLowestLimit]
+                        );
                         break;
                     }
                 }

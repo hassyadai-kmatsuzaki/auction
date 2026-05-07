@@ -165,7 +165,29 @@ class UpdateAuctionStatusAction
 
             // 開始カウントダウン
             $countdownSeconds = 10;
-            Cache::put("auction:{$auction->id}:start_at", now()->addSeconds($countdownSeconds)->timestamp, 120);
+
+            // 古いロック・フラグが残っている場合はクリア（前回のオークションの残骸対策）
+            // ※ StartAuctionAction と同等のクリーンアップ。start_at は Cache::add のガード対象なので forget しない
+            Cache::forget("countdown_job_lock:auction:{$auction->id}");
+            Cache::forget("countdown_job_running:auction:{$auction->id}");
+            Cache::forget("countdown_job_heartbeat:auction:{$auction->id}");
+            Cache::forget("countdown_job_finished:auction:{$auction->id}");
+
+            // 世代番号を 0 にリセット（StartAuctionAction と揃える）
+            Cache::put(ProcessAuctionCountdownJob::generationKey($auction->id), 0, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
+
+            // 二重dispatch ガード: start_at を Cache::add で確保
+            $added = Cache::add(
+                "auction:{$auction->id}:start_at",
+                now()->addSeconds($countdownSeconds)->timestamp,
+                120
+            );
+            if (!$added) {
+                Log::info("UpdateAuctionStatusAction.toLiveState: pre-start already in flight, skipping duplicate broadcast/dispatch", ['auction_id' => $auction->id]);
+                return 'オークションを開始しました。';
+            }
+
+            Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, 120);
 
             broadcast(new AuctionStatusChanged(
                 $auction->id,
@@ -174,7 +196,6 @@ class UpdateAuctionStatusAction
                 $countdownSeconds
             ));
 
-            Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, 120);
             ProcessAuctionCountdownJob::dispatch($auction->id);
 
             Log::info("Auction started via status change", ['auction_id' => $auction->id, 'lanes' => count($lanesToStart)]);

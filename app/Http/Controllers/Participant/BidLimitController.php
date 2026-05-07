@@ -37,10 +37,11 @@ class BidLimitController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'item_id'     => 'required|integer|exists:items,id',
-            'limit_price' => 'required|numeric|min:1',
+            'limit_price' => 'required|numeric|min:1|max:' . \App\Actions\Bid\SetBidLimitAction::MAX_LIMIT_PRICE,
         ], [
             'item_id.exists'   => '指定された商品は存在しません。',
             'limit_price.min'  => '上限価格は1円以上を指定してください。',
+            'limit_price.max'  => '上限価格は¥' . number_format(\App\Actions\Bid\SetBidLimitAction::MAX_LIMIT_PRICE) . '以下を指定してください。',
         ]);
 
         if ($validator->fails()) {

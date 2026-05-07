@@ -5,7 +5,7 @@ import {
   Divider, Alert, IconButton, CircularProgress,
 } from '@mui/material';
 import { Close as CloseIcon, PriceCheck as PriceCheckIcon } from '@mui/icons-material';
-import { QuickLimitButtons } from './QuickLimitButtons';
+import { QuickLimitButtons, MAX_BID_LIMIT_PRICE } from './QuickLimitButtons';
 import { formatYen } from '@/lib/formatPrice';
 
 interface QuickOptions {
@@ -76,7 +76,8 @@ export const BidLimitModal = React.memo(({
   }, [open, currentLimitPrice]);
 
   const parsedValue = parseFloat(inputValue);
-  const isValid     = !isNaN(parsedValue) && parsedValue >= 1;
+  const isOverCap   = !isNaN(parsedValue) && parsedValue > MAX_BID_LIMIT_PRICE;
+  const isValid     = !isNaN(parsedValue) && parsedValue >= 1 && !isOverCap;
   const isBelowCurrent = isValid && parsedValue <= currentPrice;
 
   const handleQuickSelect = (value: number) => {
@@ -129,7 +130,7 @@ export const BidLimitModal = React.memo(({
 
         {/* カスタム入力 */}
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-          カスタム入力
+          カスタム入力（上限 ¥{formatYen(MAX_BID_LIMIT_PRICE)}）
         </Typography>
         <TextField
           fullWidth
@@ -138,9 +139,11 @@ export const BidLimitModal = React.memo(({
           value={inputValue}
           onChange={handleInputChange}
           disabled={!!allowedPrice}
+          error={isOverCap}
+          helperText={isOverCap ? `上限価格は ¥${formatYen(MAX_BID_LIMIT_PRICE)} 以下を入力してください` : undefined}
           InputProps={{
             startAdornment: <InputAdornment position="start">¥</InputAdornment>,
-            inputProps: { min: 1 },
+            inputProps: { min: 1, max: MAX_BID_LIMIT_PRICE },
           }}
           size="small"
           autoComplete="off"

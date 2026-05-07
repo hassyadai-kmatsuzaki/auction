@@ -331,7 +331,7 @@ export default function AuctionList() {
                           <PersonIcon fontSize="small" sx={{ color: 'primary.main', mt: 0.25 }} />
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="caption" color="text.secondary" display="block">
-                              生産者
+                              出品者
                             </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}>
                               {auction.sellers.map((seller) => (

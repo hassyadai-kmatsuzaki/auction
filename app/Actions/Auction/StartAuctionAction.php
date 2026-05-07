@@ -45,13 +45,8 @@ class StartAuctionAction
             throw $e;
         }
 
-        // プレスタートカウントダウンをキャッシュに記録
-        Cache::put("auction:{$auction->id}:start_at", now()->addSeconds(self::PRE_START_COUNTDOWN)->timestamp, 120);
-        Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, 120);
-
-        broadcast(new AuctionStatusChanged($auction->id, 'starting', 'オークションが間もなく開始されます', self::PRE_START_COUNTDOWN));
-
         // 古いロック・フラグが残っている場合はクリア（前回のオークションの残骸対策）
+        // ※ start_at は Cache::add の二重dispatchガードとして使うので forget しない
         Cache::forget("countdown_job_lock:auction:{$auction->id}");
         Cache::forget("countdown_job_running:auction:{$auction->id}");
         Cache::forget("countdown_job_heartbeat:auction:{$auction->id}");
@@ -59,6 +54,21 @@ class StartAuctionAction
 
         // 世代番号を0にリセット（新規開始なので古い世代の残骸をクリア）
         Cache::put(ProcessAuctionCountdownJob::generationKey($auction->id), 0, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
+
+        // 二重dispatch ガード: start_at を Cache::add で確保。
+        // 既に存在 = 別経路で開始処理が in-flight → 上書きしない（フロントが「10→5→10」に戻る事故防止）
+        $added = Cache::add(
+            "auction:{$auction->id}:start_at",
+            now()->addSeconds(self::PRE_START_COUNTDOWN)->timestamp,
+            120
+        );
+        if (!$added) {
+            Log::info("StartAuctionAction: pre-start already in flight, skipping duplicate broadcast/dispatch", ['auction_id' => $auction->id]);
+            return;
+        }
+
+        Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, 120);
+        broadcast(new AuctionStatusChanged($auction->id, 'starting', 'オークションが間もなく開始されます', self::PRE_START_COUNTDOWN));
 
         ProcessAuctionCountdownJob::dispatch($auction->id);
         Log::info("Dispatched auction countdown job for auction {$auction->id}");

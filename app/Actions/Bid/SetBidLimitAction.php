@@ -19,6 +19,12 @@ use Illuminate\Support\Facades\DB;
  */
 class SetBidLimitAction
 {
+    /**
+     * 指値の業務上限。E2E ボットによる桁外れ入力（1.0E+30 等）が
+     * `adjustPriceByBidLimits` の while ループ safety counter を発火させる事故の予防。
+     */
+    public const MAX_LIMIT_PRICE = 2_000_000;
+
     public function __construct(
         private readonly JoinBidAction     $joinBidAction,
         private readonly LeaveBidAction    $leaveBidAction,
@@ -37,6 +43,9 @@ class SetBidLimitAction
     {
         if ($limitPrice < 1) {
             return BidResultDto::failure('上限価格は1円以上を設定してください。');
+        }
+        if ($limitPrice > self::MAX_LIMIT_PRICE) {
+            return BidResultDto::failure('上限価格は¥' . number_format(self::MAX_LIMIT_PRICE) . '以下を設定してください。');
         }
 
         $item->loadMissing('auction');

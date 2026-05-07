@@ -3,6 +3,12 @@ import { Box, Button, Typography } from '@mui/material';
 import { BoltOutlined as BoltIcon } from '@mui/icons-material';
 import { formatYen } from '@/lib/formatPrice';
 
+/**
+ * 指値の業務上限（バックエンド SetBidLimitAction::MAX_LIMIT_PRICE と同値）。
+ * これを超える値は入力させない / クイックボタンを disabled にする。
+ */
+export const MAX_BID_LIMIT_PRICE = 2_000_000;
+
 interface QuickOptions {
   base_price: number;
   x1_5: number;
@@ -39,7 +45,8 @@ export const QuickLimitButtons = React.memo(({ quickOptions, currentValue, onSel
       {MULTIPLIERS.map(({ key, label }) => {
         const value = quickOptions[key];
         const isSelected = currentValue === value;
-        const isDisabled = allowedPrice != null && value !== allowedPrice;
+        const isOverCap = value > MAX_BID_LIMIT_PRICE;
+        const isDisabled = (allowedPrice != null && value !== allowedPrice) || isOverCap;
         return (
           <Button
             key={key}
