@@ -114,7 +114,7 @@ export const BidLimitModal = React.memo(({
 
       <DialogContent sx={{ pt: 1 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {speciesName} ／ {isLive ? '現在' : '開始'}価格 ¥{formatYen(currentPrice)}
+          {speciesName} ／ {isLive ? '現在' : '開始'}価格 ¥{formatYen(currentPrice)}/匹
         </Typography>
 
         {/* クイック入力 */}

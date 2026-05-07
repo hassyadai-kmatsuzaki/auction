@@ -119,6 +119,9 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
         <Box sx={{ mt: 1 }}>
           <Typography variant="h6" color="primary.main" fontWeight="bold">
             ¥{formatYen(item.start_price)}〜
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5, fontWeight: 400 }}>
+              /匹
+            </Typography>
           </Typography>
           <Typography variant="caption" color="text.secondary">{item.quantity}匹セット</Typography>
         </Box>
