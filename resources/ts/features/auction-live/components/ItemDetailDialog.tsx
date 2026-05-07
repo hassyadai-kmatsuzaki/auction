@@ -169,12 +169,6 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                   <Chip label="プレミアム" color="warning" size="small" />
                 </Box>
               )}
-              {item?.is_anonymous && (
-                <Box sx={{ mb: 1 }}>
-                  <Chip label="匿名出品" color="info" size="small" />
-                </Box>
-              )}
-
               {/* 価格 */}
               <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
                 <Typography variant="caption" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 2 }, display: 'block', color: { xs: 'text.primary', md: 'text.secondary' } }}>
@@ -197,8 +191,9 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1, md: 2 }, mb: { xs: 1.5, md: 3 } }}>
                 {item?.is_anonymous ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Avatar sx={{ width: { xs: 28, md: 36 }, height: { xs: 28, md: 36 }, bgcolor: 'grey.300' }} />
                     <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: 'text.primary' }}>
-                      匿名出品
+                      -
                     </Typography>
                   </Box>
                 ) : (
