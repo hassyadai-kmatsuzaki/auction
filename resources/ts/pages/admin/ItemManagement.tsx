@@ -110,6 +110,9 @@ export default function ItemManagement() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkAnonymousDialogOpen, setBulkAnonymousDialogOpen] = useState(false);
+  const [bulkAnonymousValue, setBulkAnonymousValue] = useState<boolean>(true);
+  const [bulkAnonymousSubmitting, setBulkAnonymousSubmitting] = useState(false);
   
   // 削除確認
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -222,7 +225,7 @@ export default function ItemManagement() {
 
   const handleBulkStatusUpdate = async () => {
     if (selectedIds.length === 0 || !bulkStatus) return;
-    
+
     try {
       await axios.patch(`/api/admin/auctions/${auctionId}/items/bulk-status`, {
         item_ids: selectedIds,
@@ -236,6 +239,36 @@ export default function ItemManagement() {
       setSnackbar({ open: true, message: err.response?.data?.message || '更新に失敗しました。', severity: 'error' });
     }
   };
+
+  const handleBulkAnonymousUpdate = async () => {
+    if (selectedIds.length === 0) return;
+
+    try {
+      setBulkAnonymousSubmitting(true);
+      await axios.patch(`/api/admin/auctions/${auctionId}/items/bulk-anonymous`, {
+        item_ids: selectedIds,
+        is_anonymous: bulkAnonymousValue,
+      });
+      setSnackbar({
+        open: true,
+        message: bulkAnonymousValue ? '匿名化しました。' : '匿名解除しました。',
+        severity: 'success',
+      });
+      setSelectedIds([]);
+      setBulkAnonymousDialogOpen(false);
+      fetchItems();
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || '更新に失敗しました。',
+        severity: 'error',
+      });
+    } finally {
+      setBulkAnonymousSubmitting(false);
+    }
+  };
+
+  const isAuctionPreEvent = auction ? ['preparing', 'scheduled'].includes(auction.status) : false;
 
   // 個別ステータス変更
   const handleStatusMenuOpen = (event: React.MouseEvent<HTMLElement>, item: Item) => {
@@ -504,6 +537,30 @@ export default function ItemManagement() {
               選択した{selectedIds.length}件を一括操作
             </Button>
           )}
+
+          {selectedIds.length > 0 && isAuctionPreEvent && (
+            <>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => {
+                  setBulkAnonymousValue(true);
+                  setBulkAnonymousDialogOpen(true);
+                }}
+              >
+                {selectedIds.length}件を匿名化
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setBulkAnonymousValue(false);
+                  setBulkAnonymousDialogOpen(true);
+                }}
+              >
+                {selectedIds.length}件の匿名解除
+              </Button>
+            </>
+          )}
         </Box>
       </Paper>
 
@@ -740,6 +797,31 @@ export default function ItemManagement() {
             disabled={!bulkStatus}
           >
             更新する
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 一括匿名化ダイアログ */}
+      <Dialog open={bulkAnonymousDialogOpen} onClose={() => !bulkAnonymousSubmitting && setBulkAnonymousDialogOpen(false)}>
+        <DialogTitle>{bulkAnonymousValue ? '一括匿名化' : '一括匿名解除'}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            {selectedIds.length}件の生体を{bulkAnonymousValue ? '匿名出品にします。' : '匿名解除します。'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            開催前のオークションでのみ適用されます。オークション中・落札済み・不落札の生体は対象外です。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkAnonymousDialogOpen(false)} disabled={bulkAnonymousSubmitting}>
+            キャンセル
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleBulkAnonymousUpdate}
+            disabled={bulkAnonymousSubmitting}
+          >
+            {bulkAnonymousSubmitting ? <CircularProgress size={20} /> : (bulkAnonymousValue ? '匿名化する' : '匿名解除する')}
           </Button>
         </DialogActions>
       </Dialog>

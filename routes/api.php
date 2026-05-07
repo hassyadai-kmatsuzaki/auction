@@ -184,6 +184,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     
     // 生体一括操作（{id}より前に定義する必要がある）
     Route::patch('auctions/{auctionId}/items/bulk-status', [AdminItemController::class, 'bulkUpdateStatus']);
+    Route::patch('auctions/{auctionId}/items/bulk-anonymous', [AdminItemController::class, 'bulkUpdateAnonymous']);
     Route::get('auctions/{auctionId}/items/template', [AdminItemController::class, 'downloadTemplate']);
     Route::post('auctions/{auctionId}/items/import', [AdminItemController::class, 'import']);
     Route::get('sellers/list', [AdminItemController::class, 'getSellers']);

@@ -700,6 +700,55 @@ class ItemController extends Controller
     }
 
     /**
+     * 一括匿名化／匿名解除
+     *
+     * 開催前（auctions.status が preparing / scheduled）のオークションのみ許可。
+     *
+     * @param Request $request
+     * @param int $auctionId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function bulkUpdateAnonymous(Request $request, $auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => '開催前のオークションでのみ匿名化を変更できます。',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'integer|exists:items,id',
+            'is_anonymous' => 'required|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $itemIds = $request->input('item_ids');
+        $isAnonymous = (bool) $request->input('is_anonymous');
+
+        $updated = Item::where('auction_id', $auctionId)
+            ->whereIn('id', $itemIds)
+            ->whereNotIn('status', ['live', 'sold', 'unsold'])
+            ->update(['is_anonymous' => $isAnonymous]);
+
+        $label = $isAnonymous ? '匿名化' : '匿名解除';
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$updated}件の生体を{$label}しました。",
+        ]);
+    }
+
+    /**
      * CSVテンプレートをダウンロード
      *
      * @param int $auctionId
