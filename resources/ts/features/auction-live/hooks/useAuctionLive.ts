@@ -75,14 +75,36 @@ export function useAuctionLive(auctionId: number) {
       const newLanes = prev.lanes.slice();
 
       // 1. LaneChanged を最初に適用（current_item の差し替え）
+      //
+      // ■ item 切替時は個人状態（my_*）を必ず初期化する
+      //   LaneItemChanged の broadcastWith は public channel 用の共通フィールドのみで、
+      //   ユーザー個別の my_bid_status / my_limit_price / my_limit_triggered を含まない。
+      //   素朴な { ...prev, ...event } マージだと、前 item で 'active' だった人の
+      //   my_bid_status が新 item にそのまま引き継がれ、「最高入札者」表示が固定される事故になる
+      //   （単独 active のまま次の item に進んだケースで顕在化）。
+      //   item.id が変わったタイミングで個人状態をリセット → jitter 付き refetch で
+      //   サーバー側の正しい値（事前指値など）に同期させる。
       laneChanges.forEach((event, laneId) => {
         const idx = newLanes.findIndex((l) => l.lane_id === laneId);
         if (idx === -1) return;
+        if (!event.current_item) {
+          newLanes[idx] = { ...newLanes[idx], current_item: null };
+          changed = true;
+          return;
+        }
+        const prev = newLanes[idx].current_item;
+        const isItemSwitch = !prev || prev.id !== event.current_item.id;
         newLanes[idx] = {
           ...newLanes[idx],
-          current_item: event.current_item
-            ? ({ ...newLanes[idx].current_item, ...event.current_item } as LaneItem)
-            : null,
+          current_item: ({
+            ...prev,
+            ...event.current_item,
+            ...(isItemSwitch && {
+              my_bid_status: 'inactive' as const,
+              my_limit_price: null,
+              my_limit_triggered: false,
+            }),
+          } as LaneItem),
         };
         changed = true;
       });
