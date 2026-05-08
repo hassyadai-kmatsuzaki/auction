@@ -218,10 +218,9 @@ export default function Favorites() {
     } as LaneItem;
   };
 
-  const getStatusChip = (status: string) => {
-    // 落札済のみタグ表示（開催予定・出品中・入札中・不成立では非表示）
-    if (status !== 'sold') return null;
-    return <Chip label="落札済" color="success" size="small" />;
+  const getStatusChip = (_status: string) => {
+    // ステータスタグは表示しない
+    return null;
   };
 
   const getAuctionStatusLabel = (status: string) => {

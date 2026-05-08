@@ -324,6 +324,14 @@ class WonItemController extends Controller
         $wonItem = WonItem::with('item')->findOrFail($id);
         $group = $this->findGroupItems($wonItem);
 
+        // 送料未承認の発送を禁止（引き取り＝送料0円も承認済みなら通る）
+        if ($group->contains(fn ($w) => $w->shipping_approved_at === null)) {
+            return response()->json([
+                'success' => false,
+                'message' => '送料が未承認です。先に送料承認を行ってください。',
+            ], 409);
+        }
+
         $now = now();
         $groupIds = $group->pluck('id');
 

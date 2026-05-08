@@ -223,7 +223,6 @@ export default function WonItemManagement() {
   const [shippingDetailLoading, setShippingDetailLoading] = useState(false);
   const [approveShippingOpen, setApproveShippingOpen] = useState(false);
   const [approveShippingWinnerId, setApproveShippingWinnerId] = useState<number | null>(null);
-  const [approveShippingAutoFee, setApproveShippingAutoFee] = useState<number>(0);
   const [approveShippingOverride, setApproveShippingOverride] = useState<string>('');
   const [approveShippingReason, setApproveShippingReason] = useState<string>('');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -364,11 +363,10 @@ export default function WonItemManagement() {
     }
   };
 
-  // 送料入力モーダルを開く（「その他」を含む発送単位の手動確定用）
-  const handleOpenApproveShipping = (winnerId: number, _autoFee: number) => {
+  // 送料承認/修正モーダルを開く（送料0円の引き取り承認・承認後の修正にも対応）
+  const handleOpenApproveShipping = (winnerId: number, currentFee: number) => {
     setApproveShippingWinnerId(winnerId);
-    setApproveShippingAutoFee(0);
-    setApproveShippingOverride('');
+    setApproveShippingOverride(currentFee > 0 ? String(currentFee) : '');
     setApproveShippingReason('');
     setApproveShippingOpen(true);
   };
@@ -722,6 +720,16 @@ export default function WonItemManagement() {
     const trackingNumber = representative.tracking_number;
     const shippingCompany = representative.shipping_company;
     const shippedAt = representative.shipped_at;
+    const winner = representative.winner;
+    const calculatedCount = items.filter((i) => i.shipping_calculated_at).length;
+    const allCalculated = calculatedCount === items.length && items.length > 0;
+    const approvedCount = items.filter((i) => i.shipping_approved_at).length;
+    const allApproved = approvedCount === items.length && items.length > 0;
+    const totalShippingFee = items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
+    const isFinalized = deliveryStatus === 'shipped' || deliveryStatus === 'completed';
+    const canApproveShipping = !!winner && allCalculated && !isFinalized;
+    const canConfirmPayment = (paymentStatus === 'pending' || paymentStatus === 'paid') && !isFinalized;
+    const canShip = paymentStatus === 'confirmed' && allApproved && deliveryStatus === 'preparing';
 
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -765,26 +773,39 @@ export default function WonItemManagement() {
             </Box>
           </Box>
         )}
-        <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-          {(paymentStatus === 'pending' || paymentStatus === 'paid') && (
+        <Box sx={{ display: 'flex', gap: 1, ml: 'auto', flexWrap: 'wrap' }}>
+          {!isFinalized && (
+            <Button
+              size="small"
+              variant={allApproved ? 'outlined' : 'contained'}
+              color="warning"
+              startIcon={<CalculateIcon />}
+              onClick={() => winner && handleOpenApproveShipping(winner.id, totalShippingFee)}
+              disabled={actionLoading || !canApproveShipping}
+            >
+              {allApproved ? '送料修正' : '送料承認'}
+            </Button>
+          )}
+          {!isFinalized && (
             <Button
               size="small"
               variant="contained"
               color="success"
               startIcon={<CheckCircleIcon />}
               onClick={() => handleConfirmPayment(representative.id)}
-              disabled={actionLoading}
+              disabled={actionLoading || !canConfirmPayment}
             >
               入金確認
             </Button>
           )}
-          {paymentStatus === 'confirmed' && deliveryStatus === 'preparing' && (
+          {!isFinalized && (
             <Button
               size="small"
               variant="contained"
               color="primary"
               startIcon={<LocalShippingIcon />}
               onClick={() => handleOpenTrackingDialog(representative)}
+              disabled={actionLoading || !canShip}
             >
               発送登録
             </Button>
@@ -932,7 +953,6 @@ export default function WonItemManagement() {
               const allCalculated = calculatedCount === group.items.length;
               const approvedCount = group.items.filter((i) => i.shipping_approved_at).length;
               const allApproved = approvedCount === group.items.length && group.items.length > 0;
-              const hasManual = group.items.some((i) => i.calculation_mode === 'manual');
               const groupKey = group.winner ? `u${group.winner.id}` : 'anonymous';
               return (
                 <Card key={groupKey}>
@@ -1044,17 +1064,6 @@ export default function WonItemManagement() {
                             onClick={() => handleOpenShippingDetail(group.items)}
                           >
                             送料内訳
-                          </Button>
-                        )}
-                        {allCalculated && !allApproved && hasManual && group.winner && (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            onClick={() => handleOpenApproveShipping(group.winner!.id, totalShippingFee)}
-                            disabled={actionLoading}
-                          >
-                            送料入力
                           </Button>
                         )}
                       </Box>
@@ -1209,13 +1218,13 @@ export default function WonItemManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* 送料入力ダイアログ（「その他」種別を含む発送単位の手動確定用） */}
+      {/* 送料承認/修正ダイアログ（手動入力・引き取り0円・承認後の修正に対応） */}
       <Dialog open={approveShippingOpen} onClose={() => setApproveShippingOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>送料の入力</DialogTitle>
+        <DialogTitle>送料の承認・修正</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              「その他」種別が含まれているため、送料を手動で入力してください。
+              送料を入力して確定してください。引き取りの場合は「送料無料」を押すと0円で承認できます。
               確定すると落札者に送料が開示され、請求書が発行可能になります。
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 2 }}>

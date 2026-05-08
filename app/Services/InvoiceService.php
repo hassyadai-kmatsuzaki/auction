@@ -266,6 +266,12 @@ class InvoiceService
      */
     private function buildShippingBreakdown(Collection $wonItems): ?array
     {
+        // 送料合計が0円（引き取り等）の場合は内訳自体を出さない
+        $totalFee = (int) $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+        if ($totalFee === 0) {
+            return null;
+        }
+
         $first = $wonItems->first(
             fn ($w) => is_array($w->shipping_breakdown) && !empty($w->shipping_breakdown)
         );
