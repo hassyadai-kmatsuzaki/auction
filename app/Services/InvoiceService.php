@@ -47,6 +47,24 @@ class InvoiceService
             ->setOption('isRemoteEnabled', true);
     }
 
+    /**
+     * ユーザーの表示名を「会社名 → 屋号 → 名前」の優先順で解決する。
+     * 請求書・納品書・支払通知書の宛先表記で共通利用。
+     */
+    private function resolveUserDisplayName(?User $user): string
+    {
+        if (!$user) {
+            return '';
+        }
+        foreach (['company_name', 'trade_name', 'name'] as $field) {
+            $value = trim((string) ($user->{$field} ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+        return '';
+    }
+
     private function getWonItems(Auction $auction, User $winner): Collection
     {
         $wonItems = WonItem::where('winner_id', $winner->id)
@@ -138,8 +156,8 @@ class InvoiceService
             'type' => $type,
             'document_number' => $documentNumber,
             'issue_date' => Carbon::now()->format('Y年m月d日'),
-            // 宛先
-            'buyer_name' => $firstItem->shipping_name ?? $winner->name ?? '',
+            // 宛先（会社名 → 屋号 → 名前 の優先順）
+            'buyer_name' => $this->resolveUserDisplayName($winner),
             'buyer_postal_code' => $firstItem->shipping_postal_code ?? '',
             'buyer_address' => trim(
                 ($firstItem->shipping_prefecture ?? '') .
@@ -222,7 +240,8 @@ class InvoiceService
         $data = [
             'document_number' => $documentNumber,
             'issue_date' => Carbon::now()->format('Y年m月d日'),
-            'buyer_name' => $firstItem->shipping_name ?? $winner->name ?? '',
+            // 宛先（会社名 → 屋号 → 名前 の優先順）
+            'buyer_name' => $this->resolveUserDisplayName($winner),
             'buyer_postal_code' => $firstItem->shipping_postal_code ?? '',
             'buyer_address' => trim(
                 ($firstItem->shipping_prefecture ?? '') .
@@ -381,12 +400,12 @@ class InvoiceService
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
 
-        // 明細
+        // 明細（buyer_name は 会社名 → 屋号 → 名前 の優先順）
         $items = $wonItems->map(function ($wonItem) {
             return [
                 'item_number' => $wonItem->item->item_number ?? '',
                 'species_name' => $wonItem->item->species_name ?? '',
-                'buyer_name' => $wonItem->winner->name ?? '',
+                'buyer_name' => $this->resolveUserDisplayName($wonItem->winner),
                 'quantity' => $wonItem->quantity,
                 'total_amount' => (int) $wonItem->total_amount,
                 'commission_amount' => (int) $wonItem->commission_amount,
@@ -404,7 +423,8 @@ class InvoiceService
         $data = [
             'document_number' => $documentNumber,
             'issue_date' => Carbon::now()->format('Y年m月d日'),
-            'seller_name' => $seller->display_name ?? $seller->user->name ?? '',
+            // 出品者名（会社名 → 屋号 → 名前 の優先順、users 直参照）
+            'seller_name' => $this->resolveUserDisplayName($seller->user),
             'auction_title' => $auction->title ?? '',
             'auction_date' => $auction->event_date?->format('Y年m月d日') ?? '',
             'items' => $items,

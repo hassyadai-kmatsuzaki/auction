@@ -24,11 +24,15 @@ class ShippingNotificationMail extends Mailable
         $this->wonItem = $wonItem;
         $this->user = $wonItem->user;
         $auctionId = optional($wonItem->item)->auction_id;
-        $this->wonItems = WonItem::with('item')
-            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
-            ->where('winner_id', $wonItem->winner_id)
-            ->orderBy('id')
-            ->get();
+        $items = $auctionId && $wonItem->winner_id
+            ? WonItem::with('item')
+                ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+                ->where('winner_id', $wonItem->winner_id)
+                ->orderBy('id')
+                ->get()
+            : collect();
+        // モックや単発呼び出しで auction × winner の解決ができない場合は受け取った wonItem を1件として扱う
+        $this->wonItems = $items->isEmpty() ? collect([$wonItem]) : $items;
         $this->routeViaNotify();
     }
 
