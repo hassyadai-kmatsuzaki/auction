@@ -303,15 +303,20 @@ class WonItemController extends Controller
 
     /**
      * 発送登録（同一オークション×同一落札者の全 WonItem に同じ伝票番号を適用）
+     *
+     * shipping_company === '引き取り' の場合は伝票番号不要・即「配達完了」に遷移し、
+     * 落札者通知も送信しない（対面で受け渡し済みである前提）。
      */
     public function ship(Request $request, $id)
     {
+        $isPickup = $request->input('shipping_company') === '引き取り';
+
         $validator = Validator::make($request->all(), [
             'shipping_company' => 'required|string|max:100',
-            'tracking_number' => 'required|string|max:100',
+            'tracking_number' => $isPickup ? 'nullable|string|max:100' : 'required|string|max:100',
         ], [
             'shipping_company.required' => '配送業者は必須です。',
-            'tracking_number.required' => '追跡番号は必須です。',
+            'tracking_number.required' => '伝票番号は必須です。',
         ]);
 
         if ($validator->fails()) {
@@ -335,29 +340,44 @@ class WonItemController extends Controller
         $now = now();
         $groupIds = $group->pluck('id');
 
-        WonItem::whereIn('id', $groupIds)->update([
-            'delivery_status' => 'shipped',
-            'shipping_company' => $request->shipping_company,
-            'tracking_number' => $request->tracking_number,
-            'shipped_at' => $now,
-        ]);
+        if ($isPickup) {
+            // 引き取り：伝票なし・即配達完了
+            WonItem::whereIn('id', $groupIds)->update([
+                'delivery_status' => 'completed',
+                'shipping_company' => '引き取り',
+                'tracking_number' => null,
+                'shipped_at' => $now,
+                'delivered_at' => $now,
+            ]);
+        } else {
+            WonItem::whereIn('id', $groupIds)->update([
+                'delivery_status' => 'shipped',
+                'shipping_company' => $request->shipping_company,
+                'tracking_number' => $request->tracking_number,
+                'shipped_at' => $now,
+            ]);
+        }
 
         // 発送が先行する場合に備え、未ロックなら配送先をここでロック
         WonItem::whereIn('id', $groupIds)
             ->whereNull('shipping_locked_at')
             ->update(['shipping_locked_at' => $now]);
 
-        $representative = WonItem::with('user')->find($wonItem->id);
-        $this->notificationService->sendShippingNotification($representative);
+        if (!$isPickup) {
+            $representative = WonItem::with('user')->find($wonItem->id);
+            $this->notificationService->sendShippingNotification($representative);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => '発送完了を登録しました。',
+            'message' => $isPickup ? '引き取り完了として登録しました。' : '発送完了を登録しました。',
             'data' => [
                 'affected_count' => $group->count(),
-                'delivery_status' => 'shipped',
-                'tracking_number' => $request->tracking_number,
+                'delivery_status' => $isPickup ? 'completed' : 'shipped',
+                'tracking_number' => $isPickup ? null : $request->tracking_number,
                 'shipped_at' => $now->toIso8601String(),
+                'delivered_at' => $isPickup ? $now->toIso8601String() : null,
+                'is_pickup' => $isPickup,
             ],
         ]);
     }
@@ -533,6 +553,18 @@ class WonItemController extends Controller
         $validator = Validator::make($request->all(), [
             'shipping_fee' => 'required|integer|min:0|max:1000000',
             'adjustment_reason' => 'nullable|string|max:500',
+            'is_free_shipping' => 'nullable|boolean',
+            // 箱単位の編集（任意）。指定された場合 shipping_breakdown.boxes/bags を上書きする。
+            'boxes' => 'nullable|array',
+            'boxes.*.box_size' => 'required_with:boxes|integer|min:60|max:200',
+            'boxes.*.count' => 'required_with:boxes|integer|min:1|max:50',
+            'boxes.*.shipping_cost' => 'required_with:boxes|integer|min:0|max:1000000',
+            'boxes.*.packing_material_cost' => 'required_with:boxes|integer|min:0|max:1000000',
+            'boxes.*.bags' => 'nullable|array',
+            'boxes.*.bags.*' => 'string|max:32',
+            'bags' => 'nullable|array',
+            'bags.*.size' => 'required_with:bags|string|max:10',
+            'bags.*.quantity' => 'required_with:bags|integer|min:0|max:1000',
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
@@ -540,6 +572,8 @@ class WonItemController extends Controller
 
         $overrideFee = (int) $request->input('shipping_fee');
         $reason = $request->input('adjustment_reason');
+        $isFree = (bool) $request->input('is_free_shipping', false);
+        $hasBoxesEdit = $request->filled('boxes') || $request->filled('bags');
 
         if ($overrideFee === 0 && empty(trim((string) $reason))) {
             return response()->json([
@@ -550,6 +584,7 @@ class WonItemController extends Controller
 
         $wonItems = WonItem::where('winner_id', $winnerId)
             ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->with('item')
             ->get();
 
         if ($wonItems->isEmpty()) {
@@ -562,16 +597,74 @@ class WonItemController extends Controller
 
         $adminId = $request->user()->id;
 
-        \DB::transaction(function () use ($wonItems, $overrideFee, $reason, $adminId) {
+        // 既存 breakdown を起点に、is_free_shipping または boxes/bags 編集を上書き反映
+        $baseBreakdown = $wonItems->first()->shipping_breakdown ?? [];
+        $newBreakdown = null;
+
+        if ($isFree) {
+            // 送料無料: 内訳を「送料無料」状態に上書き（manual モード扱い）
+            $newBreakdown = [
+                'calculation_mode' => 'manual',
+                'destination_region' => $baseBreakdown['destination_region'] ?? null,
+                'manual_reason' => '送料無料',
+                'total_shipping_fee' => 0,
+                'shipping_cost' => 0,
+                'packing_material_cost' => 0,
+                'boxes' => [],
+                'bags' => [],
+                'species_breakdown' => $baseBreakdown['species_breakdown'] ?? [],
+            ];
+        } elseif ($hasBoxesEdit) {
+            // 箱・袋編集: count 件に展開して保存（既存の 1箱=1要素 形式と互換）
+            $expandedBoxes = [];
+            foreach ($request->input('boxes', []) as $row) {
+                $count = max(1, (int) ($row['count'] ?? 1));
+                for ($i = 0; $i < $count; $i++) {
+                    $expandedBoxes[] = [
+                        'box_size' => (int) ($row['box_size'] ?? 0),
+                        'bags' => array_values(array_map('strval', (array) ($row['bags'] ?? []))),
+                        'shipping_cost' => (int) ($row['shipping_cost'] ?? 0),
+                        'packing_material_cost' => (int) ($row['packing_material_cost'] ?? 0),
+                    ];
+                }
+            }
+            $bagsClean = [];
+            foreach ($request->input('bags', []) as $b) {
+                $size = (string) ($b['size'] ?? '');
+                $qty = (int) ($b['quantity'] ?? 0);
+                if ($size === '' || $qty <= 0) continue;
+                $bagsClean[] = ['size' => $size, 'quantity' => $qty];
+            }
+
+            $shippingCostSum = (int) array_sum(array_column($expandedBoxes, 'shipping_cost'));
+            $packingCostSum = (int) array_sum(array_column($expandedBoxes, 'packing_material_cost'));
+
+            $newBreakdown = $baseBreakdown;
+            $newBreakdown['boxes'] = $expandedBoxes;
+            $newBreakdown['bags'] = $bagsClean;
+            $newBreakdown['shipping_cost'] = $shippingCostSum;
+            $newBreakdown['packing_material_cost'] = $packingCostSum;
+            $newBreakdown['total_shipping_fee'] = $shippingCostSum + $packingCostSum;
+            // 内訳を手で直したらモードは manual 扱いに統一（PDF 表示の一貫性のため）
+            $newBreakdown['calculation_mode'] = 'manual';
+            // 送料無料用の manual_reason は外す（金額編集モードでは未使用）
+            unset($newBreakdown['manual_reason']);
+        }
+
+        \DB::transaction(function () use ($wonItems, $overrideFee, $reason, $adminId, $newBreakdown) {
             $quantities = $wonItems->map(fn ($w) => $w->item->quantity ?? 1)->toArray();
             $apportioned = \App\Services\ShippingCalculatorService::apportionFee($overrideFee, $quantities);
             foreach ($wonItems->values() as $i => $w) {
-                $w->update([
+                $update = [
                     'shipping_fee' => $apportioned[$i],
                     'shipping_approved_at' => now(),
                     'shipping_approved_by' => $adminId,
                     'shipping_adjustment_reason' => $reason,
-                ]);
+                ];
+                if ($newBreakdown !== null) {
+                    $update['shipping_breakdown'] = $newBreakdown;
+                }
+                $w->update($update);
             }
         });
 

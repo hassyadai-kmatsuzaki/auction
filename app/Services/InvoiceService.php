@@ -400,22 +400,30 @@ class InvoiceService
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
 
-        // 明細（buyer_name は 会社名 → 屋号 → 名前 の優先順）
+        // 明細（落札金額=winning_price×quantity 税抜、手数料=買い手手数料 税抜）
         $items = $wonItems->map(function ($wonItem) {
+            $winningAmount = (int) $wonItem->winning_price * (int) $wonItem->quantity;
             return [
                 'item_number' => $wonItem->item->item_number ?? '',
                 'species_name' => $wonItem->item->species_name ?? '',
-                'buyer_name' => $this->resolveUserDisplayName($wonItem->winner),
                 'quantity' => $wonItem->quantity,
-                'total_amount' => (int) $wonItem->total_amount,
+                'winning_amount' => $winningAmount,
                 'commission_amount' => (int) $wonItem->commission_amount,
-                'seller_amount' => (int) $wonItem->seller_amount,
             ];
         })->values()->toArray();
 
-        $totalSales = $wonItems->sum(fn ($w) => (int) $w->total_amount);
-        $totalCommission = $wonItems->sum(fn ($w) => (int) $w->commission_amount);
-        $netAmount = $wonItems->sum(fn ($w) => (int) $w->seller_amount);
+        // 税抜小計（落札金額・手数料を独立して集計）
+        $subtotalWinning = (int) $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+        $subtotalCommission = (int) $wonItems->sum(fn ($w) => (int) $w->commission_amount);
+
+        // 消費税（SystemSetting::tax_rate, 既定 10%）。InvoiceService と揃えて floor で丸める
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+        $taxWinning = (int) floor($subtotalWinning * $taxRate / 100);
+        $taxCommission = (int) floor($subtotalCommission * $taxRate / 100);
+
+        $totalWinningWithTax = $subtotalWinning + $taxWinning;
+        $totalCommissionWithTax = $subtotalCommission + $taxCommission;
+        $netAmount = $totalWinningWithTax - $totalCommissionWithTax;
 
         // 振込予定日（オークション終了7日後）
         $paymentDate = $auction->event_date?->addDays(7);
@@ -428,8 +436,13 @@ class InvoiceService
             'auction_title' => $auction->title ?? '',
             'auction_date' => $auction->event_date?->format('Y年m月d日') ?? '',
             'items' => $items,
-            'total_sales' => $totalSales,
-            'total_commission' => $totalCommission,
+            'subtotal_winning' => $subtotalWinning,
+            'subtotal_commission' => $subtotalCommission,
+            'tax_rate' => $taxRate,
+            'tax_winning' => $taxWinning,
+            'tax_commission' => $taxCommission,
+            'total_winning_with_tax' => $totalWinningWithTax,
+            'total_commission_with_tax' => $totalCommissionWithTax,
             'net_amount' => $netAmount,
             // 振込先
             'bank_name' => $seller->bank_name ?? '',

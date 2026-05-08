@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\SellerSettlement;
+use App\Models\SystemSetting;
 use App\Models\WonItem;
 use App\Models\User;
 use Carbon\Carbon;
@@ -157,10 +158,18 @@ class SettlementController extends Controller
             ], 404);
         }
 
-        $totalSales = $wonItems->sum('total_amount');
-        $totalCommission = $wonItems->sum('commission_amount');
-        $totalNet = $wonItems->sum('seller_amount');
-        $totalShippingFee = $wonItems->sum('shipping_fee');
+        // 税抜小計（落札金額=winning_price×quantity, 手数料=買い手手数料）
+        $subtotalWinning = (int) $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+        $subtotalCommission = (int) $wonItems->sum(fn ($w) => (int) $w->commission_amount);
+
+        // 消費税（SystemSetting::tax_rate, 既定 10%）
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+        $taxWinning = (int) floor($subtotalWinning * $taxRate / 100);
+        $taxCommission = (int) floor($subtotalCommission * $taxRate / 100);
+
+        $totalWinningWithTax = $subtotalWinning + $taxWinning;
+        $totalCommissionWithTax = $subtotalCommission + $taxCommission;
+        $netAmount = $totalWinningWithTax - $totalCommissionWithTax;
 
         // 精算ステータスは管理者が手動管理する seller_settlements から取得
         $settlement = SellerSettlement::firstOrCreate(
@@ -179,10 +188,14 @@ class SettlementController extends Controller
                     'settlement_id' => $settlement->id,
                     'auction' => $auction->title,
                     'auction_date' => $auction->event_date->format('Y-m-d'),
-                    'total_sales' => $totalSales,
-                    'commission' => $totalCommission,
-                    'shipping_fee' => (int) $totalShippingFee,
-                    'net_amount' => $totalNet,
+                    'subtotal_winning' => $subtotalWinning,
+                    'subtotal_commission' => $subtotalCommission,
+                    'tax_rate' => $taxRate,
+                    'tax_winning' => $taxWinning,
+                    'tax_commission' => $taxCommission,
+                    'total_winning_with_tax' => $totalWinningWithTax,
+                    'total_commission_with_tax' => $totalCommissionWithTax,
+                    'net_amount' => $netAmount,
                     'status' => $settlement->status,
                     'paid_at' => optional($settlement->paid_at)->format('Y-m-d'),
                     'scheduled_payment_date' => optional($settlement->scheduled_payment_date)->format('Y-m-d'),
@@ -200,11 +213,9 @@ class SettlementController extends Controller
                             'species_name' => $wonItem->item->species_name,
                             'quantity' => $wonItem->item->quantity,
                         ],
-                        'buyer' => $wonItem->winner ? $wonItem->winner->name : '不明',
                         'winning_price' => $wonItem->winning_price,
-                        'shipping_fee' => $wonItem->shipping_fee,
-                        'commission' => $wonItem->commission_amount,
-                        'seller_amount' => $wonItem->seller_amount,
+                        'winning_amount' => (int) $wonItem->winning_price * (int) $wonItem->quantity,
+                        'commission' => (int) $wonItem->commission_amount,
                     ];
                 }),
             ],

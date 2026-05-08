@@ -149,17 +149,15 @@
         お支払い金額: ¥{{ number_format($net_amount) }}
     </div>
 
-    <!-- 売上明細 -->
+    <!-- 売上明細（金額はすべて税抜） -->
     <table class="detail">
         <thead>
             <tr>
-                <th style="width: 8%">No.</th>
-                <th style="width: 25%">品種</th>
-                <th style="width: 10%">落札者</th>
-                <th style="width: 8%; text-align: center">数量</th>
-                <th style="width: 15%; text-align: right">落札金額</th>
-                <th style="width: 15%; text-align: right">手数料</th>
-                <th style="width: 19%; text-align: right">お支払い額</th>
+                <th style="width: 10%">No.</th>
+                <th style="width: 40%">品種</th>
+                <th style="width: 10%; text-align: center">数量</th>
+                <th style="width: 20%; text-align: right">落札金額（税抜）</th>
+                <th style="width: 20%; text-align: right">手数料（税抜）</th>
             </tr>
         </thead>
         <tbody>
@@ -167,20 +165,36 @@
             <tr>
                 <td>{{ $item['item_number'] }}</td>
                 <td>{{ $item['species_name'] }}</td>
-                <td>{{ $item['buyer_name'] }}</td>
                 <td style="text-align: center">{{ $item['quantity'] }}匹</td>
-                <td class="right">¥{{ number_format($item['total_amount']) }}</td>
-                <td class="right">-¥{{ number_format($item['commission_amount']) }}</td>
-                <td class="right">¥{{ number_format($item['seller_amount']) }}</td>
+                <td class="right">¥{{ number_format($item['winning_amount']) }}</td>
+                <td class="right">¥{{ number_format($item['commission_amount']) }}</td>
             </tr>
             @endforeach
             <tr class="total-row">
-                <td colspan="4" style="text-align: right;"><strong>合計</strong></td>
-                <td class="right"><strong>¥{{ number_format($total_sales) }}</strong></td>
-                <td class="right"><strong>-¥{{ number_format($total_commission) }}</strong></td>
-                <td class="right"><strong>¥{{ number_format($net_amount) }}</strong></td>
+                <td colspan="3" style="text-align: right;"><strong>小計（税抜）</strong></td>
+                <td class="right"><strong>¥{{ number_format($subtotal_winning) }}</strong></td>
+                <td class="right"><strong>¥{{ number_format($subtotal_commission) }}</strong></td>
+            </tr>
+            <tr>
+                <td colspan="3" style="text-align: right;">消費税（{{ rtrim(rtrim(number_format($tax_rate, 2), '0'), '.') }}%）</td>
+                <td class="right">¥{{ number_format($tax_winning) }}</td>
+                <td class="right">¥{{ number_format($tax_commission) }}</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="3" style="text-align: right;"><strong>合計（税込）</strong></td>
+                <td class="right"><strong>¥{{ number_format($total_winning_with_tax) }}</strong></td>
+                <td class="right"><strong>¥{{ number_format($total_commission_with_tax) }}</strong></td>
             </tr>
         </tbody>
+    </table>
+
+    <table class="summary-table" style="margin-top: 10px;">
+        <tr>
+            <td style="text-align: right; width: 70%;"><strong>差引お支払い額</strong></td>
+            <td style="text-align: right; font-size: 14px; font-weight: bold; color: #8B5CF6;">
+                ¥{{ number_format($net_amount) }}
+            </td>
+        </tr>
     </table>
 
     <!-- 振込先情報 -->

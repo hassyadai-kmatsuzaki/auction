@@ -34,6 +34,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Divider,
+  MenuItem,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -52,6 +53,8 @@ import {
   ViewModule as ViewModuleIcon,
   ViewList as ViewListIcon,
   LocationOn as LocationOnIcon,
+  Add as AddIcon,
+  RemoveCircleOutline as RemoveIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
@@ -225,6 +228,12 @@ export default function WonItemManagement() {
   const [approveShippingWinnerId, setApproveShippingWinnerId] = useState<number | null>(null);
   const [approveShippingOverride, setApproveShippingOverride] = useState<string>('');
   const [approveShippingReason, setApproveShippingReason] = useState<string>('');
+  // 送料修正時の箱・袋編集
+  const [approveShippingBoxes, setApproveShippingBoxes] = useState<
+    Array<{ box_size: number; count: number; shipping_cost: number; packing_material_cost: number }>
+  >([]);
+  const [approveShippingBags, setApproveShippingBags] = useState<Array<{ size: string; quantity: number }>>([]);
+  const [approveShippingIsFree, setApproveShippingIsFree] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -364,17 +373,96 @@ export default function WonItemManagement() {
   };
 
   // 送料承認/修正モーダルを開く（送料0円の引き取り承認・承認後の修正にも対応）
-  const handleOpenApproveShipping = (winnerId: number, currentFee: number) => {
+  const handleOpenApproveShipping = async (items: WonItem[]) => {
+    const winnerId = items[0]?.winner?.id;
+    if (!winnerId) return;
+    const totalFee = items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
     setApproveShippingWinnerId(winnerId);
-    setApproveShippingOverride(currentFee > 0 ? String(currentFee) : '');
+    setApproveShippingOverride(totalFee > 0 ? String(totalFee) : '');
     setApproveShippingReason('');
+    setApproveShippingBoxes([]);
+    setApproveShippingBags([]);
+    setApproveShippingIsFree(false);
     setApproveShippingOpen(true);
+
+    // 既存の shipping_breakdown を取得して初期表示
+    const representative = items.find((i) => i.shipping_calculated_at) || items[0];
+    if (!representative) return;
+    try {
+      const response = await axios.get(`/api/admin/won-items/${representative.id}`);
+      if (response.data.success) {
+        const bd = response.data.data.won_item.shipping_breakdown;
+        if (bd && Array.isArray(bd.boxes)) {
+          // box_size + 単価で集約してUI表現に変換
+          const grouped = new Map<string, { box_size: number; count: number; shipping_cost: number; packing_material_cost: number }>();
+          for (const b of bd.boxes) {
+            const key = `${b.box_size}|${b.shipping_cost}|${b.packing_material_cost}`;
+            const existing = grouped.get(key);
+            if (existing) existing.count += 1;
+            else grouped.set(key, {
+              box_size: Number(b.box_size) || 0,
+              count: 1,
+              shipping_cost: Number(b.shipping_cost) || 0,
+              packing_material_cost: Number(b.packing_material_cost) || 0,
+            });
+          }
+          setApproveShippingBoxes(Array.from(grouped.values()));
+        }
+        if (bd && Array.isArray(bd.bags)) {
+          setApproveShippingBags(
+            bd.bags.map((b: any) => ({ size: String(b.size || ''), quantity: Number(b.quantity) || 0 })),
+          );
+        }
+      }
+    } catch {
+      // 取得失敗時はそのまま空で表示
+    }
   };
 
-  // 送料無料ボタン
+  // 送料無料ボタン: 内訳もクリアし「送料無料」モードに切り替える
   const handleSetFreeShipping = () => {
     setApproveShippingOverride('0');
     setApproveShippingReason('送料無料');
+    setApproveShippingBoxes([]);
+    setApproveShippingBags([]);
+    setApproveShippingIsFree(true);
+  };
+
+  // 箱・袋の編集ヘルパー
+  const addBoxRow = () => {
+    setApproveShippingIsFree(false);
+    setApproveShippingBoxes((prev) => [
+      ...prev,
+      { box_size: 100, count: 1, shipping_cost: 0, packing_material_cost: 0 },
+    ]);
+  };
+  const removeBoxRow = (idx: number) => {
+    setApproveShippingBoxes((prev) => prev.filter((_, i) => i !== idx));
+  };
+  const updateBoxRow = (idx: number, patch: Partial<{ box_size: number; count: number; shipping_cost: number; packing_material_cost: number }>) => {
+    setApproveShippingIsFree(false);
+    setApproveShippingBoxes((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  };
+  const addBagRow = () => {
+    setApproveShippingIsFree(false);
+    setApproveShippingBags((prev) => [...prev, { size: 'S', quantity: 1 }]);
+  };
+  const removeBagRow = (idx: number) => {
+    setApproveShippingBags((prev) => prev.filter((_, i) => i !== idx));
+  };
+  const updateBagRow = (idx: number, patch: Partial<{ size: string; quantity: number }>) => {
+    setApproveShippingIsFree(false);
+    setApproveShippingBags((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  };
+
+  // 箱の合計から送料を自動算出してフィールドに反映
+  const recalcFeeFromBoxes = () => {
+    const total = approveShippingBoxes.reduce(
+      (s, b) => s + (Number(b.shipping_cost) + Number(b.packing_material_cost)) * Number(b.count || 1),
+      0,
+    );
+    setApproveShippingOverride(String(total));
+    setApproveShippingIsFree(false);
   };
 
   // 送料入力を確定
@@ -400,6 +488,19 @@ export default function WonItemManagement() {
       };
       if (approveShippingReason.trim()) {
         payload.adjustment_reason = approveShippingReason.trim();
+      }
+      if (approveShippingIsFree) {
+        payload.is_free_shipping = true;
+      } else if (approveShippingBoxes.length > 0 || approveShippingBags.length > 0) {
+        payload.boxes = approveShippingBoxes.map((b) => ({
+          box_size: Number(b.box_size),
+          count: Math.max(1, Number(b.count) || 1),
+          shipping_cost: Math.max(0, Number(b.shipping_cost) || 0),
+          packing_material_cost: Math.max(0, Number(b.packing_material_cost) || 0),
+        }));
+        payload.bags = approveShippingBags
+          .filter((b) => b.size.trim() !== '' && Number(b.quantity) > 0)
+          .map((b) => ({ size: b.size, quantity: Number(b.quantity) }));
       }
       const response = await axios.post(
         `/api/admin/auctions/${auctionId}/winners/${approveShippingWinnerId}/approve-shipping`,
@@ -725,7 +826,6 @@ export default function WonItemManagement() {
     const allCalculated = calculatedCount === items.length && items.length > 0;
     const approvedCount = items.filter((i) => i.shipping_approved_at).length;
     const allApproved = approvedCount === items.length && items.length > 0;
-    const totalShippingFee = items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
     // delivery_status は新規落札時 'pending'、入金確認後 'preparing' になる。
     // 送料承認・発送は入金確認前（pending）でも可能にする。
     const isPreShip = deliveryStatus === 'pending' || deliveryStatus === 'preparing';
@@ -785,7 +885,7 @@ export default function WonItemManagement() {
               variant={allApproved ? 'outlined' : 'contained'}
               color="warning"
               startIcon={<CalculateIcon />}
-              onClick={() => winner && handleOpenApproveShipping(winner.id, totalShippingFee)}
+              onClick={() => winner && handleOpenApproveShipping(items)}
               disabled={actionLoading || !canApproveShipping}
             >
               {allApproved ? '送料修正' : '送料承認'}
@@ -1172,6 +1272,7 @@ export default function WonItemManagement() {
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 この落札者の同一オークション内の落札商品すべてに同じ伝票番号を登録します。
+                「引き取り」を選んだ場合は伝票番号不要・即「配達完了」になります。
               </Typography>
               {selectedItem.shipping_address && (
                 <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
@@ -1194,18 +1295,28 @@ export default function WonItemManagement() {
                 <option value="佐川急便">佐川急便</option>
                 <option value="日本郵便">日本郵便</option>
                 <option value="その他">その他</option>
+                <option value="引き取り">引き取り（店頭受取）</option>
               </TextField>
             </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="伝票番号"
-                value={trackingForm.tracking_number}
-                onChange={(e) => setTrackingForm({ ...trackingForm, tracking_number: e.target.value })}
-                placeholder="1234-5678-9012"
-                required
-              />
-            </Grid>
+            {trackingForm.shipping_company !== '引き取り' && (
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="伝票番号"
+                  value={trackingForm.tracking_number}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, tracking_number: e.target.value })}
+                  placeholder="1234-5678-9012"
+                  required
+                />
+              </Grid>
+            )}
+            {trackingForm.shipping_company === '引き取り' && (
+              <Grid item xs={12}>
+                <Alert severity="info">
+                  引き取りで登録すると、伝票番号は不要で即「配達完了」になります。落札者への発送通知は送信されません。
+                </Alert>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -1216,21 +1327,24 @@ export default function WonItemManagement() {
             variant="contained"
             onClick={handleShip}
             startIcon={actionLoading ? <CircularProgress size={20} /> : <LocalShippingIcon />}
-            disabled={actionLoading || !trackingForm.tracking_number}
+            disabled={
+              actionLoading ||
+              (trackingForm.shipping_company !== '引き取り' && !trackingForm.tracking_number)
+            }
           >
-            発送登録
+            {trackingForm.shipping_company === '引き取り' ? '引き取り完了登録' : '発送登録'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 送料承認/修正ダイアログ（手動入力・引き取り0円・承認後の修正に対応） */}
-      <Dialog open={approveShippingOpen} onClose={() => setApproveShippingOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={approveShippingOpen} onClose={() => setApproveShippingOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>送料の承認・修正</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              送料を入力して確定してください。引き取りの場合は「送料無料」を押すと0円で承認できます。
-              確定すると落札者に送料が開示され、請求書が発行可能になります。
+              送料を入力して確定してください。箱サイズ・袋サイズも編集すると請求書・送料内訳の表示と整合します。
+              引き取り（送料0円）の場合は「送料無料」ボタンを押すと内訳もクリアされます。
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 2 }}>
               <TextField
@@ -1240,6 +1354,7 @@ export default function WonItemManagement() {
                 value={approveShippingOverride}
                 onChange={(e) => {
                   setApproveShippingOverride(e.target.value);
+                  setApproveShippingIsFree(false);
                   if (approveShippingReason === '送料無料') setApproveShippingReason('');
                 }}
                 inputProps={{ min: 0 }}
@@ -1254,6 +1369,167 @@ export default function WonItemManagement() {
                 送料無料
               </Button>
             </Box>
+
+            {/* 箱の編集 */}
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" color="text.secondary">箱サイズの内訳（任意）</Typography>
+            </Divider>
+            <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
+              1行＝同じサイズ・同じ単価の箱グループ。配送料・梱包資材費は1箱あたりの金額です。
+            </Typography>
+            <TableContainer component={Paper} variant="outlined" sx={{ mb: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ minWidth: 100 }}>箱サイズ</TableCell>
+                    <TableCell sx={{ width: 80 }}>箱数</TableCell>
+                    <TableCell sx={{ minWidth: 120 }}>配送料/箱(円)</TableCell>
+                    <TableCell sx={{ minWidth: 120 }}>梱包資材費/箱(円)</TableCell>
+                    <TableCell align="right" sx={{ minWidth: 100 }}>小計</TableCell>
+                    <TableCell sx={{ width: 48 }} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {approveShippingBoxes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary' }}>
+                        箱の内訳を編集する場合は「箱を追加」を押してください。
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    approveShippingBoxes.map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <TextField
+                            select
+                            size="small"
+                            value={row.box_size}
+                            onChange={(e) => updateBoxRow(idx, { box_size: Number(e.target.value) })}
+                            fullWidth
+                          >
+                            {[60, 80, 100, 120, 140, 160].map((s) => (
+                              <MenuItem key={s} value={s}>{s}サイズ</MenuItem>
+                            ))}
+                          </TextField>
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={row.count}
+                            onChange={(e) => updateBoxRow(idx, { count: Math.max(1, Number(e.target.value) || 1) })}
+                            inputProps={{ min: 1, max: 50 }}
+                            fullWidth
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={row.shipping_cost}
+                            onChange={(e) => updateBoxRow(idx, { shipping_cost: Math.max(0, Number(e.target.value) || 0) })}
+                            inputProps={{ min: 0 }}
+                            fullWidth
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={row.packing_material_cost}
+                            onChange={(e) => updateBoxRow(idx, { packing_material_cost: Math.max(0, Number(e.target.value) || 0) })}
+                            inputProps={{ min: 0 }}
+                            fullWidth
+                          />
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          ¥{formatYen((Number(row.shipping_cost) + Number(row.packing_material_cost)) * Number(row.count || 1))}
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" onClick={() => removeBoxRow(idx)} aria-label="削除">
+                            <RemoveIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+              <Button size="small" startIcon={<AddIcon />} onClick={addBoxRow}>
+                箱を追加
+              </Button>
+              {approveShippingBoxes.length > 0 && (
+                <Button size="small" variant="outlined" onClick={recalcFeeFromBoxes}>
+                  箱合計から送料を反映
+                </Button>
+              )}
+            </Box>
+
+            {/* 袋の編集 */}
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" color="text.secondary">袋構成（落札者合計、任意）</Typography>
+            </Divider>
+            <TableContainer component={Paper} variant="outlined" sx={{ mb: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ minWidth: 100 }}>袋サイズ</TableCell>
+                    <TableCell sx={{ width: 100 }}>個数</TableCell>
+                    <TableCell sx={{ width: 48 }} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {approveShippingBags.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
+                        袋の内訳を編集する場合は「袋を追加」を押してください。
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    approveShippingBags.map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <TextField
+                            select
+                            size="small"
+                            value={row.size}
+                            onChange={(e) => updateBagRow(idx, { size: e.target.value })}
+                            fullWidth
+                          >
+                            {['S', 'M', 'L', 'KA'].map((s) => (
+                              <MenuItem key={s} value={s}>{s}</MenuItem>
+                            ))}
+                          </TextField>
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={row.quantity}
+                            onChange={(e) => updateBagRow(idx, { quantity: Math.max(0, Number(e.target.value) || 0) })}
+                            inputProps={{ min: 0, max: 1000 }}
+                            fullWidth
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" onClick={() => removeBagRow(idx)} aria-label="削除">
+                            <RemoveIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Box sx={{ mb: 2 }}>
+              <Button size="small" startIcon={<AddIcon />} onClick={addBagRow}>
+                袋を追加
+              </Button>
+            </Box>
+
             <TextField
               fullWidth
               label={Number(approveShippingOverride) === 0 ? '理由（必須）' : '理由（任意）'}

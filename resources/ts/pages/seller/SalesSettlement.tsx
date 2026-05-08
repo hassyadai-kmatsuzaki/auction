@@ -52,6 +52,11 @@ import {
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 
+const formatTaxRate = (rate: number): string => {
+  if (Number.isInteger(rate)) return rate.toString();
+  return rate.toFixed(2).replace(/\.?0+$/, '');
+};
+
 interface Settlement {
   id: number;
   auction: string;
@@ -101,15 +106,30 @@ interface SettlementItem {
     species_name: string;
     quantity: number;
   };
-  buyer: string;
   winning_price: number;
-  shipping_fee: number;
+  winning_amount: number;
   commission: number;
-  seller_amount: number;
+}
+
+interface SettlementDetailInfo {
+  id: number;
+  auction: string;
+  auction_date: string;
+  subtotal_winning: number;
+  subtotal_commission: number;
+  tax_rate: number;
+  tax_winning: number;
+  tax_commission: number;
+  total_winning_with_tax: number;
+  total_commission_with_tax: number;
+  net_amount: number;
+  status: string;
+  paid_at: string | null;
+  items_count: number;
 }
 
 interface SettlementDetail {
-  settlement: Settlement;
+  settlement: SettlementDetailInfo;
   items: SettlementItem[];
 }
 
@@ -579,11 +599,8 @@ export default function SalesSettlement() {
                         <TableRow sx={{ bgcolor: '#F8FAFC' }}>
                           <TableCell>品番</TableCell>
                           <TableCell>品種名</TableCell>
-                          <TableCell>落札者</TableCell>
-                          <TableCell align="right">落札価格</TableCell>
-                          <TableCell align="right">配送料</TableCell>
-                          <TableCell align="right">手数料</TableCell>
-                          <TableCell align="right">受取金額</TableCell>
+                          <TableCell align="right">落札金額（税抜）</TableCell>
+                          <TableCell align="right">手数料（税抜）</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -591,16 +608,9 @@ export default function SalesSettlement() {
                           <TableRow key={item.id}>
                             <TableCell>No.{item.item.item_number}</TableCell>
                             <TableCell>{item.item.species_name}</TableCell>
-                            <TableCell>{item.buyer}</TableCell>
-                            <TableCell align="right">¥{formatYen(item.winning_price)}</TableCell>
-                            <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                              {item.shipping_fee > 0 ? `¥${formatYen(item.shipping_fee)}` : '-'}
-                            </TableCell>
+                            <TableCell align="right">¥{formatYen(item.winning_amount)}</TableCell>
                             <TableCell align="right" sx={{ color: 'error.main' }}>
                               -¥{formatYen(item.commission)}
-                            </TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600, color: 'success.main' }}>
-                              ¥{formatYen(item.seller_amount)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -610,42 +620,67 @@ export default function SalesSettlement() {
                 </Box>
               )}
 
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                精算内訳
-              </Typography>
-              <List disablePadding>
-                <ListItem sx={{ px: 0, py: 1 }}>
-                  <ListItemText primary="売上金額" />
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    ¥{formatYen(selectedSettlement.total_sales)}
+              {settlementDetail?.settlement && (
+                <>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                    精算内訳
                   </Typography>
-                </ListItem>
-                <Divider />
-                <ListItem sx={{ px: 0, py: 1 }}>
-                  <ListItemText primary="出品手数料" />
-                  <Typography variant="body1" sx={{ color: 'error.main' }}>
-                    -¥{formatYen(selectedSettlement.commission)}
-                  </Typography>
-                </ListItem>
-                {selectedSettlement.shipping_fee > 0 && (
-                  <ListItem sx={{ px: 0, py: 1 }}>
-                    <ListItemText primary="配送料" />
-                    <Typography variant="body1" sx={{ color: 'error.main' }}>
-                      -¥{formatYen(selectedSettlement.shipping_fee)}
-                    </Typography>
-                  </ListItem>
-                )}
-                <Divider />
-                <ListItem sx={{ px: 0, py: 1.5, bgcolor: '#F0FDF4', borderRadius: 1, mt: 1 }}>
-                  <ListItemText
-                    primary="受取金額"
-                    primaryTypographyProps={{ fontWeight: 600 }}
-                  />
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
-                    ¥{formatYen(selectedSettlement.net_amount)}
-                  </Typography>
-                </ListItem>
-              </List>
+                  <List disablePadding>
+                    {/* 小計（税抜） */}
+                    <ListItem sx={{ px: 0, py: 0.5 }}>
+                      <ListItemText
+                        primary="小計（税抜）"
+                        primaryTypographyProps={{ fontWeight: 600, color: 'text.secondary' }}
+                      />
+                    </ListItem>
+                    <ListItem sx={{ px: 2, py: 0.5 }}>
+                      <ListItemText primary="落札金額" />
+                      <Typography variant="body2">
+                        ¥{formatYen(settlementDetail.settlement.subtotal_winning)}
+                      </Typography>
+                    </ListItem>
+                    <ListItem sx={{ px: 2, py: 0.5 }}>
+                      <ListItemText primary="手数料" />
+                      <Typography variant="body2" sx={{ color: 'error.main' }}>
+                        -¥{formatYen(settlementDetail.settlement.subtotal_commission)}
+                      </Typography>
+                    </ListItem>
+                    <Divider sx={{ my: 0.5 }} />
+
+                    {/* 消費税 */}
+                    <ListItem sx={{ px: 0, py: 0.5 }}>
+                      <ListItemText
+                        primary={`消費税（${formatTaxRate(settlementDetail.settlement.tax_rate)}%）`}
+                        primaryTypographyProps={{ fontWeight: 600, color: 'text.secondary' }}
+                      />
+                    </ListItem>
+                    <ListItem sx={{ px: 2, py: 0.5 }}>
+                      <ListItemText primary="落札金額消費税" />
+                      <Typography variant="body2">
+                        ¥{formatYen(settlementDetail.settlement.tax_winning)}
+                      </Typography>
+                    </ListItem>
+                    <ListItem sx={{ px: 2, py: 0.5 }}>
+                      <ListItemText primary="手数料消費税" />
+                      <Typography variant="body2" sx={{ color: 'error.main' }}>
+                        -¥{formatYen(settlementDetail.settlement.tax_commission)}
+                      </Typography>
+                    </ListItem>
+                    <Divider sx={{ my: 0.5 }} />
+
+                    {/* 合計 */}
+                    <ListItem sx={{ px: 0, py: 1.5, bgcolor: '#F0FDF4', borderRadius: 1, mt: 1 }}>
+                      <ListItemText
+                        primary="合計（お支払い額）"
+                        primaryTypographyProps={{ fontWeight: 600 }}
+                      />
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
+                        ¥{formatYen(settlementDetail.settlement.net_amount)}
+                      </Typography>
+                    </ListItem>
+                  </List>
+                </>
+              )}
 
               <Box sx={{ mt: 3, p: 2, bgcolor: '#F8FAFC', borderRadius: 1 }}>
                 <Grid container spacing={2}>
