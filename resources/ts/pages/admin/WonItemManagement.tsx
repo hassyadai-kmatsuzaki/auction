@@ -212,7 +212,7 @@ export default function WonItemManagement() {
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(200);
   const [totalItems, setTotalItems] = useState(0);
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WonItem | null>(null);
@@ -1096,6 +1096,7 @@ export default function WonItemManagement() {
               setPage(0);
             }}
             labelRowsPerPage="表示件数"
+            rowsPerPageOptions={[50, 100, 200, 500]}
           />
         </Box>
       )}
@@ -1141,6 +1142,7 @@ export default function WonItemManagement() {
               setPage(0);
             }}
             labelRowsPerPage="表示件数"
+            rowsPerPageOptions={[50, 100, 200, 500]}
           />
         </Card>
       )}

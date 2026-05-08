@@ -85,7 +85,7 @@ class WonItemController extends Controller
     {
         $auction = Auction::findOrFail($auctionId);
 
-        $perPage = $request->input('per_page', 20);
+        $perPage = $request->input('per_page', 200);
         $paymentStatus = $request->input('payment_status');
         $deliveryStatus = $request->input('delivery_status');
 
