@@ -63,7 +63,6 @@ interface Settlement {
   auction_date: string;
   total_sales: number;
   commission: number;
-  shipping_fee: number;
   net_amount: number;
   status: string;
   paid_at: string | null;
@@ -244,7 +243,7 @@ export default function SalesSettlement() {
                   </Avatar>
                   <Box>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      累計受取金額
+                      累計受取金額（税込）
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669' }}>
                       ¥{formatYen(statistics.total_net_amount)}
@@ -263,7 +262,7 @@ export default function SalesSettlement() {
                   </Avatar>
                   <Box>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      累計売上
+                      累計売上（税込）
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
                       ¥{formatYen(statistics.total_sales)}
@@ -282,7 +281,7 @@ export default function SalesSettlement() {
                   </Avatar>
                   <Box>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      累計手数料
+                      累計手数料（税込）
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
                       ¥{formatYen(statistics.total_commission)}
@@ -347,7 +346,7 @@ export default function SalesSettlement() {
                         }}
                         formatter={(value: number, name: string) => [
                           `¥${formatYen(value)}`,
-                          name === 'sales' ? '売上' : '受取金額'
+                          name === 'sales' ? '売上（税込）' : '受取金額（税込）'
                         ]}
                       />
                       <Bar dataKey="sales" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={35} name="sales" />
@@ -363,11 +362,11 @@ export default function SalesSettlement() {
               <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box sx={{ width: 12, height: 12, borderRadius: 1, bgcolor: '#3B82F6' }} />
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>売上</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>売上（税込）</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box sx={{ width: 12, height: 12, borderRadius: 1, bgcolor: '#059669' }} />
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>受取金額</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>受取金額（税込）</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -483,9 +482,9 @@ export default function SalesSettlement() {
                     <TableRow>
                       <TableCell>オークション</TableCell>
                       <TableCell align="center">出品数</TableCell>
-                      <TableCell align="right">売上金額</TableCell>
-                      <TableCell align="right">手数料</TableCell>
-                      <TableCell align="right">受取金額</TableCell>
+                      <TableCell align="right">売上金額（税込）</TableCell>
+                      <TableCell align="right">手数料（税込）</TableCell>
+                      <TableCell align="right">受取金額（税込）</TableCell>
                       <TableCell align="center">ステータス</TableCell>
                       <TableCell>振込日</TableCell>
                       <TableCell align="center">詳細</TableCell>

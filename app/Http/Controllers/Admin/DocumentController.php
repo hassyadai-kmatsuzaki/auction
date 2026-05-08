@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\SystemSetting;
 use App\Models\WonItem;
 use Illuminate\Http\Request;
 
@@ -80,17 +81,25 @@ class DocumentController extends Controller
 
         $wonItems = $query->get();
 
+        // 消費税率（SystemSetting::tax_rate, 既定 10%）
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+
         $grouped = $wonItems
             ->filter(fn ($w) => $w->item && $w->item->auction && $w->item->sellerProfile)
             ->groupBy(fn ($w) => $w->item->auction_id.'-'.$w->item->seller_profile_id)
-            ->map(function ($group) {
+            ->map(function ($group) use ($taxRate) {
                 $first = $group->first();
                 $auction = $first->item->auction;
                 $seller = $first->item->sellerProfile;
 
-                $salesAmount = $group->sum(fn ($w) => (int) $w->total_amount);
-                $commission = $group->sum(fn ($w) => (int) $w->commission_amount);
-                $netAmount = $group->sum(fn ($w) => (int) $w->seller_amount);
+                // 税抜小計（落札金額=winning_price×quantity, 手数料=買い手手数料）
+                $subtotalWinning = (int) $group->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+                $subtotalCommission = (int) $group->sum(fn ($w) => (int) $w->commission_amount);
+
+                // 税込（floor 丸め、PDF/精算詳細と統一）
+                $salesAmount = $subtotalWinning + (int) floor($subtotalWinning * $taxRate / 100);
+                $commission = $subtotalCommission + (int) floor($subtotalCommission * $taxRate / 100);
+                $netAmount = $salesAmount - $commission;
 
                 // ステータス: 全件入金確認済みなら sent, それ以外は draft
                 $allConfirmed = $group->every(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']));

@@ -831,10 +831,10 @@ export default function WonItemManagement() {
     const isPreShip = deliveryStatus === 'pending' || deliveryStatus === 'preparing';
     const isCompleted = deliveryStatus === 'completed';
     const canApproveShipping = !!winner && allCalculated && isPreShip;
-    const canConfirmPayment = (paymentStatus === 'pending' || paymentStatus === 'paid') && !isCompleted;
+    // 入金確認は配達完了後でも可能（弊社入金タイミングが配達後になるケースがあるため）
+    const canConfirmPayment = paymentStatus === 'pending' || paymentStatus === 'paid';
     // 発送は送料承認済み＋未発送であれば、入金確認前でも可能
     const canShip = allApproved && isPreShip;
-    const showActions = !isCompleted;
 
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -879,7 +879,7 @@ export default function WonItemManagement() {
           </Box>
         )}
         <Box sx={{ display: 'flex', gap: 1, ml: 'auto', flexWrap: 'wrap' }}>
-          {showActions && isPreShip && (
+          {isPreShip && (
             <Button
               size="small"
               variant={allApproved ? 'outlined' : 'contained'}
@@ -891,19 +891,19 @@ export default function WonItemManagement() {
               {allApproved ? '送料修正' : '送料承認'}
             </Button>
           )}
-          {showActions && (
+          {canConfirmPayment && (
             <Button
               size="small"
               variant="contained"
               color="success"
               startIcon={<CheckCircleIcon />}
               onClick={() => handleConfirmPayment(representative.id)}
-              disabled={actionLoading || !canConfirmPayment}
+              disabled={actionLoading}
             >
               入金確認
             </Button>
           )}
-          {showActions && isPreShip && (
+          {isPreShip && (
             <Button
               size="small"
               variant="contained"

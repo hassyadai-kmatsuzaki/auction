@@ -35,12 +35,14 @@ class SettlementController extends Controller
         
         $sellerProfileId = $sellerProfile->id;
 
-        // 自分の出品商品の落札情報を集計（オークション単位）
+        // 消費税率（SystemSetting::tax_rate, 既定 10%）
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+
+        // 自分の出品商品の落札情報を集計（オークション単位、税抜小計を集計）
         $settlementsRaw = WonItem::select(
             'items.auction_id',
-            DB::raw('SUM(won_items.total_amount) as total_sales'),
-            DB::raw('SUM(won_items.commission_amount) as total_commission'),
-            DB::raw('SUM(won_items.seller_amount) as total_net'),
+            DB::raw('SUM(won_items.winning_price * won_items.quantity) as subtotal_winning'),
+            DB::raw('SUM(won_items.commission_amount) as subtotal_commission'),
             DB::raw('COUNT(*) as items_count')
         )
             ->join('items', 'won_items.item_id', '=', 'items.id')
@@ -49,17 +51,19 @@ class SettlementController extends Controller
             ->with(['item.auction'])
             ->get();
 
-        // オークションごとの精算情報を整形
+        // オークションごとの精算情報を整形（金額はすべて税込）
         $settlements = [];
         foreach ($settlementsRaw as $row) {
             $auction = Auction::find($row->auction_id);
             if (!$auction) continue;
 
-            // 配送料金を集計
-            $shippingFees = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
-                ->where('items.seller_profile_id', $sellerProfileId)
-                ->where('items.auction_id', $row->auction_id)
-                ->sum('won_items.shipping_fee');
+            $subtotalWinning = (int) $row->subtotal_winning;
+            $subtotalCommission = (int) $row->subtotal_commission;
+            $taxWinning = (int) floor($subtotalWinning * $taxRate / 100);
+            $taxCommission = (int) floor($subtotalCommission * $taxRate / 100);
+            $totalSalesWithTax = $subtotalWinning + $taxWinning;
+            $totalCommissionWithTax = $subtotalCommission + $taxCommission;
+            $netAmountWithTax = $totalSalesWithTax - $totalCommissionWithTax;
 
             // 精算ステータスは管理者が手動管理する seller_settlements を参照
             // レコードがなければ pending 扱い
@@ -76,10 +80,9 @@ class SettlementController extends Controller
                 'settlement_id' => $settlement->id,
                 'auction' => $auction->title,
                 'auction_date' => $auction->event_date->format('Y-m-d'),
-                'total_sales' => (float) $row->total_sales,
-                'commission' => (float) $row->total_commission,
-                'shipping_fee' => (int) $shippingFees,
-                'net_amount' => (float) $row->total_net,
+                'total_sales' => $totalSalesWithTax,
+                'commission' => $totalCommissionWithTax,
+                'net_amount' => $netAmountWithTax,
                 'status' => $settlement->status,
                 'paid_at' => optional($settlement->paid_at)->format('Y-m-d'),
                 'scheduled_payment_date' => optional($settlement->scheduled_payment_date)->format('Y-m-d'),
@@ -100,8 +103,8 @@ class SettlementController extends Controller
         $totalCommission = array_sum(array_column($completedSettlements, 'commission'));
         $completedCount = count($completedSettlements);
 
-        // 月別売上データ（過去6ヶ月）
-        $monthlySales = $this->getMonthlySales($sellerProfileId);
+        // 月別売上データ（過去6ヶ月、税込）
+        $monthlySales = $this->getMonthlySales($sellerProfileId, $taxRate);
 
         // 銀行口座情報
         $bankInfo = $this->getBankInfo($seller);
@@ -122,6 +125,7 @@ class SettlementController extends Controller
                 'monthly_sales' => $monthlySales,
                 'bank_info' => $bankInfo,
                 'next_settlement' => $nextSettlement,
+                'tax_rate' => $taxRate,
             ],
         ]);
     }
@@ -223,9 +227,9 @@ class SettlementController extends Controller
     }
 
     /**
-     * 月別売上データを取得
+     * 月別売上データを取得（税込）
      */
-    private function getMonthlySales(int $sellerProfileId): array
+    private function getMonthlySales(int $sellerProfileId, float $taxRate): array
     {
         $result = [];
         for ($i = 5; $i >= 0; $i--) {
@@ -233,17 +237,25 @@ class SettlementController extends Controller
             $startOfMonth = $month->copy()->startOfMonth();
             $endOfMonth = $month->copy()->endOfMonth();
 
-            $sales = WonItem::whereHas('item', function ($q) use ($sellerProfileId) {
-                $q->where('seller_profile_id', $sellerProfileId);
-            })
-                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-                ->selectRaw('SUM(total_amount) as sales, SUM(seller_amount) as net')
+            $row = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+                ->where('items.seller_profile_id', $sellerProfileId)
+                ->whereBetween('won_items.created_at', [$startOfMonth, $endOfMonth])
+                ->selectRaw('
+                    COALESCE(SUM(won_items.winning_price * won_items.quantity), 0) as subtotal_winning,
+                    COALESCE(SUM(won_items.commission_amount), 0) as subtotal_commission
+                ')
                 ->first();
+
+            $subtotalWinning = (int) ($row->subtotal_winning ?? 0);
+            $subtotalCommission = (int) ($row->subtotal_commission ?? 0);
+            $salesWithTax = $subtotalWinning + (int) floor($subtotalWinning * $taxRate / 100);
+            $commissionWithTax = $subtotalCommission + (int) floor($subtotalCommission * $taxRate / 100);
+            $netWithTax = $salesWithTax - $commissionWithTax;
 
             $result[] = [
                 'month' => $month->format('n') . '月',
-                'sales' => (float) ($sales->sales ?? 0),
-                'net' => (float) ($sales->net ?? 0),
+                'sales' => $salesWithTax,
+                'net' => $netWithTax,
             ];
         }
         return $result;

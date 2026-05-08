@@ -274,9 +274,9 @@ export default function DocumentManagement() {
                   <TableCell>出品者</TableCell>
                   <TableCell>オークション</TableCell>
                   <TableCell align="center">落札点数</TableCell>
-                  <TableCell align="right">売上金額</TableCell>
-                  <TableCell align="right">手数料</TableCell>
-                  <TableCell align="right">振込金額</TableCell>
+                  <TableCell align="right">売上金額（税込）</TableCell>
+                  <TableCell align="right">手数料（税込）</TableCell>
+                  <TableCell align="right">振込金額（税込）</TableCell>
                   <TableCell align="center">ステータス</TableCell>
                   <TableCell>振込予定日</TableCell>
                   <TableCell align="center">操作</TableCell>
