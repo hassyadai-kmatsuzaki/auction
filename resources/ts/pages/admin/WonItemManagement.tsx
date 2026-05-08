@@ -726,11 +726,13 @@ export default function WonItemManagement() {
     const approvedCount = items.filter((i) => i.shipping_approved_at).length;
     const allApproved = approvedCount === items.length && items.length > 0;
     const totalShippingFee = items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
-    const isPreShip = deliveryStatus === 'preparing';
+    // delivery_status は新規落札時 'pending'、入金確認後 'preparing' になる。
+    // 送料承認・発送は入金確認前（pending）でも可能にする。
+    const isPreShip = deliveryStatus === 'pending' || deliveryStatus === 'preparing';
     const isCompleted = deliveryStatus === 'completed';
     const canApproveShipping = !!winner && allCalculated && isPreShip;
     const canConfirmPayment = (paymentStatus === 'pending' || paymentStatus === 'paid') && !isCompleted;
-    // 発送は送料承認済み＋発送準備中であれば、入金確認前でも可能
+    // 発送は送料承認済み＋未発送であれば、入金確認前でも可能
     const canShip = allApproved && isPreShip;
     const showActions = !isCompleted;
 
