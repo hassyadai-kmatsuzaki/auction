@@ -726,10 +726,13 @@ export default function WonItemManagement() {
     const approvedCount = items.filter((i) => i.shipping_approved_at).length;
     const allApproved = approvedCount === items.length && items.length > 0;
     const totalShippingFee = items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
-    const isFinalized = deliveryStatus === 'shipped' || deliveryStatus === 'completed';
-    const canApproveShipping = !!winner && allCalculated && !isFinalized;
-    const canConfirmPayment = (paymentStatus === 'pending' || paymentStatus === 'paid') && !isFinalized;
-    const canShip = paymentStatus === 'confirmed' && allApproved && deliveryStatus === 'preparing';
+    const isPreShip = deliveryStatus === 'preparing';
+    const isCompleted = deliveryStatus === 'completed';
+    const canApproveShipping = !!winner && allCalculated && isPreShip;
+    const canConfirmPayment = (paymentStatus === 'pending' || paymentStatus === 'paid') && !isCompleted;
+    // 発送は送料承認済み＋発送準備中であれば、入金確認前でも可能
+    const canShip = allApproved && isPreShip;
+    const showActions = !isCompleted;
 
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -774,7 +777,7 @@ export default function WonItemManagement() {
           </Box>
         )}
         <Box sx={{ display: 'flex', gap: 1, ml: 'auto', flexWrap: 'wrap' }}>
-          {!isFinalized && (
+          {showActions && isPreShip && (
             <Button
               size="small"
               variant={allApproved ? 'outlined' : 'contained'}
@@ -786,7 +789,7 @@ export default function WonItemManagement() {
               {allApproved ? '送料修正' : '送料承認'}
             </Button>
           )}
-          {!isFinalized && (
+          {showActions && (
             <Button
               size="small"
               variant="contained"
@@ -798,7 +801,7 @@ export default function WonItemManagement() {
               入金確認
             </Button>
           )}
-          {!isFinalized && (
+          {showActions && isPreShip && (
             <Button
               size="small"
               variant="contained"

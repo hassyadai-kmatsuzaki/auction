@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\WonItem;
+use App\Services\InvoiceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -18,12 +19,16 @@ class ShippingFeeFinalizedMail extends Mailable
     public Collection $wonItems;
     public $user;
     public int $totalShippingFee;
+    public ?array $shippingBreakdown;
+    public ?string $adjustmentReason;
 
     public function __construct(Collection $wonItems)
     {
         $this->wonItems = $wonItems;
         $this->user = $wonItems->first()->user;
         $this->totalShippingFee = (int) $wonItems->sum('shipping_fee');
+        $this->shippingBreakdown = app(InvoiceService::class)->buildShippingBreakdown($wonItems);
+        $this->adjustmentReason = $wonItems->pluck('shipping_adjustment_reason')->filter()->first();
         $this->routeViaNotify();
     }
 

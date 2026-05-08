@@ -168,13 +168,39 @@ class NotificationService
             Mail::to($user->email)->queue(new ShippingFeeFinalizedMail($wonItems));
 
             $totalFee = (int) $wonItems->sum('shipping_fee');
-            $itemsLine = $wonItems->map(fn ($wi) => ($wi->item->species_name ?? '商品'))->unique()->implode('、');
-            $this->sendLine($user->id, 'shipping_fee_finalized',
-                "💡 送料が確定しました\n"
-                . "商品: {$itemsLine}\n"
-                . "送料合計: ¥" . number_format($totalFee),
-                null,
-            );
+            $breakdown = app(\App\Services\InvoiceService::class)->buildShippingBreakdown($wonItems);
+            $reason = $wonItems->pluck('shipping_adjustment_reason')->filter()->first();
+
+            $lines = ['💡 送料が確定しました'];
+            if ($totalFee === 0) {
+                $lines[] = '配送料: ¥0' . ($reason ? "（{$reason}）" : '');
+            } elseif ($breakdown && ($breakdown['mode'] ?? null) === 'manual') {
+                if (!empty($breakdown['region'])) {
+                    $lines[] = "配送地域: {$breakdown['region']}";
+                }
+                $lines[] = '配送料 計: ¥' . number_format((int) ($breakdown['manual_total'] ?? $totalFee));
+                if ($reason) {
+                    $lines[] = "（{$reason}）";
+                }
+            } elseif ($breakdown && !empty($breakdown['boxes'])) {
+                if (!empty($breakdown['region'])) {
+                    $lines[] = "配送地域: {$breakdown['region']}";
+                }
+                $lines[] = '【内訳】';
+                foreach ($breakdown['boxes'] as $box) {
+                    $lines[] = sprintf(
+                        '%sサイズ × %d箱 → ¥%s',
+                        $box['box_size'],
+                        (int) $box['count'],
+                        number_format((int) $box['subtotal'])
+                    );
+                }
+                $lines[] = '配送料 計: ¥' . number_format($totalFee) . '（梱包資材費込み）';
+            } else {
+                $lines[] = '送料合計: ¥' . number_format($totalFee);
+            }
+
+            $this->sendLine($user->id, 'shipping_fee_finalized', implode("\n", $lines), null);
 
             Log::info('送料確定通知送信', [
                 'winner_id' => $user->id,

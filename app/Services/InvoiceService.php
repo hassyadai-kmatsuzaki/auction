@@ -264,7 +264,7 @@ class InvoiceService
      * 同じ JSON が複製保存されているため、先頭から取り出して使う（合算しない）。
      * breakdown 不在（旧データ／手動運用）の場合は null を返し、PDF 側で非表示にする。
      */
-    private function buildShippingBreakdown(Collection $wonItems): ?array
+    public function buildShippingBreakdown(Collection $wonItems): ?array
     {
         // 送料合計が0円（引き取り等）の場合は内訳自体を出さない
         $totalFee = (int) $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
