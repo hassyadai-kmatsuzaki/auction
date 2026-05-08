@@ -24,7 +24,7 @@ class SystemSettingsSeeder extends Seeder
             ],
             [
                 'key' => 'contact_email',
-                'value' => 'info@example.com',
+                'value' => 'info@nep-corp.com',
                 'type' => 'string',
                 'category' => 'system',
                 'label' => '連絡先メールアドレス',
@@ -193,7 +193,7 @@ class SystemSettingsSeeder extends Seeder
             ],
             [
                 'key' => 'company_phone',
-                'value' => '03-1234-5678',
+                'value' => '080-4649-9385',
                 'type' => 'string',
                 'category' => 'document',
                 'label' => '会社電話番号',
@@ -201,7 +201,7 @@ class SystemSettingsSeeder extends Seeder
             ],
             [
                 'key' => 'company_email',
-                'value' => 'info@example.com',
+                'value' => 'info@nep-corp.com',
                 'type' => 'string',
                 'category' => 'document',
                 'label' => '会社メールアドレス',

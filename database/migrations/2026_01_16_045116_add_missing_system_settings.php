@@ -215,7 +215,7 @@ return new class extends Migration
             ],
             [
                 'setting_key' => 'company_phone',
-                'setting_value' => '03-1234-5678',
+                'setting_value' => '080-4649-9385',
                 'value_type' => 'string',
                 'category' => 'document',
                 'display_name' => '会社電話番号',
@@ -226,7 +226,7 @@ return new class extends Migration
             ],
             [
                 'setting_key' => 'company_email',
-                'setting_value' => 'info@example.com',
+                'setting_value' => 'info@nep-corp.com',
                 'value_type' => 'string',
                 'category' => 'document',
                 'display_name' => '会社メールアドレス',
