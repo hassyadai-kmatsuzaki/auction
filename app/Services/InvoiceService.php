@@ -155,6 +155,7 @@ class InvoiceService
             'subtotal' => $subtotal,
             'commission_total' => $commissionTotal,
             'total_shipping_fee' => $totalShippingFee,
+            'shipping_breakdown' => $this->buildShippingBreakdown($wonItems),
             'tax_rate' => $taxRate,
             'tax_amount' => $taxAmount,
             'grand_total' => $grandTotal,
@@ -236,6 +237,7 @@ class InvoiceService
             'subtotal' => $subtotal,
             'commission_total' => $commissionTotal,
             'total_shipping_fee' => $totalShippingFee,
+            'shipping_breakdown' => $this->buildShippingBreakdown($wonItems),
             'tax_rate' => $taxRate,
             'tax_amount' => $taxAmount,
             'grand_total' => $grandTotal,
@@ -253,6 +255,82 @@ class InvoiceService
             ->setPaper('a4')
             ->setOption('defaultFont', 'ipagothic')
             ->setOption('isRemoteEnabled', true);
+    }
+
+    /**
+     * 落札者×オークション単位の送料内訳を整形する。
+     *
+     * shipping_breakdown は FinishAuctionAction で同一落札者の全 WonItem に
+     * 同じ JSON が複製保存されているため、先頭から取り出して使う（合算しない）。
+     * breakdown 不在（旧データ／手動運用）の場合は null を返し、PDF 側で非表示にする。
+     */
+    private function buildShippingBreakdown(Collection $wonItems): ?array
+    {
+        $first = $wonItems->first(
+            fn ($w) => is_array($w->shipping_breakdown) && !empty($w->shipping_breakdown)
+        );
+        if (!$first) {
+            return null;
+        }
+
+        $bd = $first->shipping_breakdown;
+        $mode = $bd['calculation_mode'] ?? 'auto';
+
+        $speciesSubtotals = array_map(fn ($s) => [
+            'species_name' => $s['species_name'] ?? '',
+            'quantity' => (int) ($s['quantity'] ?? 0),
+            'subtotal_fee' => isset($s['subtotal_fee']) && $s['subtotal_fee'] !== null
+                ? (int) $s['subtotal_fee']
+                : null,
+        ], $bd['species_breakdown'] ?? []);
+
+        if ($mode === 'manual') {
+            return [
+                'mode' => 'manual',
+                'region' => $bd['destination_region'] ?? null,
+                'manual_reason' => $bd['manual_reason'] ?? '管理者により個別に設定された送料です。',
+                'manual_total' => (int) $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0)),
+                'species_subtotals' => $speciesSubtotals,
+                'boxes' => [],
+                'shipping_cost_total' => 0,
+                'packing_cost_total' => 0,
+                'total_shipping_fee' => 0,
+            ];
+        }
+
+        // auto / mixed: 箱サイズ別に集計
+        $boxAgg = [];
+        foreach (($bd['boxes'] ?? []) as $box) {
+            $size = $box['box_size'] ?? '?';
+            if (!isset($boxAgg[$size])) {
+                $boxAgg[$size] = ['count' => 0, 'shipping_cost' => 0, 'packing_cost' => 0];
+            }
+            $boxAgg[$size]['count'] += 1;
+            $boxAgg[$size]['shipping_cost'] += (int) ($box['shipping_cost'] ?? 0);
+            $boxAgg[$size]['packing_cost'] += (int) ($box['packing_material_cost'] ?? 0);
+        }
+        ksort($boxAgg);
+
+        $boxes = [];
+        foreach ($boxAgg as $size => $a) {
+            $boxes[] = [
+                'box_size' => $size,
+                'count' => $a['count'],
+                'shipping_cost' => $a['shipping_cost'],
+                'packing_cost' => $a['packing_cost'],
+                'subtotal' => $a['shipping_cost'] + $a['packing_cost'],
+            ];
+        }
+
+        return [
+            'mode' => $mode,
+            'region' => $bd['destination_region'] ?? null,
+            'boxes' => $boxes,
+            'shipping_cost_total' => (int) ($bd['shipping_cost'] ?? 0),
+            'packing_cost_total' => (int) ($bd['packing_material_cost'] ?? 0),
+            'total_shipping_fee' => (int) ($bd['total_shipping_fee'] ?? 0),
+            'species_subtotals' => $speciesSubtotals,
+        ];
     }
 
     private function formatDeliveryStatus(?string $status): string

@@ -262,19 +262,28 @@ class WonItemController extends Controller
         }
 
         $now = now();
-        WonItem::whereIn('id', $targets->pluck('id'))->update([
+        $ids = $targets->pluck('id');
+
+        WonItem::whereIn('id', $ids)->update([
             'payment_status' => 'confirmed',
             'payment_confirmed_at' => $now,
-            'shipping_locked_at' => $now,
-            'delivery_status' => 'preparing',
         ]);
+
+        WonItem::whereIn('id', $ids)
+            ->whereNull('shipping_locked_at')
+            ->update(['shipping_locked_at' => $now]);
+
+        // 発送先行で既に shipped/completed の場合は巻き戻さない
+        WonItem::whereIn('id', $ids)
+            ->where('delivery_status', 'pending')
+            ->update(['delivery_status' => 'preparing']);
 
         // 落札者通知は代表1件で1回、出品者通知は出品者ごとに1回。
         $representative = WonItem::with(['item.seller', 'user'])->find($wonItem->id);
         $this->notificationService->sendPaymentConfirmedNotification($representative);
 
         $bySeller = WonItem::with(['item.seller', 'user'])
-            ->whereIn('id', $targets->pluck('id'))
+            ->whereIn('id', $ids)
             ->get()
             ->groupBy(fn ($w) => $w->item->seller_profile_id);
         foreach ($bySeller as $items) {
@@ -315,20 +324,20 @@ class WonItemController extends Controller
         $wonItem = WonItem::with('item')->findOrFail($id);
         $group = $this->findGroupItems($wonItem);
 
-        if ($group->contains(fn ($w) => $w->payment_status !== 'confirmed')) {
-            return response()->json([
-                'success' => false,
-                'message' => '入金確認後に発送してください。',
-            ], 400);
-        }
-
         $now = now();
-        WonItem::whereIn('id', $group->pluck('id'))->update([
+        $groupIds = $group->pluck('id');
+
+        WonItem::whereIn('id', $groupIds)->update([
             'delivery_status' => 'shipped',
             'shipping_company' => $request->shipping_company,
             'tracking_number' => $request->tracking_number,
             'shipped_at' => $now,
         ]);
+
+        // 発送が先行する場合に備え、未ロックなら配送先をここでロック
+        WonItem::whereIn('id', $groupIds)
+            ->whereNull('shipping_locked_at')
+            ->update(['shipping_locked_at' => $now]);
 
         $representative = WonItem::with('user')->find($wonItem->id);
         $this->notificationService->sendShippingNotification($representative);

@@ -147,20 +147,17 @@ class ShippingController extends Controller
             $q->where('seller_profile_id', $sellerProfile->id);
         })->findOrFail($id);
 
-        // 入金確認済みか確認
-        if (!in_array($wonItem->payment_status, ['paid', 'confirmed'])) {
-            return response()->json([
-                'success' => false,
-                'message' => '入金確認後に発送登録してください。',
-            ], 400);
-        }
-
-        $wonItem->update([
+        $now = now();
+        $update = [
             'delivery_status' => 'shipped',
             'shipping_company' => $request->shipping_company,
             'tracking_number' => $request->tracking_number,
-            'shipped_at' => now(),
-        ]);
+            'shipped_at' => $now,
+        ];
+        if (is_null($wonItem->shipping_locked_at)) {
+            $update['shipping_locked_at'] = $now;
+        }
+        $wonItem->update($update);
 
         // 発送通知を送信
         $wonItem->load('user');

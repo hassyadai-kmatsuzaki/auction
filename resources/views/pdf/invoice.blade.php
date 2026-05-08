@@ -123,6 +123,65 @@
             font-size: 9px;
             color: #888;
         }
+        .shipping-breakdown {
+            margin: 12px 0 18px 0;
+            border: 1px solid #cfd8dc;
+            background-color: #f5f9fb;
+            padding: 10px 12px;
+        }
+        .shipping-breakdown-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 1px solid #b0bec5;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        .shipping-breakdown-meta {
+            font-size: 10px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        table.breakdown {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+        table.breakdown th {
+            background-color: #cfd8dc;
+            color: #2c3e50;
+            padding: 5px 8px;
+            font-weight: bold;
+            border: 1px solid #b0bec5;
+        }
+        table.breakdown td {
+            padding: 5px 8px;
+            border: 1px solid #cfd8dc;
+        }
+        table.breakdown .right { text-align: right; }
+        table.breakdown .center { text-align: center; }
+        table.breakdown .total-row td {
+            background-color: #eceff1;
+            font-weight: bold;
+        }
+        .species-subtotals {
+            margin-top: 8px;
+            font-size: 10px;
+            color: #455a64;
+        }
+        .species-subtotals .label {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        .species-subtotals ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .breakdown-note {
+            font-size: 9px;
+            color: #777;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -202,6 +261,8 @@
             </tr>
         </tbody>
     </table>
+
+    @include('pdf.partials.shipping_breakdown', ['shipping_breakdown' => $shipping_breakdown ?? null])
 
     @if($payment_deadline || $payment_method !== '未定')
     <div class="payment-info">

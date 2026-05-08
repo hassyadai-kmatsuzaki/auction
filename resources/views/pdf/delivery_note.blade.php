@@ -119,6 +119,65 @@
             margin-top: 15px;
             text-align: center;
         }
+        .shipping-breakdown {
+            margin: 12px 0 18px 0;
+            border: 1px solid #a7d8c4;
+            background-color: #ecf7f1;
+            padding: 10px 12px;
+        }
+        .shipping-breakdown-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #047857;
+            border-bottom: 1px solid #6db89a;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        .shipping-breakdown-meta {
+            font-size: 10px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        table.breakdown {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+        table.breakdown th {
+            background-color: #c8e6d6;
+            color: #1f4d39;
+            padding: 5px 8px;
+            font-weight: bold;
+            border: 1px solid #6db89a;
+        }
+        table.breakdown td {
+            padding: 5px 8px;
+            border: 1px solid #c8e6d6;
+        }
+        table.breakdown .right { text-align: right; }
+        table.breakdown .center { text-align: center; }
+        table.breakdown .total-row td {
+            background-color: #d8ecdf;
+            font-weight: bold;
+        }
+        .species-subtotals {
+            margin-top: 8px;
+            font-size: 10px;
+            color: #1f4d39;
+        }
+        .species-subtotals .label {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        .species-subtotals ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .breakdown-note {
+            font-size: 9px;
+            color: #777;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -201,6 +260,8 @@
             </tr>
         </tbody>
     </table>
+
+    @include('pdf.partials.shipping_breakdown', ['shipping_breakdown' => $shipping_breakdown ?? null])
 
     @if($shipping_company || $tracking_number)
     <div class="shipping-info">
