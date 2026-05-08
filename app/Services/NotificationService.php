@@ -455,34 +455,15 @@ class NotificationService
         }
     }
 
-    /** ⑨ 入金確認・発送依頼通知（出品者向け） */
+    /**
+     * ⑨ 入金確認・発送依頼通知（出品者向け）
+     *
+     * 弊社が出品者から生体を預かり、弊社から発送する運用のため、
+     * 出品者に発送依頼を流す必要がない。当面 no-op で停止する。
+     */
     public function sendSellerPaymentReceivedNotification(WonItem $wonItem): bool
     {
-        try {
-            $item = $wonItem->item;
-            if (!$item || !$item->seller) return false;
-            $seller = $item->seller;
-            if (!$seller->email) return false;
-            if (!$this->shouldSendSellerNotification($seller, 'email_payment_received')) return false;
-
-            Mail::to($seller->email)->queue(new SellerPaymentReceivedMail($wonItem));
-
-            $sellerUserId = $this->getSellerUserId($item);
-            if ($sellerUserId) {
-                $this->sendLine($sellerUserId, 'payment_received',
-                    "💰 入金が確認されました\n"
-                    . $item->species_name . "\n"
-                    . "発送をお願いします。",
-                    $this->flex->sellerPaymentReceived($wonItem),
-                );
-            }
-
-            Log::info('出品者向け入金確認通知送信', ['won_item_id' => $wonItem->id, 'seller_id' => $seller->id]);
-            return true;
-        } catch (\Exception $e) {
-            Log::error('出品者向け入金確認通知送信エラー', ['error' => $e->getMessage()]);
-            return false;
-        }
+        return false;
     }
 
     /** ⑩ オークション開始通知（出品者向け） */

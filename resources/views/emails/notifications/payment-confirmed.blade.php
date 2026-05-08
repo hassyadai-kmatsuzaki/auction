@@ -10,27 +10,15 @@
 
 ## 入金確認内容
 
-**商品名**: {{ $wonItem->item->species_name ?? '商品名' }}
+@foreach($wonItems as $wi)
+- **{{ $wi->item->species_name ?? '商品' }}**（No.{{ $wi->item->item_number ?? '-' }}）{{ $wi->quantity }}匹 — 落札 ¥{{ number_format((int) ($wi->total_amount ?? 0)) }}
+@endforeach
 
-**品番**: No.{{ $wonItem->item->item_number ?? '-' }}
+**お支払い金額合計**: ¥{{ number_format($totalAmount + $totalShippingFee) }}
 
-**お支払い金額**: ¥{{ number_format($wonItem->total_amount + ($wonItem->shipping_fee ?? 0)) }}
-
-@if(($wonItem->shipping_fee ?? 0) > 0)
-（内訳: 商品代金 ¥{{ number_format($wonItem->total_amount) }} ＋ 配送料金 ¥{{ number_format($wonItem->shipping_fee) }}）
+@if($totalShippingFee > 0)
+（内訳: 商品代金 ¥{{ number_format($totalAmount) }} ＋ 配送料金 ¥{{ number_format($totalShippingFee) }}）
 @endif
-
----
-
-## 今後の流れ
-
-1. 出品者様へ発送依頼を行いました
-2. 商品発送後、追跡番号をお知らせいたします
-3. 商品到着までしばらくお待ちください
-
-<x-mail::button :url="config('app.frontend_url') . '/participant/won-items'">
-配送状況を確認する
-</x-mail::button>
 
 ---
 

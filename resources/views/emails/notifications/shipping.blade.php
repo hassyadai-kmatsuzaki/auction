@@ -10,11 +10,9 @@
 
 ## 発送内容
 
-**商品名**: {{ $wonItem->item->species_name ?? '商品名' }}
-
-**品番**: No.{{ $wonItem->item->item_number ?? '-' }}
-
-**数量**: {{ $wonItem->quantity }}匹
+@foreach($wonItems as $wi)
+- **{{ $wi->item->species_name ?? '商品' }}**（No.{{ $wi->item->item_number ?? '-' }}）{{ $wi->quantity }}匹
+@endforeach
 
 ---
 
@@ -29,7 +27,7 @@
     $trackingUrl = '';
     $company = $wonItem->shipping_company ?? '';
     $trackingNumber = str_replace('-', '', $wonItem->tracking_number);
-    
+
     if (str_contains($company, 'ヤマト') || str_contains($company, 'クロネコ')) {
         $trackingUrl = 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno=' . $trackingNumber;
     } elseif (str_contains($company, '佐川')) {

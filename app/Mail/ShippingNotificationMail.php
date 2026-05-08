@@ -9,6 +9,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 
 class ShippingNotificationMail extends Mailable
 {
@@ -16,11 +17,18 @@ class ShippingNotificationMail extends Mailable
 
     public $wonItem;
     public $user;
+    public Collection $wonItems;
 
     public function __construct(WonItem $wonItem)
     {
         $this->wonItem = $wonItem;
         $this->user = $wonItem->user;
+        $auctionId = optional($wonItem->item)->auction_id;
+        $this->wonItems = WonItem::with('item')
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->where('winner_id', $wonItem->winner_id)
+            ->orderBy('id')
+            ->get();
         $this->routeViaNotify();
     }
 

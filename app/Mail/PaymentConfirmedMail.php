@@ -9,6 +9,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 
 class PaymentConfirmedMail extends Mailable
 {
@@ -16,11 +17,22 @@ class PaymentConfirmedMail extends Mailable
 
     public $wonItem;
     public $user;
+    public Collection $wonItems;
+    public int $totalAmount;
+    public int $totalShippingFee;
 
     public function __construct(WonItem $wonItem)
     {
         $this->wonItem = $wonItem;
         $this->user = $wonItem->user;
+        $auctionId = optional($wonItem->item)->auction_id;
+        $this->wonItems = WonItem::with('item')
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->where('winner_id', $wonItem->winner_id)
+            ->orderBy('id')
+            ->get();
+        $this->totalAmount = (int) $this->wonItems->sum(fn ($w) => (int) ($w->total_amount ?? 0));
+        $this->totalShippingFee = (int) $this->wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
         $this->routeViaNotify();
     }
 
