@@ -206,6 +206,7 @@ export default function PaymentManagement() {
                               variant="contained"
                               color="success"
                               onClick={() => setConfirmBankTarget(r)}
+                              sx={{ paddingInline: '8px' }}
                             >
                               振込確認
                             </Button>
