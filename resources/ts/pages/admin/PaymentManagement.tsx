@@ -15,6 +15,7 @@ interface Payment {
   amount: number;
   currency: string;
   status: 'pending' | 'completed' | 'failed' | 'refunded';
+  method: 'card' | 'bank_transfer' | null;
   failure_reason: string | null;
   paid_at: string | null;
   failed_at: string | null;
@@ -48,6 +49,9 @@ export default function PaymentManagement() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [refundBusy, setRefundBusy] = useState(false);
+
+  const [confirmBankTarget, setConfirmBankTarget] = useState<Payment | null>(null);
+  const [confirmBankBusy, setConfirmBankBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -101,6 +105,20 @@ export default function PaymentManagement() {
     }
   };
 
+  const runConfirmBankTransfer = async () => {
+    if (!confirmBankTarget?.user) return;
+    setConfirmBankBusy(true);
+    try {
+      await axios.post(`/api/admin/users/${confirmBankTarget.user.id}/confirm-bank-transfer`);
+      setConfirmBankTarget(null);
+      await load();
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? '振込確認に失敗しました');
+    } finally {
+      setConfirmBankBusy(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" fontWeight={600} sx={{ mb: 2 }}>決済管理</Typography>
@@ -139,13 +157,14 @@ export default function PaymentManagement() {
                     <TableCell>ユーザー</TableCell>
                     <TableCell>プラン</TableCell>
                     <TableCell align="right">金額</TableCell>
+                    <TableCell>支払方法</TableCell>
                     <TableCell>状態</TableCell>
                     <TableCell>Square決済ID</TableCell>
                     <TableCell align="right">操作</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {rows.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>該当データなし</TableCell></TableRow>}
+                  {rows.length === 0 && <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>該当データなし</TableCell></TableRow>}
                   {rows.map((r) => {
                     const s = STATUS[r.status];
                     return (
@@ -157,6 +176,15 @@ export default function PaymentManagement() {
                         </TableCell>
                         <TableCell>{r.plan?.name ?? '-'}</TableCell>
                         <TableCell align="right">{formatYen(r.amount)}</TableCell>
+                        <TableCell>
+                          {r.method === 'bank_transfer' ? (
+                            <Chip size="small" label="銀行振込" color="info" variant="outlined" />
+                          ) : r.method === 'card' ? (
+                            <Chip size="small" label="カード" variant="outlined" />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">-</Typography>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Chip size="small" label={s.label} color={s.color} />
                           {r.failure_reason && <Typography variant="caption" display="block" color="error">{r.failure_reason}</Typography>}
@@ -171,6 +199,16 @@ export default function PaymentManagement() {
                         <TableCell align="right">
                           {r.status === 'completed' && (
                             <Button size="small" variant="outlined" onClick={() => openRefund(r)}>返金</Button>
+                          )}
+                          {r.status === 'pending' && r.method === 'bank_transfer' && r.user && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => setConfirmBankTarget(r)}
+                            >
+                              振込確認
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -200,6 +238,27 @@ export default function PaymentManagement() {
         <DialogActions>
           <Button onClick={() => setRefundTarget(null)}>キャンセル</Button>
           <Button variant="contained" color="warning" onClick={runRefund} disabled={refundBusy}>{refundBusy ? '処理中…' : '返金する'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!confirmBankTarget} onClose={() => setConfirmBankTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>銀行振込の入金確認</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <Typography>
+              {confirmBankTarget?.user?.name} さんからの
+              {formatYen(confirmBankTarget?.amount ?? 0)} の入金を確認済みとして登録します。
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              この決済は完了扱いになり、サブスクリプションが有効化（1年延長）されます。
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmBankTarget(null)}>キャンセル</Button>
+          <Button variant="contained" color="success" onClick={runConfirmBankTransfer} disabled={confirmBankBusy}>
+            {confirmBankBusy ? '処理中…' : '入金確認する'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
