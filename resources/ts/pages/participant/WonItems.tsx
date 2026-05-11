@@ -107,6 +107,21 @@ interface Summary {
   auction_count: number;
 }
 
+// 消費税率（請求書/納品書PDFと同一値）
+const TAX_RATE = 10;
+
+// PDF (invoice.blade.php / delivery_note.blade.php) と同じ計算式
+// tax = floor((商品小計 + 落札手数料 + 配送料) × tax_rate / 100)
+// grand_total = 商品小計 + 落札手数料 + 配送料 + tax
+const computeTaxBreakdown = (subtotal: number, commission: number, shipping: number) => {
+  const taxBase = subtotal + commission + shipping;
+  const taxAmount = Math.floor((taxBase * TAX_RATE) / 100);
+  return {
+    taxAmount,
+    grandTotalInclTax: taxBase + taxAmount,
+  };
+};
+
 // 配送業者の追跡URLを生成
 const getTrackingUrl = (trackingNumber: string, company: string) => {
   const cleanNumber = trackingNumber.replace(/-/g, '');
@@ -334,15 +349,19 @@ export default function WonItems() {
       </Typography>
 
       {/* サマリー */}
-      {summary && (
+      {summary && (() => {
+        const overall = computeTaxBreakdown(summary.subtotal, summary.commission_total, summary.shipping_fee);
+        const paidTax = Math.floor((summary.paid_amount * TAX_RATE) / 100);
+        const pendingTax = Math.floor((summary.pending_amount * TAX_RATE) / 100);
+        return (
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={3}>
             <Paper sx={{ p: 2.5 }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-                合計落札金額
+                ご請求金額（税込）
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                ¥{formatYen(summary.grand_total)}
+                ¥{formatYen(overall.grandTotalInclTax)}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {summary.auction_count}件のオークション / {summary.item_count}品
@@ -352,20 +371,20 @@ export default function WonItems() {
           <Grid item xs={12} sm={3}>
             <Paper sx={{ p: 2.5, bgcolor: '#ECFDF5' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-                入金確認済み
+                入金確認済み（税込）
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#059669' }}>
-                ¥{formatYen(summary.paid_amount)}
+                ¥{formatYen(summary.paid_amount + paidTax)}
               </Typography>
             </Paper>
           </Grid>
           <Grid item xs={12} sm={3}>
             <Paper sx={{ p: 2.5, bgcolor: '#FEF3C7' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-                支払い待ち
+                支払い待ち（税込）
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#F59E0B' }}>
-                ¥{formatYen(summary.pending_amount)}
+                ¥{formatYen(summary.pending_amount + pendingTax)}
               </Typography>
             </Paper>
           </Grid>
@@ -380,7 +399,8 @@ export default function WonItems() {
             </Paper>
           </Grid>
         </Grid>
-      )}
+        );
+      })()}
 
       {/* タブフィルター */}
       <Paper sx={{ mb: 3 }}>
@@ -409,6 +429,11 @@ export default function WonItems() {
       ) : (
         filteredGroups.map((group) => {
           const auctionId = group.auction?.id;
+          const { taxAmount, grandTotalInclTax } = computeTaxBreakdown(
+            group.summary.subtotal,
+            group.summary.commission_total,
+            group.summary.shipping_fee,
+          );
           return (
             <Accordion key={auctionId ?? 'unknown'} defaultExpanded sx={{ mb: 2 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -423,7 +448,7 @@ export default function WonItems() {
                     </Typography>
                   </Box>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: '#059669' }}>
-                    ¥{formatYen(group.summary.grand_total)}
+                    ¥{formatYen(grandTotalInclTax)}
                   </Typography>
                   {group.summary.all_paid ? (
                     <Chip label="入金済み" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 600 }} />
@@ -603,28 +628,53 @@ export default function WonItems() {
                   </Card>
                 ))}
 
-                {/* オークション合計 */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 3, pt: 1, flexWrap: 'wrap' }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    商品小計: ¥{formatYen(group.summary.subtotal)}
-                  </Typography>
-                  {group.summary.commission_total > 0 && (
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      落札手数料: ¥{formatYen(group.summary.commission_total)}
-                    </Typography>
-                  )}
-                  {group.summary.shipping_fee > 0 ? (
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      配送料合計: ¥{formatYen(group.summary.shipping_fee)}
-                    </Typography>
-                  ) : group.shipping.pending_manual_approval ? (
-                    <Typography variant="body2" sx={{ color: '#B45309' }}>
-                      配送料合計: 管理者確定待ち
-                    </Typography>
-                  ) : null}
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#059669' }}>
-                    合計: ¥{formatYen(group.summary.grand_total)}
-                  </Typography>
+                {/* オークション合計（請求書/納品書PDFと同一構造） */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
+                  <Box sx={{ minWidth: 320, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>商品小計</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        ¥{formatYen(group.summary.subtotal)}
+                      </Typography>
+                    </Box>
+                    {group.summary.commission_total > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>落札手数料</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          ¥{formatYen(group.summary.commission_total)}
+                        </Typography>
+                      </Box>
+                    )}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>配送料</Typography>
+                      {group.summary.shipping_fee > 0 ? (
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          ¥{formatYen(group.summary.shipping_fee)}
+                        </Typography>
+                      ) : group.shipping.pending_manual_approval ? (
+                        <Typography variant="body2" sx={{ color: '#B45309', fontWeight: 600 }}>
+                          管理者確定待ち
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>¥0</Typography>
+                      )}
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        消費税（{TAX_RATE}%）
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        ¥{formatYen(taxAmount)}
+                      </Typography>
+                    </Box>
+                    <Divider />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>合計金額</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#059669' }}>
+                        ¥{formatYen(grandTotalInclTax)}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </Box>
               </AccordionDetails>
             </Accordion>

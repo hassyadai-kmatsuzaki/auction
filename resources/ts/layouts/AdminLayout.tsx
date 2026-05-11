@@ -21,6 +21,7 @@ import {
   Dashboard as DashboardIcon,
   Campaign as CampaignIcon,
   People as PeopleIcon,
+  ManageAccounts as ManageAccountsIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   ExpandLess,
@@ -98,6 +99,7 @@ export default function AdminLayout() {
   ];
 
   const userSubItems = [
+    { text: 'ユーザー一覧', icon: <ManageAccountsIcon />, path: '/admin/users' },
     { text: '出品者登録一覧', icon: <StoreIcon />, path: '/admin/sellers' },
     { text: '買受者登録一覧', icon: <PersonIcon />, path: '/admin/buyers' },
   ];

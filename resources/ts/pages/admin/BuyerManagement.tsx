@@ -10,7 +10,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
   Chip,
   IconButton,
   Button,
@@ -174,32 +173,27 @@ export default function BuyerManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
-  // ページネーション
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [total, setTotal] = useState(0);
-  
+
   // フィルタ
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  
+
   // 権限付与ダイアログ
   const [grantDialogOpen, setGrantDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     fetchUsers();
-  }, [page, rowsPerPage, statusFilter]);
+  }, [statusFilter]);
 
   const fetchUsers = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const params = new URLSearchParams({
-        page: String(page + 1),
-        per_page: String(rowsPerPage),
+        per_page: 'all',
         role: 'participant', // 参加者のみ取得
       });
 
@@ -222,7 +216,6 @@ export default function BuyerManagement() {
   };
 
   const handleSearch = () => {
-    setPage(0);
     fetchUsers();
   };
 
@@ -230,15 +223,6 @@ export default function BuyerManagement() {
     if (e.key === 'Enter') {
       handleSearch();
     }
-  };
-
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
   };
 
   const handleGrantSellerRole = async () => {
@@ -338,7 +322,6 @@ export default function BuyerManagement() {
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
-                setPage(0);
               }}
               label="ステータス"
             >
@@ -498,17 +481,11 @@ export default function BuyerManagement() {
                 )}
               </TableBody>
             </Table>
-            <TablePagination
-              component="div"
-              count={total}
-              page={page}
-              onPageChange={handleChangePage}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              labelRowsPerPage="表示件数:"
-              labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}件`}
-            />
+            <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'flex-end' }}>
+              <Typography variant="body2" color="text.secondary">
+                全 {total} 件
+              </Typography>
+            </Box>
           </>
         )}
       </TableContainer>

@@ -10,7 +10,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
   Chip,
   IconButton,
   Button,
@@ -64,6 +63,7 @@ interface User {
   id: number;
   name: string;
   trade_name: string | null;
+  company_name: string | null;
   email: string;
   phone: string | null;
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
@@ -175,32 +175,27 @@ export default function SellerManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
-  // ページネーション
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [total, setTotal] = useState(0);
-  
+
   // フィルタ
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  
+
   // 権限付与ダイアログ
   const [grantDialogOpen, setGrantDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     fetchUsers();
-  }, [page, rowsPerPage, statusFilter]);
+  }, [statusFilter]);
 
   const fetchUsers = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const params = new URLSearchParams({
-        page: String(page + 1),
-        per_page: String(rowsPerPage),
+        per_page: 'all',
         role: 'seller', // 出品者のみ取得
       });
 
@@ -223,7 +218,6 @@ export default function SellerManagement() {
   };
 
   const handleSearch = () => {
-    setPage(0);
     fetchUsers();
   };
 
@@ -231,15 +225,6 @@ export default function SellerManagement() {
     if (e.key === 'Enter') {
       handleSearch();
     }
-  };
-
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
   };
 
   const handleGrantParticipantRole = async () => {
@@ -340,7 +325,6 @@ export default function SellerManagement() {
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
-                setPage(0);
               }}
               label="ステータス"
             >
@@ -382,6 +366,8 @@ export default function SellerManagement() {
                   <TableCell>ID</TableCell>
                   <TableCell align="center">アイコン</TableCell>
                   <TableCell>名前</TableCell>
+                  <TableCell>屋号</TableCell>
+                  <TableCell>会社名</TableCell>
                   <TableCell>メールアドレス</TableCell>
                   <TableCell>ロール</TableCell>
                   <TableCell align="center">ステータス</TableCell>
@@ -394,7 +380,7 @@ export default function SellerManagement() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">
                         出品者が見つかりませんでした
                       </Typography>
@@ -416,14 +402,19 @@ export default function SellerManagement() {
                         </Avatar>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap' }}>
-                          <Typography variant="body2" fontWeight="medium">
-                            {user.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            （屋号: {user.trade_name || '-'}）
-                          </Typography>
-                        </Box>
+                        <Typography variant="body2" fontWeight="medium" sx={{ whiteSpace: 'nowrap' }}>
+                          {user.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                          {user.trade_name || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                          {user.company_name || '-'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
@@ -505,17 +496,11 @@ export default function SellerManagement() {
                 )}
               </TableBody>
             </Table>
-            <TablePagination
-              component="div"
-              count={total}
-              page={page}
-              onPageChange={handleChangePage}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              labelRowsPerPage="表示件数:"
-              labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}件`}
-            />
+            <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'flex-end' }}>
+              <Typography variant="body2" color="text.secondary">
+                全 {total} 件
+              </Typography>
+            </Box>
           </>
         )}
       </TableContainer>

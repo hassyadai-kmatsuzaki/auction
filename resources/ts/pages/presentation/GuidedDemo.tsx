@@ -661,10 +661,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
     }
   }, [tourActive, tourStep]);
 
-  const handleSignup = useCallback(() => {
-    window.location.href = '/register';
-  }, []);
-
   // Shared tour popover element (rendered in non-auction phases)
   const tourPopoverElement = tourActive ? (
     <DemoTourPopover
@@ -675,7 +671,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       onReset={onBackToTop}
       isAutoPlaying={isAutoPlaying}
       onExecuteAction={handleExecuteAction}
-      onSignup={handleSignup}
       hideFooter={hideMobileFooter}
       drawerOpen={drawerOpen}
     />
@@ -888,7 +883,6 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
             onReset={onBackToTop}
             isAutoPlaying={isAutoPlaying}
             onExecuteAction={handleExecuteAction}
-            onSignup={handleSignup}
             hideFooter={hideMobileFooter}
             drawerOpen={drawerOpen}
           />

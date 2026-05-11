@@ -59,6 +59,19 @@ import {
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 
+// 消費税率（請求書/納品書PDFと同一値）
+const TAX_RATE = 10;
+
+// PDF (invoice.blade.php / delivery_note.blade.php) と同一の計算式
+const computeTaxBreakdown = (subtotal: number, commission: number, shipping: number) => {
+  const taxBase = subtotal + commission + shipping;
+  const taxAmount = Math.floor((taxBase * TAX_RATE) / 100);
+  return {
+    taxAmount,
+    grandTotalInclTax: taxBase + taxAmount,
+  };
+};
+
 interface WonItem {
   id: number;
   item: {
@@ -614,58 +627,61 @@ export default function WonItemManagement() {
     return Array.from(map.values());
   }, [filteredItems]);
 
-  // 商品行レンダラー（落札者単位でステータス統一のため per-row の支払い/発送/操作は不要）
-  const renderItemRow = (item: WonItem, showWinner: boolean) => (
-    <TableRow key={item.id} hover>
-      <TableCell>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {item.item.item_number}
-        </Typography>
-      </TableCell>
-      <TableCell>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {item.item.species_name}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {item.quantity}匹
-          </Typography>
-        </Box>
-      </TableCell>
-      {showWinner && (
+  // 商品行レンダラー（請求書/納品書PDFと同じ列構成: No. | 品種 | 数量 | 単価 | 小計）
+  const renderItemRow = (item: WonItem, showWinner: boolean) => {
+    const lineSubtotal = Number(item.winning_price || 0) * Number(item.quantity || 0);
+    return (
+      <TableRow key={item.id} hover>
         <TableCell>
-          {item.winner ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar sx={{ width: 28, height: 28, bgcolor: '#EFF6FF', color: '#3B82F6', fontSize: '0.75rem' }}>
-                {item.winner.name.charAt(0)}
-              </Avatar>
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {item.winner.name}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {item.winner.email}
-                </Typography>
-              </Box>
-            </Box>
-          ) : (
-            <Typography variant="body2" color="text.secondary">—</Typography>
-          )}
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {item.item.item_number}
+          </Typography>
         </TableCell>
-      )}
-      <TableCell align="right">
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          ¥{formatYen(item.total_amount)}
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          (手数料¥{formatYen(item.commission_amount)})
-        </Typography>
-      </TableCell>
-    </TableRow>
-  );
+        <TableCell>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {item.item.species_name}
+          </Typography>
+        </TableCell>
+        {showWinner && (
+          <TableCell>
+            {item.winner ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar sx={{ width: 28, height: 28, bgcolor: '#EFF6FF', color: '#3B82F6', fontSize: '0.75rem' }}>
+                  {item.winner.name.charAt(0)}
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {item.winner.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {item.winner.email}
+                  </Typography>
+                </Box>
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">—</Typography>
+            )}
+          </TableCell>
+        )}
+        <TableCell align="center">
+          <Typography variant="body2">{item.quantity}匹</Typography>
+        </TableCell>
+        <TableCell align="right">
+          <Typography variant="body2">¥{formatYen(item.winning_price)}</Typography>
+        </TableCell>
+        <TableCell align="right">
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            ¥{formatYen(lineSubtotal)}
+          </Typography>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
-  // リスト表示専用の行（グループ操作だが、全行にアクションを表示して任意行から操作できる）
-  const renderListRow = (item: WonItem) => (
+  // リスト表示専用の行（請求書/納品書PDFと同じ料金列構成）
+  const renderListRow = (item: WonItem) => {
+    const lineSubtotal = Number(item.winning_price || 0) * Number(item.quantity || 0);
+    return (
     <TableRow key={item.id} hover>
       <TableCell>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -673,14 +689,9 @@ export default function WonItemManagement() {
         </Typography>
       </TableCell>
       <TableCell>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {item.item.species_name}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {item.quantity}匹
-          </Typography>
-        </Box>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {item.item.species_name}
+        </Typography>
       </TableCell>
       <TableCell>
         {item.winner ? (
@@ -701,12 +712,15 @@ export default function WonItemManagement() {
           <Typography variant="body2" color="text.secondary">—</Typography>
         )}
       </TableCell>
+      <TableCell align="center">
+        <Typography variant="body2">{item.quantity}匹</Typography>
+      </TableCell>
+      <TableCell align="right">
+        <Typography variant="body2">¥{formatYen(item.winning_price)}</Typography>
+      </TableCell>
       <TableCell align="right">
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          ¥{formatYen(item.total_amount)}
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          (手数料¥{formatYen(item.commission_amount)})
+          ¥{formatYen(lineSubtotal)}
         </Typography>
       </TableCell>
       <TableCell align="center">{getPaymentStatusChip(item.payment_status)}</TableCell>
@@ -811,7 +825,8 @@ export default function WonItemManagement() {
         </Box>
       </TableCell>
     </TableRow>
-  );
+    );
+  };
 
   // 落札者グループのヘッダー（ステータスチップ・伝票番号・アクションを集約）
   const renderGroupActions = (items: WonItem[]) => {
@@ -1052,8 +1067,10 @@ export default function WonItemManagement() {
             </Card>
           ) : (
             groupedByWinner.map((group) => {
-              const totalAmount = group.items.reduce((s, i) => s + Number(i.total_amount || 0), 0);
+              const subtotal = group.items.reduce((s, i) => s + Number(i.winning_price || 0) * Number(i.quantity || 0), 0);
+              const commissionTotal = group.items.reduce((s, i) => s + Number(i.commission_amount || 0), 0);
               const totalShippingFee = group.items.reduce((s, i) => s + Number(i.shipping_fee || 0), 0);
+              const { taxAmount, grandTotalInclTax } = computeTaxBreakdown(subtotal, commissionTotal, totalShippingFee);
               const calculatedCount = group.items.filter((i) => i.shipping_calculated_at).length;
               const allCalculated = calculatedCount === group.items.length;
               const approvedCount = group.items.filter((i) => i.shipping_approved_at).length;
@@ -1104,8 +1121,8 @@ export default function WonItemManagement() {
                       )}
                     </Box>
 
-                    {/* 集計 */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+                    {/* 集計（請求書/納品書PDFと同一構造） */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap' }}>
                       <Box>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札件数</Typography>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -1114,14 +1131,21 @@ export default function WonItemManagement() {
                       </Box>
                       <Divider orientation="vertical" flexItem />
                       <Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札合計</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>商品小計</Typography>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          ¥{formatYen(totalAmount)}
+                          ¥{formatYen(subtotal)}
                         </Typography>
                       </Box>
                       <Divider orientation="vertical" flexItem />
                       <Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>送料</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>落札手数料</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          ¥{formatYen(commissionTotal)}
+                        </Typography>
+                      </Box>
+                      <Divider orientation="vertical" flexItem />
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>配送料</Typography>
                         {allCalculated ? (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             <Typography variant="h6" sx={{ fontWeight: 700, color: allApproved ? 'success.main' : 'info.main' }}>
@@ -1144,6 +1168,20 @@ export default function WonItemManagement() {
                             未計算（{group.items.length - calculatedCount}件）
                           </Typography>
                         )}
+                      </Box>
+                      <Divider orientation="vertical" flexItem />
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>消費税（{TAX_RATE}%）</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          ¥{formatYen(taxAmount)}
+                        </Typography>
+                      </Box>
+                      <Divider orientation="vertical" flexItem />
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>合計金額（税込）</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#059669' }}>
+                          ¥{formatYen(grandTotalInclTax)}
+                        </Typography>
                       </Box>
 
                       {/* アクション */}
@@ -1180,14 +1218,16 @@ export default function WonItemManagement() {
                     {renderGroupActions(group.items)}
                   </Box>
 
-                  {/* 商品テーブル */}
+                  {/* 商品テーブル（請求書/納品書PDFと同じ列構成） */}
                   <TableContainer>
                     <Table>
                       <TableHead>
                         <TableRow>
                           <TableCell>No.</TableCell>
                           <TableCell>品種名</TableCell>
-                          <TableCell align="right">落札金額</TableCell>
+                          <TableCell align="center">数量</TableCell>
+                          <TableCell align="right">単価</TableCell>
+                          <TableCell align="right">小計</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1225,7 +1265,9 @@ export default function WonItemManagement() {
                   <TableCell>No.</TableCell>
                   <TableCell>品種名</TableCell>
                   <TableCell>落札者</TableCell>
-                  <TableCell align="right">落札金額</TableCell>
+                  <TableCell align="center">数量</TableCell>
+                  <TableCell align="right">単価</TableCell>
+                  <TableCell align="right">小計</TableCell>
                   <TableCell align="center">支払い</TableCell>
                   <TableCell align="center">発送</TableCell>
                   <TableCell>伝票番号</TableCell>
@@ -1235,7 +1277,7 @@ export default function WonItemManagement() {
               <TableBody>
                 {filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">落札商品がありません</Typography>
                     </TableCell>
                   </TableRow>

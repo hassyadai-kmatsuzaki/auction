@@ -60,8 +60,19 @@ class UserController extends Controller
         $sortOrder = $request->get('sort_order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
 
-        // ページネーション
-        $users = $query->paginate(20);
+        // ページネーション（per_page=all で全件返す）
+        $perPage = $request->get('per_page', 20);
+        if ($perPage === 'all') {
+            $all = $query->get();
+            $users = new \Illuminate\Pagination\LengthAwarePaginator(
+                $all,
+                $all->count(),
+                max($all->count(), 1),
+                1
+            );
+        } else {
+            $users = $query->paginate((int) $perPage);
+        }
 
         // アイコン URL を一覧用に明示的に付与（accessor は $appends 未設定のため toArray に含まれない）
         $users->getCollection()->transform(function ($user) {
