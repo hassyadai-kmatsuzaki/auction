@@ -601,6 +601,12 @@ class WonItemController extends Controller
         $baseBreakdown = $wonItems->first()->shipping_breakdown ?? [];
         $newBreakdown = null;
 
+        // 自動計算値と異なる金額で確定された場合は、内訳 JSON も manual に切替えて再構築する。
+        // shipping_breakdown はオークション確定時に保存されたまま参照されるため、
+        // shipping_fee だけ上書きすると PDF の「送料内訳」セクションが古い箱明細を表示してしまう。
+        $autoTotalFee = (int) $wonItems->sum(fn ($w) => (int) ($w->shipping_fee_auto ?? $w->shipping_fee ?? 0));
+        $feeAdjusted = $overrideFee !== $autoTotalFee;
+
         if ($isFree) {
             // 送料無料: 内訳を「送料無料」状態に上書き（manual モード扱い）
             $newBreakdown = [
@@ -649,6 +655,10 @@ class WonItemController extends Controller
             $newBreakdown['calculation_mode'] = 'manual';
             // 送料無料用の manual_reason は外す（金額編集モードでは未使用）
             unset($newBreakdown['manual_reason']);
+        } elseif ($feeAdjusted) {
+            // 箱内訳の編集なしに金額のみ調整された場合、自動計算の箱明細はもう正しくないので
+            // manual モードに切替え、箱明細を破棄して manual_total ベースに統一する。
+            $newBreakdown = $this->buildManualOverrideBreakdown($baseBreakdown, $overrideFee, $reason);
         }
 
         \DB::transaction(function () use ($wonItems, $overrideFee, $reason, $adminId, $newBreakdown) {
@@ -720,7 +730,11 @@ class WonItemController extends Controller
         $quantities = $wonItems->map(fn ($w) => $w->item->quantity ?? 1)->toArray();
         $apportioned = \App\Services\ShippingCalculatorService::apportionFee($totalFee, $quantities);
 
-        \DB::transaction(function () use ($wonItems, $apportioned, $reason, $adminId) {
+        // 手動入力された送料に整合する内訳 JSON を構築（PDFの「送料内訳」を確定値に揃えるため）
+        $baseBreakdown = $wonItems->first()->shipping_breakdown ?? [];
+        $newBreakdown = $this->buildManualOverrideBreakdown($baseBreakdown, $totalFee, $reason);
+
+        \DB::transaction(function () use ($wonItems, $apportioned, $reason, $adminId, $newBreakdown) {
             foreach ($wonItems->values() as $i => $w) {
                 $w->update([
                     'shipping_fee' => $apportioned[$i],
@@ -730,6 +744,7 @@ class WonItemController extends Controller
                     'shipping_approved_at' => now(),
                     'shipping_approved_by' => $adminId,
                     'shipping_adjustment_reason' => $reason,
+                    'shipping_breakdown' => $newBreakdown,
                 ]);
             }
         });
@@ -746,7 +761,33 @@ class WonItemController extends Controller
     }
 
     /**
-     * 配���先住所をフォーマット
+     * 管理者の手動上書きに伴い shipping_breakdown JSON を manual モードに再構築する。
+     *
+     * 自動計算時の箱明細（boxes/bags）は金額と整合しなくなるため破棄し、
+     * 確定された総額を manual_total/total_shipping_fee として保持する。
+     * 種別小計（species_breakdown）も金額が変わると不整合となるのでクリアする。
+     * destination_region だけは届け先地域情報なので温存する。
+     */
+    private function buildManualOverrideBreakdown(array $baseBreakdown, int $totalFee, ?string $reason): array
+    {
+        return [
+            'calculation_mode' => 'manual',
+            'destination_region' => $baseBreakdown['destination_region'] ?? null,
+            'manual_reason' => $reason !== null && trim($reason) !== ''
+                ? $reason
+                : '管理者により個別に設定された送料です。',
+            'manual_total' => $totalFee,
+            'total_shipping_fee' => $totalFee,
+            'shipping_cost' => 0,
+            'packing_material_cost' => 0,
+            'boxes' => [],
+            'bags' => [],
+            'species_breakdown' => [],
+        ];
+    }
+
+    /**
+     * 配送先住所をフォーマット
      */
     private function formatShippingAddress(WonItem $wonItem): ?string
     {

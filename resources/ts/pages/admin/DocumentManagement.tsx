@@ -191,7 +191,7 @@ export default function DocumentManagement() {
                   <TableCell>買受者</TableCell>
                   <TableCell>オークション</TableCell>
                   <TableCell align="center">点数</TableCell>
-                  <TableCell align="right">請求金額</TableCell>
+                  <TableCell align="right">請求金額（税込）</TableCell>
                   <TableCell align="center">ステータス</TableCell>
                   <TableCell>発行日</TableCell>
                   <TableCell align="center">操作</TableCell>

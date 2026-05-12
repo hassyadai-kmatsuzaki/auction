@@ -25,15 +25,22 @@ class DocumentController extends Controller
 
         $wonItems = $query->get();
 
+        // InvoiceService::buildInvoiceData と同じ式で税込合計を組み立てる
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+
         $grouped = $wonItems
             ->filter(fn ($w) => $w->item && $w->item->auction && $w->winner)
             ->groupBy(fn ($w) => $w->item->auction_id.'-'.$w->winner_id)
-            ->map(function ($group) {
+            ->map(function ($group) use ($taxRate) {
                 $first = $group->first();
                 $auction = $first->item->auction;
                 $winner = $first->winner;
 
-                $totalAmount = $group->sum(fn ($w) => (int) $w->total_amount) + $group->sum(fn ($w) => $w->shipping_fee ?? 0);
+                $subtotal = (int) $group->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+                $commissionTotal = (int) $group->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
+                $shippingFeeTotal = (int) $group->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+                $taxAmount = (int) floor(($subtotal + $commissionTotal + $shippingFeeTotal) * $taxRate / 100);
+                $totalAmount = $subtotal + $commissionTotal + $shippingFeeTotal + $taxAmount;
 
                 $statuses = $group->pluck('payment_status')->unique();
                 $status = 'pending';
