@@ -602,7 +602,7 @@
       <div class="step-tile anim" data-anim="fade-up" data-delay="2">
         <span class="step-tile__index">STEP 03</span>
         <h3 class="step-tile__title">落札・決済</h3>
-        <p class="step-tile__desc">落札確定後、決済は振込で完了。取引のすべてが {{ $brand }} とのやり取りで、出品者と直接やり取りすることはありません。</p>
+        <p class="step-tile__desc">落札確定後、落札成立日の翌日から3営業日以内に振込でお支払い。取引のすべてが {{ $brand }} とのやり取りで、出品者と直接やり取りすることはありません。</p>
       </div>
       <div class="step-tile anim" data-anim="fade-up" data-delay="3">
         <span class="step-tile__index">STEP 04</span>
