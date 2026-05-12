@@ -213,7 +213,12 @@ export default function DocumentManagement() {
                             {row.buyer.name.charAt(0)}
                           </Avatar>
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>{row.buyer.name}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{row.buyer.name}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                                #{row.buyer.id}
+                              </Typography>
+                            </Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.buyer.email}</Typography>
                           </Box>
                         </Box>
@@ -298,7 +303,12 @@ export default function DocumentManagement() {
                             {row.seller.name.charAt(0)}
                           </Avatar>
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>{row.seller.name}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{row.seller.name}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                                #{row.seller.id}
+                              </Typography>
+                            </Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.seller.email}</Typography>
                           </Box>
                         </Box>
@@ -384,7 +394,12 @@ export default function DocumentManagement() {
                             {row.buyer.name.charAt(0)}
                           </Avatar>
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>{row.buyer.name}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{row.buyer.name}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                                #{row.buyer.id}
+                              </Typography>
+                            </Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>{row.buyer.email}</Typography>
                           </Box>
                         </Box>
