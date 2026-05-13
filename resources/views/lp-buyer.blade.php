@@ -123,22 +123,6 @@
       日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、業者間プラットフォームです。
     </p>
 
-    {{-- 協賛企業（横スクロール） --}}
-    <p class="partners-row__label anim" data-anim="fade-up">協賛企業</p>
-    @php $supporters = [1, 2, 3, 4, 5, 6, 7]; @endphp
-    <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
-      <div class="partners-marquee__track">
-        {{-- 同じセットを3回連結し、CSS の translateX(-50%) で継ぎ目なくループ --}}
-        @for ($i = 0; $i < 3; $i++)
-          @foreach ($supporters as $n)
-            <div class="partners-marquee__item">
-              <img src="/img/lp/supporter/{{ $n }}.png" alt="" loading="lazy">
-            </div>
-          @endforeach
-        @endfor
-      </div>
-    </div>
-
     {{-- 出品ブリーダー（横スクロール） --}}
     <p class="partners-row__label anim" data-anim="fade-up">出品ブリーダー</p>
     @php $breeders = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]; @endphp
@@ -155,7 +139,16 @@
       </div>
     </div>
 
-    <p class="partners-note anim" data-anim="fade-up">※ 協賛企業・出品ブリーダーのロゴは順次掲載予定です。</p>
+    {{-- 協賛企業（7社・静止グリッド） --}}
+    <p class="partners-row__label anim" data-anim="fade-up">協賛企業</p>
+    @php $supporters = [1, 2, 3, 4, 5, 6, 7]; @endphp
+    <div class="partners-grid anim" data-anim="fade-up">
+      @foreach ($supporters as $n)
+        <div class="partners-grid__item">
+          <img src="/img/lp/supporter/{{ $n }}.png" alt="" loading="lazy">
+        </div>
+      @endforeach
+    </div>
   </div>
 </section>
 

@@ -457,7 +457,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   .hero__title-line { font-size: clamp(1.5rem, 7vw, 2rem); }
   .hero__title-line--strong { font-size: clamp(1.8rem, 8vw, 2.4rem); }
   .hero__desc { text-align: left; }
-  .hero__visual { height: 420px; }
+  .hero__visual { height: 320px; }
   .hero__cta { width: 100%; max-width: 100%; justify-self: stretch; }
 }
 
@@ -604,7 +604,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
 }
 .partners-marquee__track {
   display: flex;
-  gap: 20px;
+  gap: 0;
   width: max-content;
   animation: partners-scroll 40s linear infinite;
 }
@@ -629,6 +629,34 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
 @keyframes partners-scroll {
   from { transform: translate3d(0, 0, 0); }
   to   { transform: translate3d(-50%, 0, 0); }
+}
+
+/* 協賛企業（静止表示・左詰・画像間隔0） */
+.partners-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 10px;
+}
+.partners-grid__item {
+  flex: 0 0 auto;
+  width: calc(100% / 7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+}
+.partners-grid__item img {
+  height: 100%;
+  width: 100%;
+  max-width: 160px;
+  object-fit: cover;
+  opacity: 0.85;
+}
+@media (max-width: 767px) {
+  .partners-grid__item { width: 25%; }
 }
 
 /* Row label (協賛企業 / 出品ブリーダー の見出し) */
@@ -2859,3 +2887,29 @@ a.solution-card:hover .solution-card__arrow {
   box-shadow: 0 8px 18px rgba(var(--brand-primary-dark-rgb), 0.22);
 }
 .contact-form__submit svg { stroke: #ffffff; }
+
+/* ===================================
+   HERO CTA STICKY (実験・SPのみ)
+   FV を抜けたら hero__cta を画面下端に固定する。
+   戻すときはこのブロック削除 + lp.js の initHeroCtaSticky 関連を削除。
+   =================================== */
+@media (max-width: 767px) {
+  .hero__cta.is-stuck {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    margin: 0;
+    z-index: 95;
+    background: transparent;
+    animation: hero-cta-stuck-in 0.25s ease-out;
+  }
+  .hero__cta.is-stuck .hero__cta-card {
+    box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+  }
+}
+@keyframes hero-cta-stuck-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
