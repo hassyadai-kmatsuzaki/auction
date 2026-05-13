@@ -32,11 +32,14 @@ use RuntimeException;
  *   - user_roles: participant 付与
  *
  * 環境変数で挙動を上書きできる:
- *   E2E_BIDDER_COUNT       … 作成人数 (default 100)
- *   E2E_BIDDER_EMAIL_PREFIX … メールアドレス左辺の prefix (default "e2e-bidder")
- *   E2E_BIDDER_EMAIL_DOMAIN … ドメイン (default "medaka-test.local")
- *   E2E_BIDDER_PASSWORD    … 共通パスワード (default "E2eBidder!2026")
- *   E2E_BIDDER_START_INDEX … 連番開始 (default 1)
+ *   E2E_BIDDER_COUNT          … 作成人数 (default 100)
+ *   E2E_BIDDER_EMAIL_PREFIX   … メールアドレス左辺の prefix (default "e2e-bidder")
+ *   E2E_BIDDER_EMAIL_SEPARATOR … prefix と連番の間の区切り文字 (default "-")
+ *                                 例: prefix=k.matsuzaki separator=+ →
+ *                                     k.matsuzaki+001@{domain}
+ *   E2E_BIDDER_EMAIL_DOMAIN   … ドメイン (default "medaka-test.local")
+ *   E2E_BIDDER_PASSWORD       … 共通パスワード (default "E2eBidder!2026")
+ *   E2E_BIDDER_START_INDEX    … 連番開始 (default 1)
  */
 class E2EBidderSeeder extends Seeder
 {
@@ -100,11 +103,12 @@ class E2EBidderSeeder extends Seeder
 
     public function run(): void
     {
-        $count        = (int) (env('E2E_BIDDER_COUNT', 200));
-        $emailPrefix  = (string) env('E2E_BIDDER_EMAIL_PREFIX', 'e2e-bidder');
-        $emailDomain  = (string) env('E2E_BIDDER_EMAIL_DOMAIN', 'medaka-test.local');
-        $password     = (string) env('E2E_BIDDER_PASSWORD', 'E2eBidder!2026');
-        $startIndex   = (int) env('E2E_BIDDER_START_INDEX', 1);
+        $count          = (int) (env('E2E_BIDDER_COUNT', 100));
+        $emailPrefix    = (string) env('E2E_BIDDER_EMAIL_PREFIX', 'e2e-bidder');
+        $emailSeparator = (string) env('E2E_BIDDER_EMAIL_SEPARATOR', '-');
+        $emailDomain    = (string) env('E2E_BIDDER_EMAIL_DOMAIN', 'medaka-test.local');
+        $password       = (string) env('E2E_BIDDER_PASSWORD', 'E2eBidder!2026');
+        $startIndex     = (int) env('E2E_BIDDER_START_INDEX', 1);
 
         if ($count <= 0) {
             throw new RuntimeException('E2E_BIDDER_COUNT must be > 0');
@@ -125,7 +129,7 @@ class E2EBidderSeeder extends Seeder
         $regionCounts = [];
 
         for ($i = $startIndex; $i < $startIndex + $count; $i++) {
-            $email = sprintf('%s-%03d@%s', $emailPrefix, $i, $emailDomain);
+            $email = sprintf('%s%s%03d@%s', $emailPrefix, $emailSeparator, $i, $emailDomain);
             $name  = sprintf('E2E Bidder %03d', $i);
             $address = $this->pickAddress($i);
             $regionCounts[$address['region']] = ($regionCounts[$address['region']] ?? 0) + 1;
@@ -172,8 +176,8 @@ class E2EBidderSeeder extends Seeder
             $created, $repaired, $skipped, $count, $plan->code, $plan->id
         ));
         $this->command->info(sprintf(
-            'login: email=%s-{NNN}@%s / password=%s',
-            $emailPrefix, $emailDomain, $password
+            'login: email=%s%s{NNN}@%s / password=%s',
+            $emailPrefix, $emailSeparator, $emailDomain, $password
         ));
         // 「全11リージョン分散できているか」を運用者が一目で確認するための内訳。
         // ラウンドロビン割当の妥当性チェック兼、送料テスト範囲の自己申告。

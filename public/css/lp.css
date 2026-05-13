@@ -33,10 +33,10 @@
   --transition: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Brand accent palette (default: teal). LP-specific override via body class. */
-  --brand-primary: var(--brand-primary);
-  --brand-primary-dark: var(--brand-primary-dark);
-  --brand-primary-soft: var(--brand-primary-soft);
-  --brand-primary-alt: var(--brand-primary-alt);
+  --brand-primary: #2bb1b7;
+  --brand-primary-dark: #0d4f55;
+  --brand-primary-soft: #e7f7f8;
+  --brand-primary-alt: #4cc4c9;
   --brand-primary-rgb: 43, 177, 183;
   --brand-primary-dark-rgb: 13, 79, 85;
 }

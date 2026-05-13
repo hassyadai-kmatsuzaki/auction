@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\ItemMedia;
+use App\Models\Lane;
 use App\Models\SellerProfile;
 use App\Models\SpeciesType;
 use App\Models\User;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * E2E 用の生体（items）を 100 件作成する seeder。
+ * E2E 用の生体（items）を最大 200 件作成する seeder。
  *
  * 本番 DB に対して安全に流せるよう、以下を遵守する:
  *   - 既存 items は触らない（auction にすでに items がある場合は abort）
@@ -29,9 +30,13 @@ use RuntimeException;
  *   - 出品者ごとに 1/3 が is_anonymous=true（匿名出品テスト兼）
  *   - thumbnail_path / item_media (写真+動画) を demo 素材から循環割当
  *
+ * 品種マスタは 100 種だが、count が 100 を超えた場合は 2 巡目に
+ * 「品種名 (A)」「品種名 (B)」のサフィックスを付与して重複を回避する。
+ * したがって最大 200 件まで作成可能（それ以上は弾く）。
+ *
  * 環境変数:
  *   E2E_ITEM_AUCTION_ID       … オークション ID (default 40)
- *   E2E_ITEM_COUNT            … 生成件数 (default 100)
+ *   E2E_ITEM_COUNT            … 生成件数 (default 200)
  *   E2E_ITEM_SELLER_USER_IDS  … 出品者 user_id のカンマ区切り（必須）
  *   E2E_ITEM_BASE_URL         … メディア URL の origin（default: config('app.url')）
  *                               生成される ItemMedia.file_path は
@@ -136,17 +141,20 @@ class E2EItemSeeder extends Seeder
     public function run(): void
     {
         $auctionId   = (int) (env('E2E_ITEM_AUCTION_ID', 40));
-        $count       = (int) (env('E2E_ITEM_COUNT', 100));
+        $count       = (int) (env('E2E_ITEM_COUNT', 200));
         $userIdsRaw  = (string) env('E2E_ITEM_SELLER_USER_IDS', '');
         $baseUrl     = rtrim((string) env('E2E_ITEM_BASE_URL', config('app.url')), '/');
+
+        $breedCount    = count(self::BREED_NAMES);
+        $maxItemCount  = $breedCount * 2; // (A)/(B) サフィックスで 2 巡まで許容
 
         if ($count <= 0) {
             throw new RuntimeException('E2E_ITEM_COUNT must be > 0');
         }
-        if ($count > count(self::BREED_NAMES)) {
+        if ($count > $maxItemCount) {
             throw new RuntimeException(sprintf(
-                'E2E_ITEM_COUNT (%d) は品種名マスタ件数 (%d) を超えています。',
-                $count, count(self::BREED_NAMES)
+                'E2E_ITEM_COUNT (%d) は品種名マスタ件数の2倍 (%d) を超えています。',
+                $count, $maxItemCount
             ));
         }
         if ($baseUrl === '') {
@@ -174,7 +182,13 @@ class E2EItemSeeder extends Seeder
             $perSellerCount[$sellerProfile->user_id] = ($perSellerCount[$sellerProfile->user_id] ?? 0) + 1;
             $sellerLocalIdx = $perSellerCount[$sellerProfile->user_id]; // この出品者の中での連番（1始まり）
 
-            $speciesName = self::BREED_NAMES[$i - 1];
+            // 1〜100 は素のまま、101〜200 は (A)(B) サフィックスを付与して品種名の一意性を担保
+            $breedIdx  = ($i - 1) % $breedCount;
+            $cycle     = intdiv($i - 1, $breedCount); // 0=1巡目, 1=2巡目
+            $baseBreed = self::BREED_NAMES[$breedIdx];
+            $speciesName = $cycle === 0
+                ? sprintf('%s (A)', $baseBreed)
+                : sprintf('%s (B)', $baseBreed);
             // start_price: 100〜2000 / 100 円刻み（決定論的）
             $startPrice = 100 + ((($i * 13) % 20) * 100);
             // quantity: 20〜200 / 10 刻み（決定論的）
@@ -240,6 +254,75 @@ class E2EItemSeeder extends Seeder
             ->implode(', ');
         $this->command->info('per-seller distribution: ' . $line);
         $this->command->info('CSV: ' . $csvPath);
+
+        // lanes が既に作られているオークションなら、items を lane_items に均等割当する。
+        // E2EAuctionSeeder で lanes を先に作っておくのが前提。lanes が無い auction はスキップ。
+        $this->assignItemsToLanes($auctionId);
+    }
+
+    /**
+     * 作成した items を auction の lanes に均等に割り当てて lane_items を投入する。
+     *
+     * - lanes が無いオークションでは何もしない（手動でレーン作成する運用との互換）
+     * - 既に lane_items が存在する場合も何もしない（再実行で順番が崩れるのを防ぐ）
+     * - item_number 順に lane_count 個のレーンへラウンドロビン分配
+     *   (lane_count=2 / 200 items の場合: 奇数→レーン1, 偶数→レーン2 / 各100件)
+     * - sequence_order は各レーン内 1 始まりの連番
+     */
+    private function assignItemsToLanes(int $auctionId): void
+    {
+        $lanes = Lane::where('auction_id', $auctionId)
+            ->orderBy('lane_number')
+            ->get();
+
+        if ($lanes->isEmpty()) {
+            $this->command->info('lanes が未作成のため lane_items は投入しません（手動割当を想定）。');
+            return;
+        }
+
+        $existingLaneItems = DB::table('lane_items')
+            ->whereIn('lane_id', $lanes->pluck('id'))
+            ->count();
+        if ($existingLaneItems > 0) {
+            $this->command->info(sprintf(
+                'lane_items が既に %d 件あるため割当をスキップします。',
+                $existingLaneItems
+            ));
+            return;
+        }
+
+        $items = Item::where('auction_id', $auctionId)
+            ->orderBy('item_number')
+            ->get();
+
+        $perLaneCount = [];
+        $now = now();
+
+        DB::transaction(function () use ($items, $lanes, &$perLaneCount, $now) {
+            $laneCount = $lanes->count();
+            $perLaneSeq = []; // lane_id => 連番
+
+            foreach ($items as $idx => $item) {
+                $lane = $lanes[$idx % $laneCount];
+                $seq  = ($perLaneSeq[$lane->id] ?? 0) + 1;
+                $perLaneSeq[$lane->id] = $seq;
+                $perLaneCount[$lane->lane_number] = $seq;
+
+                DB::table('lane_items')->insert([
+                    'lane_id'        => $lane->id,
+                    'item_id'        => $item->id,
+                    'sequence_order' => $seq,
+                    'created_at'     => $now,
+                    'updated_at'     => $now,
+                ]);
+            }
+        });
+
+        ksort($perLaneCount);
+        $line = collect($perLaneCount)
+            ->map(fn ($n, $laneNo) => "lane{$laneNo}={$n}")
+            ->implode(', ');
+        $this->command->info('lane assignment: ' . $line);
     }
 
     /**
