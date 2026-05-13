@@ -32,7 +32,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/lp.css?v=41">
+  <link rel="stylesheet" href="/css/lp.css?v=42">
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },
@@ -605,7 +605,7 @@
       手数料を払って…手取りで、いくら残りましたか？」</p>
     </div>
 
-    <p class="video-conclusion anim" data-anim="fade-up" style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: clamp(0.95rem, 2vw, 1.1rem); line-height: 1.85; color:#2d3748;">
+    <p class="video-conclusion anim" data-anim="fade-up" style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: clamp(0.95rem, 2vw, 1.1rem); line-height: 1.85; color:#ffffff;">
       ヤフオクは小売チャネル、{{ $brand }} は卸チャネル。<br>
       <strong>使い分けることで、手取り全体が増えます。</strong>
     </p>
