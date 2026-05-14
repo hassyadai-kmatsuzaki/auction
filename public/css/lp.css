@@ -653,7 +653,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   height: 100%;
   width: 100%;
   max-width: 160px;
-  object-fit: cover;
+  object-fit: contain;
   opacity: 0.85;
 }
 @media (max-width: 767px) {
@@ -2907,6 +2907,7 @@ a.solution-card:hover .solution-card__arrow {
       "title"
       "desc"
       "cta";
+    gap: 0;
   }
   .hero__copy {
     display: contents;
@@ -2921,5 +2922,6 @@ a.solution-card:hover .solution-card__arrow {
     margin: 0;
     width: 100%;
     max-width: none;
+    background: #2ab2b7;
   }
 }
