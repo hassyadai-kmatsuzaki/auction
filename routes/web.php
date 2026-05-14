@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\LpController;
 use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\Webhook\SesEventController;
 use Illuminate\Support\Facades\Route;
@@ -17,13 +18,9 @@ Route::get('/legal/privacy', $comingSoon);
 Route::get('/legal/terms', $comingSoon);
 
 // LP（業者向けオンラインオークション）— 公開前のため noindex 必須。
-$noindexLp = function (string $view) {
-    return response()
-        ->view($view)
-        ->header('X-Robots-Tag', 'noindex, nofollow');
-};
-Route::get('/buyer', fn () => $noindexLp('lp-buyer'));
-Route::get('/seller', fn () => $noindexLp('lp-seller'));
+// CTA URL は LP CVR 設定（lp_cvr_settings + system_settings）から解決。
+Route::get('/buyer', [LpController::class, 'buyer']);
+Route::get('/seller', [LpController::class, 'seller']);
 
 // LP の問い合わせフォーム送信。スパム抑止のためレートリミットを併用。
 Route::post('/contact', [ContactController::class, 'store'])

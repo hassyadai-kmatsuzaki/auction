@@ -1,6 +1,7 @@
 @php
   $brand = 'MEDAICHI';
-  $lineUrl = 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD';
+  // $lineUrl は LpController から渡される。直接アクセスや未設定時のフェイルセーフを兼ねてデフォルト値を保持。
+  $lineUrl = $lineUrl ?? 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD';
 @endphp
 <!DOCTYPE html>
 <html lang="ja">
@@ -33,6 +34,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/lp.css?v=42">
+  <style>
+    @media (max-width: 767px) {
+      .hero__cta { background: #5d40c6; }
+    }
+  </style>
   <script>
     (function(d) {
       var config = { kitId: 'png6ego', scriptTimeout: 3000, async: true },

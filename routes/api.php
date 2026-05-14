@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementContro
 use App\Http\Controllers\Admin\EmailCampaignController as AdminEmailCampaignController;
 use App\Http\Controllers\Admin\AuctionController as AdminAuctionController;
 use App\Http\Controllers\Admin\SystemSettingController;
+use App\Http\Controllers\Admin\LpCvrSettingController;
 use App\Http\Controllers\User\AnnouncementController as UserAnnouncementController;
 use App\Http\Controllers\Seller\ItemController as SellerItemController;
 use App\Http\Controllers\Seller\ProfileController as SellerProfileController;
@@ -177,6 +178,15 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::put('settings', [SystemSettingController::class, 'update']);
     Route::get('settings/shipping/rates', [SystemSettingController::class, 'getShippingRates']);
     Route::put('settings/shipping/rates', [SystemSettingController::class, 'updateShippingRates']);
+
+    // LP CVR 設定（買受者LP / 出品者LP の流入経路別CTA URL）
+    Route::prefix('lp-cvr/{lpType}')->where(['lpType' => 'buyer|seller'])->group(function () {
+        Route::get('/', [LpCvrSettingController::class, 'index']);
+        Route::post('/', [LpCvrSettingController::class, 'store']);
+        Route::put('/default', [LpCvrSettingController::class, 'updateDefault']);
+        Route::put('/{id}', [LpCvrSettingController::class, 'update'])->whereNumber('id');
+        Route::delete('/{id}', [LpCvrSettingController::class, 'destroy'])->whereNumber('id');
+    });
     
     // 生体管理
     Route::get('auctions/{auctionId}/items', [AdminItemController::class, 'index']);

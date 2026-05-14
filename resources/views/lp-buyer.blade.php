@@ -1,6 +1,7 @@
 @php
   $brand = 'MEDAICHI';
-  $lineUrl = 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD';
+  // $lineUrl は LpController から渡される。直接アクセスや未設定時のフェイルセーフを兼ねてデフォルト値を保持。
+  $lineUrl = $lineUrl ?? 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD';
 @endphp
 <!DOCTYPE html>
 <html lang="ja">
