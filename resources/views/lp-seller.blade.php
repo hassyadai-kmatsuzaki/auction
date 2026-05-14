@@ -130,7 +130,7 @@
 
     {{-- 出品ブリーダー（横スクロール） --}}
     <p class="partners-row__label anim" data-anim="fade-up">出品ブリーダー</p>
-    @php $breeders = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]; @endphp
+    @php $breeders = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]; @endphp
     <div class="partners-marquee anim" data-anim="fade-up" aria-hidden="true">
       <div class="partners-marquee__track">
         @for ($i = 0; $i < 3; $i++)
@@ -519,7 +519,7 @@
 </section>
 
 <!-- ===== ⑧ 最強差別化（手取り比較表） ===== -->
-<section class="section section--video">
+{{-- <section class="section section--video">
   <div class="container">
     <div class="video-header anim" data-anim="fade-up">
       <h2 class="video-header__title">ヤフオクで60,000円、{{ $brand }}で40,000円。<br class="pc-only">通帳に残るのは、いくら？</h2>
@@ -610,7 +610,7 @@
       ※ {{ $brand }} の買取代金は、インボイス登録ありの場合の試算です（未登録の場合の調整金は FAQ 参照）。
     </p>
   </div>
-</section>
+</section> --}}
 
 <!-- ===== ⑨ 出品までの4ステップ ===== -->
 <section class="section section--steps" id="flow">
