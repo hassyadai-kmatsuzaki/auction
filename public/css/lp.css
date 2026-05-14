@@ -2890,64 +2890,36 @@ a.solution-card:hover .solution-card__arrow {
 .contact-form__submit svg { stroke: #ffffff; }
 
 /* ===================================
-   HERO CTA STICKY (実験・SPのみ)
-   FV を抜けたら hero__cta を画面下端に固定する。
-   戻すときはこのブロック削除 + lp.js の initHeroCtaSticky 関連を削除。
-   =================================== */
-@media (max-width: 767px) {
-  .hero__cta.is-stuck {
-    position: fixed;
-    bottom: 12px;
-    left: 12px;
-    right: 12px;
-    width: auto;
-    margin: 0;
-    z-index: 95;
-    background: transparent;
-    animation: hero-cta-stuck-in 0.25s ease-out;
-  }
-  .hero__cta.is-stuck .hero__cta-card {
-    box-shadow: 0 10px 28px rgba(0,0,0,0.18);
-  }
-}
-@keyframes hero-cta-stuck-in {
-  from { transform: translateY(20px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-
-/* ===================================
    HERO LAYOUT (SP) - 実験
-   SP のみ、Hero 内を「画像→見出し→説明文」に並び替え、
-   CTA は画面最下部に常時固定（画像/見出し/説明文がCTAの後ろをスクロール）。
+   SP のみ、Hero 内を「画像→見出し→説明文→CTA」に並び替え、
+   CTA は画面下端に sticky 配置。スクロールしてCTA本来位置（FV最下部）に
+   到達したらそこで停止し、以降は hero と一緒に流れていく。
    戻すときはこのブロック削除。
    =================================== */
 @media (max-width: 767px) {
   .hero {
     overflow: visible;
-    padding-bottom: 180px;
   }
   .hero__inner {
     grid-template-areas:
       "eyebrow"
       "visual"
       "title"
-      "desc";
-    padding-bottom: 0;
+      "desc"
+      "cta";
   }
   .hero__copy {
     display: contents;
   }
   .hero__title { grid-area: title; text-align: center; }
-  .hero__desc  { grid-area: desc; text-align: left; margin-top: 1rem; }
+  .hero__desc  { grid-area: desc; text-align: left; margin-top: 1rem; margin-bottom: 1.5rem; }
   .hero__cta {
-    position: fixed;
+    grid-area: cta;
+    position: sticky;
     bottom: 12px;
-    left: 12px;
-    right: 12px;
     z-index: 95;
-    background: transparent;
     margin: 0;
-    width: auto;
+    width: 100%;
     max-width: none;
   }
 }

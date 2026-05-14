@@ -207,42 +207,6 @@
   }
 
   /* =============================
-     Hero CTA sticky (実験・SPのみ)
-     FV を抜けたら .hero__cta に .is-stuck を付与し、CSS 側で画面下端に固定。
-     戻すときはこの関数定義と DOMContentLoaded 内の呼び出しを削除。
-     ============================= */
-  function initHeroCtaSticky() {
-    var cta = document.querySelector('.hero__cta');
-    var hero = document.querySelector('.hero');
-    if (!cta || !hero) return;
-
-    var mq = window.matchMedia('(max-width: 767px)');
-    var ticking = false;
-
-    function update() {
-      if (!mq.matches) {
-        cta.classList.remove('is-stuck');
-        return;
-      }
-      var heroBottom = hero.getBoundingClientRect().bottom;
-      if (heroBottom < 0) {
-        cta.classList.add('is-stuck');
-      } else {
-        cta.classList.remove('is-stuck');
-      }
-    }
-
-    window.addEventListener('scroll', function () {
-      if (!ticking) {
-        requestAnimationFrame(function () { update(); ticking = false; });
-        ticking = true;
-      }
-    }, { passive: true });
-    window.addEventListener('resize', update);
-    update();
-  }
-
-  /* =============================
      Init
      ============================= */
   document.addEventListener('DOMContentLoaded', function () {
@@ -251,6 +215,5 @@
     initLineupScroll();
     initFloatingCta();
     initHeroDots();
-    initHeroCtaSticky();
   });
 })();
