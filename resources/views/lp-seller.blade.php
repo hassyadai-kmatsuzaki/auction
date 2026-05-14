@@ -136,7 +136,7 @@
         @for ($i = 0; $i < 3; $i++)
           @foreach ($breeders as $n)
             <div class="partners-marquee__item">
-              <img src="/img/lp/seller/{{ $n }}.png" alt="" loading="lazy">
+              <img src="/img/lp/seller/{{ $n }}.png?v=1" alt="" loading="lazy">
             </div>
           @endforeach
         @endfor
