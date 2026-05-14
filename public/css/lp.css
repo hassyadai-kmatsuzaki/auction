@@ -616,7 +616,7 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   display: inline-flex;
   align-items: center;
   height: 50px;
-  width: 80px;
+  width: 50px;
 }
 .partners-marquee__item img {
   height: 100%;
@@ -926,7 +926,7 @@ a.solution-card:hover .solution-card__arrow {
 .steps-strong {
   text-align: center;
   font-size: clamp(0.98rem, 1.8vw, 1.1rem);
-  color: #ffffff;
+  color: #1a2533;
   font-weight: 800;
   line-height: 1.95;
   letter-spacing: 0.02em;
@@ -1116,8 +1116,7 @@ a.solution-card:hover .solution-card__arrow {
    STEPS
    =================================== */
 .section--steps {
-  background: var(--brand-primary);
-  color: #ffffff;
+  background: #fff;
   padding: 4rem 0;
 }
 @media (min-width: 768px) { .section--steps { padding: 5.5rem 0; } }
@@ -1131,16 +1130,16 @@ a.solution-card:hover .solution-card__arrow {
 }
 .steps-header__title {
   font-size: clamp(1.5rem, 4vw, 2.2rem);
-  color: #ffffff;
+  color: #1a2533;
   font-weight: 900;
   letter-spacing: 0.02em;
   line-height: 1.55;
   margin-bottom: 0.75rem;
 }
-.steps-header__mark { color: #ffffff; }
+.steps-header__mark { color: var(--brand-primary); }
 .steps-header__desc {
   font-size: clamp(0.92rem, 1.6vw, 1rem);
-  color: #ffffff;
+  color: #4a5568;
   font-weight: 500;
   line-height: 1.85;
 }
