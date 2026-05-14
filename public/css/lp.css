@@ -2917,21 +2917,22 @@ a.solution-card:hover .solution-card__arrow {
 
 /* ===================================
    HERO LAYOUT (SP) - 実験
-   SP のみ、Hero 内を「画像→見出し→CTA→説明文」に並び替え、
-   CTA を FV 内で sticky 固定（説明文がスクロールしてもCTAが画像直下に張り付く）。
+   SP のみ、Hero 内を「画像→見出し→説明文」に並び替え、
+   CTA は画面最下部に常時固定（画像/見出し/説明文がCTAの後ろをスクロール）。
    戻すときはこのブロック削除。
    =================================== */
 @media (max-width: 767px) {
   .hero {
     overflow: visible;
+    padding-bottom: 180px;
   }
   .hero__inner {
     grid-template-areas:
       "eyebrow"
       "visual"
       "title"
-      "cta"
       "desc";
+    padding-bottom: 0;
   }
   .hero__copy {
     display: contents;
@@ -2939,11 +2940,14 @@ a.solution-card:hover .solution-card__arrow {
   .hero__title { grid-area: title; text-align: center; }
   .hero__desc  { grid-area: desc; text-align: left; margin-top: 1rem; }
   .hero__cta {
-    position: sticky;
-    top: 64px;
-    z-index: 5;
-    background: var(--brand-primary);
-    padding: 12px 0;
-    margin-bottom: 0.5rem;
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 95;
+    background: transparent;
+    margin: 0;
+    width: auto;
+    max-width: none;
   }
 }
