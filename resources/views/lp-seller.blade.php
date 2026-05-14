@@ -125,7 +125,7 @@
     </div>
 
     <p class="partners-header__desc anim visible" data-anim="fade-up" style="text-align:center;max-width: 100%;margin:0 auto 1.5rem;color:#4a5568;font-weight:500;line-height:1.85;font-size:clamp(0.92rem, 1.6vw, 1rem);">
-      日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、業者間プラットフォームです。
+      日本のメダカ業界を代表するメーカー・専業ブリーダーが参画する、<br class="sp-only">業者間プラットフォームです。
     </p>
 
     {{-- 出品ブリーダー（横スクロール） --}}
