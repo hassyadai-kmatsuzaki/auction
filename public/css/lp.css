@@ -637,14 +637,14 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 0;
+  gap: 0 40px;
   margin-bottom: 10px;
   background: #fff;
   padding: 20px;
 }
 .partners-grid__item {
   flex: 0 0 auto;
-  width: calc(100% / 7);
+  width: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -653,12 +653,14 @@ h1, h2, h3, h4 {  font-weight: 700; line-height: 1.4; }
 .partners-grid__item img {
   height: 100%;
   width: 100%;
-  max-width: 160px;
+  max-width: 100%;
   object-fit: contain;
   opacity: 0.85;
 }
 @media (max-width: 767px) {
+  .partners-grid { gap: 0; }
   .partners-grid__item { width: 25%; }
+  .partners-grid__item img { max-width: 160px; }
 }
 
 /* Row label (協賛企業 / 出品ブリーダー の見出し) */
