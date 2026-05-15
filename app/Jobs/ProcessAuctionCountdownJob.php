@@ -7,6 +7,8 @@ use App\Models\Lane;
 use App\Services\CountdownService;
 use App\Services\NotificationService;
 use App\Events\AuctionStatusChanged;
+use App\Events\AuctionStartCountdownTick;
+use App\Logging\BroadcastFailureLogger;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -135,12 +137,24 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 $remaining = max(0, $startAt - now()->timestamp);
                 if ($remaining <= 0) break;
 
-                broadcast(new AuctionStatusChanged(
-                    $this->auctionId,
-                    'starting',
-                    "開始まで {$remaining}秒",
-                    $remaining
-                ));
+                // 120名規模で「10→0」が綺麗にいかない事象への対策。
+                // AuctionStatusChanged(ShouldBroadcast) だと broadcasts キュー経由で
+                // 順序逆転・遅延が出るため、pre-start tick だけ専用 Now イベントに切替。
+                // payload/チャネル/broadcastAs は AuctionStatusChanged と同一なのでフロント無改修。
+                try {
+                    broadcast(new AuctionStartCountdownTick(
+                        $this->auctionId,
+                        'starting',
+                        "開始まで {$remaining}秒",
+                        $remaining
+                    ));
+                } catch (\Throwable $e) {
+                    BroadcastFailureLogger::warn(
+                        'AuctionStartCountdownTick',
+                        $e->getMessage(),
+                        ['auction_id' => $this->auctionId, 'remaining' => $remaining]
+                    );
+                }
                 sleep(1);
             }
 
