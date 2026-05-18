@@ -21,6 +21,7 @@ import ParticipantLayout from './layouts/ParticipantLayout';
 import AdminLayout from './layouts/AdminLayout';
 import SellerLayout from './layouts/SellerLayout';
 import AuctionWorkspace from './layouts/AuctionWorkspace';
+import MediaEditorLayout from './layouts/MediaEditorLayout';
 
 // Legal（同期ロード）
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
@@ -80,6 +81,11 @@ const AIRecommendations      = lazy(() => import('./pages/admin/AIRecommendation
 const PlanManagement         = lazy(() => import('./pages/admin/PlanManagement'));
 const SubscriptionManagement = lazy(() => import('./pages/admin/SubscriptionManagement'));
 const PaymentManagement      = lazy(() => import('./pages/admin/PaymentManagement'));
+
+// Media Editor (admin / media_editor 共用、メディアのみ編集)
+const MediaEditorAuctionList = lazy(() => import('./pages/admin/MediaEditor/AuctionList'));
+const MediaEditorItemList    = lazy(() => import('./pages/admin/MediaEditor/ItemList'));
+const MediaEditorItemMediaEdit = lazy(() => import('./pages/admin/MediaEditor/ItemMediaEdit'));
 
 // Seller
 const SellerDashboard        = lazy(() => import('./pages/seller/Dashboard'));
@@ -160,6 +166,18 @@ function App() {
             <Route path="profile" element={<SellerProfile />} />
             <Route path="bank" element={<SellerProfile />} /> {/* 口座情報（プロフィールで代用） */}
             <Route path="settings" element={<SellerProfile />} /> {/* 設定（プロフィールで代用） */}
+          </Route>
+
+          {/* メディア編集（admin / media_editor 共用、商品メディアのみ） */}
+          {/* 注意: /admin ルート（admin 専用）より先に置く必要あり */}
+          <Route path="/admin/media-editor" element={
+            <PrivateRoute requiredRoles={['admin', 'media_editor']}>
+              <MediaEditorLayout />
+            </PrivateRoute>
+          }>
+            <Route index element={<MediaEditorAuctionList />} />
+            <Route path="auctions/:auctionId/items" element={<MediaEditorItemList />} />
+            <Route path="auctions/:auctionId/items/:id" element={<MediaEditorItemMediaEdit />} />
           </Route>
 
           {/* 管理者ページ */}

@@ -382,6 +382,24 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     });
 });
 
+// メディア編集者API（admin / media_editor の両方が利用可、開催前オークションのみ）
+Route::middleware(['auth:sanctum', 'check.role:admin,media_editor', 'audit'])->prefix('media-editor')->group(function () {
+    // 開催前オークション一覧
+    Route::get('auctions', [\App\Http\Controllers\MediaEditor\AuctionController::class, 'index']);
+
+    // アイテム取得・メディア編集（{auctionId} が preparing / scheduled でなければ 403）
+    Route::middleware('ensure.auction.editable')->group(function () {
+        Route::get('auctions/{auctionId}/items', [\App\Http\Controllers\MediaEditor\ItemController::class, 'index']);
+        Route::get('auctions/{auctionId}/items/{id}', [\App\Http\Controllers\MediaEditor\ItemController::class, 'show']);
+
+        Route::post('auctions/{auctionId}/items/media/bulk-upload', [\App\Http\Controllers\Admin\ItemMediaBulkController::class, 'bulkUpload']);
+        Route::post('auctions/{auctionId}/items/{id}/media', [\App\Http\Controllers\MediaEditor\ItemController::class, 'uploadMedia']);
+        Route::delete('auctions/{auctionId}/items/{id}/media/{mediaId}', [\App\Http\Controllers\MediaEditor\ItemController::class, 'deleteMedia']);
+        Route::put('auctions/{auctionId}/items/{id}/media/reorder', [\App\Http\Controllers\MediaEditor\ItemController::class, 'reorderMedia']);
+        Route::patch('auctions/{auctionId}/items/{id}/media/{mediaId}/thumbnail', [\App\Http\Controllers\MediaEditor\ItemController::class, 'setThumbnail']);
+    });
+});
+
 // ユーザーAPI（参加者・出品者共通）
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/announcements', [UserAnnouncementController::class, 'index']);

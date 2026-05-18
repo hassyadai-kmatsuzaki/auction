@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'rate.limit' => \App\Http\Middleware\RateLimitByIp::class,
             'audit' => \App\Http\Middleware\AuditLog::class,
             'check.subscription' => \App\Http\Middleware\CheckSubscription::class,
+            'ensure.auction.editable' => \App\Http\Middleware\EnsureAuctionEditable::class,
         ]);
 
         // ALB（HTTPS終端）配下での X-Forwarded-* を信頼

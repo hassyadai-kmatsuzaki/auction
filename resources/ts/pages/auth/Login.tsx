@@ -83,8 +83,11 @@ export default function Login() {
       if (userStr) {
         const user = JSON.parse(userStr);
 
-        if (user.roles && user.roles.length === 1 && user.roles.some((r: any) => r.name === 'admin')) {
+        const roleNames: string[] = (user.roles || []).map((r: any) => r.name);
+        if (roleNames.includes('admin')) {
           navigate('/admin', { replace: true });
+        } else if (roleNames.includes('media_editor')) {
+          navigate('/admin/media-editor', { replace: true });
         } else {
           navigate('/participant/home', { replace: true });
         }

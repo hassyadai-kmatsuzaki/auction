@@ -72,7 +72,7 @@ export default function UserCreate() {
   // URLパラメータからロールを取得して自動選択
   useEffect(() => {
     const roleParam = searchParams.get('role');
-    if (roleParam && ['admin', 'seller', 'participant'].includes(roleParam)) {
+    if (roleParam && ['admin', 'seller', 'participant', 'media_editor'].includes(roleParam)) {
       setFormData(prev => ({
         ...prev,
         roles: [roleParam],
@@ -104,6 +104,7 @@ export default function UserCreate() {
     { name: 'admin', display_name: '管理者' },
     { name: 'seller', display_name: '出品者' },
     { name: 'participant', display_name: '参加者' },
+    { name: 'media_editor', display_name: '商品メディア編集者' },
   ];
 
   const validate = () => {

@@ -26,12 +26,17 @@ const RootRedirect: React.FC = () => {
   }
 
   // ロールに応じてリダイレクト
-  // 管理者のみの場合は管理画面へ、それ以外は参加者画面へ
-  if (user?.roles.length === 1 && user?.roles.some(r => r.name === 'admin')) {
+  // - admin を含む場合は管理画面（admin 兼任の media_editor も含む）
+  // - media_editor 単独の場合はメディア編集者ホーム
+  // - それ以外は参加者画面
+  const roleNames = user?.roles.map(r => r.name) ?? [];
+  if (roleNames.includes('admin')) {
     return <Navigate to="/admin" replace />;
-  } else {
-    return <Navigate to="/participant/home" replace />;
   }
+  if (roleNames.includes('media_editor')) {
+    return <Navigate to="/admin/media-editor" replace />;
+  }
+  return <Navigate to="/participant/home" replace />;
 };
 
 export default RootRedirect;

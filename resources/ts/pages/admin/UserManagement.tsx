@@ -277,6 +277,7 @@ export default function UserManagement() {
               <MenuItem value="admin">管理者</MenuItem>
               <MenuItem value="seller">出品者</MenuItem>
               <MenuItem value="participant">参加者</MenuItem>
+              <MenuItem value="media_editor">商品メディア編集者</MenuItem>
             </Select>
           </FormControl>
 

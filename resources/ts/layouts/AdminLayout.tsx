@@ -33,6 +33,7 @@ import {
   Psychology as AIIcon,
   Cloud as CloudIcon,
   CameraAlt as CameraIcon,
+  PhotoLibrary as PhotoLibraryIcon,
   Timeline as TimelineIcon,
   Warning as WarningIcon,
   Recommend as RecommendIcon,
@@ -213,6 +214,31 @@ export default function AdminLayout() {
               </ListItemIcon>
               <ListItemText
                 primary="オークション管理"
+                primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
+              />
+            </ListItemButton>
+          </ListItem>
+
+          {/* メディア編集（商品の画像・動画のみ編集できるサブ画面） */}
+          <ListItem disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              selected={isPathActive('/admin/media-editor')}
+              onClick={() => handleMenuNavigate('/admin/media-editor')}
+              sx={{
+                py: 1.2,
+                '&.Mui-selected': {
+                  backgroundColor: '#F0FDF4',
+                  borderRight: '3px solid #059669',
+                  '& .MuiListItemIcon-root': { color: '#059669' },
+                  '& .MuiListItemText-primary': { color: '#059669', fontWeight: 600 },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <PhotoLibraryIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="メディア編集"
                 primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
               />
             </ListItemButton>

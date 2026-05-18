@@ -131,7 +131,7 @@ class UserController extends Controller
             'address_line1' => 'nullable|string|max:255',
             'address_line2' => 'nullable|string|max:255',
             'roles' => 'required|array|min:1',
-            'roles.*' => 'required|string|in:admin,seller,participant',
+            'roles.*' => 'required|string|in:admin,seller,participant,media_editor',
             'force_create' => 'nullable|boolean', // 削除済みユーザーを完全削除して再作成する場合
             'is_test' => 'nullable|boolean',
         ]);
@@ -276,7 +276,7 @@ class UserController extends Controller
             'is_active' => 'boolean',
             'is_test' => 'boolean',
             'roles' => 'array',
-            'roles.*' => 'string|in:admin,seller,participant',
+            'roles.*' => 'string|in:admin,seller,participant,media_editor',
         ]);
 
         $shouldNotifyApproval = false;
