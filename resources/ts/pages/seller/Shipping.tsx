@@ -37,6 +37,7 @@ interface ShippingItem {
   item: {
     id: number;
     item_number: number;
+    exhibit_code?: string | null;
     species_name: string;
     quantity: number;
     thumbnail_path?: string;
@@ -261,7 +262,7 @@ export default function SellerShipping() {
                         {item.item.species_name}
                       </Typography>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {item.auction.title} / No.{item.item.item_number}
+                        {item.auction.title} / {item.item.exhibit_code ?? `No.${item.item.item_number}`}
                       </Typography>
                     </TableCell>
                     <TableCell>

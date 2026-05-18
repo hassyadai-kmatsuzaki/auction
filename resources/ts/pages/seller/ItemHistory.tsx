@@ -43,6 +43,7 @@ import { formatYen } from '../../lib/formatPrice';
 interface Item {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -365,7 +366,7 @@ export default function ItemHistory() {
                                 {item.species_name}
                               </Typography>
                               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                #{item.item_number} | {new Date(item.created_at).toLocaleDateString('ja-JP')}
+                                {item.exhibit_code ?? `#${item.item_number}`} | #{item.item_number} | {new Date(item.created_at).toLocaleDateString('ja-JP')}
                               </Typography>
                             </Box>
                           </Box>

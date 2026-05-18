@@ -138,6 +138,7 @@ class LiveController extends Controller
                 $currentItemData = [
                     'id' => $item->id,
                     'item_number' => $item->item_number,
+                    'exhibit_code' => $item->exhibit_code,
                     'species_name' => $item->species_name,
                     'quantity' => $item->quantity,
                     'start_price' => $item->start_price,
@@ -160,6 +161,7 @@ class LiveController extends Controller
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
                         'species_name' => $item->species_name,
                         'status' => $item->status,
                         'sequence' => $item->pivot->sequence_order,
@@ -174,6 +176,7 @@ class LiveController extends Controller
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
                         'species_name' => $item->species_name,
                         'quantity' => $item->quantity,
                         'start_price' => $item->start_price,

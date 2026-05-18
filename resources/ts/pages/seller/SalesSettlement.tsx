@@ -102,6 +102,7 @@ interface SettlementItem {
   item: {
     id: number;
     item_number: string;
+    exhibit_code?: string | null;
     species_name: string;
     quantity: number;
   };
@@ -605,7 +606,7 @@ export default function SalesSettlement() {
                       <TableBody>
                         {settlementDetail.items.map((item) => (
                           <TableRow key={item.id}>
-                            <TableCell>No.{item.item.item_number}</TableCell>
+                            <TableCell>{item.item.exhibit_code ?? `No.${item.item.item_number}`}</TableCell>
                             <TableCell>{item.item.species_name}</TableCell>
                             <TableCell align="right">¥{formatYen(item.winning_amount)}</TableCell>
                             <TableCell align="right" sx={{ color: 'error.main' }}>

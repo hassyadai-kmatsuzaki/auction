@@ -168,6 +168,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     // オークション管理
     Route::apiResource('auctions', AdminAuctionController::class);
     Route::patch('auctions/{id}/status', [AdminAuctionController::class, 'updateStatus']);
+    Route::patch('auctions/{id}/publish', [AdminAuctionController::class, 'updatePublish']);
     Route::patch('auctions/{id}/lane-count', [AdminAuctionController::class, 'updateLaneCount']);
     Route::get('auctions-item-management', [AdminAuctionController::class, 'itemManagementList']);
     
@@ -398,6 +399,17 @@ Route::middleware(['auth:sanctum', 'check.role:admin,media_editor', 'audit'])->p
         Route::put('auctions/{auctionId}/items/{id}/media/reorder', [\App\Http\Controllers\MediaEditor\ItemController::class, 'reorderMedia']);
         Route::patch('auctions/{auctionId}/items/{id}/media/{mediaId}/thumbnail', [\App\Http\Controllers\MediaEditor\ItemController::class, 'setThumbnail']);
     });
+});
+
+// 社内ツール用API（admin ロールのみ）
+// 仕様: docs/api/internal-item-media-upload.md
+Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('internal')->group(function () {
+    Route::post('items/{itemId}/media', [\App\Http\Controllers\Internal\ItemMediaController::class, 'upload'])
+        ->whereNumber('itemId');
+    Route::get('items/{itemId}/media/{mediaId}', [\App\Http\Controllers\Internal\ItemMediaController::class, 'show'])
+        ->whereNumber('itemId')->whereNumber('mediaId');
+    Route::patch('items/{itemId}/media/{mediaId}/thumbnail', [\App\Http\Controllers\Internal\ItemMediaController::class, 'setThumbnail'])
+        ->whereNumber('itemId')->whereNumber('mediaId');
 });
 
 // ユーザーAPI（参加者・出品者共通）

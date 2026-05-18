@@ -77,6 +77,7 @@ interface WonItem {
   item: {
     id: number;
     item_number: number;
+    exhibit_code?: string | null;
     species_name: string;
     quantity: number;
     thumbnail_path?: string;
@@ -634,8 +635,13 @@ export default function WonItemManagement() {
       <TableRow key={item.id} hover>
         <TableCell>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {item.item.item_number}
+            {item.item.exhibit_code ?? `#${item.item.item_number}`}
           </Typography>
+          {item.item.exhibit_code && (
+            <Typography variant="caption" color="text.secondary">
+              #{item.item.item_number}
+            </Typography>
+          )}
         </TableCell>
         <TableCell>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -685,8 +691,13 @@ export default function WonItemManagement() {
     <TableRow key={item.id} hover>
       <TableCell>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {item.item.item_number}
+          {item.item.exhibit_code ?? `#${item.item.item_number}`}
         </Typography>
+        {item.item.exhibit_code && (
+          <Typography variant="caption" color="text.secondary">
+            #{item.item.item_number}
+          </Typography>
+        )}
       </TableCell>
       <TableCell>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>

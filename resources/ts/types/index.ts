@@ -55,6 +55,8 @@ export interface Item {
   id: number;
   auction_id: number;
   item_number: number;
+  /** 出品ID（表示専用）。レーン名 + 3桁連番（例: A001）。未発行時は null。 */
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -144,6 +146,8 @@ export interface SystemSettings {
 export interface LaneItem {
   id: number;
   item_number: number;
+  /** 出品ID（表示専用）。例: A001。レーン未割当または未発行は null。 */
+  exhibit_code?: string | null;
   species_name: string;
   seller_name?: string;
   seller_profile_image_url?: string | null;
@@ -172,6 +176,7 @@ export interface LaneItem {
 export interface UpcomingItem {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -229,6 +234,7 @@ export interface LiveState {
 export interface WonItemSummary {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   quantity_unit?: string;

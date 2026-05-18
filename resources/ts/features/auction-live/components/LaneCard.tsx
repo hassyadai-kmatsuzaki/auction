@@ -112,7 +112,7 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
 
       <CardContent>
         <Typography variant="caption" color="text.secondary">
-          No.{item.item_number}
+          {item.exhibit_code ?? `No.${item.item_number}`}
         </Typography>
         <Typography variant="h6" sx={{ lineHeight: 1.3 }}>
           {item.species_name}

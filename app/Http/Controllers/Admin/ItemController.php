@@ -77,6 +77,7 @@ class ItemController extends Controller
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
                         'species_name' => $item->species_name,
                         'species_type' => $item->speciesType ? [
                             'id' => $item->speciesType->id,
@@ -200,6 +201,7 @@ class ItemController extends Controller
                 'item' => [
                     'id' => $item->id,
                     'item_number' => $item->item_number,
+                    'exhibit_code' => $item->exhibit_code,
                     'species_name' => $item->species_name,
                 ],
             ],
@@ -226,6 +228,7 @@ class ItemController extends Controller
                 'item' => [
                     'id' => $item->id,
                     'item_number' => $item->item_number,
+                    'exhibit_code' => $item->exhibit_code,
                     'species_name' => $item->species_name,
                     'species_type' => $item->speciesType ? [
                         'id' => $item->speciesType->id,

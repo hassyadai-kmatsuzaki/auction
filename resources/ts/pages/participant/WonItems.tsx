@@ -50,6 +50,7 @@ interface WonItemData {
   item: {
     id: number;
     item_number: number;
+    exhibit_code?: string | null;
     species_name: string;
     quantity: number;
     thumbnail_path?: string;
@@ -546,7 +547,7 @@ export default function WonItems() {
                           {/* ヘッダー */}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              No.{wonItem.item?.item_number ?? '-'}
+                              {wonItem.item?.exhibit_code ?? `No.${wonItem.item?.item_number ?? '-'}`}
                             </Typography>
                             <Chip
                               label={getPaymentStatusLabel(wonItem.payment_status)}

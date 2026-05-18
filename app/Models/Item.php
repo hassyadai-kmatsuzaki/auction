@@ -17,6 +17,8 @@ class Item extends BaseModel
         'auction_id',
         'seller_profile_id',
         'item_number',
+        'exhibit_code',
+        'exhibit_code_issued_at',
         'seller_display_order',
         'species_name',
         'species_type_id',
@@ -56,6 +58,7 @@ class Item extends BaseModel
         'is_anonymous' => 'boolean',
         'live_started_at' => 'datetime',
         'live_ended_at' => 'datetime',
+        'exhibit_code_issued_at' => 'datetime',
         'parent_fish_info' => 'array',
         'breeding_environment' => 'array',
     ];

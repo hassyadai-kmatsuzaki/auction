@@ -15,6 +15,7 @@ interface Bidder {
 interface LaneItem {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   current_price: number;
@@ -64,7 +65,9 @@ export const LaneControlCard = React.memo(({ lane, onNextItem, isLoading }: Prop
                 <img src={item.thumbnail_path} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
               )}
               <Box>
-                <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {item.exhibit_code ?? `No.${item.item_number}`}
+                </Typography>
                 <Typography variant="body2" fontWeight="bold">{item.species_name}</Typography>
                 <Typography variant="body2" color="primary.main">
                   ¥{formatYen(item.current_price)}

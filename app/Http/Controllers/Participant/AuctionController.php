@@ -222,6 +222,7 @@ class AuctionController extends Controller
             return [
                 'id' => $wi->id,
                 'item_number' => $wi->item->item_number,
+                'exhibit_code' => $wi->item->exhibit_code,
                 'species_name' => $wi->item->species_name,
                 'quantity' => $wi->item->quantity,
                 'quantity_unit' => $wi->item->quantity_unit ?? 'fish',
@@ -288,13 +289,14 @@ class AuctionController extends Controller
 
             $lanesData[] = [
                 'lane_number' => $lane->lane_number,
-                'lane_name' => "レーン{$lane->lane_number}",
+                'lane_name' => $lane->lane_name ?: "レーン{$lane->lane_number}",
                 'status' => $lane->status,
                 'items' => $laneItems->map(function ($item) {
                     $isAnon = (bool) $item->is_anonymous;
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
                         'species_name' => $item->species_name,
                         'quantity' => $item->quantity,
                         'quantity_unit' => $item->quantity_unit ?? 'fish',
@@ -341,6 +343,7 @@ class AuctionController extends Controller
                     return [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
                         'species_name' => $item->species_name,
                         'quantity' => $item->quantity,
                         'quantity_unit' => $item->quantity_unit ?? 'fish',

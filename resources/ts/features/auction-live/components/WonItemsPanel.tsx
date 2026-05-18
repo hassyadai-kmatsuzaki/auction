@@ -37,7 +37,7 @@ export const WonItemsPanel = React.memo(({ items, totalAmount }: Props) => {
               const unit = item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹';
               return (
                 <TableRow key={item.id}>
-                  <TableCell>{item.item_number}</TableCell>
+                  <TableCell>{(item as any).exhibit_code ?? item.item_number}</TableCell>
                   <TableCell>{item.species_name}</TableCell>
                   <TableCell align="right">
                     ¥{formatYen(item.winning_price)}/1{unit}

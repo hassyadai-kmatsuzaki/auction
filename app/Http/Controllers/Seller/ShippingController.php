@@ -80,6 +80,7 @@ class ShippingController extends Controller
                         'item' => [
                             'id' => $wonItem->item->id,
                             'item_number' => $wonItem->item->item_number,
+                            'exhibit_code' => $wonItem->item->exhibit_code,
                             'species_name' => $wonItem->item->species_name,
                             'quantity' => $wonItem->item->quantity,
                             'thumbnail_path' => $wonItem->item->thumbnail_path,

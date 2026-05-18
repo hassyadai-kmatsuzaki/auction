@@ -161,7 +161,7 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
                 {infoItem.is_premium && <Chip label="プレミアム" size="small" color="warning" />}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                No.{infoItem.item_number} / 数量: {infoItem.quantity}
+                {(infoItem as any).exhibit_code ?? `No.${infoItem.item_number}`} / 数量: {infoItem.quantity}
               </Typography>
               <Typography variant="h5" color="primary.main" fontWeight="bold">
                 ¥{formatYen(infoItem.start_price)}〜

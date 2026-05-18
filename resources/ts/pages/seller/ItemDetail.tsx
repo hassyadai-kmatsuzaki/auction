@@ -37,6 +37,7 @@ import { formatYen } from '../../lib/formatPrice';
 interface ItemDetail {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -193,7 +194,7 @@ export default function ItemDetail() {
             )}
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            出品番号: #{item.item_number}
+            出品ID: {item.exhibit_code ?? '未発行'} ／ 出品番号: #{item.item_number}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>

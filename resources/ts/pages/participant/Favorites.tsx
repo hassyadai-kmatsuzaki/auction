@@ -45,6 +45,7 @@ interface FavoriteItem {
   id: number;
   item_id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -194,6 +195,7 @@ export default function Favorites() {
     return {
       id: fav.item_id,
       item_number: fav.item_number,
+      exhibit_code: fav.exhibit_code ?? null,
       species_name: fav.species_name,
       seller_name: fav.seller?.seller_name ?? '',
       seller_profile_image_url: fav.seller?.profile_image_url ?? null,
@@ -376,7 +378,7 @@ export default function Favorites() {
                   )}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
-                      No.{item.item_number}
+                      {item.exhibit_code ?? `No.${item.item_number}`}
                     </Typography>
                     {getStatusChip(item.status)}
                   </Box>

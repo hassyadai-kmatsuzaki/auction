@@ -55,6 +55,21 @@ class AuctionFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'status' => 'finished',
             'event_date' => fake()->dateTimeBetween('-1 month', '-1 day'),
+            // テストでの finished はデフォルトで公開状態とみなす。
+            // 「終了しているが未公開」を再現したいテストは ->state(['is_published' => false]) で上書きする。
+            'is_published' => true,
+            'published_at' => now()->subHour(),
+        ]);
+    }
+
+    /**
+     * 「未公開」状態を明示する state（is_published=false テスト用）。
+     */
+    public function unpublished(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_published' => false,
+            'published_at' => null,
         ]);
     }
 

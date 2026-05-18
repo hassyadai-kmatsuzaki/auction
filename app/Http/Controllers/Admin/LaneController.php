@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Exhibit\IssueExhibitCodeAction;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
@@ -26,7 +27,7 @@ class LaneController extends Controller
         
         $lanes = $auction->lanes()
             ->with(['items' => function ($query) {
-                $query->select('items.id', 'item_number', 'species_name', 'quantity', 'start_price', 'is_premium', 'status', 'thumbnail_path', 'seller_profile_id')
+                $query->select('items.id', 'item_number', 'exhibit_code', 'species_name', 'quantity', 'start_price', 'is_premium', 'status', 'thumbnail_path', 'seller_profile_id')
                     ->with(['sellerProfile.user'])
                     ->orderBy('lane_items.sequence_order');
             }])
@@ -68,6 +69,7 @@ class LaneController extends Controller
                             return [
                                 'id' => $item->id,
                                 'item_number' => $item->item_number,
+                                'exhibit_code' => $item->exhibit_code,
                                 'species_name' => $item->species_name,
                                 'quantity' => $item->quantity,
                                 'start_price' => $item->start_price,
@@ -139,6 +141,9 @@ class LaneController extends Controller
         $newLaneNumber = $maxLaneNumber + 1;
 
         $laneName = $request->input('lane_name', null);
+        if ($laneName === null || trim($laneName) === '') {
+            $laneName = $this->defaultLaneName($newLaneNumber);
+        }
 
         $lane = Lane::create([
             'auction_id' => $auction->id,
@@ -250,7 +255,7 @@ class LaneController extends Controller
     /**
      * 生体をレーンに割り当て（レーン間移動・新規割り当て・並び替えすべて対応）
      */
-    public function assignItem(Request $request, $auctionId, $laneId)
+    public function assignItem(Request $request, $auctionId, $laneId, IssueExhibitCodeAction $issueExhibitCode)
     {
         $auction = Auction::findOrFail($auctionId);
 
@@ -277,7 +282,7 @@ class LaneController extends Controller
         $item = Item::where('auction_id', $auctionId)->where('id', $request->item_id)->firstOrFail();
 
         try {
-            DB::transaction(function () use ($laneId, $item, $request) {
+            DB::transaction(function () use ($laneId, $item, $request, $issueExhibitCode) {
                 // 既存の割り当てを確認
                 $existing = DB::table('lane_items')
                     ->where('item_id', $item->id)
@@ -318,7 +323,21 @@ class LaneController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                // 出品ID（表示専用）を発行。既発行/lane_name 未設定なら no-op。
+                // 通知ジョブは transaction commit 後に dispatch する必要があるため silent=true。
+                $issueExhibitCode->execute($item->fresh(), silent: true);
             });
+
+            // 通知ジョブはトランザクション commit 後に投入（commit 前に dispatch すると
+            // ジョブ実行時にまだ exhibit_code が見えない事故が起きるため）。
+            $fresh = $item->fresh();
+            if ($fresh && $fresh->exhibit_code !== null && $fresh->seller_profile_id) {
+                \App\Jobs\NotifyExhibitCodesJob::dispatchIfNotPending(
+                    $fresh->seller_profile_id,
+                    $fresh->auction_id
+                );
+            }
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->errorInfo[1] === 1062) {
                 return response()->json([
@@ -424,7 +443,7 @@ class LaneController extends Controller
      * - 各レーン内の出品者グループ順序をランダムにシャッフル
      * - 既存割り当ての末尾に追加（既存は一切変更しない）
      */
-    public function autoAssign($auctionId)
+    public function autoAssign($auctionId, IssueExhibitCodeAction $issueExhibitCode)
     {
         $auction = Auction::findOrFail($auctionId);
 
@@ -535,8 +554,10 @@ class LaneController extends Controller
         // Step 6: lane_items に挿入（既存アイテムの後ろに追加）
         $totalAssigned = 0;
         $laneStats = [];
+        // 実際に挿入された item_id の集合（出品ID発行・通知対象）
+        $insertedItemIds = [];
 
-        DB::transaction(function () use ($laneAssignments, $lanes, &$totalAssigned, &$laneStats) {
+        DB::transaction(function () use ($laneAssignments, $lanes, &$totalAssigned, &$laneStats, &$insertedItemIds) {
             foreach ($laneAssignments as $laneId => $items) {
                 if ($items->isEmpty()) {
                     $lane = $lanes->find($laneId);
@@ -556,6 +577,7 @@ class LaneController extends Controller
 
                 $position = $lastOrder + 1;
                 $insertData = [];
+                $itemIdsForBulk = [];
 
                 foreach ($items as $item) {
                     $insertData[] = [
@@ -565,11 +587,15 @@ class LaneController extends Controller
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
+                    $itemIdsForBulk[] = $item->id;
                 }
 
                 try {
                     DB::table('lane_items')->insert($insertData);
                     $addedCount = count($insertData);
+                    foreach ($itemIdsForBulk as $id) {
+                        $insertedItemIds[] = $id;
+                    }
                 } catch (\Illuminate\Database\QueryException $e) {
                     // UNIQUE制約違反（二重クリック等）は個別挿入にフォールバック
                     if ($e->errorInfo[1] !== 1062) {
@@ -587,6 +613,7 @@ class LaneController extends Controller
                                 'updated_at' => now(),
                             ]);
                             $addedCount++;
+                            $insertedItemIds[] = $item->id;
                         } catch (\Illuminate\Database\QueryException $inner) {
                             if ($inner->errorInfo[1] !== 1062) {
                                 throw $inner;
@@ -605,7 +632,34 @@ class LaneController extends Controller
                     'total_count' => $lastOrder + $addedCount,
                 ];
             }
+
+            // 出品ID（表示専用）をトランザクション内で発行。
+            // silent=true で通知は出さず、commit 後に出品者×オークション単位で一括投入。
+            if (!empty($insertedItemIds)) {
+                $newlyAssigned = Item::whereIn('id', $insertedItemIds)
+                    ->whereNull('exhibit_code')
+                    ->get();
+                foreach ($newlyAssigned as $assignedItem) {
+                    app(IssueExhibitCodeAction::class)->execute($assignedItem, silent: true);
+                }
+            }
         });
+
+        // commit 後に通知投入（出品者×オークション単位で重複排除）
+        if (!empty($insertedItemIds)) {
+            $pairs = Item::whereIn('id', $insertedItemIds)
+                ->whereNotNull('exhibit_code')
+                ->whereNotNull('seller_profile_id')
+                ->select('seller_profile_id', 'auction_id')
+                ->distinct()
+                ->get();
+            foreach ($pairs as $pair) {
+                \App\Jobs\NotifyExhibitCodesJob::dispatchIfNotPending(
+                    $pair->seller_profile_id,
+                    $pair->auction_id
+                );
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -648,6 +702,9 @@ class LaneController extends Controller
 
     /**
      * 初期レーンを作成（レーンが0個の場合のみ）
+     *
+     * lane_name は A, B, C, ... の英字を自動採番する（出品ID表示用）。
+     * lane_number が 26 を超える場合（運用上はあり得ないが）は AA, AB, ... と桁を増やす。
      */
     private function createInitialLanes(Auction $auction): void
     {
@@ -655,9 +712,25 @@ class LaneController extends Controller
             Lane::create([
                 'auction_id' => $auction->id,
                 'lane_number' => $i,
+                'lane_name' => $this->defaultLaneName($i),
                 'status' => 'waiting',
             ]);
         }
+    }
+
+    /**
+     * レーン番号からデフォルトの lane_name（A, B, ... Z, AA, AB, ...）を生成する。
+     */
+    private function defaultLaneName(int $laneNumber): string
+    {
+        $name = '';
+        $n = $laneNumber;
+        while ($n > 0) {
+            $n--;
+            $name = chr(65 + ($n % 26)) . $name;
+            $n = intdiv($n, 26);
+        }
+        return $name;
     }
 
     /**

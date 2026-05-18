@@ -27,6 +27,7 @@ class WonItemController extends Controller
         $userId = Auth::id();
 
         $wonItemsQuery = WonItem::forWinner($userId)
+            ->whereHas('item.auction', fn ($q) => $q->where('is_published', true))
             ->with(['item.auction', 'item.media']);
         $this->testMode->applyToWonItemQuery($wonItemsQuery);
         $wonItems = $wonItemsQuery
@@ -102,6 +103,7 @@ class WonItemController extends Controller
                         'item' => $item ? [
                             'id' => $item->id,
                             'item_number' => $item->item_number,
+                            'exhibit_code' => $item->exhibit_code,
                             'species_name' => $item->species_name,
                             'quantity' => $item->quantity,
                             'thumbnail_path' => $item->thumbnail_path,
@@ -153,8 +155,9 @@ class WonItemController extends Controller
     public function show($id)
     {
         $userId = Auth::id();
-        
+
         $wonItemQuery = WonItem::forWinner($userId)
+            ->whereHas('item.auction', fn ($q) => $q->where('is_published', true))
             ->with(['item.auction', 'item.media'])
             ->where('id', $id);
         $this->testMode->applyToWonItemQuery($wonItemQuery);
@@ -172,6 +175,7 @@ class WonItemController extends Controller
                     'item' => $item ? [
                         'id' => $item->id,
                         'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
                         'species_name' => $item->species_name,
                         'quantity' => $item->quantity,
                         'thumbnail_path' => $item->thumbnail_path,

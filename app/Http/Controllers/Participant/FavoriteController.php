@@ -43,6 +43,7 @@ class FavoriteController extends Controller
                 'id' => $fav->id,
                 'item_id' => $item->id,
                 'item_number' => $item->item_number,
+                'exhibit_code' => $item->exhibit_code,
                 'species_name' => $item->species_name,
                 'quantity' => $item->quantity,
                 'start_price' => $item->start_price,

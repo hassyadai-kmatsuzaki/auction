@@ -260,6 +260,32 @@ export default function AuctionManagement() {
     handleMenuClose();
   };
 
+  /**
+   * 落札者管理画面への公開フラグを切り替える。
+   * 公開=true で参加者の「落札者管理」ページに当該オークションの落札商品が表示される。
+   */
+  const handleTogglePublish = async () => {
+    if (!selectedAuction) return;
+    const current = (selectedAuction as any).is_published === true;
+    const next = !current;
+    const verb = next ? '公開する' : '非公開に戻す';
+    if (!window.confirm(`「${selectedAuction.title}」を${verb}してよろしいですか？`)) {
+      handleMenuClose();
+      return;
+    }
+    try {
+      setError(null);
+      const response = await axios.patch(`/api/admin/auctions/${selectedAuction.id}/publish`, { is_published: next });
+      setSuccessMessage(response.data?.message || (next ? '公開しました。' : '非公開に戻しました。'));
+      fetchAuctions();
+    } catch (err: any) {
+      console.error('公開フラグ変更エラー:', err);
+      setError(err.response?.data?.message || '公開フラグの変更に失敗しました。');
+    } finally {
+      handleMenuClose();
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'preparing': return '準備中';
@@ -430,6 +456,9 @@ export default function AuctionManagement() {
                                 {auction.is_test && (
                                   <Chip label="TEST" size="small" color="warning" variant="outlined" />
                                 )}
+                                {(auction as any).is_published && (
+                                  <Chip label="公開中" size="small" color="info" variant="outlined" />
+                                )}
                               </Box>
                               <IconButton
                                 size="small"
@@ -536,11 +565,16 @@ export default function AuctionManagement() {
                         <TableCell>{formatDate(auction.event_date)}</TableCell>
                         <TableCell>{formatTime(auction.start_time)}</TableCell>
                         <TableCell align="center">
-                          <Chip
-                            label={getStatusLabel(auction.status)}
-                            size="small"
-                            color={getStatusColor(auction.status)}
-                          />
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <Chip
+                              label={getStatusLabel(auction.status)}
+                              size="small"
+                              color={getStatusColor(auction.status)}
+                            />
+                            {(auction as any).is_published && (
+                              <Chip label="公開中" size="small" color="info" variant="outlined" />
+                            )}
+                          </Box>
                         </TableCell>
                         <TableCell align="right">
                           <Box>
@@ -615,7 +649,14 @@ export default function AuctionManagement() {
               落札者管理
             </MenuItem>
           )}
-          
+
+          {(selectedAuction?.status === 'finished' || selectedAuction?.status === 'live') && (
+            <MenuItem onClick={handleTogglePublish}>
+              <ReceiptIcon sx={{ mr: 1, fontSize: 20 }} />
+              {(selectedAuction as any)?.is_published ? '落札者画面: 非公開に戻す' : '落札者画面: 公開する'}
+            </MenuItem>
+          )}
+
           <MenuItem onClick={handleEdit}>
             <EditIcon sx={{ mr: 1, fontSize: 20 }} />
             編集

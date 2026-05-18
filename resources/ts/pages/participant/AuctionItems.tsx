@@ -36,6 +36,7 @@ const toLaneItem = (item: ItemData | null): LaneItem | null => {
   return {
     id: item.id,
     item_number: item.item_number,
+    exhibit_code: (item as any).exhibit_code ?? null,
     species_name: item.species_name,
     current_price: item.current_price ?? item.start_price,
     quantity: item.quantity,
@@ -327,7 +328,9 @@ export default function AuctionItems() {
                 return (
                   <TableRow key={item.id} hover sx={{ cursor: 'pointer' }}
                     onClick={() => setSelectedItem(item)}>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.item_number}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      {(item as any).exhibit_code ?? item.item_number}
+                    </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {item.species_name}

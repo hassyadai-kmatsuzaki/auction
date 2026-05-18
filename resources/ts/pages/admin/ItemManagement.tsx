@@ -71,6 +71,7 @@ interface Auction {
 interface Item {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -607,8 +608,13 @@ export default function ItemManagement() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      #{item.item_number}
+                      {item.exhibit_code ?? `#${item.item_number}`}
                     </Typography>
+                    {item.exhibit_code && (
+                      <Typography variant="caption" color="text.secondary">
+                        #{item.item_number}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

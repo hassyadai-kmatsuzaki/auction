@@ -41,6 +41,8 @@ import { formatYen } from '../../lib/formatPrice';
 interface LaneItem {
   id: number;
   item_number: number;
+  /** 出品ID（表示専用）。レーン割当時に発行され以後固定。 */
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -777,7 +779,7 @@ export default function LaneAssignment() {
                                   </Avatar>
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
                                     <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      #{item.item_number} {item.species_name}
+                                      {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
                                       ¥{formatYen(item.start_price)} / {item.quantity}匹
@@ -828,7 +830,7 @@ export default function LaneAssignment() {
                           </Avatar>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              #{item.item_number} {item.species_name}
+                              {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               ¥{formatYen(item.start_price)} / {item.quantity}匹
@@ -973,7 +975,7 @@ export default function LaneAssignment() {
                                 </Avatar>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
                                   <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    #{item.item_number} {item.species_name}
+                                    {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
                                     ¥{formatYen(item.start_price)} / {item.quantity}匹

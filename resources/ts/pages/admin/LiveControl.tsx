@@ -297,7 +297,7 @@ export default function LiveControl() {
                                   <Avatar src={item.thumbnail_path || '/img/noimage.png'} variant="rounded" sx={{ width: 32, height: 32 }} />
                                   <Box>
                                     <Typography variant="body2" sx={{ fontWeight: 500 }}>{item.species_name}</Typography>
-                                    <Typography variant="caption" color="text.secondary">No.{item.item_number} × {item.quantity}匹</Typography>
+                                    <Typography variant="caption" color="text.secondary">{(item as any).exhibit_code ?? `No.${item.item_number}`} × {item.quantity}匹</Typography>
                                   </Box>
                                 </Box>
                               </TableCell>

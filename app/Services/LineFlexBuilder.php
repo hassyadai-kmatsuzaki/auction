@@ -230,6 +230,45 @@ class LineFlexBuilder
         );
     }
 
+    /**
+     * 出品者向け 出品ID発行通知
+     *
+     * @param  Auction  $auction
+     * @param  array<int, array{exhibit_code: string, item_number: int|null, species_name: string}>  $items
+     */
+    public function exhibitCodeIssued(Auction $auction, array $items): array
+    {
+        $bodyRows = [
+            ['オークション', (string) $auction->title],
+            ['開催日',       $auction->event_date?->format('Y/m/d') ?? ''],
+            ['対象件数',     count($items) . ' 件'],
+        ];
+
+        // 最大10件まで本文に列挙（LINE の bubble size 制約への配慮）
+        $listed = array_slice($items, 0, 10);
+        foreach ($listed as $row) {
+            $code = (string) ($row['exhibit_code'] ?? '');
+            $species = (string) ($row['species_name'] ?? '');
+            // ラベル側に出品ID、値側にタイトル
+            $bodyRows[] = [$code, $species];
+        }
+        if (count($items) > count($listed)) {
+            $remaining = count($items) - count($listed);
+            $bodyRows[] = ['(以下省略)', "他 {$remaining} 件"];
+        }
+
+        return $this->bubble(
+            heroImageUrl: $this->itemHeroImage($this->featuredItem($auction)),
+            headerText: '📋 出品ID発行のお知らせ',
+            headerColor: self::BRAND_COLOR,
+            bodyRows: $bodyRows,
+            bodyNote: '当日の会場ではこの出品IDで進行いたします。',
+            footerButton: ($url = $this->appUrl('/seller/items'))
+                ? ['label' => '出品状況を確認', 'uri' => $url]
+                : null,
+        );
+    }
+
     /** ⑪ 出品者向けオークション開始通知 */
     public function sellerAuctionStart(Auction $auction): array
     {

@@ -307,6 +307,49 @@ class AuctionController extends Controller
         return $this->updateStatusAction->execute($auction, $request->status)->toResponse();
     }
 
+    /**
+     * 落札者管理画面への公開フラグを切り替え
+     *
+     * is_published=true で参加者の /participant/won-items に対象 auction の落札商品が表示される。
+     * デフォルトは false。検収完了後に管理者が明示的に true にして公開する。
+     */
+    public function updatePublish(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'is_published' => 'required|boolean',
+        ], [
+            'is_published.required' => '公開フラグは必須です。',
+            'is_published.boolean'  => '公開フラグは true / false で指定してください。',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $auction = Auction::findOrFail($id);
+        $isPublished = (bool) $request->boolean('is_published');
+
+        $auction->update([
+            'is_published' => $isPublished,
+            'published_at' => $isPublished ? now() : null,
+        ]);
+
+        \Illuminate\Support\Facades\Log::channel('audit')->info('auction.publish_toggled', [
+            'auction_id'   => $auction->id,
+            'is_published' => $isPublished,
+            'user_id'      => $request->user()?->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $isPublished ? 'オークションを公開しました。' : 'オークションを非公開に戻しました。',
+            'data' => [
+                'id'           => $auction->id,
+                'is_published' => $auction->is_published,
+                'published_at' => $auction->published_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
     /** レーン数更新 */
     public function updateLaneCount(Request $request, $id)
     {

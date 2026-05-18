@@ -53,6 +53,8 @@ class WonItemController extends Controller
                 'title' => $auction->title,
                 'event_date' => $auction->event_date->format('Y-m-d'),
                 'status' => $auction->status,
+                'is_published' => (bool) $auction->is_published,
+                'published_at' => $auction->published_at?->toIso8601String(),
                 'statistics' => [
                     'total_count' => $totalCount,
                     'total_amount' => $totalAmount,
@@ -134,6 +136,7 @@ class WonItemController extends Controller
                         'item' => [
                             'id' => $wonItem->item->id,
                             'item_number' => $wonItem->item->item_number,
+                            'exhibit_code' => $wonItem->item->exhibit_code,
                             'species_name' => $wonItem->item->species_name,
                             'quantity' => $wonItem->item->quantity,
                             'thumbnail_path' => $wonItem->item->thumbnail_path,
@@ -191,6 +194,7 @@ class WonItemController extends Controller
                     'item' => [
                         'id' => $wonItem->item->id,
                         'item_number' => $wonItem->item->item_number,
+                        'exhibit_code' => $wonItem->item->exhibit_code,
                         'species_name' => $wonItem->item->species_name,
                         'quantity' => $wonItem->item->quantity,
                         'thumbnail_path' => $wonItem->item->thumbnail_path,
