@@ -416,10 +416,14 @@ class InvoiceService
         $subtotalWinning = (int) $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
         $subtotalCommission = (int) $wonItems->sum(fn ($w) => (int) $w->commission_amount);
 
-        // 消費税（SystemSetting::tax_rate, 既定 10%）。InvoiceService と揃えて floor で丸める
-        $taxRate = (float) SystemSetting::get('tax_rate', 10);
-        $taxWinning = (int) floor($subtotalWinning * $taxRate / 100);
-        $taxCommission = (int) floor($subtotalCommission * $taxRate / 100);
+        // 消費税率の解決（落札分は免税事業者なら経過措置率、手数料は常に 10%）
+        $taxMeta = app(InvoiceTaxResolver::class)->resolve($auction, $seller);
+        $winningTaxRate = $taxMeta['winning_tax_rate'];
+        $commissionTaxRate = $taxMeta['commission_tax_rate'];
+
+        // 端数処理は floor で統一
+        $taxWinning = (int) floor($subtotalWinning * $winningTaxRate / 100);
+        $taxCommission = (int) floor($subtotalCommission * $commissionTaxRate / 100);
 
         $totalWinningWithTax = $subtotalWinning + $taxWinning;
         $totalCommissionWithTax = $subtotalCommission + $taxCommission;
@@ -438,7 +442,12 @@ class InvoiceService
             'items' => $items,
             'subtotal_winning' => $subtotalWinning,
             'subtotal_commission' => $subtotalCommission,
-            'tax_rate' => $taxRate,
+            'tax_rate' => $commissionTaxRate, // 既存テンプレート互換: 手数料側の税率
+            'winning_tax_rate' => $winningTaxRate,
+            'commission_tax_rate' => $commissionTaxRate,
+            'is_tax_exempt' => $taxMeta['is_tax_exempt'],
+            'transition_rate' => $taxMeta['transition_rate'],
+            'tax_basis_date' => $taxMeta['basis_date'],
             'tax_winning' => $taxWinning,
             'tax_commission' => $taxCommission,
             'total_winning_with_tax' => $totalWinningWithTax,

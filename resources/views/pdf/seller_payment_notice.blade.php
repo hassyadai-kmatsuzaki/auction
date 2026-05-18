@@ -120,6 +120,22 @@
             margin-top: 15px;
             text-align: center;
         }
+        .tax-chip {
+            display: inline-block;
+            background-color: #FEF3C7;
+            color: #B45309;
+            padding: 3px 10px;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+        .tax-note {
+            font-size: 9px;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -135,6 +151,24 @@
     <div class="seller-info">
         <div class="seller-name">{{ $seller_name }} 様</div>
     </div>
+
+    @php
+        $fmtRate = function ($r) {
+            return rtrim(rtrim(number_format((float) $r, 2), '0'), '.');
+        };
+    @endphp
+
+    @if(!empty($is_tax_exempt))
+        @if((float) $winning_tax_rate > 0)
+            <div class="tax-chip">
+                免税事業者・落札分は消費税相当額 {{ $fmtRate($winning_tax_rate) }}%（経過措置 {{ $fmtRate((float) $transition_rate * 100) }}%）適用
+            </div>
+        @else
+            <div class="tax-chip">
+                免税事業者・経過措置終了（落札分の消費税相当額なし）
+            </div>
+        @endif
+    @endif
 
     <div class="auction-info">
         対象オークション: {{ $auction_title }}
@@ -175,11 +209,25 @@
                 <td class="right"><strong>¥{{ number_format($subtotal_winning) }}</strong></td>
                 <td class="right"><strong>¥{{ number_format($subtotal_commission) }}</strong></td>
             </tr>
+            @if(!empty($is_tax_exempt))
             <tr>
-                <td colspan="3" style="text-align: right;">消費税（{{ rtrim(rtrim(number_format($tax_rate, 2), '0'), '.') }}%）</td>
+                <td colspan="3" style="text-align: right;">
+                    @if((float) $winning_tax_rate > 0)
+                        消費税相当額（{{ $fmtRate($winning_tax_rate) }}%）／消費税（{{ $fmtRate($commission_tax_rate) }}%）
+                    @else
+                        消費税相当額（なし）／消費税（{{ $fmtRate($commission_tax_rate) }}%）
+                    @endif
+                </td>
                 <td class="right">¥{{ number_format($tax_winning) }}</td>
                 <td class="right">¥{{ number_format($tax_commission) }}</td>
             </tr>
+            @else
+            <tr>
+                <td colspan="3" style="text-align: right;">消費税（{{ $fmtRate($tax_rate) }}%）</td>
+                <td class="right">¥{{ number_format($tax_winning) }}</td>
+                <td class="right">¥{{ number_format($tax_commission) }}</td>
+            </tr>
+            @endif
             <tr class="total-row">
                 <td colspan="3" style="text-align: right;"><strong>合計（税込）</strong></td>
                 <td class="right"><strong>¥{{ number_format($total_winning_with_tax) }}</strong></td>
@@ -226,6 +274,19 @@
     <p style="text-align: center; font-weight: bold; color: #8B5CF6;">
         振込予定日: {{ $payment_scheduled_date }}
     </p>
+    @endif
+
+    @if(!empty($is_tax_exempt))
+    <div class="tax-note">
+        ※ 消費税の扱いについて<br>
+        @if((float) $winning_tax_rate > 0)
+            ・落札金額：消費税相当額 {{ $fmtRate($winning_tax_rate) }}%（インボイス制度の経過措置 {{ $fmtRate((float) $transition_rate * 100) }}% 適用）<br>
+            ・手数料：通常消費税 {{ $fmtRate($commission_tax_rate) }}%
+        @else
+            ・落札分は消費税相当額の上乗せはありません（経過措置終了）<br>
+            ・手数料：通常消費税 {{ $fmtRate($commission_tax_rate) }}%
+        @endif
+    </div>
     @endif
 
     <div class="issuer">

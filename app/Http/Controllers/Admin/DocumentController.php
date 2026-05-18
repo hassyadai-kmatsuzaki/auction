@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\SystemSetting;
 use App\Models\WonItem;
+use App\Services\InvoiceTaxResolver;
 use Illuminate\Http\Request;
 
 class DocumentController extends Controller
@@ -88,13 +89,12 @@ class DocumentController extends Controller
 
         $wonItems = $query->get();
 
-        // 消費税率（SystemSetting::tax_rate, 既定 10%）
-        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+        $resolver = app(InvoiceTaxResolver::class);
 
         $grouped = $wonItems
             ->filter(fn ($w) => $w->item && $w->item->auction && $w->item->sellerProfile)
             ->groupBy(fn ($w) => $w->item->auction_id.'-'.$w->item->seller_profile_id)
-            ->map(function ($group) use ($taxRate) {
+            ->map(function ($group) use ($resolver) {
                 $first = $group->first();
                 $auction = $first->item->auction;
                 $seller = $first->item->sellerProfile;
@@ -103,9 +103,12 @@ class DocumentController extends Controller
                 $subtotalWinning = (int) $group->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
                 $subtotalCommission = (int) $group->sum(fn ($w) => (int) $w->commission_amount);
 
+                // 消費税率（落札分は免税事業者なら経過措置率、手数料は常に 10%）
+                $taxMeta = $resolver->resolve($auction, $seller);
+
                 // 税込（floor 丸め、PDF/精算詳細と統一）
-                $salesAmount = $subtotalWinning + (int) floor($subtotalWinning * $taxRate / 100);
-                $commission = $subtotalCommission + (int) floor($subtotalCommission * $taxRate / 100);
+                $salesAmount = $subtotalWinning + (int) floor($subtotalWinning * $taxMeta['winning_tax_rate'] / 100);
+                $commission = $subtotalCommission + (int) floor($subtotalCommission * $taxMeta['commission_tax_rate'] / 100);
                 $netAmount = $salesAmount - $commission;
 
                 // ステータス: 全件入金確認済みなら sent, それ以外は draft
@@ -131,6 +134,9 @@ class DocumentController extends Controller
                     'status' => $status,
                     'issued_at' => $allConfirmed ? $first->created_at?->toIso8601String() : null,
                     'transfer_scheduled' => $transferScheduled?->format('Y-m-d'),
+                    'is_tax_exempt' => $taxMeta['is_tax_exempt'],
+                    'winning_tax_rate' => $taxMeta['winning_tax_rate'],
+                    'transition_rate' => $taxMeta['transition_rate'],
                 ];
             })
             ->values();

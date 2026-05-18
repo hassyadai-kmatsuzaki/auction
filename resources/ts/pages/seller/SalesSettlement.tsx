@@ -118,6 +118,11 @@ interface SettlementDetailInfo {
   subtotal_winning: number;
   subtotal_commission: number;
   tax_rate: number;
+  winning_tax_rate?: number;
+  commission_tax_rate?: number;
+  is_tax_exempt?: boolean;
+  transition_rate?: number | null;
+  tax_basis_date?: string | null;
   tax_winning: number;
   tax_commission: number;
   total_winning_with_tax: number;
@@ -648,24 +653,63 @@ export default function SalesSettlement() {
                     <Divider sx={{ my: 0.5 }} />
 
                     {/* 消費税 */}
-                    <ListItem sx={{ px: 0, py: 0.5 }}>
-                      <ListItemText
-                        primary={`消費税（${formatTaxRate(settlementDetail.settlement.tax_rate)}%）`}
-                        primaryTypographyProps={{ fontWeight: 600, color: 'text.secondary' }}
-                      />
-                    </ListItem>
-                    <ListItem sx={{ px: 2, py: 0.5 }}>
-                      <ListItemText primary="落札金額消費税" />
-                      <Typography variant="body2">
-                        ¥{formatYen(settlementDetail.settlement.tax_winning)}
-                      </Typography>
-                    </ListItem>
-                    <ListItem sx={{ px: 2, py: 0.5 }}>
-                      <ListItemText primary="手数料消費税" />
-                      <Typography variant="body2" sx={{ color: 'error.main' }}>
-                        -¥{formatYen(settlementDetail.settlement.tax_commission)}
-                      </Typography>
-                    </ListItem>
+                    {settlementDetail.settlement.is_tax_exempt ? (
+                      <>
+                        <ListItem sx={{ px: 0, py: 0.5 }}>
+                          <ListItemText
+                            primary="消費税"
+                            secondary={
+                              (settlementDetail.settlement.winning_tax_rate ?? 0) > 0
+                                ? `免税事業者・落札分は消費税相当額 ${formatTaxRate(settlementDetail.settlement.winning_tax_rate ?? 0)}%（経過措置 ${formatTaxRate((settlementDetail.settlement.transition_rate ?? 0) * 100)}%）／手数料は ${formatTaxRate(settlementDetail.settlement.commission_tax_rate ?? settlementDetail.settlement.tax_rate)}%`
+                                : `免税事業者・経過措置終了（落札分の消費税相当額なし）／手数料は ${formatTaxRate(settlementDetail.settlement.commission_tax_rate ?? settlementDetail.settlement.tax_rate)}%`
+                            }
+                            primaryTypographyProps={{ fontWeight: 600, color: 'text.secondary' }}
+                            secondaryTypographyProps={{ fontSize: '0.7rem' }}
+                          />
+                        </ListItem>
+                        <ListItem sx={{ px: 2, py: 0.5 }}>
+                          <ListItemText
+                            primary={
+                              (settlementDetail.settlement.winning_tax_rate ?? 0) > 0
+                                ? `落札金額消費税相当額（${formatTaxRate(settlementDetail.settlement.winning_tax_rate ?? 0)}%）`
+                                : '落札金額消費税相当額（なし）'
+                            }
+                          />
+                          <Typography variant="body2">
+                            ¥{formatYen(settlementDetail.settlement.tax_winning)}
+                          </Typography>
+                        </ListItem>
+                        <ListItem sx={{ px: 2, py: 0.5 }}>
+                          <ListItemText
+                            primary={`手数料消費税（${formatTaxRate(settlementDetail.settlement.commission_tax_rate ?? settlementDetail.settlement.tax_rate)}%）`}
+                          />
+                          <Typography variant="body2" sx={{ color: 'error.main' }}>
+                            -¥{formatYen(settlementDetail.settlement.tax_commission)}
+                          </Typography>
+                        </ListItem>
+                      </>
+                    ) : (
+                      <>
+                        <ListItem sx={{ px: 0, py: 0.5 }}>
+                          <ListItemText
+                            primary={`消費税（${formatTaxRate(settlementDetail.settlement.tax_rate)}%）`}
+                            primaryTypographyProps={{ fontWeight: 600, color: 'text.secondary' }}
+                          />
+                        </ListItem>
+                        <ListItem sx={{ px: 2, py: 0.5 }}>
+                          <ListItemText primary="落札金額消費税" />
+                          <Typography variant="body2">
+                            ¥{formatYen(settlementDetail.settlement.tax_winning)}
+                          </Typography>
+                        </ListItem>
+                        <ListItem sx={{ px: 2, py: 0.5 }}>
+                          <ListItemText primary="手数料消費税" />
+                          <Typography variant="body2" sx={{ color: 'error.main' }}>
+                            -¥{formatYen(settlementDetail.settlement.tax_commission)}
+                          </Typography>
+                        </ListItem>
+                      </>
+                    )}
                     <Divider sx={{ my: 0.5 }} />
 
                     {/* 合計 */}

@@ -8,6 +8,7 @@ use App\Models\SellerSettlement;
 use App\Models\SystemSetting;
 use App\Models\WonItem;
 use App\Models\User;
+use App\Services\InvoiceTaxResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,8 +36,9 @@ class SettlementController extends Controller
         
         $sellerProfileId = $sellerProfile->id;
 
-        // 消費税率（SystemSetting::tax_rate, 既定 10%）
+        // 消費税率（手数料側のみ。落札側は免税事業者なら経過措置率で別途解決）
         $taxRate = (float) SystemSetting::get('tax_rate', 10);
+        $resolver = app(InvoiceTaxResolver::class);
 
         // 自分の出品商品の落札情報を集計（オークション単位、税抜小計を集計）
         $settlementsRaw = WonItem::select(
@@ -59,8 +61,10 @@ class SettlementController extends Controller
 
             $subtotalWinning = (int) $row->subtotal_winning;
             $subtotalCommission = (int) $row->subtotal_commission;
-            $taxWinning = (int) floor($subtotalWinning * $taxRate / 100);
-            $taxCommission = (int) floor($subtotalCommission * $taxRate / 100);
+
+            $taxMeta = $resolver->resolve($auction, $sellerProfile);
+            $taxWinning = (int) floor($subtotalWinning * $taxMeta['winning_tax_rate'] / 100);
+            $taxCommission = (int) floor($subtotalCommission * $taxMeta['commission_tax_rate'] / 100);
             $totalSalesWithTax = $subtotalWinning + $taxWinning;
             $totalCommissionWithTax = $subtotalCommission + $taxCommission;
             $netAmountWithTax = $totalSalesWithTax - $totalCommissionWithTax;
@@ -90,6 +94,9 @@ class SettlementController extends Controller
                 'transaction_reference' => $settlement->transaction_reference,
                 'note' => $settlement->note,
                 'items_count' => (int) $row->items_count,
+                'is_tax_exempt' => $taxMeta['is_tax_exempt'],
+                'winning_tax_rate' => $taxMeta['winning_tax_rate'],
+                'transition_rate' => $taxMeta['transition_rate'],
             ];
         }
 
@@ -104,7 +111,7 @@ class SettlementController extends Controller
         $completedCount = count($completedSettlements);
 
         // 月別売上データ（過去6ヶ月、税込）
-        $monthlySales = $this->getMonthlySales($sellerProfileId, $taxRate);
+        $monthlySales = $this->getMonthlySales($sellerProfile);
 
         // 銀行口座情報
         $bankInfo = $this->getBankInfo($seller);
@@ -166,10 +173,12 @@ class SettlementController extends Controller
         $subtotalWinning = (int) $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
         $subtotalCommission = (int) $wonItems->sum(fn ($w) => (int) $w->commission_amount);
 
-        // 消費税（SystemSetting::tax_rate, 既定 10%）
-        $taxRate = (float) SystemSetting::get('tax_rate', 10);
-        $taxWinning = (int) floor($subtotalWinning * $taxRate / 100);
-        $taxCommission = (int) floor($subtotalCommission * $taxRate / 100);
+        // 消費税率（落札分は免税事業者なら経過措置率、手数料は常に 10%）
+        $taxMeta = app(InvoiceTaxResolver::class)->resolve($auction, $sellerProfile);
+        $winningTaxRate = $taxMeta['winning_tax_rate'];
+        $commissionTaxRate = $taxMeta['commission_tax_rate'];
+        $taxWinning = (int) floor($subtotalWinning * $winningTaxRate / 100);
+        $taxCommission = (int) floor($subtotalCommission * $commissionTaxRate / 100);
 
         $totalWinningWithTax = $subtotalWinning + $taxWinning;
         $totalCommissionWithTax = $subtotalCommission + $taxCommission;
@@ -194,7 +203,12 @@ class SettlementController extends Controller
                     'auction_date' => $auction->event_date->format('Y-m-d'),
                     'subtotal_winning' => $subtotalWinning,
                     'subtotal_commission' => $subtotalCommission,
-                    'tax_rate' => $taxRate,
+                    'tax_rate' => $commissionTaxRate, // 互換: 手数料側の税率
+                    'winning_tax_rate' => $winningTaxRate,
+                    'commission_tax_rate' => $commissionTaxRate,
+                    'is_tax_exempt' => $taxMeta['is_tax_exempt'],
+                    'transition_rate' => $taxMeta['transition_rate'],
+                    'tax_basis_date' => $taxMeta['basis_date'],
                     'tax_winning' => $taxWinning,
                     'tax_commission' => $taxCommission,
                     'total_winning_with_tax' => $totalWinningWithTax,
@@ -229,29 +243,45 @@ class SettlementController extends Controller
 
     /**
      * 月別売上データを取得（税込）
+     *
+     * 同月内でも auction.event_date が経過措置の異なる区間にまたがる可能性があるため、
+     * オークション単位で税率を解決し、月で合算する。
      */
-    private function getMonthlySales(int $sellerProfileId, float $taxRate): array
+    private function getMonthlySales(\App\Models\SellerProfile $sellerProfile): array
     {
+        $sellerProfileId = $sellerProfile->id;
+        $resolver = app(InvoiceTaxResolver::class);
+
         $result = [];
         for ($i = 5; $i >= 0; $i--) {
             $month = Carbon::now()->subMonths($i);
             $startOfMonth = $month->copy()->startOfMonth();
             $endOfMonth = $month->copy()->endOfMonth();
 
-            $row = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+            $rows = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
                 ->where('items.seller_profile_id', $sellerProfileId)
                 ->whereBetween('won_items.created_at', [$startOfMonth, $endOfMonth])
+                ->groupBy('items.auction_id')
                 ->selectRaw('
+                    items.auction_id as auction_id,
                     COALESCE(SUM(won_items.winning_price * won_items.quantity), 0) as subtotal_winning,
                     COALESCE(SUM(won_items.commission_amount), 0) as subtotal_commission
                 ')
-                ->first();
+                ->get();
 
-            $subtotalWinning = (int) ($row->subtotal_winning ?? 0);
-            $subtotalCommission = (int) ($row->subtotal_commission ?? 0);
-            $salesWithTax = $subtotalWinning + (int) floor($subtotalWinning * $taxRate / 100);
-            $commissionWithTax = $subtotalCommission + (int) floor($subtotalCommission * $taxRate / 100);
-            $netWithTax = $salesWithTax - $commissionWithTax;
+            $salesWithTax = 0;
+            $netWithTax = 0;
+            foreach ($rows as $row) {
+                $auction = Auction::find($row->auction_id);
+                if (!$auction) continue;
+                $subtotalWinning = (int) ($row->subtotal_winning ?? 0);
+                $subtotalCommission = (int) ($row->subtotal_commission ?? 0);
+                $taxMeta = $resolver->resolve($auction, $sellerProfile);
+                $auctionSales = $subtotalWinning + (int) floor($subtotalWinning * $taxMeta['winning_tax_rate'] / 100);
+                $auctionCommission = $subtotalCommission + (int) floor($subtotalCommission * $taxMeta['commission_tax_rate'] / 100);
+                $salesWithTax += $auctionSales;
+                $netWithTax += $auctionSales - $auctionCommission;
+            }
 
             $result[] = [
                 'month' => $month->format('n') . '月',
