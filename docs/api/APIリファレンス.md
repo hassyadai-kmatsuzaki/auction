@@ -1,10 +1,11 @@
 # メダカオークション API リファレンス
 
 **文書番号**: API-2026-001  
-**版数**: 2.0  
-**最終更新**: 2026年4月22日
+**版数**: 2.1  
+**最終更新**: 2026年5月19日
 
-**Base URL**: `https://medaka-auction.jp/api`  
+**Base URL（本番）**: `https://medaka-auction.jp/api`  
+**Base URL（ステージング）**: `https://medaka-auction.com/api`  
 **認証方式**: Bearer Token (Laravel Sanctum)  
 **Content-Type**: `application/json`  
 **レート制限**: 認証エンドポイント 10回/分、その他 60回/分
@@ -18,18 +19,20 @@
 3. [サブスクリプション API](#3-サブスクリプション-api)
 4. [LINE 連携 API](#4-line-連携-api)
 5. [お知らせ API](#5-お知らせ-api)
-6. [チュートリアル API](#6-チュートリアル-api)
+6. [チュートリアル / マニュアル API](#6-チュートリアル--マニュアル-api)
 7. [配送料計算 API](#7-配送料計算-api)
 8. [参加者 API](#8-参加者-api)
 9. [出品者 API](#9-出品者-api)
 10. [管理者 API](#10-管理者-api)
-11. [WebSocket イベント](#11-websocket-イベント)
-12. [共通レスポンス形式](#12-共通レスポンス形式)
+11. [メディア編集者 API](#11-メディア編集者-api)
+12. [WebSocket イベント](#12-websocket-イベント)
+13. [共通レスポンス形式](#13-共通レスポンス形式)
 
 > 🔒 = 要認証（Sanctum Bearer Token）  
 > 👑 = 管理者ロール必須  
 > 🏪 = 出品者ロール必須  
-> 🎯 = 参加者ロール必須
+> 🎯 = 参加者ロール必須  
+> 🎬 = メディア編集者ロール必須
 
 ---
 
@@ -206,12 +209,14 @@ LINE OAuth コールバック（Webhook 用）。
 
 ---
 
-## 6. チュートリアル API 🔒
+## 6. チュートリアル / マニュアル API 🔒
 
 | メソッド | パス | 説明 |
 |---|---|---|
 | GET | `/tutorials?role={role}` | チュートリアルステップ一覧（role: participant/seller） |
 | POST | `/tutorials/complete` | ステップ完了マーク（`step_key`: ステップキー） |
+| GET | `/manuals` | ロール別マニュアル一覧 |
+| GET | `/manuals/{id}` | マニュアル詳細 |
 
 ---
 
@@ -494,6 +499,8 @@ LINE OAuth コールバック（Webhook 用）。
 | GET | `/seller/shipping` | 発送管理一覧（未発送・発送済み） |
 | POST | `/seller/shipping/{id}/ship` | 発送処理 |
 | PUT | `/seller/shipping/{id}/tracking` | 追跡番号更新 |
+| GET | `/seller/auctions/{auctionId}/shipments` | 出品単位の伝票番号一覧 |
+| POST | `/seller/auctions/{auctionId}/shipments` | 伝票番号一括登録（追加型・10件上限） |
 
 ### `POST /seller/shipping/{id}/ship`
 
@@ -511,6 +518,14 @@ LINE OAuth コールバック（Webhook 用）。
 | GET | `/seller/settlements` | 精算一覧 |
 | GET | `/seller/settlements/{auctionId}` | オークション別精算詳細 |
 | GET | `/seller/settlements/{auctionId}/payment-notice` | 支払通知書 PDF ダウンロード |
+
+---
+
+### 9.6 マスタ参照
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/seller/species-types` | 出品可能な種別マスタ一覧（袋仕様・箱入数を含む） |
 
 ---
 
@@ -563,8 +578,9 @@ LINE OAuth コールバック（Webhook 用）。
 | POST | `/admin/auctions` | オークション作成 |
 | GET | `/admin/auctions/{id}` | オークション詳細 |
 | PUT | `/admin/auctions/{id}` | オークション更新 |
-| DELETE | `/admin/auctions/{id}` | オークション削除 |
+| DELETE | `/admin/auctions/{id}` | オークション削除（ソフトデリート） |
 | PATCH | `/admin/auctions/{id}/status` | ステータス更新 |
+| PATCH | `/admin/auctions/{id}/publish` | 公開／非公開切替（`is_published` 真偽） |
 | PATCH | `/admin/auctions/{id}/lane-count` | レーン数変更 |
 | GET | `/admin/auctions-item-management` | 商品管理用オークション一覧 |
 
@@ -581,6 +597,7 @@ LINE OAuth コールバック（Webhook 用）。
 | DELETE | `/admin/auctions/{auctionId}/items/{id}` | 商品削除 |
 | PATCH | `/admin/auctions/{auctionId}/items/{id}/status` | 商品ステータス更新 |
 | PATCH | `/admin/auctions/{auctionId}/items/bulk-status` | 商品ステータス一括更新 |
+| PATCH | `/admin/auctions/{auctionId}/items/bulk-anonymous` | 匿名出品フラグ一括切替 |
 | GET | `/admin/auctions/{auctionId}/items/template` | CSV テンプレートダウンロード |
 | POST | `/admin/auctions/{auctionId}/items/import` | CSV インポート |
 | GET | `/admin/sellers/list` | 出品者一覧（商品登録用） |
@@ -801,7 +818,122 @@ LINE OAuth コールバック（Webhook 用）。
 
 ---
 
-## 11. WebSocket イベント
+### 10.22 メール配信管理
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/admin/email-campaigns` | 配信キャンペーン一覧 |
+| GET | `/admin/email-campaigns/{id}` | キャンペーン詳細 |
+| POST | `/admin/email-campaigns` | キャンペーン作成・予約 |
+| POST | `/admin/email-campaigns/{id}/cancel` | 予約キャンセル |
+| POST | `/admin/email-campaigns/preview` | 本文プレビュー（DB 書込みなし） |
+| POST | `/admin/email-campaigns/test-send` | テスト送信（DB 書込みなし） |
+
+---
+
+### 10.23 LP CVR 設定
+
+買受者LP・出品者LPの流入経路別 CTA URL を管理。`{lpType}` は `buyer` または `seller`。
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/admin/lp-cvr/{lpType}` | 流入経路リスト取得 |
+| POST | `/admin/lp-cvr/{lpType}` | 流入経路追加 |
+| PUT | `/admin/lp-cvr/{lpType}/{id}` | 流入経路更新 |
+| PUT | `/admin/lp-cvr/{lpType}/default` | デフォルト CTA URL 更新 |
+| DELETE | `/admin/lp-cvr/{lpType}/{id}` | 流入経路削除 |
+
+---
+
+### 10.24 種別マスタ管理
+
+メダカ／水草／金魚など出品種別を管理。袋仕様・箱入数・混載制約を種別配下に持つ。
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/admin/masters/species-types` | 種別一覧 |
+| POST | `/admin/masters/species-types` | 種別作成 |
+| POST | `/admin/masters/species-types/reorder` | 並び順更新 |
+| GET | `/admin/masters/species-types/{id}` | 種別詳細 |
+| PATCH | `/admin/masters/species-types/{id}` | 種別更新 |
+| DELETE | `/admin/masters/species-types/{id}` | 種別削除 |
+| GET | `/admin/masters/species-types/{id}/bag-specs` | 袋マスタ一覧 |
+| POST | `/admin/masters/species-types/{id}/bag-specs` | 袋マスタ追加 |
+| PATCH | `/admin/masters/species-types/{id}/bag-specs/{specId}` | 袋マスタ更新 |
+| DELETE | `/admin/masters/species-types/{id}/bag-specs/{specId}` | 袋マスタ削除 |
+| GET | `/admin/masters/species-types/{id}/box-capacities` | 箱入数マスタ一覧 |
+| PUT | `/admin/masters/species-types/{id}/box-capacities` | 箱入数マスタ一括更新 |
+| DELETE | `/admin/masters/species-types/{id}/box-capacities/{capId}` | 箱入数マスタ削除 |
+| GET | `/admin/masters/species-types/{id}/mix-restrictions` | 混載制約一覧 |
+| POST | `/admin/masters/species-types/{id}/mix-restrictions` | 混載制約追加 |
+| DELETE | `/admin/masters/species-types/{id}/mix-restrictions/{rowId}` | 混載制約削除 |
+
+---
+
+### 10.25 CSV エクスポート
+
+集計結果・マスタ情報を CSV ストリーミング配信。BOM 付き UTF-8。
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/admin/exports/auctions-summary.csv` | オークション一覧サマリー（1行=1オークション） |
+| GET | `/admin/exports/auction-items.csv` | 出品生体明細（全出品・未落札含む） |
+| GET | `/admin/exports/members.csv` | 会員情報一覧 |
+| GET | `/admin/exports/subscriptions.csv` | 年会費サブスクリプション一覧 |
+
+**`GET /admin/exports/auctions-summary.csv` クエリパラメータ**
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| from | date | 開催日下限（`YYYY-MM-DD`） |
+| to | date | 開催日上限 |
+| include_test | boolean | `1` で `is_test=true` オークションを含める（デフォルト除外） |
+
+**カラム（オークション一覧サマリー）**: オークションID / オークション名 / オークション日 / ステータス / 会員数 / 出品数 / 出品人数 / 落札数 / 落札人数 / 参加数 / 売上(税抜) / 手数料(税抜) / 送料(税抜) / 税金 / 合計(税込)
+
+- 売上・手数料・送料は `won_items` の合算（落札確定全件、支払い状況不問）
+- 税金 = (売上 + 手数料 + 送料) × `SystemSetting('tax_rate', 10)` / 100
+- 会員数は実行時点の `users` 全件スナップショット（全行同じ値）
+- 出品人数／落札人数／参加数はオークション単位のユニーク数
+
+**`GET /admin/exports/auction-items.csv` クエリパラメータ**
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| auction_id | integer | 単一オークションに絞り込み（指定時は from/to 無視） |
+| from | date | 開催日下限 |
+| to | date | 開催日上限 |
+| include_test | boolean | テストオークションを含める |
+
+**カラム（出品生体明細）**: オークションID / オークション日 / オークション名 / 出品番号 / 品種名 / 匹数 / 出品者名 / ステータス / 落札者名 / 落札金額(税抜) / 送料(税抜) / 手数料(税抜) / 税金 / 合計(税込)
+
+- 未落札行は落札者名・金額系カラムが空欄
+- 出品者名・落札者名は `users.trade_name` → `users.name` → `-` の順でフォールバック
+
+**`GET /admin/exports/members.csv`** — 全ユーザーを1行ずつ。列: ID / 氏名 / 屋号 / メールアドレス / 郵便番号 / 都道府県 / 市区町村 / 住所1 / 住所2 / 電話番号 / ロール / ステータス / 登録日。
+
+**`GET /admin/exports/subscriptions.csv`** — 全ユーザー1行。列: ID / 氏名 / 屋号 / メールアドレス / 登録状況 / プラン名 / 年会費(円) / サブスク状態 / 現在の課金期間終了 / 最終支払日。
+
+---
+
+## 11. メディア編集者 API
+
+🔒 認証必須。`admin` または `media_editor` ロールが必要。準備中（`preparing` / `scheduled`）のオークションに対してのみメディア操作が可能。
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/media-editor/auctions` | 編集対象のオークション一覧 |
+| GET | `/media-editor/auctions/{auctionId}/items` | 出品一覧 |
+| GET | `/media-editor/auctions/{auctionId}/items/{id}` | 出品詳細 |
+| POST | `/media-editor/auctions/{auctionId}/items/media/bulk-upload` | 一括アップロード |
+| POST | `/media-editor/auctions/{auctionId}/items/{id}/media` | 単体アップロード |
+| DELETE | `/media-editor/auctions/{auctionId}/items/{id}/media/{mediaId}` | 削除 |
+| PUT | `/media-editor/auctions/{auctionId}/items/{id}/media/reorder` | 並び順更新 |
+| PATCH | `/media-editor/auctions/{auctionId}/items/{id}/media/{mediaId}/thumbnail` | サムネイル指定 |
+
+---
+
+## 12. WebSocket イベント
 
 **接続方式**: Laravel Reverb (WebSocket)  
 **チャンネル**: `auction.{auctionId}.live`
@@ -830,7 +962,7 @@ LINE OAuth コールバック（Webhook 用）。
 
 ---
 
-## 12. 共通レスポンス形式
+## 13. 共通レスポンス形式
 
 ### 成功レスポンス
 
