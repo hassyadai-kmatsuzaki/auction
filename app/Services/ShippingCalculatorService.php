@@ -163,10 +163,17 @@ class ShippingCalculatorService
 
     /**
      * 指定種別のマスタで送料を計算する（auto 種別専用）。
+     *
+     * v5 仕様（pack_unit / unit_capacity をマスタが持つ）が有効な種別では
+     * 新ロジックへ分岐する。それ以外は旧 Greedy ロジックを温存。
      */
     private function calculateForSpecies(int $speciesId, array $items, string $destinationRegion): array
     {
         $this->loadSpeciesMasters($speciesId);
+
+        if ($this->isV5Capable($speciesId)) {
+            return $this->calculateForSpeciesV5($speciesId, $items, $destinationRegion);
+        }
 
         $bags = $this->determineBags($speciesId, $items);
         $boxes = $this->packBags($speciesId, $bags);
@@ -651,6 +658,8 @@ class ShippingCalculatorService
             foreach (BoxSpec::all() as $box) {
                 $specs[$box->box_size] = [
                     'max_weight_kg' => $box->max_weight_kg,
+                    'unit_capacity' => $box->unit_capacity !== null ? (int) $box->unit_capacity : null,
+                    'allow_single_l_override' => (bool) $box->allow_single_l_override,
                 ];
             }
             return $specs;
@@ -684,6 +693,7 @@ class ShippingCalculatorService
                     'min_qty' => (int) $bag->min_qty,
                     'max_qty' => $bag->max_qty !== null ? (int) $bag->max_qty : null,
                     'weight_kg' => (float) $bag->weight_kg,
+                    'pack_unit' => $bag->pack_unit !== null ? (int) $bag->pack_unit : null,
                 ];
             }
             return $specs;
@@ -747,5 +757,249 @@ class ShippingCalculatorService
             $result[] = ['size' => $size, 'quantity' => $count];
         }
         return $result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // v5 ロジック（pack_unit / unit_capacity ベース・総当たり最適化）
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * 指定種別が v5 マスタ（pack_unit / unit_capacity）を備えているかを判定。
+     */
+    private function isV5Capable(int $speciesId): bool
+    {
+        $bagSpecs = $this->speciesMasters[$speciesId]['bag_specs'] ?? [];
+        foreach ($bagSpecs as $spec) {
+            if (($spec['pack_unit'] ?? null) === null) {
+                return false;
+            }
+        }
+        foreach ($this->boxSpecs as $box) {
+            if (($box['unit_capacity'] ?? null) === null) {
+                return false;
+            }
+        }
+        return !empty($bagSpecs) && !empty($this->boxSpecs);
+    }
+
+    /**
+     * v5 仕様での送料計算。1 出品 = 1 袋を前提に箱構成を総当たりして料金最小を返す。
+     */
+    private function calculateForSpeciesV5(int $speciesId, array $items, string $destinationRegion): array
+    {
+        $bagSpecs = $this->speciesMasters[$speciesId]['bag_specs'];
+
+        // 各出品を 1 袋にマップ
+        $counts = [];
+        foreach ($bagSpecs as $size => $_) {
+            $counts[$size] = 0;
+        }
+        foreach ($items as $item) {
+            $size = $this->determineBagSizeV5($speciesId, (int) $item['quantity']);
+            $counts[$size]++;
+        }
+
+        $best = $this->optimizeBoxesV5($speciesId, $counts, $destinationRegion);
+        if ($best === null) {
+            throw new \RuntimeException("v5: 袋を箱に詰められません（species_id={$speciesId}）");
+        }
+
+        $boxDetails = [];
+        foreach ($best['boxes'] as $box) {
+            $boxDetails[] = [
+                'box_size' => $box['size'],
+                'bags' => $this->formatBagsInBox($box['bags']),
+                'shipping_cost' => $this->getShippingRate($destinationRegion, $box['size']),
+                'packing_material_cost' => $this->getPackingMaterialCost($box['size']),
+            ];
+        }
+
+        return [
+            'bags' => $this->formatBagsSummary(array_filter($counts, fn ($c) => $c > 0)),
+            'boxes' => $boxDetails,
+            'shipping_cost' => $best['shipping_cost'],
+            'packing_material_cost' => $best['packing_material_cost'],
+            'total_shipping_fee' => $best['shipping_cost'] + $best['packing_material_cost'],
+            'destination_region' => $destinationRegion,
+        ];
+    }
+
+    /**
+     * 匹数 → 袋サイズ。bag_specs.min_qty〜max_qty レンジで判定。
+     */
+    private function determineBagSizeV5(int $speciesId, int $quantity): string
+    {
+        foreach ($this->speciesMasters[$speciesId]['bag_specs'] as $size => $spec) {
+            $min = (int) $spec['min_qty'];
+            $max = $spec['max_qty'] !== null ? (int) $spec['max_qty'] : PHP_INT_MAX;
+            if ($quantity >= $min && $quantity <= $max) {
+                return $size;
+            }
+        }
+        throw new \RuntimeException("v5: 匹数 {$quantity} を収容できる袋がありません（species_id={$speciesId}）");
+    }
+
+    /**
+     * 箱構成 (n80, n100, n140) を総当たりして料金最小のパッキングを返す。
+     */
+    private function optimizeBoxesV5(int $speciesId, array $counts, string $destinationRegion): ?array
+    {
+        $bagSpecs = $this->speciesMasters[$speciesId]['bag_specs'];
+        $sizesAsc = array_keys($this->boxSpecs);
+        sort($sizesAsc);
+
+        // 総単位数・総重量
+        $totalUnits = 0;
+        $totalWeight = 0.0;
+        $totalBags = 0;
+        foreach ($counts as $bagSize => $n) {
+            $totalUnits += $n * (int) ($bagSpecs[$bagSize]['pack_unit'] ?? 0);
+            $totalWeight += $n * (float) ($bagSpecs[$bagSize]['weight_kg'] ?? 0);
+            $totalBags += $n;
+        }
+
+        if ($totalBags === 0) {
+            return ['boxes' => [], 'shipping_cost' => 0, 'packing_material_cost' => 0];
+        }
+
+        // 探索上限：袋数 + 1（L×1 単独で 80 箱を追加するケースを考慮）
+        $maxN = $totalBags + 1;
+
+        $best = null;
+
+        for ($n140 = 0; $n140 <= $maxN; $n140++) {
+            for ($n100 = 0; $n100 <= $maxN - $n140; $n100++) {
+                for ($n80 = 0; $n80 <= $maxN - $n140 - $n100; $n80++) {
+                    $boxCount = $n80 + $n100 + $n140;
+                    if ($boxCount === 0) continue;
+                    if ($boxCount > $totalBags + max(0, $counts['L'] ?? 0)) continue;
+
+                    // 単位下限の剪枝（80 箱の L×1 特例による許容増分を加味）
+                    $box80Spec = $this->boxSpecs[80] ?? null;
+                    $box100Spec = $this->boxSpecs[100] ?? null;
+                    $box140Spec = $this->boxSpecs[140] ?? null;
+                    $unitCap = $n80 * (int) ($box80Spec['unit_capacity'] ?? 0)
+                        + $n100 * (int) ($box100Spec['unit_capacity'] ?? 0)
+                        + $n140 * (int) ($box140Spec['unit_capacity'] ?? 0);
+                    $bonusUnits = 0;
+                    if (!empty($box80Spec['allow_single_l_override']) && ($counts['L'] ?? 0) > 0) {
+                        $lUnit = (int) ($bagSpecs['L']['pack_unit'] ?? 0);
+                        $cap80 = (int) ($box80Spec['unit_capacity'] ?? 0);
+                        $bonusUnits = min($n80, (int) ($counts['L'] ?? 0)) * max(0, $lUnit - $cap80);
+                    }
+                    if ($unitCap + $bonusUnits < $totalUnits) continue;
+
+                    // 重量下限の剪枝
+                    $weightCap = $n80 * (float) ($box80Spec['max_weight_kg'] ?? 0)
+                        + $n100 * (float) ($box100Spec['max_weight_kg'] ?? 0)
+                        + $n140 * (float) ($box140Spec['max_weight_kg'] ?? 0);
+                    if ($weightCap + 1e-9 < $totalWeight) continue;
+
+                    $result = $this->tryPackV5(
+                        $speciesId,
+                        $counts,
+                        [80 => $n80, 100 => $n100, 140 => $n140],
+                        $destinationRegion
+                    );
+                    if ($result === null) continue;
+
+                    if ($best === null || $result['shipping_cost'] + $result['packing_material_cost']
+                        < $best['shipping_cost'] + $best['packing_material_cost']) {
+                        $best = $result;
+                    }
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * 指定の箱構成に袋を First-Fit Decreasing で詰められるか試行。
+     * 全箱が少なくとも 1 袋を含み、かつ fits_in_box を満たすときのみ成功。
+     */
+    private function tryPackV5(int $speciesId, array $counts, array $boxConfig, string $destinationRegion): ?array
+    {
+        $boxList = [];
+        foreach ([140, 100, 80] as $size) {
+            $n = (int) ($boxConfig[$size] ?? 0);
+            for ($i = 0; $i < $n; $i++) {
+                $boxList[] = ['size' => $size, 'bags' => ['S' => 0, 'M' => 0, 'L' => 0]];
+            }
+        }
+        if (empty($boxList)) {
+            return null;
+        }
+
+        $remaining = ['L' => (int) ($counts['L'] ?? 0), 'M' => (int) ($counts['M'] ?? 0), 'S' => (int) ($counts['S'] ?? 0)];
+
+        foreach (['L', 'M', 'S'] as $bagSize) {
+            while ($remaining[$bagSize] > 0) {
+                $placed = false;
+                foreach ($boxList as $idx => $box) {
+                    $trial = $box['bags'];
+                    $trial[$bagSize]++;
+                    if ($this->fitsInBoxV5($speciesId, $trial, $box['size'])) {
+                        $boxList[$idx]['bags'] = $trial;
+                        $remaining[$bagSize]--;
+                        $placed = true;
+                        break;
+                    }
+                }
+                if (!$placed) return null;
+            }
+        }
+
+        // 空箱が残っていれば、その boxConfig は最適候補から外す（別の構成で必ず安く出る）
+        $totalShipping = 0;
+        $totalPacking = 0;
+        foreach ($boxList as $box) {
+            if (array_sum($box['bags']) === 0) {
+                return null;
+            }
+            $totalShipping += $this->getShippingRate($destinationRegion, $box['size']);
+            $totalPacking += $this->getPackingMaterialCost($box['size']);
+        }
+
+        return [
+            'boxes' => $boxList,
+            'shipping_cost' => $totalShipping,
+            'packing_material_cost' => $totalPacking,
+        ];
+    }
+
+    /**
+     * v5 の箱収容判定。単位上限と重量上限の両方を満たす必要あり。
+     * 80 箱の L×1 単独時のみ単位上限超過を許可。
+     */
+    private function fitsInBoxV5(int $speciesId, array $bags, int $boxSize): bool
+    {
+        $boxSpec = $this->boxSpecs[$boxSize] ?? null;
+        if (!$boxSpec) return false;
+        $bagSpecs = $this->speciesMasters[$speciesId]['bag_specs'];
+
+        $s = (int) ($bags['S'] ?? 0);
+        $m = (int) ($bags['M'] ?? 0);
+        $l = (int) ($bags['L'] ?? 0);
+
+        $unitS = (int) ($bagSpecs['S']['pack_unit'] ?? 0);
+        $unitM = (int) ($bagSpecs['M']['pack_unit'] ?? 0);
+        $unitL = (int) ($bagSpecs['L']['pack_unit'] ?? 0);
+        $totalUnits = $s * $unitS + $m * $unitM + $l * $unitL;
+
+        $isSingleL = ($s === 0 && $m === 0 && $l === 1);
+        $allowOverride = !empty($boxSpec['allow_single_l_override']) && $isSingleL;
+        if (!$allowOverride && $totalUnits > (int) ($boxSpec['unit_capacity'] ?? 0)) {
+            return false;
+        }
+
+        $totalWeight = $s * (float) ($bagSpecs['S']['weight_kg'] ?? 0)
+            + $m * (float) ($bagSpecs['M']['weight_kg'] ?? 0)
+            + $l * (float) ($bagSpecs['L']['weight_kg'] ?? 0);
+        if ($totalWeight > (float) ($boxSpec['max_weight_kg'] ?? 0) + 1e-9) {
+            return false;
+        }
+
+        return true;
     }
 }

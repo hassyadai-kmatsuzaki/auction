@@ -115,8 +115,9 @@ class ShippingCalculatorServiceTest extends TestCase
     }
 
     /** @test */
-    public function メダカ単独_中量_関東_M袋1個100号箱(): void
+    public function v5_メダカ単独_中量50匹_関東_M袋1個_80号箱単独(): void
     {
+        // v5: M袋は単位2、80箱は単位上限2＋重量5kg以内なので 80号単独で済む
         $calculator = new ShippingCalculatorService();
         $result = $calculator->calculate(
             [['quantity' => 50, 'species_type_id' => $this->medakaId]],
@@ -124,34 +125,31 @@ class ShippingCalculatorServiceTest extends TestCase
         );
 
         $this->assertSame('auto', $result['calculation_mode']);
-        $this->assertSame(100, $result['boxes'][0]['box_size']);
-        // 関東100号 = 847, 資材(100号) = 350 → 1197
-        $this->assertSame(847, $result['shipping_cost']);
-        $this->assertSame(350, $result['packing_material_cost']);
-        $this->assertSame(1197, $result['total_shipping_fee']);
+        $this->assertSame(80, $result['boxes'][0]['box_size']);
+        $this->assertSame(704, $result['shipping_cost']);
+        $this->assertSame(300, $result['packing_material_cost']);
+        $this->assertSame(1004, $result['total_shipping_fee']);
     }
 
     /** @test */
-    public function メダカ単独_大量_関東_L袋1個140号箱(): void
+    public function v5_メダカ単独_最大100匹_L袋1個_80号箱特例で1004円(): void
     {
+        // v5: 100匹は L袋(単位3)、80箱の単位上限2を超えるが L×1単独特例で許可
         $calculator = new ShippingCalculatorService();
         $result = $calculator->calculate(
-            [['quantity' => 250, 'species_type_id' => $this->medakaId]],
+            [['quantity' => 100, 'species_type_id' => $this->medakaId]],
             '関東'
         );
 
         $this->assertSame('auto', $result['calculation_mode']);
-        $this->assertSame(140, $result['boxes'][0]['box_size']);
-        // 関東140号 = 1320, 資材(140号) = 450 → 1770
-        $this->assertSame(1320, $result['shipping_cost']);
-        $this->assertSame(450, $result['packing_material_cost']);
-        $this->assertSame(1770, $result['total_shipping_fee']);
+        $this->assertSame(80, $result['boxes'][0]['box_size']);
+        $this->assertSame(1004, $result['total_shipping_fee']);
     }
 
     /** @test */
-    public function メダカ_100号ではS袋Mを混載しない(): void
+    public function v5_メダカ_S袋とM袋は100号箱で同梱可能(): void
     {
-        // S×1 + M×1 → 100 で混載不可 → 140 に詰める
+        // v5: S(単位1)+M(単位2) = 単位3 ≤ 100号箱(上限7)、重量3.5kg ≤ 10kg → 同梱OK
         $calculator = new ShippingCalculatorService();
         $result = $calculator->calculate(
             [
@@ -162,7 +160,8 @@ class ShippingCalculatorServiceTest extends TestCase
         );
 
         $this->assertSame(1, count($result['boxes']));
-        $this->assertSame(140, $result['boxes'][0]['box_size']);
+        $this->assertSame(100, $result['boxes'][0]['box_size']);
+        $this->assertSame(1197, $result['total_shipping_fee']);
     }
 
     /** @test */

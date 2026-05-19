@@ -336,9 +336,13 @@ export default function SubmitItem() {
       });
     } catch (err: any) {
       console.error('出品申込エラー:', err);
+      const validationErrors = err.response?.data?.errors;
+      const errorMessage = validationErrors && typeof validationErrors === 'object'
+        ? Object.values(validationErrors).flat().join('\n')
+        : (err.response?.data?.message || '出品申込に失敗しました');
       setSnackbar({
         open: true,
-        message: err.response?.data?.message || '出品申込に失敗しました',
+        message: errorMessage,
         severity: 'error'
       });
       // 出品作成自体が失敗した場合のみ再送可能にする。
@@ -894,7 +898,11 @@ export default function SubmitItem() {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          sx={{ whiteSpace: 'pre-line' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

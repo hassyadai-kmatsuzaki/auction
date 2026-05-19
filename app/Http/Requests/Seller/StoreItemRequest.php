@@ -49,7 +49,7 @@ class StoreItemRequest extends FormRequest
             'species_name.max' => '品種名は100文字以内で入力してください。',
             'quantity.required' => '匹数は必須です。',
             'quantity.min' => '匹数は1匹以上で指定してください。',
-            'quantity.max' => '匹数は100匹以下で指定してください。',
+            'quantity.max' => "1出品あたり100匹までとさせていただいております。\n※保証を入れていただく場合は、パックにその旨をご記載ください。",
             'start_price.required' => '開始価格は必須です。',
             'start_price.min' => '開始価格は100円以上で指定してください。',
             'start_price.max' => '開始価格は10,000,000円以下で指定してください。',
