@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Auction;
 use App\Models\Item;
+use App\Models\Subscription;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -210,6 +211,146 @@ class CsvExportService
                     $commission !== null ? (int) $commission : '',
                     $tax !== null ? (int) $tax : '',
                     $grand !== null ? (int) $grand : '',
+                ]);
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    /**
+     * 3つ目: 会員情報CSV
+     * 全ユーザー (soft deleted 除外) を 1 行ずつ出力
+     */
+    public function streamMembers(): StreamedResponse
+    {
+        $filename = sprintf('members_%s.csv', now()->format('Ymd_His'));
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        return response()->stream(function () {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($out, [
+                'ID',
+                '氏名',
+                '屋号',
+                'メールアドレス',
+                '郵便番号',
+                '都道府県',
+                '市区町村',
+                '住所1',
+                '住所2',
+                '電話番号',
+                'ロール',
+                'ステータス',
+                '登録日',
+            ]);
+
+            $query = User::query()
+                ->with(['roles:id,display_name'])
+                ->orderBy('id');
+
+            foreach ($query->lazy(200) as $user) {
+                $roles = $user->roles->pluck('display_name')->filter()->implode(' / ');
+
+                fputcsv($out, [
+                    $user->id,
+                    $user->name ?? '',
+                    $user->trade_name ?? '',
+                    $user->email ?? '',
+                    $user->postal_code ?? '',
+                    $user->prefecture ?? '',
+                    $user->city ?? '',
+                    $user->address_line1 ?? '',
+                    $user->address_line2 ?? '',
+                    $user->phone ?? '',
+                    $roles !== '' ? $roles : '-',
+                    $user->status ?? '',
+                    optional($user->created_at)->format('Y-m-d') ?? '',
+                ]);
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    /**
+     * 4つ目: 年会費CSV
+     * 全ユーザー1行。subscription の有無 + 最終支払日 (payments.paid_at の MAX) を出す
+     */
+    public function streamSubscriptions(): StreamedResponse
+    {
+        $filename = sprintf('subscriptions_%s.csv', now()->format('Ymd_His'));
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        // 最終支払日 (completed のもののみ) を user_id ごとに 1 回で取得
+        $lastPaidAt = DB::table('payments')
+            ->select('user_id', DB::raw('MAX(paid_at) as last_paid_at'))
+            ->where('status', 'completed')
+            ->whereNotNull('paid_at')
+            ->groupBy('user_id')
+            ->pluck('last_paid_at', 'user_id');
+
+        return response()->stream(function () use ($lastPaidAt) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($out, [
+                'ID',
+                '氏名',
+                '屋号',
+                'メールアドレス',
+                '登録状況',
+                'プラン名',
+                '年会費(円)',
+                'サブスク状態',
+                '現在の課金期間終了',
+                '最終支払日',
+            ]);
+
+            $query = User::query()
+                ->with(['subscription.plan'])
+                ->orderBy('id');
+
+            foreach ($query->lazy(200) as $user) {
+                /** @var \App\Models\Subscription|null $sub */
+                $sub = $user->subscription;
+                $plan = $sub?->plan;
+
+                $registered = $sub !== null;
+                $isActive = $sub !== null && $sub->status === Subscription::STATUS_ACTIVE;
+
+                if ($isActive) {
+                    $regLabel = '登録済（有効）';
+                } elseif ($registered) {
+                    $regLabel = '登録済（' . $sub->status . '）';
+                } else {
+                    $regLabel = '未登録';
+                }
+
+                $lastPaid = $lastPaidAt->get($user->id);
+                $lastPaidFormatted = $lastPaid ? Carbon::parse($lastPaid)->format('Y-m-d') : '';
+
+                fputcsv($out, [
+                    $user->id,
+                    $user->name ?? '',
+                    $user->trade_name ?? '',
+                    $user->email ?? '',
+                    $regLabel,
+                    $plan?->name ?? '',
+                    $plan?->amount !== null ? (int) $plan->amount : '',
+                    $sub?->status ?? '',
+                    optional($sub?->current_period_end)->format('Y-m-d') ?? '',
+                    $lastPaidFormatted,
                 ]);
             }
 

@@ -51,4 +51,20 @@ class CsvExportController extends Controller
 
         return $this->csvExportService->streamAuctionItems($auctionId, $from, $to, $includeTest);
     }
+
+    /**
+     * GET /api/admin/exports/members.csv
+     */
+    public function members(Request $request): StreamedResponse
+    {
+        return $this->csvExportService->streamMembers();
+    }
+
+    /**
+     * GET /api/admin/exports/subscriptions.csv
+     */
+    public function subscriptions(Request $request): StreamedResponse
+    {
+        return $this->csvExportService->streamSubscriptions();
+    }
 }
