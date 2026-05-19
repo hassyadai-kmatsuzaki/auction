@@ -123,7 +123,7 @@ export default function MediaEditorItemListPage() {
 
                   <Box sx={{ flexGrow: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      #{item.item_number} {item.species_name}
+                      #{item.id} {item.species_name}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
                       <Chip

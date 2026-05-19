@@ -221,7 +221,7 @@ export default function MediaEditorItemMediaEditPage() {
       </Button>
 
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-        #{item.item_number} {item.species_name}
+        #{item.id} {item.species_name}
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
         画像・動画のアップロード、サムネイル設定、削除のみ行えます。
