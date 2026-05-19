@@ -341,6 +341,12 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::post('/generate', [\App\Http\Controllers\Admin\ReportController::class, 'generate']);
     });
 
+    // CSVエクスポート
+    Route::prefix('exports')->group(function () {
+        Route::get('/auctions-summary.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'auctionsSummary']);
+        Route::get('/auction-items.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'auctionItems']);
+    });
+
     // 血統証明書管理
     Route::prefix('pedigree')->group(function () {
         Route::get('/{itemId}', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'show']);

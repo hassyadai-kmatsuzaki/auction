@@ -72,6 +72,7 @@ const DocumentManagement     = lazy(() => import('./pages/admin/DocumentManageme
 const LaneAssignment         = lazy(() => import('./pages/admin/LaneAssignment'));
 const SellerOrderPage        = lazy(() => import('./features/admin/auction-seller-order/pages/SellerOrderPage'));
 const Reports                = lazy(() => import('./pages/admin/Reports'));
+const CsvExports             = lazy(() => import('./pages/admin/CsvExports'));
 const DesignSystem           = lazy(() => import('./pages/admin/DesignSystem'));
 const AIAnalytics            = lazy(() => import('./pages/admin/AIAnalytics'));
 const AIImageRecognition     = lazy(() => import('./pages/admin/AIImageRecognition'));
@@ -244,6 +245,7 @@ function App() {
             <Route path="ai/fraud-detection" element={<AIFraudDetection />} />
             <Route path="ai/recommendations" element={<AIRecommendations />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="exports" element={<CsvExports />} />
             
             {/* ユーザー管理 */}
             <Route path="users" element={<UserManagement />} />

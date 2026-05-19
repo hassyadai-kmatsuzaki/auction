@@ -42,6 +42,7 @@ import {
   Subscriptions as SubscriptionsIcon,
   WorkspacePremium as PlanIcon,
   Email as EmailIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -112,6 +113,7 @@ export default function AdminLayout() {
     { text: 'インフラスケーリング', icon: <CloudIcon />, path: '/admin/scaling' },
     { text: '帳票管理', icon: <ReceiptIcon />, path: '/admin/documents' },
     { text: 'レポート', icon: <AssessmentIcon />, path: '/admin/reports' },
+    { text: 'CSVエクスポート', icon: <FileDownloadIcon />, path: '/admin/exports' },
   ];
 
   const billingMenuItems = [
