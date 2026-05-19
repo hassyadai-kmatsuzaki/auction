@@ -28,6 +28,11 @@ export default function CsvExports() {
   const [itemsIncludeTest, setItemsIncludeTest] = useState(false);
   const [downloadingItems, setDownloadingItems] = useState(false);
 
+  // 3つ目: 会員情報
+  const [downloadingMembers, setDownloadingMembers] = useState(false);
+  // 4つ目: 年会費
+  const [downloadingSubscriptions, setDownloadingSubscriptions] = useState(false);
+
   const [auctions, setAuctions] = useState<AuctionOption[]>([]);
   const [loadingAuctions, setLoadingAuctions] = useState(false);
   const [error, setError] = useState('');
@@ -87,6 +92,30 @@ export default function CsvExports() {
       setError(e.response?.data?.message || 'CSVダウンロードに失敗しました。');
     } finally {
       setDownloadingItems(false);
+    }
+  };
+
+  const handleDownloadMembers = async () => {
+    setDownloadingMembers(true);
+    setError('');
+    try {
+      await adminCsvExportApi.members();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'CSVダウンロードに失敗しました。');
+    } finally {
+      setDownloadingMembers(false);
+    }
+  };
+
+  const handleDownloadSubscriptions = async () => {
+    setDownloadingSubscriptions(true);
+    setError('');
+    try {
+      await adminCsvExportApi.subscriptions();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'CSVダウンロードに失敗しました。');
+    } finally {
+      setDownloadingSubscriptions(false);
     }
   };
 
@@ -220,6 +249,38 @@ export default function CsvExports() {
             </Button>
           </Grid>
         </Grid>
+      </Paper>
+
+      <Paper sx={{ p: 3, mt: 3 }}>
+        <Typography variant="h6" gutterBottom>会員情報</Typography>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          全会員のID・氏名・屋号・メールアドレス・住所・電話番号・ロール・ステータス・登録日を出力します。
+        </Typography>
+        <Divider sx={{ my: 2 }} />
+        <Button
+          variant="contained"
+          startIcon={downloadingMembers ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+          onClick={handleDownloadMembers}
+          disabled={downloadingMembers}
+        >
+          CSVをダウンロード
+        </Button>
+      </Paper>
+
+      <Paper sx={{ p: 3, mt: 3 }}>
+        <Typography variant="h6" gutterBottom>年会費</Typography>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          全会員1行ずつ。登録状況（登録済/未登録）・プラン・年会費・サブスク状態・現在の課金期間終了日・最終支払日を出力します。
+        </Typography>
+        <Divider sx={{ my: 2 }} />
+        <Button
+          variant="contained"
+          startIcon={downloadingSubscriptions ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+          onClick={handleDownloadSubscriptions}
+          disabled={downloadingSubscriptions}
+        >
+          CSVをダウンロード
+        </Button>
       </Paper>
     </Box>
   );

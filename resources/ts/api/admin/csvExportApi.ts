@@ -52,4 +52,16 @@ export const adminCsvExportApi = {
       cleanParams(params),
       'auction_items.csv',
     ),
+  members: () =>
+    downloadCsv(
+      '/api/admin/exports/members.csv',
+      {},
+      'members.csv',
+    ),
+  subscriptions: () =>
+    downloadCsv(
+      '/api/admin/exports/subscriptions.csv',
+      {},
+      'subscriptions.csv',
+    ),
 };
