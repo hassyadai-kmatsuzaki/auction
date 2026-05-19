@@ -878,8 +878,7 @@ LINE OAuth コールバック（Webhook 用）。
 |---|---|---|
 | GET | `/admin/exports/auctions-summary.csv` | オークション一覧サマリー（1行=1オークション） |
 | GET | `/admin/exports/auction-items.csv` | 出品生体明細（全出品・未落札含む） |
-| GET | `/admin/exports/members.csv` | 会員情報一覧 |
-| GET | `/admin/exports/subscriptions.csv` | 年会費サブスクリプション一覧 |
+| GET | `/admin/exports/members.csv` | 会員情報＋年会費の統合 CSV |
 
 **`GET /admin/exports/auctions-summary.csv` クエリパラメータ**
 
@@ -910,9 +909,12 @@ LINE OAuth コールバック（Webhook 用）。
 - 未落札行は落札者名・金額系カラムが空欄
 - 出品者名・落札者名は `users.trade_name` → `users.name` → `-` の順でフォールバック
 
-**`GET /admin/exports/members.csv`** — 全ユーザーを1行ずつ。列: ID / 氏名 / 屋号 / メールアドレス / 郵便番号 / 都道府県 / 市区町村 / 住所1 / 住所2 / 電話番号 / ロール / ステータス / 登録日。
+**`GET /admin/exports/members.csv`** — 全ユーザーを1行ずつ。会員情報と年会費を統合した CSV。列:
 
-**`GET /admin/exports/subscriptions.csv`** — 全ユーザー1行。列: ID / 氏名 / 屋号 / メールアドレス / 登録状況 / プラン名 / 年会費(円) / サブスク状態 / 現在の課金期間終了 / 最終支払日。
+- 基本: ID / 氏名 / 屋号 / メールアドレス / 郵便番号 / 都道府県 / 市区町村 / 住所1 / 住所2 / 電話番号 / ロール / ステータス / 登録日
+- 年会費: 年会費登録状況（`未登録` / `登録済（有効）` / `登録済（その他状態）`） / プラン名 / 年会費(円) / サブスク状態 / 現在の課金期間終了 / 最終支払日
+
+`最終支払日` は `payments.status='completed'` の `paid_at` の最大値。
 
 ---
 

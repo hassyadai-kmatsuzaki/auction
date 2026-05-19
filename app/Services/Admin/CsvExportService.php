@@ -219,73 +219,12 @@ class CsvExportService
     }
 
     /**
-     * 3つ目: 会員情報CSV
+     * 3つ目: 会員情報CSV（年会費情報を統合）
      * 全ユーザー (soft deleted 除外) を 1 行ずつ出力
      */
     public function streamMembers(): StreamedResponse
     {
         $filename = sprintf('members_%s.csv', now()->format('Ymd_His'));
-
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ];
-
-        return response()->stream(function () {
-            $out = fopen('php://output', 'w');
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
-            fputcsv($out, [
-                'ID',
-                '氏名',
-                '屋号',
-                'メールアドレス',
-                '郵便番号',
-                '都道府県',
-                '市区町村',
-                '住所1',
-                '住所2',
-                '電話番号',
-                'ロール',
-                'ステータス',
-                '登録日',
-            ]);
-
-            $query = User::query()
-                ->with(['roles:id,display_name'])
-                ->orderBy('id');
-
-            foreach ($query->lazy(200) as $user) {
-                $roles = $user->roles->pluck('display_name')->filter()->implode(' / ');
-
-                fputcsv($out, [
-                    $user->id,
-                    $user->name ?? '',
-                    $user->trade_name ?? '',
-                    $user->email ?? '',
-                    $user->postal_code ?? '',
-                    $user->prefecture ?? '',
-                    $user->city ?? '',
-                    $user->address_line1 ?? '',
-                    $user->address_line2 ?? '',
-                    $user->phone ?? '',
-                    $roles !== '' ? $roles : '-',
-                    $user->status ?? '',
-                    optional($user->created_at)->format('Y-m-d') ?? '',
-                ]);
-            }
-
-            fclose($out);
-        }, 200, $headers);
-    }
-
-    /**
-     * 4つ目: 年会費CSV
-     * 全ユーザー1行。subscription の有無 + 最終支払日 (payments.paid_at の MAX) を出す
-     */
-    public function streamSubscriptions(): StreamedResponse
-    {
-        $filename = sprintf('subscriptions_%s.csv', now()->format('Ymd_His'));
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -309,7 +248,16 @@ class CsvExportService
                 '氏名',
                 '屋号',
                 'メールアドレス',
-                '登録状況',
+                '郵便番号',
+                '都道府県',
+                '市区町村',
+                '住所1',
+                '住所2',
+                '電話番号',
+                'ロール',
+                'ステータス',
+                '登録日',
+                '年会費登録状況',
                 'プラン名',
                 '年会費(円)',
                 'サブスク状態',
@@ -318,10 +266,12 @@ class CsvExportService
             ]);
 
             $query = User::query()
-                ->with(['subscription.plan'])
+                ->with(['roles:id,display_name', 'subscription.plan'])
                 ->orderBy('id');
 
             foreach ($query->lazy(200) as $user) {
+                $roles = $user->roles->pluck('display_name')->filter()->implode(' / ');
+
                 /** @var \App\Models\Subscription|null $sub */
                 $sub = $user->subscription;
                 $plan = $sub?->plan;
@@ -345,6 +295,15 @@ class CsvExportService
                     $user->name ?? '',
                     $user->trade_name ?? '',
                     $user->email ?? '',
+                    $user->postal_code ?? '',
+                    $user->prefecture ?? '',
+                    $user->city ?? '',
+                    $user->address_line1 ?? '',
+                    $user->address_line2 ?? '',
+                    $user->phone ?? '',
+                    $roles !== '' ? $roles : '-',
+                    $user->status ?? '',
+                    optional($user->created_at)->format('Y-m-d') ?? '',
                     $regLabel,
                     $plan?->name ?? '',
                     $plan?->amount !== null ? (int) $plan->amount : '',

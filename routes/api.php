@@ -346,7 +346,6 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::get('/auctions-summary.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'auctionsSummary']);
         Route::get('/auction-items.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'auctionItems']);
         Route::get('/members.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'members']);
-        Route::get('/subscriptions.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'subscriptions']);
     });
 
     // 血統証明書管理

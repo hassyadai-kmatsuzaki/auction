@@ -54,17 +54,10 @@ class CsvExportController extends Controller
 
     /**
      * GET /api/admin/exports/members.csv
+     * 会員情報（年会費情報を含む統合 CSV）
      */
     public function members(Request $request): StreamedResponse
     {
         return $this->csvExportService->streamMembers();
-    }
-
-    /**
-     * GET /api/admin/exports/subscriptions.csv
-     */
-    public function subscriptions(Request $request): StreamedResponse
-    {
-        return $this->csvExportService->streamSubscriptions();
     }
 }

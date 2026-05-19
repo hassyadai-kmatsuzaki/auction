@@ -58,10 +58,4 @@ export const adminCsvExportApi = {
       {},
       'members.csv',
     ),
-  subscriptions: () =>
-    downloadCsv(
-      '/api/admin/exports/subscriptions.csv',
-      {},
-      'subscriptions.csv',
-    ),
 };
