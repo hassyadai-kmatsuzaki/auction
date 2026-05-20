@@ -1,7 +1,7 @@
 <x-mail::message>
 # 出品商品が落札されました
 
-{{ $seller->sellerProfile->seller_name ?? $seller->name ?? '出品者' }} 様
+{{ $seller->trade_name ?? $seller->name ?? '-' }} 様
 
 おめでとうございます！
 出品された商品が落札されましたのでお知らせいたします。
@@ -22,13 +22,8 @@
 
 ## 今後の流れ
 
-1. 買受者様からの入金をお待ちください
-2. 入金確認後、発送依頼のメールをお送りします
-3. 発送後、伝票番号を管理画面からご登録ください
-
-<x-mail::button :url="config('app.frontend_url') . '/seller/shipping'">
-発送管理を確認する
-</x-mail::button>
+商品の発送は弊社で代行いたしますので、出品者様での発送作業は不要です。
+落札代金は所定の精算スケジュールに従ってお支払いいたします。
 
 ---
 
