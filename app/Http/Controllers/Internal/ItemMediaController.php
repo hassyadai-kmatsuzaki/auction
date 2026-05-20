@@ -6,6 +6,7 @@ use App\Actions\Item\UploadMediaAction;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemMedia;
+use App\Services\IdempotencyService;
 use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,9 +15,12 @@ use Illuminate\Support\Facades\Validator;
 
 class ItemMediaController extends Controller
 {
+    private const IDEMPOTENCY_SCOPE = 'internal-upload';
+
     public function __construct(
-        private readonly UploadMediaAction $uploadMediaAction,
-        private readonly StorageService    $storage,
+        private readonly UploadMediaAction  $uploadMediaAction,
+        private readonly StorageService     $storage,
+        private readonly IdempotencyService $idempotency,
     ) {}
 
     /**
@@ -50,14 +54,68 @@ class ItemMediaController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $mediaType  = $request->input('media_type');
-        $result = $this->uploadMediaAction->execute(
-            $item,
-            $request->file('file'),
-            $mediaType,
-            $request->boolean('is_thumbnail', false),
-        );
+        $mediaType    = $request->input('media_type');
+        $isThumbnail  = $request->boolean('is_thumbnail', false);
+        $idempotencyKey = $this->extractIdempotencyKey($request);
 
+        if ($idempotencyKey !== null) {
+            $requestHash = $this->buildRequestHash(
+                $itemId,
+                $mediaType,
+                $isThumbnail,
+                $request->file('file'),
+            );
+
+            $claim = $this->idempotency->claim(self::IDEMPOTENCY_SCOPE, $idempotencyKey, $requestHash);
+
+            switch ($claim['result']) {
+                case IdempotencyService::REPLAY:
+                    return response()
+                        ->json($claim['body'], $claim['status'])
+                        ->header('Idempotent-Replayed', 'true');
+
+                case IdempotencyService::CONFLICT_PROCESSING:
+                    return response()->json([
+                        'success' => false,
+                        'message' => '同一の Idempotency-Key で処理が進行中です。完了後に再試行してください。',
+                    ], 409);
+
+                case IdempotencyService::PAYLOAD_MISMATCH:
+                    return response()->json([
+                        'success' => false,
+                        'message' => '同一の Idempotency-Key に対して異なるリクエスト内容が送られました。',
+                    ], 422);
+            }
+        }
+
+        try {
+            $response = $this->runUpload($item, $request->file('file'), $mediaType, $isThumbnail);
+        } catch (\Throwable $e) {
+            if ($idempotencyKey !== null) {
+                $this->idempotency->release(self::IDEMPOTENCY_SCOPE, $idempotencyKey);
+            }
+            throw $e;
+        }
+
+        if ($idempotencyKey !== null) {
+            if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+                $this->idempotency->complete(
+                    self::IDEMPOTENCY_SCOPE,
+                    $idempotencyKey,
+                    $response->getStatusCode(),
+                    $response->getData(true),
+                );
+            } else {
+                $this->idempotency->release(self::IDEMPOTENCY_SCOPE, $idempotencyKey);
+            }
+        }
+
+        return $response;
+    }
+
+    private function runUpload(Item $item, \Illuminate\Http\UploadedFile $file, string $mediaType, bool $isThumbnail): JsonResponse
+    {
+        $result = $this->uploadMediaAction->execute($item, $file, $mediaType, $isThumbnail);
         $response = $result->toResponse(201);
 
         if (!$result->success) {
@@ -67,7 +125,6 @@ class ItemMediaController extends Controller
         $payload = $response->getData(true);
         $mediaPayload = $payload['data']['media'] ?? null;
 
-        // 既存 UploadMediaAction は変更しない方針のため、ここで processing を合成する。
         if ($mediaType === 'video' && $mediaPayload) {
             $payload['data']['processing'] = [
                 'poster_generated'   => !empty($mediaPayload['poster_path']),
@@ -77,6 +134,30 @@ class ItemMediaController extends Controller
         }
 
         return $response;
+    }
+
+    private function extractIdempotencyKey(Request $request): ?string
+    {
+        $key = $request->header('Idempotency-Key');
+        if ($key === null) {
+            return null;
+        }
+        $key = trim($key);
+        if ($key === '' || strlen($key) > 128) {
+            return null;
+        }
+        return $key;
+    }
+
+    private function buildRequestHash(int $itemId, string $mediaType, bool $isThumbnail, ?\Illuminate\Http\UploadedFile $file): string
+    {
+        $fileHash = $file ? hash_file('sha256', $file->getRealPath()) : '';
+        return hash('sha256', implode('|', [
+            $itemId,
+            $mediaType,
+            $isThumbnail ? '1' : '0',
+            $fileHash,
+        ]));
     }
 
     /**

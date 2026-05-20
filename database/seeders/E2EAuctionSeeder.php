@@ -73,6 +73,11 @@ class E2EAuctionSeeder extends Seeder
                     'start_time'               => $startTime,
                     'status'                   => 'scheduled',
                     'is_test'                  => true,
+                    // 落札者の /mypage/won-items は is_published=true でフィルタしている
+                    // ([app/Http/Controllers/Participant/WonItemController.php] index)。
+                    // 検証時に落札者画面が「見えない」事故を避けるため、テスト段階から公開状態にしておく。
+                    'is_published'             => true,
+                    'published_at'             => now(),
                     'description'              => "E2E 動作確認用のテストオークション。\nis_test=true のテストユーザーにのみ表示されます。",
                     'lane_count'               => $laneCount,
                     'default_bid_increment'    => 100,
@@ -92,6 +97,9 @@ class E2EAuctionSeeder extends Seeder
                     'use_custom_settings'     => true,
                     'custom_auction_settings' => $customAuctionSettings,
                     'is_test'                 => true,
+                    // 既存テスト auction が未公開のまま残っていた場合に備えて公開状態へ揃える
+                    'is_published'            => true,
+                    'published_at'            => $auction->published_at ?? now(),
                 ])->save();
             }
 
