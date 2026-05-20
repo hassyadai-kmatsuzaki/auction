@@ -130,7 +130,7 @@ export default function ItemForm() {
   const fetchSellers = async () => {
     try {
       // 出品者一覧を取得（seller_profilesテーブルから）
-      const response = await axios.get('/api/admin/users?role=seller&per_page=100');
+      const response = await axios.get('/api/admin/users?role=seller&per_page=all');
       if (response.data.success) {
         // APIレスポンス構造: { success: true, data: { current_page, data: [...users...], ... } }
         const users = response.data.data?.data || response.data.data || [];
