@@ -34,7 +34,7 @@ class VideoProcessingService
         $localPoster = tempnam(sys_get_temp_dir(), 'poster_') . '.jpg';
         try {
             $process = new Process([
-                'ffmpeg', '-y',
+                $this->ffmpegBin(), '-y',
                 '-ss', self::POSTER_AT_SECONDS,
                 '-i', $localSource,
                 '-frames:v', '1',
@@ -73,7 +73,7 @@ class VideoProcessingService
         $localOut = tempnam(sys_get_temp_dir(), 'enc_') . '.mp4';
         try {
             $process = new Process([
-                'ffmpeg', '-y',
+                $this->ffmpegBin(), '-y',
                 '-i', $localSource,
                 '-c:v', 'libx264',
                 '-preset', 'medium',
@@ -99,6 +99,11 @@ class VideoProcessingService
             @unlink($localSource);
             @unlink($localOut);
         }
+    }
+
+    private function ffmpegBin(): string
+    {
+        return config('services.ffmpeg.bin') ?: 'ffmpeg';
     }
 
     private function copyToLocal(string $disk, string $path): ?string

@@ -191,8 +191,11 @@ class E2EItemSeeder extends Seeder
                 : sprintf('%s (B)', $baseBreed);
             // start_price: 100〜2000 / 100 円刻み（決定論的）
             $startPrice = 100 + ((($i * 13) % 20) * 100);
-            // quantity: 20〜200 / 10 刻み（決定論的）
-            $quantity   = 20 + ((($i * 7) % 19) * 10);
+            // quantity: 1〜100 匹（決定論的）
+            // 本番の実態は 100 匹超なし。v5 配送ロジックは「1出品=1袋」マップなので
+            // bag_specs.max_qty を超えると throw するため上限 100 で抑える。
+            // 1〜100 の範囲で S/M/L 全ての袋サイズを通過する分布になる。
+            $quantity   = 1 + (($i * 7) % 100);
             // 各出品者の中で 3 件に 1 件を匿名（3,6,9,...）。10件出品なら3件 ≒ 1/3。
             $isAnonymous = ($sellerLocalIdx % 3 === 0);
 

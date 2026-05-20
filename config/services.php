@@ -72,6 +72,10 @@ return [
         'messaging_token'      => env('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN', ''),
     ],
 
+    'ffmpeg' => [
+        'bin' => env('FFMPEG_BIN', '/usr/local/bin/ffmpeg'),
+    ],
+
     'square' => [
         'environment'        => env('SQUARE_ENVIRONMENT', 'sandbox'),
         'access_token'       => env('SQUARE_ACCESS_TOKEN', ''),

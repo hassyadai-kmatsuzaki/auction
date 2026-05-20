@@ -120,6 +120,11 @@ class E2ESellerSeeder extends Seeder
                     'account_type'    => 'savings',
                     'account_number'  => sprintf('%07d', 1000000 + (int) substr($sellerCode, 4)),
                     'account_holder'  => 'カ）イーツーイー' . (int) substr($sellerCode, 4),
+                    // インボイス登録番号: 連番が奇数なら課税事業者(T+13桁)、偶数なら免税事業者(null)
+                    // → 出品者支払通知書の課税/免税の両パターンを同一オークションで検証できる
+                    'business_registration_number' => ((int) substr($sellerCode, 4)) % 2 === 1
+                        ? sprintf('T%013d', 1000000000000 + (int) substr($sellerCode, 4))
+                        : null,
                 ]);
 
                 return $user;
@@ -189,6 +194,10 @@ class E2ESellerSeeder extends Seeder
                     'account_type'    => 'savings',
                     'account_number'  => sprintf('%07d', 1000000 + (int) substr($sellerCode, 4)),
                     'account_holder'  => 'カ）イーツーイー' . (int) substr($sellerCode, 4),
+                    // インボイス登録番号: 連番が奇数なら課税事業者(T+13桁)、偶数なら免税事業者(null)
+                    'business_registration_number' => ((int) substr($sellerCode, 4)) % 2 === 1
+                        ? sprintf('T%013d', 1000000000000 + (int) substr($sellerCode, 4))
+                        : null,
                 ]
             );
         });
