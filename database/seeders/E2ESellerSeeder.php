@@ -114,11 +114,12 @@ class E2ESellerSeeder extends Seeder
                     'commission_rate' => 10.00,
                     'is_active'       => true,
                     // 振込先（出品者支払通知書 PDF が振込先欄を埋められるようダミーを投入）
+                    // 連番は sellerCode "E2E-NNN" の NNN を採用（repair 側と同じパターン）
                     'bank_name'       => 'E2E銀行',
-                    'bank_branch'     => sprintf('E2E支店 %03d', $i % 999),
+                    'bank_branch'     => sprintf('E2E支店 %s', substr($sellerCode, 4)),
                     'account_type'    => 'savings',
-                    'account_number'  => sprintf('%07d', 1000000 + $i),
-                    'account_holder'  => 'カ）イーツーイー' . $i,
+                    'account_number'  => sprintf('%07d', 1000000 + (int) substr($sellerCode, 4)),
+                    'account_holder'  => 'カ）イーツーイー' . (int) substr($sellerCode, 4),
                 ]);
 
                 return $user;
