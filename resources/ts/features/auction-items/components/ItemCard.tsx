@@ -13,6 +13,7 @@ import { formatYen } from '@/lib/formatPrice';
 interface ItemData {
   id: number;
   item_number: number;
+  exhibit_code?: string | null;
   species_name: string;
   quantity: number;
   start_price: number;
@@ -87,7 +88,7 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
 
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="caption" color="text.secondary">No.{item.item_number}</Typography>
+          <Typography variant="caption" color="text.secondary">{item.exhibit_code ?? `No.${item.item_number}`}</Typography>
           {!hideStatus && <Chip label={status.label} color={status.color} size="small" />}
         </Box>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.species_name}</Typography>
