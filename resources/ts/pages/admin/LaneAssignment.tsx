@@ -48,6 +48,7 @@ interface LaneItem {
   quantity: number;
   start_price: number;
   is_premium: boolean;
+  is_anonymous?: boolean;
   status: string;
   thumbnail_path: string | null;
   sequence_order?: number;
@@ -821,9 +822,14 @@ export default function LaneAssignment() {
                                     <PetsIcon sx={{ fontSize: 14 }} />
                                   </Avatar>
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
-                                      {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                                      {item.is_anonymous && (
+                                        <Chip label="匿名" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
+                                      )}
+                                      <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                                        {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
+                                      </Typography>
+                                    </Box>
                                     <Typography variant="caption" color="text.secondary">
                                       ¥{formatYen(item.start_price)} / {item.quantity}匹
                                     </Typography>
@@ -872,9 +878,14 @@ export default function LaneAssignment() {
                             <PetsIcon sx={{ fontSize: 16 }} />
                           </Avatar>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
-                              {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                              {item.is_anonymous && (
+                                <Chip label="匿名" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
+                              )}
+                              <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                                {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
+                              </Typography>
+                            </Box>
                             <Typography variant="caption" color="text.secondary">
                               ¥{formatYen(item.start_price)} / {item.quantity}匹
                             </Typography>
@@ -1017,9 +1028,14 @@ export default function LaneAssignment() {
                                   <PetsIcon sx={{ fontSize: 16 }} />
                                 </Avatar>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
-                                    {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
-                                  </Typography>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                                    {item.is_anonymous && (
+                                      <Chip label="匿名" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
+                                    )}
+                                    <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                                      {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
+                                    </Typography>
+                                  </Box>
                                   <Typography variant="caption" color="text.secondary">
                                     ¥{formatYen(item.start_price)} / {item.quantity}匹
                                   </Typography>

@@ -27,7 +27,7 @@ class LaneController extends Controller
         
         $lanes = $auction->lanes()
             ->with(['items' => function ($query) {
-                $query->select('items.id', 'item_number', 'exhibit_code', 'species_name', 'quantity', 'start_price', 'is_premium', 'status', 'thumbnail_path', 'seller_profile_id')
+                $query->select('items.id', 'item_number', 'exhibit_code', 'species_name', 'quantity', 'start_price', 'is_premium', 'is_anonymous', 'status', 'thumbnail_path', 'seller_profile_id')
                     ->with(['sellerProfile.user'])
                     ->orderBy('lane_items.sequence_order');
             }])
@@ -74,6 +74,7 @@ class LaneController extends Controller
                                 'quantity' => $item->quantity,
                                 'start_price' => $item->start_price,
                                 'is_premium' => $item->is_premium,
+                                'is_anonymous' => (bool) $item->is_anonymous,
                                 'status' => $item->status,
                                 'thumbnail_path' => $item->thumbnail_path,
                                 'sequence_order' => $item->pivot->sequence_order,
@@ -98,6 +99,7 @@ class LaneController extends Controller
                         'quantity' => $item->quantity,
                         'start_price' => $item->start_price,
                         'is_premium' => $item->is_premium,
+                        'is_anonymous' => (bool) $item->is_anonymous,
                         'status' => $item->status,
                         'thumbnail_path' => $item->thumbnail_path,
                         'seller_profile_id' => $item->seller_profile_id,
