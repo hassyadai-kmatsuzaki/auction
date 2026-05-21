@@ -23,10 +23,11 @@ class StorageService
             return $this->resolvedDisk;
         }
 
-        $key    = config('filesystems.disks.s3.key');
+        // 認証情報は IAM Role / env のどちらでも AWS SDK が自動解決する。
+        // bucket と SDK の存在だけ確認すれば S3 を選んでよい。
         $bucket = config('filesystems.disks.s3.bucket');
 
-        if (!empty($key) && !empty($bucket) && class_exists(\Aws\S3\S3Client::class)) {
+        if (!empty($bucket) && class_exists(\Aws\S3\S3Client::class)) {
             return $this->resolvedDisk = 's3';
         }
 
