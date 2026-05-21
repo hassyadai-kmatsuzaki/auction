@@ -257,9 +257,9 @@ class NotificationService
                 }
 
                 $this->sendLine($participant->id, 'auction_start',
-                    "🔔 オークションが開始されました！\n"
+                    "🔔 まもなくオークションが開始されます\n"
                     . $auction->title . "\n"
-                    . "今すぐ参加しましょう！",
+                    . "開始時刻: " . ($auction->start_time ?? '本日中'),
                     $this->flex->auctionStart($auction),
                 );
             }
@@ -483,7 +483,8 @@ class NotificationService
                 }
                 // LINE
                 $this->sendLine($seller->id, 'auction_start',
-                    "🔔 出品した生体のオークションが開始されました\n" . $auction->title,
+                    "🔔 まもなくオークションが開始されます\n" . $auction->title
+                    . "\n開始時刻: " . ($auction->start_time ?? '本日中'),
                     $this->flex->sellerAuctionStart($auction),
                 );
             }

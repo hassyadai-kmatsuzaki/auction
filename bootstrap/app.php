@@ -64,6 +64,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // 予定されたオークションを1分ごとに自動開始
         $schedule->command('auctions:start-scheduled')->everyMinute();
 
+        // 開始30分前のオークションに開始予告通知を送信（参加者・出品者）
+        // 開始時刻と同時の大量メール送信を避けてキュー/Redisへの瞬間負荷を分散する目的。
+        // ProcessAuctionCountdownJob 側に start_notice_sent_at IS NULL のときだけ
+        // 開始時に送るフォールバックを持たせており、scheduler 落ち時も保険が効く。
+        $schedule->command('auctions:dispatch-start-notice')->everyMinute()
+            ->withoutOverlapping();
+
         // ライブオークションのカウントダウンジョブ監視・自動復旧
         $schedule->command('auctions:monitor-jobs')->everyMinute();
 

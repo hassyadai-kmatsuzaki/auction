@@ -24,6 +24,7 @@ class Auction extends BaseModel
         'is_test',
         'is_published',
         'published_at',
+        'start_notice_sent_at',
         'description',
         'lane_count',
         'default_bid_increment',  // @deprecated フロントエンドで未使用。DB互換のため残存。
@@ -53,6 +54,7 @@ class Auction extends BaseModel
         'is_test' => 'boolean',
         'is_published' => 'boolean',
         'published_at' => 'datetime',
+        'start_notice_sent_at' => 'datetime',
         'lane_count' => 'integer',
         'countdown_seconds' => 'integer',
         'payment_deadline_hours' => 'integer',

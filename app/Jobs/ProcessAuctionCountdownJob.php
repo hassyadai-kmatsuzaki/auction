@@ -205,17 +205,26 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             ));
 
             // オークション開始通知を送信（参加者 + 出品者）
+            // 通常運用では `auctions:dispatch-start-notice` scheduler が開始30分前に送信し
+            // start_notice_sent_at にフラグを立てる。ここはそのフォールバックで、
+            // scheduler が落ちていた等で送信されていない場合のみ即時送信する。
             // 失敗してもライブ進行は止めないが、全員に通知が届かない事象は重大なので
             // CloudWatch メトリクスに失敗を記録し、運用側で検知できるようにする。
             try {
                 $auctionForNotification = Auction::find($this->auctionId);
-                if ($auctionForNotification) {
+                if ($auctionForNotification && $auctionForNotification->start_notice_sent_at === null) {
                     $notificationService = app(\App\Services\NotificationService::class);
                     $sentCount = $notificationService->sendAuctionStartNotification($auctionForNotification);
                     $notificationService->sendSellerAuctionStartNotification($auctionForNotification);
-                    Log::info('auction.start_notification.sent', [
+                    $auctionForNotification->forceFill(['start_notice_sent_at' => now()])->save();
+                    Log::info('auction.start_notification.sent_fallback', [
                         'auction_id' => $this->auctionId,
                         'sent_count' => $sentCount,
+                    ]);
+                } elseif ($auctionForNotification) {
+                    Log::info('auction.start_notification.skipped_already_sent', [
+                        'auction_id' => $this->auctionId,
+                        'sent_at'    => $auctionForNotification->start_notice_sent_at?->toIso8601String(),
                     ]);
                 }
             } catch (\Exception $e) {

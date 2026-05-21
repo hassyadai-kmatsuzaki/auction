@@ -28,7 +28,7 @@ class AuctionStartNotificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '【日本メダカオンライン市場】オークション開始のお知らせ',
+            subject: '【日本メダカオンライン市場】まもなくオークションが開始されます',
         );
     }
 

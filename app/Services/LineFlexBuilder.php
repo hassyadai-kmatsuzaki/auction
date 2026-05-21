@@ -115,14 +115,15 @@ class LineFlexBuilder
 
         return $this->bubble(
             heroImageUrl: $this->itemHeroImage($featuredItem),
-            headerText: '🔔 オークション開催中',
+            headerText: '🔔 まもなくオークションが開始されます',
             headerColor: self::ALERT_COLOR,
             bodyRows: [
-                ['タイトル', (string) $auction->title],
-                ['開催日',   $auction->event_date?->format('Y/m/d') ?? '本日'],
+                ['タイトル',   (string) $auction->title],
+                ['開催日',     $auction->event_date?->format('Y/m/d') ?? '本日'],
+                ['開始時刻',   (string) ($auction->start_time ?? '本日中')],
             ],
-            bodyNote: '今すぐ参加しましょう！',
-            footerButton: $url ? ['label' => '今すぐ参加', 'uri' => $url] : null,
+            bodyNote: '開始時刻になりましたらご参加ください。',
+            footerButton: $url ? ['label' => 'オークションに参加する', 'uri' => $url] : null,
         );
     }
 
@@ -274,11 +275,12 @@ class LineFlexBuilder
     {
         return $this->bubble(
             heroImageUrl: $this->itemHeroImage($this->featuredItem($auction)),
-            headerText: '🔔 オークションが開始されました',
+            headerText: '🔔 まもなくオークションが開始されます',
             headerColor: self::BRAND_COLOR,
             bodyRows: [
                 ['タイトル', (string) $auction->title],
                 ['開催日',   $auction->event_date?->format('Y/m/d') ?? '本日'],
+                ['開始時刻', (string) ($auction->start_time ?? '本日中')],
             ],
             footerButton: ($url = $this->appUrl('/seller/items'))
                 ? ['label' => '出品状況を確認', 'uri' => $url]

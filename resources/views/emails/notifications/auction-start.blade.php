@@ -1,10 +1,10 @@
 <x-mail::message>
-# オークション開始のお知らせ
+# まもなくオークションが開始されます
 
 {{ $user->name }} 様
 
-お待たせいたしました！
-オークションが開始されましたのでお知らせいたします。
+ご参加予定のオークションがまもなく開始されます。
+お時間になりましたら下記ボタンからご参加ください。
 
 ---
 
@@ -14,11 +14,11 @@
 
 **開催日**: {{ \Carbon\Carbon::parse($auction->event_date)->format('Y年m月d日') }}
 
-**開始時刻**: {{ $auction->start_time ?? '開催中' }}
+**開始時刻**: {{ $auction->start_time ?? '本日中' }}
 
 ---
 
-今すぐ参加しましょう！
+開始時刻になりましたら、下記ボタンからオークションにご参加いただけます。
 
 <x-mail::button :url="config('app.frontend_url') . '/participant/auction/' . $auction->id . '/live'">
 オークションに参加する
