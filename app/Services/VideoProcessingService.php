@@ -122,8 +122,9 @@ class VideoProcessingService
     {
         $stream = fopen($localPath, 'r');
         try {
+            // S3 バケットが BucketOwnerEnforced のため ACL/visibility は付けない。
+            // 公開はバケットポリシー側で制御する。
             Storage::disk($disk)->put($destPath, $stream, [
-                'visibility'  => 'public',
                 'ContentType' => $mime,
             ]);
         } finally {

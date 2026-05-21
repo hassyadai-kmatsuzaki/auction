@@ -35,7 +35,9 @@ class UploadMediaAction
 
         try {
             if ($disk === 's3') {
-                $path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs('', $file, $filename, 'public');
+                // BucketOwnerEnforced 環境では visibility=public は不要 (ACL 禁止)。
+                // 公開はバケットポリシーで制御する。
+                $path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs('', $file, $filename);
             } else {
                 $directory = dirname($filename);
                 if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($directory)) {
