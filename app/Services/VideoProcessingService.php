@@ -38,6 +38,7 @@ class VideoProcessingService
                 '-ss', self::POSTER_AT_SECONDS,
                 '-i', $localSource,
                 '-frames:v', '1',
+                '-update', '1',
                 '-vf', 'scale=\'min(' . self::LONG_EDGE . ',iw)\':-2',
                 '-q:v', '3',
                 $localPoster,

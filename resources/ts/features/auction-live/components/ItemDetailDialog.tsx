@@ -106,7 +106,7 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
         <DialogTitle sx={{ py: { md: 2.5 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 }, color: { xs: 'text.primary' } }}>
-              No.{item?.item_number} {item?.species_name}
+              {item?.exhibit_code ?? `No.${item?.item_number}`} {item?.species_name}
             </Typography>
             <IconButton onClick={handleClose}><CloseIcon /></IconButton>
           </Box>
