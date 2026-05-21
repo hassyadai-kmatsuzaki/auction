@@ -95,8 +95,15 @@ class MigrateItemMediaToS3 extends Command
         if ($s3Exists) {
             $stats['paths_skipped_s3']++;
             if ($deleteLocal && $localExists && !$dryRun) {
-                $local->delete($path);
-                $stats['local_deleted']++;
+                $deleted = $local->delete($path);
+                if ($deleted) {
+                    $stats['local_deleted']++;
+                } else {
+                    $stats['local_delete_failed']++;
+                    $abs = storage_path('app/public/' . $path);
+                    $owner = file_exists($abs) ? (posix_getpwuid(fileowner($abs))['name'] ?? '?') : '?';
+                    $this->warn(sprintf('  local 削除失敗 media_id=%d col=%s path=%s owner=%s', $m->id, $col, $path, $owner));
+                }
             }
             return;
         }
