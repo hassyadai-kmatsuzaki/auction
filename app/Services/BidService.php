@@ -36,7 +36,7 @@ class BidService
         //   getLiveState は polling fallback で 5 秒ごとに呼ばれる可能性があり、
         //   120 接続 × 5 秒 = 24 req/秒 で 300 件読むのは DB 負荷大
         $lanes            = $auction->lanes()
-            ->with(['currentItem.media', 'currentItem.sellerProfile', 'currentItem.sellerProfile.user:id,trade_name'])
+            ->with(['currentItem.media', 'currentItem.sellerProfile', 'currentItem.sellerProfile.user:id,trade_name,profile_image_path'])
             ->orderBy('lane_number')
             ->get();
         $defaultCountdown = $auction->getAuctionSettings()['countdown_seconds'] ?? 3;

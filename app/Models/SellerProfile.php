@@ -121,12 +121,13 @@ class SellerProfile extends BaseModel
 
     /**
      * プロフィール画像の公開URL（相対パスで返す。フロントは現在のホストで解決する）
+     * seller_profiles.profile_image_path が空のときは users.profile_image_path にフォールバックする。
      */
     public function getProfileImageUrlAttribute(): ?string
     {
-        if (empty($this->profile_image_path)) {
-            return null;
+        if (!empty($this->profile_image_path)) {
+            return '/storage/' . ltrim($this->profile_image_path, '/');
         }
-        return '/storage/' . ltrim($this->profile_image_path, '/');
+        return $this->user?->profile_image_url;
     }
 }

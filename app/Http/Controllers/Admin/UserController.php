@@ -28,7 +28,7 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        $query = User::with(['roles', 'sellerProfile']);
+        $query = User::with(['roles', 'sellerProfile', 'sellerProfile.user:id,profile_image_path']);
 
         // デフォルトでアクティブなユーザーのみ表示（削除済みを除外）
         // show_deleted=true の場合は削除済みも含める
@@ -98,7 +98,7 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $user = User::with(['roles', 'sellerProfile'])->findOrFail($id);
+        $user = User::with(['roles', 'sellerProfile', 'sellerProfile.user:id,profile_image_path'])->findOrFail($id);
 
         // 出品者プロフィールがある場合は口座情報も含める（管理者用）
         $userData = $user->toArray();

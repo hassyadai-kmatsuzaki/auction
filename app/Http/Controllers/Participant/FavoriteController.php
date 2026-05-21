@@ -25,7 +25,7 @@ class FavoriteController extends Controller
         $includePast = $request->boolean('include_past', false);
 
         $favoritesQuery = Favorite::where('user_id', $userId)
-            ->with(['item.auction', 'item.media', 'item.sellerProfile', 'item.sellerProfile.user:id,trade_name']);
+            ->with(['item.auction', 'item.media', 'item.sellerProfile', 'item.sellerProfile.user:id,trade_name,profile_image_path']);
 
         // テストモード ON で許可ユーザーでなければ空にする（許可ユーザーには全件見せる）
         if ($this->testMode->isEnabled() && !$this->testMode->currentUserCanSeeTestUniverse(Auth::user())) {

@@ -280,7 +280,7 @@ class AuctionController extends Controller
                         $query->orderBy('display_order');
                     },
                     'sellerProfile:id,user_id,profile_image_path',
-                    'sellerProfile.user:id,trade_name',
+                    'sellerProfile.user:id,trade_name,profile_image_path',
                 ]);
             $this->testMode->applyToItemQuery($laneItemsQuery);
             $laneItems = $laneItemsQuery
@@ -325,8 +325,8 @@ class AuctionController extends Controller
                 'media' => function ($query) {
                     $query->orderBy('display_order');
                 },
-                'sellerProfile:id,user_id',
-                'sellerProfile.user:id,trade_name',
+                'sellerProfile:id,user_id,profile_image_path',
+                'sellerProfile.user:id,trade_name,profile_image_path',
             ]);
         $this->testMode->applyToItemQuery($unassignedItemsQuery);
         $unassignedItems = $unassignedItemsQuery
