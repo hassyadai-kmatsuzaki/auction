@@ -659,6 +659,8 @@ class WonItemController extends Controller
             $newBreakdown['calculation_mode'] = 'manual';
             // 送料無料用の manual_reason は外す（金額編集モードでは未使用）
             unset($newBreakdown['manual_reason']);
+            // 自動計算時の品種別内訳は手動編集後の金額と整合しないため破棄する
+            $newBreakdown['species_breakdown'] = [];
         } elseif ($feeAdjusted) {
             // 箱内訳の編集なしに金額のみ調整された場合、自動計算の箱明細はもう正しくないので
             // manual モードに切替え、箱明細を破棄して manual_total ベースに統一する。

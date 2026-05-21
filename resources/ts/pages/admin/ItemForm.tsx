@@ -98,6 +98,7 @@ export default function ItemForm() {
     individual_info: '',
     notes: '',
     is_premium: false,
+    is_anonymous: false,
     unsold_action: 'return',
     status: 'registered',
   });
@@ -169,6 +170,7 @@ export default function ItemForm() {
           individual_info: item.individual_info || '',
           notes: item.notes || '',
           is_premium: item.is_premium || false,
+          is_anonymous: item.is_anonymous || false,
           unsold_action: item.unsold_action || 'return',
           status: item.status || 'registered',
         });
@@ -218,6 +220,7 @@ export default function ItemForm() {
         individual_info: formData.individual_info || null,
         notes: formData.notes || null,
         is_premium: formData.is_premium,
+        is_anonymous: formData.is_anonymous,
         unsold_action: formData.unsold_action,
         seller_profile_id: selectedSeller?.id || null,
         status: formData.status,
@@ -602,6 +605,19 @@ export default function ItemForm() {
                         />
                       }
                       label="プレミアムプラン"
+                      sx={{ mt: 1 }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={formData.is_anonymous}
+                          onChange={handleChange('is_anonymous')}
+                        />
+                      }
+                      label="匿名出品（出品者名を非公開にする）"
                       sx={{ mt: 1 }}
                     />
                   </Grid>
