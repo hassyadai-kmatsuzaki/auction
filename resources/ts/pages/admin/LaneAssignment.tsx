@@ -821,7 +821,7 @@ export default function LaneAssignment() {
                                     <PetsIcon sx={{ fontSize: 14 }} />
                                   </Avatar>
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                                       {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
@@ -872,7 +872,7 @@ export default function LaneAssignment() {
                             <PetsIcon sx={{ fontSize: 16 }} />
                           </Avatar>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                               {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -901,7 +901,7 @@ export default function LaneAssignment() {
         <Grid item xs={12} md={9}>
           <Grid container spacing={2}>
             {lanes.map((lane) => (
-              <Grid item xs={12} md={6} lg={4} key={lane.id}>
+              <Grid item xs={12} md={6} lg={6} key={lane.id}>
                 <Paper
                   sx={{
                     p: 2,
@@ -1017,7 +1017,7 @@ export default function LaneAssignment() {
                                   <PetsIcon sx={{ fontSize: 16 }} />
                                 </Avatar>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                                     {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
