@@ -254,8 +254,11 @@ class LaneController extends Controller
 
     /**
      * 生体をレーンに割り当て（レーン間移動・新規割り当て・並び替えすべて対応）
+     *
+     * 出品ID（exhibit_code）はここでは発行しない。並び順を確定させてから
+     * `issueExhibitCodes` で一括発行する運用に切り替え済み。
      */
-    public function assignItem(Request $request, $auctionId, $laneId, IssueExhibitCodeAction $issueExhibitCode)
+    public function assignItem(Request $request, $auctionId, $laneId)
     {
         $auction = Auction::findOrFail($auctionId);
 
@@ -282,7 +285,7 @@ class LaneController extends Controller
         $item = Item::where('auction_id', $auctionId)->where('id', $request->item_id)->firstOrFail();
 
         try {
-            DB::transaction(function () use ($laneId, $item, $request, $issueExhibitCode) {
+            DB::transaction(function () use ($laneId, $item, $request) {
                 // 既存の割り当てを確認
                 $existing = DB::table('lane_items')
                     ->where('item_id', $item->id)
@@ -323,21 +326,7 @@ class LaneController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-
-                // 出品ID（表示専用）を発行。既発行/lane_name 未設定なら no-op。
-                // 通知ジョブは transaction commit 後に dispatch する必要があるため silent=true。
-                $issueExhibitCode->execute($item->fresh(), silent: true);
             });
-
-            // 通知ジョブはトランザクション commit 後に投入（commit 前に dispatch すると
-            // ジョブ実行時にまだ exhibit_code が見えない事故が起きるため）。
-            $fresh = $item->fresh();
-            if ($fresh && $fresh->exhibit_code !== null && $fresh->seller_profile_id) {
-                \App\Jobs\NotifyExhibitCodesJob::dispatchIfNotPending(
-                    $fresh->seller_profile_id,
-                    $fresh->auction_id
-                );
-            }
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->errorInfo[1] === 1062) {
                 return response()->json([
@@ -443,7 +432,7 @@ class LaneController extends Controller
      * - 各レーン内の出品者グループ順序をランダムにシャッフル
      * - 既存割り当ての末尾に追加（既存は一切変更しない）
      */
-    public function autoAssign($auctionId, IssueExhibitCodeAction $issueExhibitCode)
+    public function autoAssign($auctionId)
     {
         $auction = Auction::findOrFail($auctionId);
 
@@ -554,10 +543,8 @@ class LaneController extends Controller
         // Step 6: lane_items に挿入（既存アイテムの後ろに追加）
         $totalAssigned = 0;
         $laneStats = [];
-        // 実際に挿入された item_id の集合（出品ID発行・通知対象）
-        $insertedItemIds = [];
 
-        DB::transaction(function () use ($laneAssignments, $lanes, &$totalAssigned, &$laneStats, &$insertedItemIds) {
+        DB::transaction(function () use ($laneAssignments, $lanes, &$totalAssigned, &$laneStats) {
             foreach ($laneAssignments as $laneId => $items) {
                 if ($items->isEmpty()) {
                     $lane = $lanes->find($laneId);
@@ -577,7 +564,6 @@ class LaneController extends Controller
 
                 $position = $lastOrder + 1;
                 $insertData = [];
-                $itemIdsForBulk = [];
 
                 foreach ($items as $item) {
                     $insertData[] = [
@@ -587,15 +573,11 @@ class LaneController extends Controller
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
-                    $itemIdsForBulk[] = $item->id;
                 }
 
                 try {
                     DB::table('lane_items')->insert($insertData);
                     $addedCount = count($insertData);
-                    foreach ($itemIdsForBulk as $id) {
-                        $insertedItemIds[] = $id;
-                    }
                 } catch (\Illuminate\Database\QueryException $e) {
                     // UNIQUE制約違反（二重クリック等）は個別挿入にフォールバック
                     if ($e->errorInfo[1] !== 1062) {
@@ -613,7 +595,6 @@ class LaneController extends Controller
                                 'updated_at' => now(),
                             ]);
                             $addedCount++;
-                            $insertedItemIds[] = $item->id;
                         } catch (\Illuminate\Database\QueryException $inner) {
                             if ($inner->errorInfo[1] !== 1062) {
                                 throw $inner;
@@ -632,23 +613,77 @@ class LaneController extends Controller
                     'total_count' => $lastOrder + $addedCount,
                 ];
             }
+        });
 
-            // 出品ID（表示専用）をトランザクション内で発行。
-            // silent=true で通知は出さず、commit 後に出品者×オークション単位で一括投入。
-            if (!empty($insertedItemIds)) {
-                $newlyAssigned = Item::whereIn('id', $insertedItemIds)
-                    ->whereNull('exhibit_code')
-                    ->get();
-                foreach ($newlyAssigned as $assignedItem) {
-                    app(IssueExhibitCodeAction::class)->execute($assignedItem, silent: true);
+        return response()->json([
+            'success' => true,
+            'message' => $totalAssigned . '件の生体を' . $lanes->count() . 'レーンに割り当てました。',
+            'data' => [
+                'assigned_count' => $totalAssigned,
+                'lane_summary' => $laneStats,
+            ],
+        ]);
+    }
+
+    /**
+     * 出品ID（exhibit_code）をオークション全体で一括発行する。
+     *
+     * 動作:
+     *  - lane_items に割当済み × exhibit_code が未発行 の items を対象に IssueExhibitCodeAction を実行
+     *  - 発行成功した items から (seller_profile_id, auction_id) 単位で NotifyExhibitCodesJob を投入
+     *  - 既発行 item は IssueExhibitCodeAction 側で早期 return されるため再採番されない（冪等）
+     *
+     * 注意: lane_name 未設定や seller_profile_id null の item は IssueExhibitCodeAction 側で
+     * 黙ってスキップされるため、対象から除外せずそのまま渡してよい。
+     */
+    public function issueExhibitCodes($auctionId, IssueExhibitCodeAction $issueExhibitCode)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは発行できません。',
+            ], 400);
+        }
+
+        $laneIds = $auction->lanes()->pluck('id');
+        if ($laneIds->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'レーンが存在しません。',
+            ], 422);
+        }
+
+        $assignedItemIds = DB::table('lane_items')
+            ->whereIn('lane_id', $laneIds)
+            ->pluck('item_id');
+
+        $targets = Item::whereIn('id', $assignedItemIds)
+            ->whereNull('exhibit_code')
+            ->get();
+
+        if ($targets->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => '未発行の出品IDはありません。',
+                'data' => ['issued_count' => 0, 'notified_sellers' => 0],
+            ]);
+        }
+
+        $issuedIds = [];
+        DB::transaction(function () use ($targets, $issueExhibitCode, &$issuedIds) {
+            foreach ($targets as $item) {
+                // silent=true で発行のみ。通知は commit 後に出品者×オークション単位で投入する。
+                if ($issueExhibitCode->execute($item, silent: true) !== null) {
+                    $issuedIds[] = $item->id;
                 }
             }
         });
 
-        // commit 後に通知投入（出品者×オークション単位で重複排除）
-        if (!empty($insertedItemIds)) {
-            $pairs = Item::whereIn('id', $insertedItemIds)
-                ->whereNotNull('exhibit_code')
+        $notifiedSellers = 0;
+        if (!empty($issuedIds)) {
+            $pairs = Item::whereIn('id', $issuedIds)
                 ->whereNotNull('seller_profile_id')
                 ->select('seller_profile_id', 'auction_id')
                 ->distinct()
@@ -658,15 +693,16 @@ class LaneController extends Controller
                     $pair->seller_profile_id,
                     $pair->auction_id
                 );
+                $notifiedSellers++;
             }
         }
 
         return response()->json([
             'success' => true,
-            'message' => $totalAssigned . '件の生体を' . $lanes->count() . 'レーンに割り当てました。',
+            'message' => count($issuedIds) . '件の出品IDを発行し、' . $notifiedSellers . '名の出品者へ通知を投入しました。',
             'data' => [
-                'assigned_count' => $totalAssigned,
-                'lane_summary' => $laneStats,
+                'issued_count'     => count($issuedIds),
+                'notified_sellers' => $notifiedSellers,
             ],
         ]);
     }

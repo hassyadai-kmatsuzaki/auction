@@ -223,6 +223,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::put('auctions/{auctionId}/lanes/{laneId}', [AdminLaneController::class, 'updateLane']);
     Route::post('auctions/{auctionId}/lanes/auto-assign', [AdminLaneController::class, 'autoAssign']);
     Route::post('auctions/{auctionId}/lanes/bulk-unassign', [AdminLaneController::class, 'bulkUnassign']);
+    Route::post('auctions/{auctionId}/lanes/issue-exhibit-codes', [AdminLaneController::class, 'issueExhibitCodes']);
     
     // 出品者別 伝票番号一覧
     Route::get('auctions/{auctionId}/shipments', [\App\Http\Controllers\Admin\ShipmentController::class, 'index']);

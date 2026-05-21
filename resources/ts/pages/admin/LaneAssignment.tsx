@@ -34,6 +34,7 @@ import {
   Close as CloseIcon,
   Reorder as ReorderIcon,
   Store as StoreIcon,
+  ConfirmationNumber as ConfirmationNumberIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
@@ -114,6 +115,10 @@ export default function LaneAssignment() {
 
   // 一括解除
   const [bulkUnassignLoading, setBulkUnassignLoading] = useState(false);
+
+  // 出品ID 一括発行
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [issueLoading, setIssueLoading] = useState(false);
 
   // レーン管理
   const [addingLane, setAddingLane] = useState(false);
@@ -408,6 +413,21 @@ export default function LaneAssignment() {
     }
   };
 
+  // 出品ID一括発行（レーン割当済み × 未発行の item に対して exhibit_code を発行 + 出品者へ通知）
+  const handleIssueExhibitCodes = async () => {
+    try {
+      setIssueLoading(true);
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/issue-exhibit-codes`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setIssueDialogOpen(false);
+      fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '出品IDの発行に失敗しました', severity: 'error' });
+    } finally {
+      setIssueLoading(false);
+    }
+  };
+
   // 一括割り当て解除
   const handleBulkUnassign = async () => {
     if (!confirm('全レーンの割り当てを解除しますか？すべての生体が未割当に戻ります。')) return;
@@ -634,6 +654,29 @@ export default function LaneAssignment() {
           >
             自動割当
           </Button>
+          {(() => {
+            const unissuedCount = lanes.reduce(
+              (acc, l) => acc + l.items.filter((it) => !it.exhibit_code).length,
+              0,
+            );
+            return (
+              <Button
+                startIcon={<ConfirmationNumberIcon />}
+                onClick={() => setIssueDialogOpen(true)}
+                variant="contained"
+                color="secondary"
+                size="small"
+                disabled={
+                  auction?.status === 'live' ||
+                  issueLoading ||
+                  unissuedCount === 0
+                }
+              >
+                出品ID発行
+                {unissuedCount > 0 ? `（${unissuedCount}件）` : ''}
+              </Button>
+            );
+          })()}
         </Box>
       </Box>
 
@@ -1053,6 +1096,48 @@ export default function LaneAssignment() {
             color="primary"
           >
             {autoAssignLoading ? <CircularProgress size={20} /> : '自動割当を実行'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 出品ID発行ダイアログ */}
+      <Dialog open={issueDialogOpen} onClose={() => !issueLoading && setIssueDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>出品IDを発行</DialogTitle>
+        <DialogContent>
+          {(() => {
+            const unissuedItems = lanes.flatMap((l) => l.items.filter((it) => !it.exhibit_code));
+            const sellerCount = new Set(
+              unissuedItems
+                .map((it) => it.seller_profile_id)
+                .filter((sid): sid is number => !!sid),
+            ).size;
+            return (
+              <>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  レーン割当済みで未発行の生体 <strong>{unissuedItems.length}件</strong> に出品IDを発行します。
+                </Typography>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  発行後、対象の出品者（{sellerCount}名）に出品IDをまとめたメール通知が送信されます。
+                </Alert>
+                <Alert severity="warning">
+                  発行された出品IDは固定され、以後レーン移動や並び替えで変わりません。
+                  順番に変更がないことを確認してから実行してください。
+                </Alert>
+              </>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIssueDialogOpen(false)} disabled={issueLoading}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleIssueExhibitCodes}
+            disabled={issueLoading}
+            variant="contained"
+            color="secondary"
+          >
+            {issueLoading ? <CircularProgress size={20} /> : '発行して通知'}
           </Button>
         </DialogActions>
       </Dialog>

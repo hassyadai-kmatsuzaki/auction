@@ -137,7 +137,7 @@ class DashboardController extends Controller
                 'id' => $auction->id,
                 'title' => $auction->title,
                 'date' => $auction->event_date->format('Y-m-d'),
-                'deadline' => $auction->upload_deadline->toIso8601String(),
+                'deadline' => $auction->upload_deadline?->toIso8601String(),
                 'status' => 'accepting',
             ];
         })->toArray();
