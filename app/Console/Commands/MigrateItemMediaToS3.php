@@ -25,6 +25,12 @@ class MigrateItemMediaToS3 extends Command
             $this->error('AWS_BUCKET が未設定です。');
             return self::FAILURE;
         }
+        $this->info("対象バケット: {$bucket}");
+
+        // put 失敗を Laravel が握りつぶさないように throw=true で再ビルドする。
+        // 静かな false を返されると AWS の本当のエラー文が消えるため。
+        config(['filesystems.disks.s3.throw' => true]);
+        Storage::forgetDisk('s3');
 
         $dryRun      = (bool) $this->option('dry-run');
         $deleteLocal = (bool) $this->option('delete-local');
@@ -118,14 +124,17 @@ class MigrateItemMediaToS3 extends Command
                 $options['ACL']        = 'public-read';
             }
 
-            $s3->put($path, $stream, $options);
+            $ok = $s3->put($path, $stream, $options);
 
             if (is_resource($stream)) {
                 fclose($stream);
             }
 
+            if ($ok === false) {
+                throw new \RuntimeException('Storage::put が false を返した');
+            }
             if (!$s3->exists($path)) {
-                throw new \RuntimeException('S3 アップロード後の存在確認に失敗');
+                throw new \RuntimeException('put 後の exists() で見えない');
             }
             $s3Size = $s3->size($path);
             if ((int) $s3Size !== (int) $bytes) {
