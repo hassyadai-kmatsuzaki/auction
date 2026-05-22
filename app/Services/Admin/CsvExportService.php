@@ -357,7 +357,7 @@ class CsvExportService
 
                 $wonItems = WonItem::where('winner_id', $winnerId)
                     ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
-                    ->with(['item.speciesType:id,name'])
+                    ->with(['item:id,species_name'])
                     ->orderBy('item_id')
                     ->get();
 
@@ -382,7 +382,9 @@ class CsvExportService
 
     /**
      * shipping_breakdown.boxes を発送リスト用に整形。
-     * 例: [{box_size:100, bags:["S","M"]}, {box_size:100, bags:["S","M"]}] → "100(S×1/M×1)・100(S×1/M×1)"
+     * boxes[].bags は ShippingCalculatorService::formatBagsInBox() で
+     * 既に "S×7" 形式の文字列配列として保存されているため、そのまま並べる。
+     * 例: [{box_size:140, bags:["S×7"]}, {box_size:100, bags:["M×2"]}] → "140(S×7)・100(M×2)"
      * 対面引取 (pickup) または breakdown 未設定の場合は空文字。
      */
     private function formatBoxesForShippingCsv($wonItems): string
@@ -396,29 +398,23 @@ class CsvExportService
         $boxes = $bd['boxes'] ?? [];
         if (!is_array($boxes) || empty($boxes)) return '';
 
-        $bagOrder = ['S', 'M', 'L', 'KA'];
+        $bagOrder = ['S' => 0, 'M' => 1, 'L' => 2, 'KA' => 3];
         $parts = [];
         foreach ($boxes as $box) {
             $size = $box['box_size'] ?? '';
             $bags = $box['bags'] ?? [];
             if (!is_array($bags)) $bags = [];
 
-            $counts = [];
-            foreach ($bags as $bag) {
-                $key = (string) $bag;
-                $counts[$key] = ($counts[$key] ?? 0) + 1;
-            }
+            $bagsStr = array_values(array_filter(array_map(
+                fn ($bag) => (string) $bag,
+                $bags
+            ), fn ($s) => $s !== ''));
 
-            $bagsStr = [];
-            foreach ($bagOrder as $sz) {
-                if (isset($counts[$sz])) {
-                    $bagsStr[] = "{$sz}×{$counts[$sz]}";
-                    unset($counts[$sz]);
-                }
-            }
-            foreach ($counts as $sz => $c) {
-                $bagsStr[] = "{$sz}×{$c}";
-            }
+            usort($bagsStr, function ($a, $b) use ($bagOrder) {
+                $ka = $bagOrder[explode('×', $a, 2)[0]] ?? 99;
+                $kb = $bagOrder[explode('×', $b, 2)[0]] ?? 99;
+                return $ka <=> $kb;
+            });
 
             $parts[] = $bagsStr === []
                 ? (string) $size
@@ -428,16 +424,19 @@ class CsvExportService
     }
 
     /**
-     * 商品IDを「ID(種別名)」形式で「・」連結。
-     * 例: "1601(サファイヤ)・1602(サファイヤ)・1603(サファイヤ)"
+     * 商品IDを「ID(品種名)」形式で「・」連結。
+     * 品種名は items.species_name（出品時に入力された個別品種名）を使う。
+     * 例: "1601(サファイヤ)・1602(サファイヤ)・1603(オロチ)"
      */
     private function formatItemIdsForShippingCsv($wonItems): string
     {
         return $wonItems->map(function ($w) {
             $item = $w->item;
             if (!$item) return '';
-            $species = $item->speciesType?->name;
-            return $species ? "{$item->id}({$species})" : (string) $item->id;
+            $species = $item->species_name;
+            return $species !== null && $species !== ''
+                ? "{$item->id}({$species})"
+                : (string) $item->id;
         })->filter(fn ($s) => $s !== '')->implode('・');
     }
 
