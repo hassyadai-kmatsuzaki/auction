@@ -65,8 +65,8 @@
     <p class="hero__eyebrow sp-only hero-anim" data-hero-delay="1">業界歴20年 × プロ選魚 × 審査制出品者</p>
 
     <div class="hero__visual hero-anim" data-hero-delay="2">
-      <img src="/img/lp/fv-okada-yui.png?v" alt="" class="hero__visual-img" loading="eager">
-      {{-- <span class="hero__visual-credit">岡田結実</span> --}}
+      <img src="/img/lp/fv-okada-yui.png?v=2" alt="" class="hero__visual-img" loading="eager">
+      <span class="hero__visual-credit">岡田結実</span>
     </div>
 
     <div class="hero__copy hero-anim" data-hero-delay="3">
@@ -918,7 +918,7 @@
         </div>
       </div>
       <div class="cta-banner__visual anim" data-anim="fade-up" data-delay="1" aria-hidden="true">
-        <img src="/img/lp/cta.png?v=2" alt="" loading="lazy">
+        <img src="/img/lp/cta.png?v=3" alt="" loading="lazy">
       </div>
     </div>
   </div>
