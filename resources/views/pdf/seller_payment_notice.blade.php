@@ -187,8 +187,9 @@
     <table class="detail">
         <thead>
             <tr>
-                <th style="width: 10%">No.</th>
-                <th style="width: 40%">品種</th>
+                <th style="width: 8%">商品ID</th>
+                <th style="width: 12%">出品ID</th>
+                <th style="width: 30%">品種</th>
                 <th style="width: 10%; text-align: center">数量</th>
                 <th style="width: 20%; text-align: right">落札金額（税抜）</th>
                 <th style="width: 20%; text-align: right">手数料（税抜）</th>
@@ -197,7 +198,8 @@
         <tbody>
             @foreach($items as $item)
             <tr>
-                <td>{{ $item['item_number'] }}</td>
+                <td>{{ $item['item_id'] }}</td>
+                <td>{{ $item['exhibit_code'] }}</td>
                 <td>{{ $item['species_name'] }}</td>
                 <td style="text-align: center">{{ $item['quantity'] }}匹</td>
                 <td class="right">¥{{ number_format($item['winning_amount']) }}</td>
@@ -205,13 +207,13 @@
             </tr>
             @endforeach
             <tr class="total-row">
-                <td colspan="3" style="text-align: right;"><strong>小計（税抜）</strong></td>
+                <td colspan="4" style="text-align: right;"><strong>小計（税抜）</strong></td>
                 <td class="right"><strong>¥{{ number_format($subtotal_winning) }}</strong></td>
                 <td class="right"><strong>¥{{ number_format($subtotal_commission) }}</strong></td>
             </tr>
             @if(!empty($is_tax_exempt))
             <tr>
-                <td colspan="3" style="text-align: right;">
+                <td colspan="4" style="text-align: right;">
                     @if((float) $winning_tax_rate > 0)
                         消費税相当額（{{ $fmtRate($winning_tax_rate) }}%）／消費税（{{ $fmtRate($commission_tax_rate) }}%）
                     @else
@@ -223,13 +225,13 @@
             </tr>
             @else
             <tr>
-                <td colspan="3" style="text-align: right;">消費税（{{ $fmtRate($tax_rate) }}%）</td>
+                <td colspan="4" style="text-align: right;">消費税（{{ $fmtRate($tax_rate) }}%）</td>
                 <td class="right">¥{{ number_format($tax_winning) }}</td>
                 <td class="right">¥{{ number_format($tax_commission) }}</td>
             </tr>
             @endif
             <tr class="total-row">
-                <td colspan="3" style="text-align: right;"><strong>合計（税込）</strong></td>
+                <td colspan="4" style="text-align: right;"><strong>合計（税込）</strong></td>
                 <td class="right"><strong>¥{{ number_format($total_winning_with_tax) }}</strong></td>
                 <td class="right"><strong>¥{{ number_format($total_commission_with_tax) }}</strong></td>
             </tr>

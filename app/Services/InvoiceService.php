@@ -116,6 +116,8 @@ class InvoiceService
             $winningPrice = (int) $wonItem->winning_price;
             $quantity = (int) $wonItem->quantity;
             return [
+                'item_id' => $item->id ?? '',
+                'exhibit_code' => $item->exhibit_code ?: '-',
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
                 'quantity' => $quantity,
@@ -211,6 +213,8 @@ class InvoiceService
             $winningPrice = (int) $wonItem->winning_price;
             $quantity = (int) $wonItem->quantity;
             return [
+                'item_id' => $item->id ?? '',
+                'exhibit_code' => $item->exhibit_code ?: '-',
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
                 'quantity' => $quantity,
@@ -404,6 +408,8 @@ class InvoiceService
         $items = $wonItems->map(function ($wonItem) {
             $winningAmount = (int) $wonItem->winning_price * (int) $wonItem->quantity;
             return [
+                'item_id' => $wonItem->item->id ?? '',
+                'exhibit_code' => $wonItem->item->exhibit_code ?: '-',
                 'item_number' => $wonItem->item->item_number ?? '',
                 'species_name' => $wonItem->item->species_name ?? '',
                 'quantity' => $wonItem->quantity,

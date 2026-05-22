@@ -170,8 +170,9 @@
     <table class="detail">
         <thead>
             <tr>
-                <th style="width: 10%">No.</th>
-                <th style="width: 40%">品種</th>
+                <th style="width: 8%">商品ID</th>
+                <th style="width: 12%">出品ID</th>
+                <th style="width: 30%">品種</th>
                 <th style="width: 15%; text-align: center">数量</th>
                 <th style="width: 20%; text-align: right">単価</th>
                 <th style="width: 15%; text-align: right">小計</th>
@@ -180,7 +181,8 @@
         <tbody>
             @foreach($items as $item)
             <tr>
-                <td>{{ $item['item_number'] }}</td>
+                <td>{{ $item['item_id'] }}</td>
+                <td>{{ $item['exhibit_code'] }}</td>
                 <td>{{ $item['species_name'] }}</td>
                 <td style="text-align: center">{{ $item['quantity'] }}{{ $item['quantity_unit'] }}</td>
                 <td class="right">¥{{ number_format($item['winning_price']) }}</td>
@@ -188,25 +190,25 @@
             </tr>
             @endforeach
             <tr class="subtotal-row">
-                <td colspan="4" style="text-align: right;"><strong>商品小計</strong></td>
+                <td colspan="5" style="text-align: right;"><strong>商品小計</strong></td>
                 <td class="right"><strong>¥{{ number_format($subtotal) }}</strong></td>
             </tr>
             @if($commission_total > 0)
             <tr class="shipping-row">
-                <td colspan="4" style="text-align: right;">落札手数料</td>
+                <td colspan="5" style="text-align: right;">落札手数料</td>
                 <td class="right">¥{{ number_format($commission_total) }}</td>
             </tr>
             @endif
             <tr class="shipping-row">
-                <td colspan="4" style="text-align: right;">配送料</td>
+                <td colspan="5" style="text-align: right;">配送料</td>
                 <td class="right">¥{{ number_format($total_shipping_fee) }}</td>
             </tr>
             <tr class="shipping-row">
-                <td colspan="4" style="text-align: right;">消費税（{{ rtrim(rtrim(number_format($tax_rate, 1), '0'), '.') }}%）</td>
+                <td colspan="5" style="text-align: right;">消費税（{{ rtrim(rtrim(number_format($tax_rate, 1), '0'), '.') }}%）</td>
                 <td class="right">¥{{ number_format($tax_amount) }}</td>
             </tr>
             <tr class="total-row">
-                <td colspan="4" style="text-align: right;"><strong>合計金額</strong></td>
+                <td colspan="5" style="text-align: right;"><strong>合計金額</strong></td>
                 <td class="right"><strong>¥{{ number_format($grand_total) }}</strong></td>
             </tr>
         </tbody>
