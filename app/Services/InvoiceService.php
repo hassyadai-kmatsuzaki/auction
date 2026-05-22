@@ -117,7 +117,7 @@ class InvoiceService
             $quantity = (int) $wonItem->quantity;
             return [
                 'item_id' => $item->id ?? '',
-                'exhibit_code' => $item->exhibit_code ?: '-',
+                'exhibit_code' => $this->formatExhibitCode($item->exhibit_code),
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
                 'quantity' => $quantity,
@@ -214,7 +214,7 @@ class InvoiceService
             $quantity = (int) $wonItem->quantity;
             return [
                 'item_id' => $item->id ?? '',
-                'exhibit_code' => $item->exhibit_code ?: '-',
+                'exhibit_code' => $this->formatExhibitCode($item->exhibit_code),
                 'item_number' => $item->item_number ?? '',
                 'species_name' => $item->species_name ?? '',
                 'quantity' => $quantity,
@@ -381,6 +381,13 @@ class InvoiceService
         };
     }
 
+    private function formatExhibitCode(?string $code): string
+    {
+        $code = (string) ($code ?? '');
+        $code = str_replace('レーン', '', $code);
+        return $code !== '' ? $code : '-';
+    }
+
     /**
      * 出品者支払通知書PDFを生成（オークション×出品者単位）
      */
@@ -409,7 +416,7 @@ class InvoiceService
             $winningAmount = (int) $wonItem->winning_price * (int) $wonItem->quantity;
             return [
                 'item_id' => $wonItem->item->id ?? '',
-                'exhibit_code' => $wonItem->item->exhibit_code ?: '-',
+                'exhibit_code' => $this->formatExhibitCode($wonItem->item->exhibit_code),
                 'item_number' => $wonItem->item->item_number ?? '',
                 'species_name' => $wonItem->item->species_name ?? '',
                 'quantity' => $wonItem->quantity,

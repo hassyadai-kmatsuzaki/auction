@@ -73,11 +73,12 @@ const computeTaxBreakdown = (subtotal: number, commission: number, shipping: num
   };
 };
 
+const stripLane = (code?: string | null): string => (code ?? '').replace(/レーン/g, '');
+
 interface WonItem {
   id: number;
   item: {
     id: number;
-    item_number: number;
     exhibit_code?: string | null;
     species_name: string;
     quantity: number;
@@ -653,11 +654,11 @@ export default function WonItemManagement() {
       <TableRow key={item.id} hover>
         <TableCell>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {item.item.exhibit_code ?? `#${item.item.item_number}`}
+            #{item.item.id}
           </Typography>
           {item.item.exhibit_code && (
             <Typography variant="caption" color="text.secondary">
-              #{item.item.item_number}
+              {stripLane(item.item.exhibit_code)}
             </Typography>
           )}
         </TableCell>
@@ -709,11 +710,11 @@ export default function WonItemManagement() {
     <TableRow key={item.id} hover>
       <TableCell>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {item.item.exhibit_code ?? `#${item.item.item_number}`}
+          #{item.item.id}
         </Typography>
         {item.item.exhibit_code && (
           <Typography variant="caption" color="text.secondary">
-            #{item.item.item_number}
+            {stripLane(item.item.exhibit_code)}
           </Typography>
         )}
       </TableCell>
