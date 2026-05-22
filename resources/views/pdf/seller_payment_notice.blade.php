@@ -190,9 +190,9 @@
                 <th style="width: 8%">商品ID</th>
                 <th style="width: 12%">出品ID</th>
                 <th style="width: 30%">品種</th>
-                <th style="width: 10%; text-align: center">数量</th>
-                <th style="width: 20%; text-align: right">落札金額（税抜）</th>
-                <th style="width: 20%; text-align: right">手数料（税抜）</th>
+                <th style="width: 10%">数量</th>
+                <th style="width: 20%">落札金額（税抜）</th>
+                <th style="width: 20%">手数料（税抜）</th>
             </tr>
         </thead>
         <tbody>

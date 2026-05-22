@@ -173,9 +173,9 @@
                 <th style="width: 8%">商品ID</th>
                 <th style="width: 12%">出品ID</th>
                 <th style="width: 30%">品種</th>
-                <th style="width: 15%; text-align: center">数量</th>
-                <th style="width: 20%; text-align: right">単価</th>
-                <th style="width: 15%; text-align: right">小計</th>
+                <th style="width: 15%">数量</th>
+                <th style="width: 20%">単価</th>
+                <th style="width: 15%">小計</th>
             </tr>
         </thead>
         <tbody>
