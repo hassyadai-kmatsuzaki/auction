@@ -58,6 +58,7 @@ import {
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
+import { adminCsvExportApi } from '../../api/admin/csvExportApi';
 
 // 消費税率（請求書/納品書PDFと同一値）
 const TAX_RATE = 10;
@@ -249,11 +250,28 @@ export default function WonItemManagement() {
   const [approveShippingBags, setApproveShippingBags] = useState<Array<{ size: string; quantity: number }>>([]);
   const [approveShippingIsFree, setApproveShippingIsFree] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [exporting, setExporting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
+
+  const handleExportShippingCsv = async () => {
+    if (!auctionId) return;
+    setExporting(true);
+    try {
+      await adminCsvExportApi.wonItemsShipping(Number(auctionId));
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || 'CSVダウンロードに失敗しました',
+        severity: 'error',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // データ取得
   const fetchWonItems = useCallback(async () => {
@@ -995,8 +1013,13 @@ export default function WonItemManagement() {
         <IconButton onClick={fetchWonItems} title="更新">
           <RefreshIcon />
         </IconButton>
-        <Button variant="outlined" startIcon={<ExportIcon />}>
-          CSVエクスポート
+        <Button
+          variant="outlined"
+          startIcon={exporting ? <CircularProgress size={16} /> : <ExportIcon />}
+          onClick={handleExportShippingCsv}
+          disabled={exporting || !auctionId}
+        >
+          発送用CSV
         </Button>
       </Box>
 

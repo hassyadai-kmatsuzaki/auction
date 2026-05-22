@@ -58,4 +58,10 @@ export const adminCsvExportApi = {
       {},
       'members.csv',
     ),
+  wonItemsShipping: (auctionId: number) =>
+    downloadCsv(
+      '/api/admin/exports/won-items-shipping.csv',
+      cleanParams({ auction_id: auctionId }),
+      `auction_${auctionId}_shipping_list.csv`,
+    ),
 };

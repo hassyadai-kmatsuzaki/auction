@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\Subscription;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Models\WonItem;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -315,6 +316,129 @@ class CsvExportService
 
             fclose($out);
         }, 200, $headers);
+    }
+
+    /**
+     * 4つ目: 発送作業用 落札者リストCSV（オークション1件、落札者でグルーピング）
+     *
+     * 1行 = 1落札者。発送現場が「誰に・どの箱を・どの商品を」まとめるための一覧。
+     * 列: 屋号 / 名前 / 箱サイズ(袋構成) / 商品ID
+     *   - 屋号は users.trade_name、空なら氏名で代用（同シートでグループ化しやすくする）
+     *   - 箱列は shipping_breakdown.boxes を「100(S×1/M×1)・100(M×2)」形式に整形
+     *   - 対面引取 (delivery_method=pickup) は箱列を空欄
+     *   - 商品IDは「1601(サファイヤ)・1602(サファイヤ)」形式（種別名は items.speciesType.name）
+     */
+    public function streamWonItemsShipping(int $auctionId): StreamedResponse
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $filename = sprintf('auction_%d_shipping_list.csv', $auctionId);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        return response()->stream(function () use ($auctionId) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($out, ['屋号', '名前', '箱サイズ(袋構成)', '商品ID']);
+
+            $winnerIds = WonItem::whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+                ->whereNotNull('winner_id')
+                ->orderBy('winner_id')
+                ->pluck('winner_id')
+                ->unique()
+                ->values();
+
+            foreach ($winnerIds as $winnerId) {
+                $winner = User::find($winnerId);
+                if (!$winner) continue;
+
+                $wonItems = WonItem::where('winner_id', $winnerId)
+                    ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+                    ->with(['item.speciesType:id,name'])
+                    ->orderBy('item_id')
+                    ->get();
+
+                if ($wonItems->isEmpty()) continue;
+
+                $name = (string) ($winner->name ?? '');
+                $tradeName = $winner->trade_name !== null && $winner->trade_name !== ''
+                    ? $winner->trade_name
+                    : $name;
+
+                fputcsv($out, [
+                    $tradeName,
+                    $name,
+                    $this->formatBoxesForShippingCsv($wonItems),
+                    $this->formatItemIdsForShippingCsv($wonItems),
+                ]);
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    /**
+     * shipping_breakdown.boxes を発送リスト用に整形。
+     * 例: [{box_size:100, bags:["S","M"]}, {box_size:100, bags:["S","M"]}] → "100(S×1/M×1)・100(S×1/M×1)"
+     * 対面引取 (pickup) または breakdown 未設定の場合は空文字。
+     */
+    private function formatBoxesForShippingCsv($wonItems): string
+    {
+        $first = $wonItems->first();
+        if (!$first) return '';
+
+        if ($first->delivery_method === 'pickup') return '';
+
+        $bd = $first->shipping_breakdown ?? [];
+        $boxes = $bd['boxes'] ?? [];
+        if (!is_array($boxes) || empty($boxes)) return '';
+
+        $bagOrder = ['S', 'M', 'L', 'KA'];
+        $parts = [];
+        foreach ($boxes as $box) {
+            $size = $box['box_size'] ?? '';
+            $bags = $box['bags'] ?? [];
+            if (!is_array($bags)) $bags = [];
+
+            $counts = [];
+            foreach ($bags as $bag) {
+                $key = (string) $bag;
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+
+            $bagsStr = [];
+            foreach ($bagOrder as $sz) {
+                if (isset($counts[$sz])) {
+                    $bagsStr[] = "{$sz}×{$counts[$sz]}";
+                    unset($counts[$sz]);
+                }
+            }
+            foreach ($counts as $sz => $c) {
+                $bagsStr[] = "{$sz}×{$c}";
+            }
+
+            $parts[] = $bagsStr === []
+                ? (string) $size
+                : "{$size}(" . implode('/', $bagsStr) . ")";
+        }
+        return implode('・', $parts);
+    }
+
+    /**
+     * 商品IDを「ID(種別名)」形式で「・」連結。
+     * 例: "1601(サファイヤ)・1602(サファイヤ)・1603(サファイヤ)"
+     */
+    private function formatItemIdsForShippingCsv($wonItems): string
+    {
+        return $wonItems->map(function ($w) {
+            $item = $w->item;
+            if (!$item) return '';
+            $species = $item->speciesType?->name;
+            return $species ? "{$item->id}({$species})" : (string) $item->id;
+        })->filter(fn ($s) => $s !== '')->implode('・');
     }
 
     /**

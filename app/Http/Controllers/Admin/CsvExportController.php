@@ -60,4 +60,17 @@ class CsvExportController extends Controller
     {
         return $this->csvExportService->streamMembers();
     }
+
+    /**
+     * GET /api/admin/exports/won-items-shipping.csv
+     * 発送作業用 落札者リスト（1オークション・落札者でグルーピング）
+     */
+    public function wonItemsShipping(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'auction_id' => 'required|integer|exists:auctions,id',
+        ]);
+
+        return $this->csvExportService->streamWonItemsShipping((int) $request->input('auction_id'));
+    }
 }
