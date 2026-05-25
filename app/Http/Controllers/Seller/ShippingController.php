@@ -39,9 +39,10 @@ class ShippingController extends Controller
         $status = $request->input('status'); // pending, shipped, delivered
 
         // 自分の出品した商品の落札情報を取得
+        // 弊社預かり・弊社発送モデルのため、出品者には買受者の個人情報（氏名・住所・伝票番号）は返さない
         $query = WonItem::whereHas('item', function ($q) use ($sellerProfileId) {
             $q->where('seller_profile_id', $sellerProfileId);
-        })->with(['item.auction', 'winner']);
+        })->with(['item.auction']);
 
         // ステータスフィルター
         if ($status && $status !== 'all') {
@@ -89,18 +90,11 @@ class ShippingController extends Controller
                             'id' => $wonItem->item->auction->id,
                             'title' => $wonItem->item->auction->title,
                         ],
-                        'buyer' => $wonItem->winner ? [
-                            'id' => $wonItem->winner->id,
-                            'name' => $wonItem->winner->name,
-                            'address' => $this->formatAddress($wonItem),
-                        ] : null,
                         'price' => $wonItem->winning_price,
                         'total_amount' => $wonItem->total_amount,
                         'shipping_fee' => $wonItem->shipping_fee ?? 0,
                         'payment_status' => $wonItem->payment_status,
                         'delivery_status' => $this->mapDeliveryStatus($wonItem->delivery_status),
-                        'tracking_number' => $wonItem->tracking_number,
-                        'shipping_company' => $wonItem->shipping_company,
                         'sold_at' => $wonItem->created_at->toIso8601String(),
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                         'delivered_at' => $wonItem->delivered_at ? $wonItem->delivered_at->toIso8601String() : null,
@@ -219,36 +213,6 @@ class ShippingController extends Controller
             'success' => true,
             'message' => '伝票番号を更新しました。',
         ]);
-    }
-
-    /**
-     * 住所をフォーマット
-     */
-    private function formatAddress(WonItem $wonItem): string
-    {
-        // 配送先住所が設定されている場合はそちらを使用
-        if ($wonItem->shipping_postal_code) {
-            $address = $wonItem->shipping_prefecture;
-            $address .= $wonItem->shipping_city;
-            $address .= $wonItem->shipping_address_line1;
-            if ($wonItem->shipping_address_line2) {
-                $address .= ' ' . $wonItem->shipping_address_line2;
-            }
-            return $address;
-        }
-
-        // 落札者の住所を使用
-        if ($wonItem->winner) {
-            $address = $wonItem->winner->prefecture ?? '';
-            $address .= $wonItem->winner->city ?? '';
-            $address .= $wonItem->winner->address_line1 ?? '';
-            if ($wonItem->winner->address_line2) {
-                $address .= ' ' . $wonItem->winner->address_line2;
-            }
-            return $address ?: '住所未登録';
-        }
-
-        return '住所未登録';
     }
 
     /**

@@ -17,16 +17,11 @@ import {
   TableRow,
   Chip,
   IconButton,
-  Tooltip,
-  Link,
   CircularProgress,
   Alert,
-  Snackbar,
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  OpenInNew as OpenInNewIcon,
-  ContentCopy as CopyIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
@@ -46,18 +41,11 @@ interface ShippingItem {
     id: number;
     title: string;
   };
-  buyer: {
-    id: number;
-    name: string;
-    address: string;
-  } | null;
   price: number;
   total_amount: number;
   shipping_fee: number;
   payment_status: string;
   delivery_status: string;
-  tracking_number?: string;
-  shipping_company?: string;
   sold_at: string;
   shipped_at?: string;
   delivered_at?: string;
@@ -69,21 +57,6 @@ interface Statistics {
   delivered: number;
 }
 
-// 配送業者の追跡URLを生成
-const getTrackingUrl = (trackingNumber: string, company: string) => {
-  const cleanNumber = trackingNumber.replace(/-/g, '');
-  switch (company) {
-    case 'ヤマト運輸':
-      return `https://jizen.kuronekoyamato.co.jp/jizen/servlet/crjz.b.NQ0010?id=${cleanNumber}`;
-    case '佐川急便':
-      return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${cleanNumber}`;
-    case '日本郵便':
-      return `https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S003&locale=ja&SVID=023&reqCodeNo1=${cleanNumber}`;
-    default:
-      return '';
-  }
-};
-
 export default function SellerShipping() {
   const [items, setItems] = useState<ShippingItem[]>([]);
   const [statistics, setStatistics] = useState<Statistics>({ pending: 0, shipped: 0, delivered: 0 });
@@ -91,11 +64,6 @@ export default function SellerShipping() {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
 
   // データ取得
   const fetchShippingItems = useCallback(async () => {
@@ -123,20 +91,11 @@ export default function SellerShipping() {
     fetchShippingItems();
   }, [fetchShippingItems]);
 
-  const handleCopyTrackingNumber = (trackingNumber: string) => {
-    navigator.clipboard.writeText(trackingNumber);
-    setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
-  };
-
   // フィルタリング（検索）
   const filteredItems = items.filter((item) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    return (
-      item.item.species_name.toLowerCase().includes(query) ||
-      (item.buyer?.name || '').toLowerCase().includes(query) ||
-      (item.tracking_number || '').includes(query)
-    );
+    return item.item.species_name.toLowerCase().includes(query);
   });
 
   const getStatusChip = (status: string) => {
@@ -218,7 +177,7 @@ export default function SellerShipping() {
         <Box sx={{ p: 2 }}>
           <TextField
             size="small"
-            placeholder="品種名、買受者名、伝票番号で検索..."
+            placeholder="品種名で検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             sx={{ width: 350 }}
@@ -240,17 +199,14 @@ export default function SellerShipping() {
             <TableHead>
               <TableRow>
                 <TableCell>商品</TableCell>
-                <TableCell>買受者・配送先</TableCell>
                 <TableCell align="right">落札価格</TableCell>
                 <TableCell align="center">ステータス</TableCell>
-                <TableCell>伝票番号</TableCell>
-                <TableCell align="center">操作</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">発送対象の商品がありません</Typography>
                   </TableCell>
                 </TableRow>
@@ -263,14 +219,6 @@ export default function SellerShipping() {
                       </Typography>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                         {item.auction.title} / {item.item.exhibit_code ?? `No.${item.item.item_number}`}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {item.buyer?.name || '不明'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {item.buyer?.address || '住所未登録'}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -286,57 +234,6 @@ export default function SellerShipping() {
                     <TableCell align="center">
                       {getStatusChip(item.delivery_status)}
                     </TableCell>
-                    <TableCell>
-                      {item.tracking_number ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                              {item.tracking_number}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              {item.shipping_company}
-                            </Typography>
-                          </Box>
-                          <Tooltip title="コピー">
-                            <IconButton size="small" onClick={() => handleCopyTrackingNumber(item.tracking_number!)}>
-                              <CopyIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
-                          {item.shipping_company && getTrackingUrl(item.tracking_number, item.shipping_company) && (
-                            <Tooltip title="配送状況を確認">
-                              <IconButton
-                                size="small"
-                                component={Link}
-                                href={getTrackingUrl(item.tracking_number, item.shipping_company)}
-                                target="_blank"
-                              >
-                                <OpenInNewIcon sx={{ fontSize: 14 }} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                          未登録
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      {item.tracking_number && item.shipping_company && getTrackingUrl(item.tracking_number, item.shipping_company) ? (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          endIcon={<OpenInNewIcon />}
-                          component={Link}
-                          href={getTrackingUrl(item.tracking_number, item.shipping_company)}
-                          target="_blank"
-                        >
-                          配送状況
-                        </Button>
-                      ) : (
-                        <Chip label={item.payment_status === 'pending' ? '入金待ち' : '発送待ち'} size="small" sx={{ bgcolor: '#FEF3C7', color: '#D97706' }} />
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -344,19 +241,6 @@ export default function SellerShipping() {
           </Table>
         </TableContainer>
       </Card>
-
-
-      {/* スナックバー */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }
