@@ -347,32 +347,6 @@ export default function Login() {
           <GoogleLoginButton />
         </Box>
         */}
-
-        <Typography
-          sx={{
-            textAlign: 'center',
-            mt: 3,
-            fontSize: '0.875rem',
-            color: '#000',
-          }}
-        >
-          アカウントをお持ちでない方は{' '}
-          <Typography
-            component="span"
-            data-testid="link-register"
-            onClick={() => navigate('/register')}
-            sx={{
-              cursor: 'pointer',
-              color: '#000',
-              fontWeight: 600,
-              textDecoration: 'underline',
-              textUnderlineOffset: '3px',
-              '&:hover': { opacity: 0.85 },
-            }}
-          >
-            新規登録
-          </Typography>
-        </Typography>
       </Box>
 
       <Dialog
