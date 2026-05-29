@@ -171,8 +171,10 @@ class CsvExportService
                 '品種名',
                 '匹数',
                 '出品者名',
+                '出品者ID',
                 'ステータス',
                 '落札者名',
+                '落札者ID',
                 '落札金額(税抜)',
                 '送料(税抜)',
                 '手数料(税抜)',
@@ -183,18 +185,22 @@ class CsvExportService
             foreach ($query->lazy(200) as $item) {
                 $auction = $item->auction;
                 $sellerName = $this->resolveSellerName($item);
+                $sellerId = $item->sellerProfile?->user?->id;
                 $won = $item->wonItem;
 
                 if ($won) {
-                    $sales = (float) $won->total_amount;
+                    // 落札金額(税抜) = 落札価格 × 匹数。total_amount は手数料込みのため使わない。
+                    $sales = (float) $won->winning_price * (int) $won->quantity;
                     $shipping = (float) $won->shipping_fee;
                     $commission = (float) $won->commission_amount;
                     $tax = floor(($sales + $commission + $shipping) * $taxRate / 100);
                     $grand = $sales + $commission + $shipping + $tax;
                     $winnerName = $this->resolveWinnerName($won);
+                    $winnerId = $won->winner_id;
                 } else {
                     $sales = $shipping = $commission = $tax = $grand = null;
                     $winnerName = '';
+                    $winnerId = null;
                 }
 
                 fputcsv($out, [
@@ -205,8 +211,10 @@ class CsvExportService
                     $item->species_name,
                     $item->quantity,
                     $sellerName,
+                    $sellerId ?? '',
                     $item->status,
                     $winnerName,
+                    $winnerId ?? '',
                     $sales !== null ? (int) $sales : '',
                     $shipping !== null ? (int) $shipping : '',
                     $commission !== null ? (int) $commission : '',
@@ -264,10 +272,20 @@ class CsvExportService
                 'サブスク状態',
                 '現在の課金期間終了',
                 '最終支払日',
+                'インボイス番号',
+                '銀行名',
+                '支店名',
+                '種別',
+                '口座番号',
+                '名義',
             ]);
 
             $query = User::query()
-                ->with(['roles:id,display_name', 'subscription.plan'])
+                ->with([
+                    'roles:id,display_name',
+                    'subscription.plan',
+                    'sellerProfile:id,user_id,business_registration_number,bank_name,bank_branch,account_type,account_number,account_holder',
+                ])
                 ->orderBy('id');
 
             foreach ($query->lazy(200) as $user) {
@@ -291,6 +309,8 @@ class CsvExportService
                 $lastPaid = $lastPaidAt->get($user->id);
                 $lastPaidFormatted = $lastPaid ? Carbon::parse($lastPaid)->format('Y-m-d') : '';
 
+                $profile = $user->sellerProfile;
+
                 fputcsv($out, [
                     $user->id,
                     $user->name ?? '',
@@ -311,6 +331,12 @@ class CsvExportService
                     $sub?->status ?? '',
                     optional($sub?->current_period_end)->format('Y-m-d') ?? '',
                     $lastPaidFormatted,
+                    $profile?->business_registration_number ?? '',
+                    $profile?->bank_name ?? '',
+                    $profile?->bank_branch ?? '',
+                    $this->formatAccountType($profile?->account_type),
+                    $profile?->account_number ?? '',
+                    $profile?->account_holder ?? '',
                 ]);
             }
 
@@ -463,7 +489,8 @@ class CsvExportService
                 DB::raw('COUNT(DISTINCT items.seller_profile_id) as sellers_count'),
                 DB::raw('COUNT(DISTINCT won_items.id) as won_count'),
                 DB::raw('COUNT(DISTINCT won_items.winner_id) as winners_count'),
-                DB::raw('COALESCE(SUM(won_items.total_amount), 0) as sales'),
+                // 売上(税抜) = 落札価格 × 匹数の合算。total_amount は手数料込みのため使わない。
+                DB::raw('COALESCE(SUM(won_items.winning_price * won_items.quantity), 0) as sales'),
                 DB::raw('COALESCE(SUM(won_items.commission_amount), 0) as commission'),
                 DB::raw('COALESCE(SUM(won_items.shipping_fee), 0) as shipping'),
             )
@@ -514,6 +541,18 @@ class CsvExportService
             'commission' => 0.0,
             'shipping' => 0.0,
         ];
+    }
+
+    /**
+     * 口座種別コードを日本語表記に変換。空・未知の値はそのまま（空文字）返す。
+     */
+    private function formatAccountType(?string $type): string
+    {
+        return match ($type) {
+            'savings' => '普通',
+            'checking' => '当座',
+            default => $type ?? '',
+        };
     }
 
     private function resolveSellerName(Item $item): string
