@@ -54,8 +54,8 @@ class IssueExhibitCodeActionTest extends TestCase
         $action = new IssueExhibitCodeAction();
         $code = $action->execute($item->fresh(), silent: true);
 
-        $this->assertSame('A001', $code);
-        $this->assertSame('A001', $item->fresh()->exhibit_code);
+        $this->assertSame('A-001', $code);
+        $this->assertSame('A-001', $item->fresh()->exhibit_code);
         $this->assertNotNull($item->fresh()->exhibit_code_issued_at);
     }
 
@@ -81,9 +81,9 @@ class IssueExhibitCodeActionTest extends TestCase
             $action->execute($item->fresh(), silent: true);
         }
 
-        $this->assertSame('A001', $items[1]->fresh()->exhibit_code);
-        $this->assertSame('A002', $items[2]->fresh()->exhibit_code);
-        $this->assertSame('A003', $items[3]->fresh()->exhibit_code);
+        $this->assertSame('A-001', $items[1]->fresh()->exhibit_code);
+        $this->assertSame('A-002', $items[2]->fresh()->exhibit_code);
+        $this->assertSame('A-003', $items[3]->fresh()->exhibit_code);
     }
 
     public function test_既に発行済みのアイテムには再採番されない(): void
@@ -166,7 +166,7 @@ class IssueExhibitCodeActionTest extends TestCase
         $action = new IssueExhibitCodeAction();
         $action->execute($item, silent: true);
 
-        $this->assertSame('A005', $item->fresh()->exhibit_code);
+        $this->assertSame('A-005', $item->fresh()->exhibit_code);
 
         // 並び替え: sequence_order を変更しても exhibit_code は変わらない
         DB::table('lane_items')
@@ -175,6 +175,6 @@ class IssueExhibitCodeActionTest extends TestCase
 
         $action->execute($item->fresh(), silent: true);
 
-        $this->assertSame('A005', $item->fresh()->exhibit_code);
+        $this->assertSame('A-005', $item->fresh()->exhibit_code);
     }
 }

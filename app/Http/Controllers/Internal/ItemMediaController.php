@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Internal;
 
 use App\Actions\Item\UploadMediaAction;
 use App\Http\Controllers\Controller;
+use App\Models\Auction;
 use App\Models\Item;
 use App\Models\ItemMedia;
 use App\Services\IdempotencyService;
@@ -31,6 +32,67 @@ class ItemMediaController extends Controller
     public function upload(Request $request, int $itemId): JsonResponse
     {
         $item = Item::findOrFail($itemId);
+
+        return $this->performUpload($item, $request);
+    }
+
+    /**
+     * 社内ツール用 メディアアップロード（出品ID版）。
+     * AI動画パイプラインが items.id を扱わず、(auction_id + exhibit_code) で紐付けるための入口。
+     * ボディ仕様・冪等性・1ファイル=1リクエストは {@see upload()}（items.id 版）と完全に同一。
+     * 認証: auth:sanctum + check.role:admin（routes/api.php 側で適用）。
+     * 仕様: docs/api/internal-item-media-upload.md
+     */
+    public function uploadByExhibitCode(Request $request, int $auctionId, string $exhibitCode): JsonResponse
+    {
+        // ① auction の存在と「メディアを受け付けられる状態」を検証（誤った auction_id での誤爆防止）。
+        //    exhibit_code は非ユニーク（オークション毎に再利用）なので auction_id がスコープキー。
+        //    撮影〜編集〜登録は開催前に行われるため、許可は preparing / scheduled のみ（live 以降は不可）。
+        $auction = Auction::find($auctionId);
+        if ($auction === null) {
+            return response()->json([
+                'success' => false,
+                'message' => '指定された auction_id が存在しません。',
+            ], 404);
+        }
+
+        if (! in_array($auction->status, ['preparing', 'scheduled'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'このオークションは現在メディアを受け付けられる状態（開催前）ではありません。',
+            ], 422);
+        }
+
+        // ② (auction_id, exhibit_code) で item を一意特定。
+        $matches = Item::where('auction_id', $auctionId)
+            ->where('exhibit_code', $exhibitCode)
+            ->get();
+
+        if ($matches->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => '指定された出品ID（exhibit_code）に該当する商品が見つかりません。',
+            ], 404);
+        }
+
+        if ($matches->count() > 1) {
+            // 本来は (lane_name + sequence_order) 由来でオークション内ユニークなので起きない想定。
+            return response()->json([
+                'success' => false,
+                'message' => '指定された出品IDに該当する商品が複数存在します。運営に連絡してください。',
+            ], 409);
+        }
+
+        return $this->performUpload($matches->first(), $request);
+    }
+
+    /**
+     * 解決済みの Item に対するアップロード本体（バリデーション + 冪等性 + 保存）。
+     * items.id 版・exhibit_code 版の両方から呼ばれる共通処理。
+     */
+    private function performUpload(Item $item, Request $request): JsonResponse
+    {
+        $itemId = $item->id;
 
         $validator = Validator::make($request->all(), [
             'file' => [

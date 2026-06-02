@@ -6,7 +6,7 @@
 - 認証: `auth:sanctum` (Bearer トークン)
 - 権限: `admin` ロール必須
 
-ルート定義: [routes/api.php:413-419](../../routes/api.php#L413-L419)
+ルート定義: [routes/api.php:413-428](../../routes/api.php#L413-L428)
 コントローラ: [app/Http/Controllers/Internal/ItemMediaController.php](../../app/Http/Controllers/Internal/ItemMediaController.php)
 
 ---
@@ -108,6 +108,54 @@ Authorization: Bearer <sanctum-token>
 | 404 | `itemId` の商品が存在しない |
 | 409 | `Idempotency-Key` 衝突 (処理中) |
 | 422 | バリデーション失敗 / `Idempotency-Key` 衝突 (内容不一致) |
+
+---
+
+### 1-b. メディアアップロード（出品ID版 / exhibit_code）
+
+`POST /api/internal/auctions/{auction_id}/items/{exhibit_code}/media`
+
+AI 動画自動編集パイプライン用の入口です。`items.id` を扱わず、印刷QRカードから読み取った
+**出品ID（`exhibit_code`）** で商品を特定してメディアを紐付けます。
+
+**ボディ仕様・冪等性（`Idempotency-Key`）・1ファイル=1リクエスト・レスポンス形式は
+[1. メディアアップロード](#1-メディアアップロード)（`items.id` 版）と完全に同一です。**
+変わるのはパスのキーだけ（`items.id` → `auction_id` + `exhibit_code`）。`items.id` 版も併存します。
+
+#### リクエスト
+
+- `Content-Type: multipart/form-data`
+- パスパラメータ:
+  - `auction_id` (整数) — `auctions.id`。**現2桁→将来3桁の数字**
+  - `exhibit_code` (文字列) — 出品ID。**`{レーン}-{3桁ゼロ埋め}` 形式（例 `A-001`, `B-200`）**。
+    レーンは英字1文字、番号は `001`〜。大文字・ハイフン・ゼロ埋め桁数まで完全一致が必要
+    （`A-1` `A001` `a-001` は不可）
+- ヘッダ・ボディは `items.id` 版と同一
+
+#### item の特定ロジック
+
+1. `auction_id` が**存在**し、かつ**開催前（`preparing` / `scheduled`）**であることを検証。
+   - `exhibit_code` はオークション毎に**再利用される非ユニーク値**のため、`auction_id` をスコープキーにして
+     別オークションの同一 `exhibit_code` への**誤爆を防止**する。
+   - `live` 以降（開催中・終了・キャンセル）は受け付けない（撮影〜編集〜登録は開催前に行うため）。
+2. `(auction_id, exhibit_code)` で `items` を一意特定し、メディアを紐付け。
+
+#### レスポンス / エラー
+
+| ステータス | 条件 |
+|---|---|
+| 201 | 成功（`items.id` 版と同じ media 情報を返す） |
+| 401 | トークン未付与 / 不正 |
+| 403 | `admin` ロールでない |
+| 404 | `auction_id` が存在しない / `(auction_id, exhibit_code)` に該当 item なし |
+| 409 | 該当 item が複数（曖昧。`exhibit_code` はオークション内で一意になる発番のため本来起きない想定） / `Idempotency-Key` 衝突 (処理中) |
+| 422 | オークションが開催前（`preparing` / `scheduled`）でない / バリデーション失敗 / `Idempotency-Key` 衝突 (内容不一致) |
+
+> **`exhibit_code` 発番フォーマットとの一致について**
+> システム側の発番は [IssueExhibitCodeAction](../../app/Actions/Exhibit/IssueExhibitCodeAction.php) が
+> `{lane_name}-{sprintf('%03d', sequence_order)}`（例 `A-001`）で行う。QRカードと**完全一致**するよう
+> ハイフン入りに揃えてある。`exhibit_code` のオークション内一意性は `lane_name`（A/B）＋ `sequence_order`
+> の組み合わせで担保される（DB の UNIQUE 制約ではなく発番ロジックによる）。
 
 ---
 

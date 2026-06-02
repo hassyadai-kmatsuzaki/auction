@@ -930,13 +930,8 @@ export default function LaneAssignment() {
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: 1 }}>
                       <Typography variant="h6" sx={{ fontWeight: 600, flexShrink: 0 }}>
-                        レーン {lane.lane_number}
+                        レーン {lane.lane_name || lane.lane_number}
                       </Typography>
-                      {lane.lane_name && (
-                        <Typography variant="body2" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          ({lane.lane_name})
-                        </Typography>
-                      )}
                       {auction?.status !== 'live' && (
                         <Tooltip title="レーン名を編集">
                           <IconButton

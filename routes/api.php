@@ -419,6 +419,12 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('internal')->gro
         ->whereNumber('itemId')->whereNumber('mediaId');
     Route::patch('items/{itemId}/media/{mediaId}/thumbnail', [\App\Http\Controllers\Internal\ItemMediaController::class, 'setThumbnail'])
         ->whereNumber('itemId')->whereNumber('mediaId');
+
+    // 出品ID（exhibit_code）版アップロード。AI動画パイプライン用（items.id を扱わず紐付け）。
+    // exhibit_code は `{レーン}-{3桁ゼロ埋め}` 形式（例 A-001）。レーンは英字1文字。
+    Route::post('auctions/{auctionId}/items/{exhibitCode}/media', [\App\Http\Controllers\Internal\ItemMediaController::class, 'uploadByExhibitCode'])
+        ->whereNumber('auctionId')
+        ->where('exhibitCode', '[A-Za-z]-[0-9]{3}');
 });
 
 // ユーザーAPI（参加者・出品者共通）

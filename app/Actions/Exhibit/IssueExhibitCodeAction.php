@@ -15,7 +15,9 @@ use Illuminate\Support\Facades\Log;
  * 既存トランザクションに乗せて「lane_items への INSERT 完了 → exhibit_code セット」を1回実行する。
  *
  * 発行ルール:
- *  - `{lane.lane_name}{sprintf('%03d', lane_items.sequence_order)}` （例: `A001`）
+ *  - `{lane.lane_name}-{sprintf('%03d', lane_items.sequence_order)}` （例: `A-001`）
+ *    印刷QRカード（AI動画パイプライン）の exhibit_code と完全一致させる必要があるため、
+ *    レーン名と連番の間にハイフンを入れる（仕様: docs/api/internal-item-media-upload.md）。
  *  - 一度セットされた exhibit_code は再採番しない（後続のレーン移動・並び替えで sequence_order が変わっても固定）
  *  - lane_name 未設定や lane 未割当の場合は黙ってスキップ（業務ロジックには関与しない表示用なので例外を投げない）
  */
@@ -84,7 +86,7 @@ class IssueExhibitCodeAction
             return null;
         }
 
-        return sprintf('%s%03d', $laneName, (int) $row->sequence_order);
+        return sprintf('%s-%03d', $laneName, (int) $row->sequence_order);
     }
 
     private function scheduleNotification(Item $item): void

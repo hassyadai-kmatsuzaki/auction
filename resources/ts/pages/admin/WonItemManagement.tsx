@@ -83,6 +83,10 @@ interface WonItem {
     species_name: string;
     quantity: number;
     thumbnail_path?: string;
+    seller?: {
+      name: string | null;
+      trade_name: string | null;
+    } | null;
   };
   winner: {
     id: number;
@@ -666,6 +670,12 @@ export default function WonItemManagement() {
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
             {item.item.species_name}
           </Typography>
+          {item.item.seller && (
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              出品: {item.item.seller.trade_name || '-'}
+              {item.item.seller.name ? `（${item.item.seller.name}）` : ''}
+            </Typography>
+          )}
         </TableCell>
         {showWinner && (
           <TableCell>
@@ -722,6 +732,12 @@ export default function WonItemManagement() {
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
           {item.item.species_name}
         </Typography>
+        {item.item.seller && (
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+            出品: {item.item.seller.trade_name || '-'}
+            {item.item.seller.name ? `（${item.item.seller.name}）` : ''}
+          </Typography>
+        )}
       </TableCell>
       <TableCell>
         {item.winner ? (

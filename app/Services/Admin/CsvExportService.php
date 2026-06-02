@@ -299,11 +299,11 @@ class CsvExportService
                 $isActive = $sub !== null && $sub->status === Subscription::STATUS_ACTIVE;
 
                 if ($isActive) {
-                    $regLabel = '登録済（有効）';
+                    $regLabel = '会員登録済';
                 } elseif ($registered) {
-                    $regLabel = '登録済（' . $sub->status . '）';
+                    $regLabel = '口座(振込/確認)待ち';
                 } else {
-                    $regLabel = '未登録';
+                    $regLabel = '申請済/決済待ち';
                 }
 
                 $lastPaid = $lastPaidAt->get($user->id);

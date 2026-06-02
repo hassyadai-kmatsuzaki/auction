@@ -93,7 +93,7 @@ class WonItemController extends Controller
 
         $query = WonItem::whereHas('item', function ($q) use ($auctionId) {
             $q->where('auction_id', $auctionId);
-        })->with(['item', 'winner']);
+        })->with(['item.sellerProfile.user:id,trade_name', 'winner']);
 
         if ($paymentStatus && $paymentStatus !== 'all') {
             $query->where('payment_status', $paymentStatus);
@@ -140,6 +140,10 @@ class WonItemController extends Controller
                             'species_name' => $wonItem->item->species_name,
                             'quantity' => $wonItem->item->quantity,
                             'thumbnail_path' => $wonItem->item->thumbnail_path,
+                            'seller' => $wonItem->item->sellerProfile ? [
+                                'name' => $wonItem->item->sellerProfile->seller_name,
+                                'trade_name' => $wonItem->item->sellerProfile->user?->trade_name,
+                            ] : null,
                         ],
                         'winner' => $wonItem->winner ? [
                             'id' => $wonItem->winner->id,

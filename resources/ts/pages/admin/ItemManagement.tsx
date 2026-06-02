@@ -608,10 +608,10 @@ export default function ItemManagement() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      #{item.id}
+                      {item.exhibit_code ?? `#${item.item_number}`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      {item.exhibit_code ?? `#${item.item_number}`}
+                      #{item.id}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -678,7 +678,7 @@ export default function ItemManagement() {
                     <IconButton
                       size="small"
                       color="primary"
-                      onClick={() => navigate(`/admin/auctions/${auctionId}/items/${item.id}/edit`)}
+                      onClick={() => window.open(`/admin/auctions/${auctionId}/items/${item.id}/edit`, '_blank', 'noopener')}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
