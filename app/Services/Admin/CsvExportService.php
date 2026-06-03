@@ -348,11 +348,14 @@ class CsvExportService
      * 4つ目: 発送作業用 落札者リストCSV（オークション1件、落札者でグルーピング）
      *
      * 1行 = 1落札者。発送現場が「誰に・どの箱を・どの商品を」まとめるための一覧。
-     * 列: 屋号 / 名前 / 箱サイズ(袋構成) / 商品ID
-     *   - 屋号は users.trade_name、空なら氏名で代用（同シートでグループ化しやすくする）
+     * 列: お届け先会社・部門名1 / お届け先名 / 箱サイズ(袋構成) / 商品ID /
+     *     お届け先郵便番号 / お届け先住所 / お届け先住所（建物名） / お届け先電話番号
+     *   - 「お届け先会社・部門名1」は users.trade_name（屋号）、空なら氏名で代用（同シートでグループ化しやすくする）
      *   - 箱列は shipping_breakdown.boxes を「100(S×1/M×1)・100(M×2)」形式に整形
      *   - 対面引取 (delivery_method=pickup) は箱列を空欄
      *   - 商品IDは「1601(サファイヤ)・1602(サファイヤ)」形式（種別名は items.speciesType.name）
+     *   - お届け先住所は users.prefecture + city + address_line1 を連結、建物名は address_line2
+     *   - 弊社発送モデルのため、お届け先＝落札者(winner)の登録住所
      */
     public function streamWonItemsShipping(int $auctionId): StreamedResponse
     {
@@ -368,7 +371,16 @@ class CsvExportService
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            fputcsv($out, ['屋号', '名前', '箱サイズ(袋構成)', '商品ID']);
+            fputcsv($out, [
+                'お届け先会社・部門名1',
+                'お届け先名',
+                '箱サイズ(袋構成)',
+                '商品ID',
+                'お届け先郵便番号',
+                'お届け先住所',
+                'お届け先住所（建物名）',
+                'お届け先電話番号',
+            ]);
 
             $winnerIds = WonItem::whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
                 ->whereNotNull('winner_id')
@@ -394,11 +406,22 @@ class CsvExportService
                     ? $winner->trade_name
                     : $name;
 
+                // お届け先住所 = 都道府県 + 市区町村 + 住所1 を連結（建物名は別列）
+                $address = implode('', array_filter([
+                    (string) ($winner->prefecture ?? ''),
+                    (string) ($winner->city ?? ''),
+                    (string) ($winner->address_line1 ?? ''),
+                ], fn ($s) => $s !== ''));
+
                 fputcsv($out, [
                     $tradeName,
                     $name,
                     $this->formatBoxesForShippingCsv($wonItems),
                     $this->formatItemIdsForShippingCsv($wonItems),
+                    (string) ($winner->postal_code ?? ''),
+                    $address,
+                    (string) ($winner->address_line2 ?? ''),
+                    (string) ($winner->phone ?? ''),
                 ]);
             }
 
