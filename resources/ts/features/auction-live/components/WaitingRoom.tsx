@@ -148,15 +148,17 @@ export const EntranceBlocked = React.memo(
               <Typography variant="h3" fontWeight="bold" color="warning.main">{entranceCountdown}</Typography>
             </Box>
           )}
-          <Button
-            variant="outlined"
-            size="large"
-            startIcon={<ListAltIcon />}
-            onClick={() => navigate(`/participant/auction/${auctionId}/items`)}
-            sx={{ fontWeight: 700, mb: 2 }}
-          >
-            出品一覧を見る
-          </Button>
+          {SHOW_AUCTION_ITEM_LIST && (
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<ListAltIcon />}
+              onClick={() => navigate(`/participant/auction/${auctionId}/items`)}
+              sx={{ fontWeight: 700, mb: 2 }}
+            >
+              出品一覧を見る
+            </Button>
+          )}
           {startAt && (
             <Typography variant="body2" color="text.secondary">
               オークション開始予定: {new Date(startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
