@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import type { Auction } from '../../types';
 import axios from '../../lib/axios';
+import { SHOW_AUCTION_ITEM_LIST } from '../../lib/featureFlags';
 
 export default function AuctionList() {
   const navigate = useNavigate();
@@ -368,14 +369,16 @@ export default function AuctionList() {
                 <CardActions sx={{ p: 3, pt: 0 }}>
                   {auction.status === 'live' ? (
                     <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
-                      <Button
-                        variant="outlined"
-                        size="large"
-                        onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
-                        sx={{ fontWeight: 600, flex: 1 }}
-                      >
-                        出品一覧
-                      </Button>
+                      {SHOW_AUCTION_ITEM_LIST && (
+                        <Button
+                          variant="outlined"
+                          size="large"
+                          onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
+                          sx={{ fontWeight: 600, flex: 1 }}
+                        >
+                          出品一覧
+                        </Button>
+                      )}
                       <Button
                         variant="contained"
                         color="success"
@@ -392,14 +395,16 @@ export default function AuctionList() {
                     auction.entrance_allowed ? (
                       /* 入室可能: 2ボタン並列表示 */
                       <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
-                        <Button
-                          variant="outlined"
-                          size="large"
-                          onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
-                          sx={{ fontWeight: 600, flex: 1 }}
-                        >
-                          出品一覧
-                        </Button>
+                        {SHOW_AUCTION_ITEM_LIST && (
+                          <Button
+                            variant="outlined"
+                            size="large"
+                            onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
+                            sx={{ fontWeight: 600, flex: 1 }}
+                          >
+                            出品一覧
+                          </Button>
+                        )}
                         <Button
                           variant="contained"
                           color="primary"
@@ -412,16 +417,18 @@ export default function AuctionList() {
                         </Button>
                       </Box>
                     ) : (
-                      /* 入室不可: 出品一覧ボタンのみ */
-                      <Button
-                        variant="outlined"
-                        fullWidth
-                        size="large"
-                        onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
-                        sx={{ fontWeight: 600 }}
-                      >
-                        出品一覧を見る
-                      </Button>
+                      /* 入室不可: 出品一覧ボタンのみ（一旦非表示中） */
+                      SHOW_AUCTION_ITEM_LIST && (
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          size="large"
+                          onClick={() => navigate(`/participant/auction/${auction.id}/items`)}
+                          sx={{ fontWeight: 600 }}
+                        >
+                          出品一覧を見る
+                        </Button>
+                      )
                     )
                   ) : (
                     <Button

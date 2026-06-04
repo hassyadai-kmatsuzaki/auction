@@ -31,6 +31,7 @@ import { ConsentOverlay } from '../../features/auction-live/components/ConsentOv
 import { WaitingRoom, EntranceBlocked, StartingCountdown } from '../../features/auction-live/components/WaitingRoom';
 import { UpcomingItems } from '../../features/auction-live/components/UpcomingItems';
 import type { LiveLane, LaneItem } from '../../types';
+import { SHOW_AUCTION_ITEM_LIST } from '../../lib/featureFlags';
 
 interface CelebrationItem {
   species_name: string;
@@ -682,7 +683,7 @@ export default function AuctionLive() {
         totalLaneCount={liveState.lanes.length}
         socketConnected={socketConnected}
         onRefresh={refetch}
-        onNavigateItems={() => navigate(`/participant/auction/${auctionId}/items`)}
+        onNavigateItems={SHOW_AUCTION_ITEM_LIST ? () => navigate(`/participant/auction/${auctionId}/items`) : undefined}
       />
 
       <Container maxWidth="xl" sx={{ py: 2 }}>

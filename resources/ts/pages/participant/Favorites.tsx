@@ -38,6 +38,7 @@ import { optimizedImageUrl } from '../../lib/optimizedMedia';
 import { useUserPreference } from '../../hooks/useUserPreference';
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import type { LaneItem } from '../../types';
+import { SHOW_AUCTION_ITEM_LIST } from '../../lib/featureFlags';
 
 type SortKey = 'created_desc' | 'created_asc' | 'seller' | 'price_asc' | 'price_desc';
 
@@ -479,16 +480,18 @@ export default function Favorites() {
                   ライブ画面へ
                 </Button>
               )}
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  const auctionId = selectedItem.auction!.id;
-                  handleDetailClose();
-                  navigate(`/participant/auction/${auctionId}/items`);
-                }}
-              >
-                出品一覧へ
-              </Button>
+              {SHOW_AUCTION_ITEM_LIST && (
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    const auctionId = selectedItem.auction!.id;
+                    handleDetailClose();
+                    navigate(`/participant/auction/${auctionId}/items`);
+                  }}
+                >
+                  出品一覧へ
+                </Button>
+              )}
             </>
           ) : null
         }

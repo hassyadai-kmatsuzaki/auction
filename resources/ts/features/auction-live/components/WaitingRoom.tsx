@@ -11,6 +11,7 @@ import {
 } from '@mui/icons-material';
 import type { PriceIncrementTier, CountdownTier } from '../../../types';
 import { formatYen } from '../../../lib/formatPrice';
+import { SHOW_AUCTION_ITEM_LIST } from '../../../lib/featureFlags';
 
 interface WaitingRoomProps {
   title: string;
@@ -110,15 +111,17 @@ export const WaitingRoom = React.memo(({ title, auctionId, priceIncrementTiers, 
           <CircularProgress size={30} sx={{ mb: 1 }} />
           <Typography variant="body1" color="text.secondary">まもなく開始されます...</Typography>
         </Box>
-        <Button
-          variant="outlined"
-          size="large"
-          startIcon={<ListAltIcon />}
-          onClick={() => navigate(`/participant/auction/${auctionId}/items`)}
-          sx={{ fontWeight: 700, mb: 2 }}
-        >
-          出品一覧を見る
-        </Button>
+        {SHOW_AUCTION_ITEM_LIST && (
+          <Button
+            variant="outlined"
+            size="large"
+            startIcon={<ListAltIcon />}
+            onClick={() => navigate(`/participant/auction/${auctionId}/items`)}
+            sx={{ fontWeight: 700, mb: 2 }}
+          >
+            出品一覧を見る
+          </Button>
+        )}
         <Typography variant="caption" color="text.secondary" display="block">
           開始されると自動的に画面が切り替わります
         </Typography>

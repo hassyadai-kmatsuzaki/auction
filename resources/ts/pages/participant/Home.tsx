@@ -21,6 +21,7 @@ import {
 import type { Auction } from '../../types';
 import AnnouncementList from '../../components/AnnouncementList';
 import axios from '../../lib/axios';
+import { SHOW_AUCTION_ITEM_LIST } from '../../lib/featureFlags';
 
 interface SponsoredAd {
   id: number;
@@ -202,20 +203,22 @@ export default function ParticipantHome() {
               >
                 待機室へ入室
               </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<ListAltIcon />}
-                onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/items`)}
-                sx={{
-                  fontWeight: 700,
-                  px: 4,
-                  py: 1.5,
-                  fontSize: '1rem',
-                }}
-              >
-                出品一覧
-              </Button>
+              {SHOW_AUCTION_ITEM_LIST && (
+                <Button
+                  variant="outlined"
+                  size="large"
+                  startIcon={<ListAltIcon />}
+                  onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/items`)}
+                  sx={{
+                    fontWeight: 700,
+                    px: 4,
+                    py: 1.5,
+                    fontSize: '1rem',
+                  }}
+                >
+                  出品一覧
+                </Button>
+              )}
             </Box>
           </Container>
         </Box>
@@ -261,15 +264,17 @@ export default function ParticipantHome() {
                 >
                   待機室へ入室
                 </Button>
-                <Button
-                  variant="text"
-                  size="small"
-                  startIcon={<ListAltIcon />}
-                  onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/items`)}
-                  sx={{ fontWeight: 600 }}
-                >
-                  出品一覧
-                </Button>
+                {SHOW_AUCTION_ITEM_LIST && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    startIcon={<ListAltIcon />}
+                    onClick={() => navigate(`/participant/auction/${scheduledAuction.id}/items`)}
+                    sx={{ fontWeight: 600 }}
+                  >
+                    出品一覧
+                  </Button>
+                )}
               </Box>
             </CardContent>
           </Card>
