@@ -10,7 +10,8 @@ use Symfony\Component\Process\Process;
 
 class VideoProcessingService
 {
-    private const LONG_EDGE = 720;
+    private const VIDEO_LONG_EDGE = 2160;
+    private const POSTER_LONG_EDGE = 720;
     private const CRF = 26;
     private const AUDIO_BITRATE = '128k';
     private const POSTER_AT_SECONDS = '00:00:01';
@@ -39,7 +40,7 @@ class VideoProcessingService
                 '-i', $localSource,
                 '-frames:v', '1',
                 '-update', '1',
-                '-vf', 'scale=\'min(' . self::LONG_EDGE . ',iw)\':-2',
+                '-vf', 'scale=\'min(' . self::POSTER_LONG_EDGE . ',iw)\':-2',
                 '-q:v', '3',
                 $localPoster,
             ]);
@@ -77,9 +78,9 @@ class VideoProcessingService
                 $this->ffmpegBin(), '-y',
                 '-i', $localSource,
                 '-c:v', 'libx264',
-                '-preset', 'medium',
+                '-preset', 'veryfast',
                 '-crf', (string) self::CRF,
-                '-vf', 'scale=\'if(gt(iw,ih),min(' . self::LONG_EDGE . ',iw),-2)\':\'if(gt(iw,ih),-2,min(' . self::LONG_EDGE . ',ih))\'',
+                '-vf', 'scale=\'if(gt(iw,ih),min(' . self::VIDEO_LONG_EDGE . ',iw),-2)\':\'if(gt(iw,ih),-2,min(' . self::VIDEO_LONG_EDGE . ',ih))\'',
                 '-c:a', 'aac',
                 '-b:a', self::AUDIO_BITRATE,
                 '-movflags', '+faststart',

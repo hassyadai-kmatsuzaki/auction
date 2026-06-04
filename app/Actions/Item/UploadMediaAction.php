@@ -73,7 +73,8 @@ class UploadMediaAction
             'media_type'    => $dbMediaType,
             'file_path'     => $path,
             'poster_path'   => $posterPath,
-            'is_processed'  => $mediaType !== 'video',
+            // 動画は圧縮せずオリジナルをそのまま使うため、常に処理済み扱い。
+            'is_processed'  => true,
             'file_name'     => $file->getClientOriginalName(),
             'file_size'     => $file->getSize(),
             'mime_type'     => $file->getMimeType(),
@@ -81,10 +82,8 @@ class UploadMediaAction
             'display_order' => $displayOrder + 1,
         ]);
 
-        // 動画の圧縮はキューで非同期実行
-        if ($mediaType === 'video') {
-            ProcessItemVideoJob::dispatch($media->id);
-        }
+        // 動画は圧縮せずオリジナルをそのまま保存・再生する。
+        // 圧縮を復活させる場合はここで ProcessItemVideoJob::dispatch($media->id) を呼ぶ。
 
         return AuctionResultDto::success('ファイルをアップロードしました。', [
             'media' => [

@@ -460,8 +460,10 @@ class ItemController extends Controller
         // メディアファイルを削除
         $disk = $this->getStorageDisk();
         foreach ($item->media as $media) {
-            if ($media->file_path) {
-                Storage::disk($disk)->delete($media->file_path);
+            foreach ([$media->file_path, $media->poster_path, $media->original_path] as $path) {
+                if ($path) {
+                    Storage::disk($disk)->delete($path);
+                }
             }
             $media->delete();
         }

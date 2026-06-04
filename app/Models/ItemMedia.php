@@ -26,6 +26,7 @@ class ItemMedia extends BaseModel
         'media_type',
         'file_path',
         'poster_path',
+        'original_path',
         'is_processed',
         'file_name',
         'file_size',

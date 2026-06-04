@@ -76,7 +76,7 @@ class BidService
                 ->orderBy('lane_items.sequence_order', 'asc')
                 ->limit(3)
                 ->select(
-                    'items.id', 'items.item_number', 'items.species_name', 'items.quantity',
+                    'items.id', 'items.item_number', 'items.exhibit_code', 'items.species_name', 'items.quantity',
                     'items.start_price', 'items.thumbnail_path', 'items.is_premium',
                     'items.is_anonymous',
                     'lane_items.sequence_order'
@@ -196,6 +196,7 @@ class BidService
                 $laneData['current_item'] = [
                     'id'                       => $item->id,
                     'item_number'              => $item->item_number,
+                    'exhibit_code'             => $item->exhibit_code,
                     'species_name'             => $item->species_name,
                     // 屋号（users.trade_name）を直参照。未設定は null（フロントで「-」表示）。
                     'seller_name'              => $isAnonCurrent ? '匿名出品' : ($item->sellerProfile?->user?->trade_name ?? null),
@@ -230,6 +231,7 @@ class BidService
                 $data = [
                     'id'             => (int) $i->id,
                     'item_number'    => $i->item_number,
+                    'exhibit_code'   => $i->exhibit_code,
                     'species_name'   => $i->species_name,
                     'quantity'       => $i->quantity,
                     'start_price'    => $i->start_price,

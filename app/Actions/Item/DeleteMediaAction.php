@@ -20,9 +20,11 @@ class DeleteMediaAction
             $item->update(['thumbnail_path' => null]);
         }
 
-        // ストレージからファイル削除
-        if ($media->file_path) {
-            $this->storage->delete($media->file_path);
+        // ストレージからファイル削除（本体・ポスター・オリジナルすべて）
+        foreach ([$media->file_path, $media->poster_path, $media->original_path] as $path) {
+            if ($path) {
+                $this->storage->delete($path);
+            }
         }
 
         $media->delete();

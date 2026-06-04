@@ -48,15 +48,15 @@ class ProcessItemVideoJob implements ShouldQueue
         }
 
         $media->update([
-            'file_path'    => $encodedPath,
-            'mime_type'    => 'video/mp4',
-            'file_size'    => Storage::disk($storage->disk())->size($encodedPath),
-            'is_processed' => true,
+            'file_path'     => $encodedPath,
+            'original_path' => $originalPath,
+            'mime_type'     => 'video/mp4',
+            'file_size'     => Storage::disk($storage->disk())->size($encodedPath),
+            'is_processed'  => true,
         ]);
 
-        if ($originalPath !== $encodedPath) {
-            Storage::disk($storage->disk())->delete($originalPath);
-        }
+        // オリジナル（無圧縮）は削除せず保持する。再生は圧縮版(file_path)、
+        // アーカイブ/再エンコード用にオリジナルを original_path に温存。
 
         $this->writeStatus('done');
     }
