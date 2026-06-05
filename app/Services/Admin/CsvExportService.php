@@ -348,12 +348,12 @@ class CsvExportService
      * 4つ目: 発送作業用 落札者リストCSV（オークション1件、落札者でグルーピング）
      *
      * 1行 = 1落札者。発送現場が「誰に・どの箱を・どの商品を」まとめるための一覧。
-     * 列: お届け先会社・部門名1 / お届け先名 / 箱サイズ(袋構成) / 商品ID /
+     * 列: お届け先会社・部門名1 / お届け先名 / 箱サイズ(袋構成) / 出品ID /
      *     お届け先郵便番号 / お届け先住所 / お届け先住所（建物名） / お届け先電話番号
      *   - 「お届け先会社・部門名1」は users.trade_name（屋号）、空なら氏名で代用（同シートでグループ化しやすくする）
      *   - 箱列は shipping_breakdown.boxes を「100(S×1/M×1)・100(M×2)」形式に整形
      *   - 対面引取 (delivery_method=pickup) は箱列を空欄
-     *   - 商品IDは「1601(サファイヤ)・1602(サファイヤ)」形式（種別名は items.speciesType.name）
+     *   - 出品IDは「A001(サファイヤ)・A002(サファイヤ)」形式（出品ID=items.exhibit_code、品種名=items.species_name）。未発行なら items.id にフォールバック
      *   - お届け先住所は users.prefecture + city + address_line1 を連結、建物名は address_line2
      *   - 弊社発送モデルのため、お届け先＝落札者(winner)の登録住所
      */
@@ -375,7 +375,7 @@ class CsvExportService
                 'お届け先会社・部門名1',
                 'お届け先名',
                 '箱サイズ(袋構成)',
-                '商品ID',
+                '出品ID',
                 'お届け先郵便番号',
                 'お届け先住所',
                 'お届け先住所（建物名）',
@@ -395,7 +395,7 @@ class CsvExportService
 
                 $wonItems = WonItem::where('winner_id', $winnerId)
                     ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
-                    ->with(['item:id,species_name'])
+                    ->with(['item:id,exhibit_code,species_name'])
                     ->orderBy('item_id')
                     ->get();
 
@@ -473,19 +473,24 @@ class CsvExportService
     }
 
     /**
-     * 商品IDを「ID(品種名)」形式で「・」連結。
-     * 品種名は items.species_name（出品時に入力された個別品種名）を使う。
-     * 例: "1601(サファイヤ)・1602(サファイヤ)・1603(オロチ)"
+     * 出品IDを「出品ID(品種名)」形式で「・」連結。
+     * 出品IDは items.exhibit_code（レーン割当時に発行される表示専用ID。例: A001）。
+     * 未発行（null/空）の場合のみ items.id にフォールバックし、発送現場で識別子が欠落しないようにする。
+     * 品種名は items.species_name（出品時に入力された個別品種名）。
+     * 例: "A001(サファイヤ)・A002(サファイヤ)・A003(オロチ)"
      */
     private function formatItemIdsForShippingCsv($wonItems): string
     {
         return $wonItems->map(function ($w) {
             $item = $w->item;
             if (!$item) return '';
+            $code = $item->exhibit_code !== null && $item->exhibit_code !== ''
+                ? (string) $item->exhibit_code
+                : (string) $item->id;
             $species = $item->species_name;
             return $species !== null && $species !== ''
-                ? "{$item->id}({$species})"
-                : (string) $item->id;
+                ? "{$code}({$species})"
+                : $code;
         })->filter(fn ($s) => $s !== '')->implode('・');
     }
 
