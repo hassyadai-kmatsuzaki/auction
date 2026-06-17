@@ -103,6 +103,11 @@ export function useAuctionLive(auctionId: number) {
               my_bid_status: 'inactive' as const,
               my_limit_price: null,
               my_limit_triggered: false,
+              // 切替直後は必ず pre_bid から始まる（MoveToNextItemAction が startPreBidCountdown を実行）。
+              // LaneItemChanged のペイロードに phase が無く、放置すると直前 item の phase('bidding')を
+              // 引き継いで入札ボタンが一瞬活性化してしまう。準備中側にフォールバックして誤タップを防ぐ。
+              // 直後の countdown.tick / refetch でサーバーの正しい phase に上書きされる。
+              phase: 'pre_bid' as const,
             }),
           } as LaneItem),
         };

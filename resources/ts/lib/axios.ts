@@ -74,6 +74,23 @@ export function resolveErrorMessage(error: AxiosError): string {
   return '通信エラーが発生しました。画面を更新するか、時間をおいてもう一度お試しください。';
 }
 
+// ─── 通信エラー（インフラ起因・全ユーザー同時に起きうる）判定 ─────────────
+//
+// ネットワーク未達・タイムアウト・5xx は、デプロイ・worker 再起動・Reverb 全断・
+// 一時的な混雑などで「全クライアントが同時に」発生しうる。これらの背景 GET 失敗で
+// 全員に通信エラートーストが一斉表示され困惑させた事故があったため、GET の通信エラーは
+// トーストせずログのみ残す（呼び出し側の reject ハンドリングは従来どおり維持）。
+// 4xx の actionable なエラー（403/404/409/419/422 等）は分類外＝従来どおりトーストする。
+export function isCommunicationError(error: AxiosError): boolean {
+  if (!error.response) return true;                    // サーバー未達（瞬断/中断/CORS）
+  if (error.code === 'ERR_NETWORK') return true;       // 電波・Wi-Fi 切れ
+  if (error.code === 'ECONNABORTED') return true;      // タイムアウト
+  const status = error.response.status;
+  if (status >= 500) return true;                      // 5xx（デプロイ/再起動/混雑/DB 一時障害）
+  if (status === 408 || status === 429) return true;   // タイムアウト/レート制限
+  return false;
+}
+
 const api = axios.create({
   baseURL: '',
   headers: {
@@ -97,6 +114,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    // AbortController による中断（入札連打・unmount 等）はユーザー通知もログも不要。
+    // ※ 早期 return しないと CanceledError が fallback トースト「通信エラー…」を誤発火する。
+    if (error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
+
     const status = error.response?.status;
     // silent はリクエスト側オプション（config.silent）と
     // サーバー応答ボディ（response.data.silent）の両方を尊重する。
@@ -120,6 +143,20 @@ api.interceptors.response.use(
         window.location.href = target;
         return Promise.reject(error);
       }
+    }
+
+    // 全ユーザーに同時発生しうる通信エラー（背景 GET の一斉失敗＝Reverb 全断時の
+    // 5秒ポーリング／商品切替ごとの再取得波／再接続時の won-items invalidate 等）は、
+    // トーストを出さずログのみ残す。前回「全員に同じタイミングで通信エラー」事故の恒久対策。
+    // 書き込み（POST/PUT/DELETE 等）は従来どおりトーストしてフィードバックを残す（GET 限定）。
+    const method = (error.config?.method ?? 'get').toLowerCase();
+    if (method === 'get' && isCommunicationError(error)) {
+      console.error('[api] communication error on GET (toast suppressed)', {
+        url: error.config?.url,
+        code: error.code,
+        status,
+      });
+      return Promise.reject(error);
     }
 
     if (!silent) {

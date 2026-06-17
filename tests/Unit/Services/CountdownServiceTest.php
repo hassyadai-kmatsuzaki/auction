@@ -335,6 +335,45 @@ class CountdownServiceTest extends TestCase
         ]);
     }
 
+    /**
+     * 即落札レース回帰テスト（2026-06-17 / item 1757 インシデント）。
+     *
+     * カウント0の瞬間に入札（JoinBidAction）が処理中だと、JoinBidAction は
+     * bid_inflight ロックを価格上昇 commit まで保持する。その間 tick が確定すると
+     * freeze→bidding の新ラウンドを飛ばして即落札してしまう事故が起きていた。
+     * 修正後は、bid_inflight ロック保持中は tick が確定を見送る（商品は live のまま）。
+     */
+    public function test_tick_は_入札処理中ロック保持中は確定を見送り商品をliveのまま残す(): void
+    {
+        $lane = $this->makeLiveLane();
+        $svc = app(CountdownService::class);
+        $svc->startCountdown($lane);
+
+        $state = Cache::get("countdown:lane:{$lane->id}");
+        $state['remaining_seconds'] = 0;
+        Cache::put("countdown:lane:{$lane->id}", $state, 3600);
+
+        // HTTP 側の入札処理中を模擬: JoinBidAction と同一キーのロックを保持する
+        $itemId = $lane->current_item_id;
+        $heldLock = Cache::lock("bid_inflight:item:{$itemId}", 5);
+        $this->assertTrue($heldLock->get(), '前提: ロックを取得できること');
+
+        try {
+            $result = $svc->tick($lane->id);
+
+            // 確定されず見送られ、商品は live のまま（誤落札/誤流札しない）
+            $this->assertSame('finalize_deferred', $result['action']);
+            $this->assertSame('live', $lane->currentItem->fresh()->status);
+        } finally {
+            $heldLock->release();
+        }
+
+        // ロック解放後の次tickでは正常に確定する（入札者0なので流札）
+        $result2 = $svc->tick($lane->id);
+        $this->assertSame('countdown_end', $result2['action']);
+        $this->assertSame('unsold', $lane->currentItem->fresh()->status);
+    }
+
     public function test_tick_は_入札者2人以上で価格上昇しfreeze開始(): void
     {
         $lane = $this->makeLiveLane(10000);

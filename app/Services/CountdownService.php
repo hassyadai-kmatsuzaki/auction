@@ -309,30 +309,67 @@ class CountdownService
         $this->metrics->countdownTick($laneId, 'bidding', (float) $state['remaining_seconds']);
 
         // カウントダウン終了時の処理
+        //
+        // ■ 即落札レース対策（2026-06-17 / item 1757 インシデント）:
+        //   入札が「カウント0ちょうど」に着弾すると、JoinBidAction の価格上昇（freeze 書き込み）と
+        //   この終了判定が lane キャッシュ上で競合し、freeze→bidding の新ラウンド（8秒）を飛ばして
+        //   即落札する事故が起きる。確定判定を JoinBidAction と同一の bid_inflight ロック下で行い、
+        //   ロック取得後にキャッシュと active 数を読み直すことで Join/Leave と直列化する。
+        //   - ロックは非ブロッキング get()。取れなければ HTTP 側が入札処理中なので確定を見送り、
+        //     次tickで再判定する（全レーンを逐次処理する単一ジョブのため block() は厳禁）。
+        //   - 中止・見送り時は古い $state を Cache::put しない（直前に書かれた freeze の破壊防止）。
         if ($state['remaining_seconds'] <= 0) {
-            if ($activeBidderCount >= 2) {
-                // 入札者2人以上 → 価格上昇 → フリーズカウントダウン
-                // 最後に入札した人を落札権利者として他を自動離脱
-                try {
-                    $lastBidder = $state['last_bidder_user_id'] ?? null;
-                    $this->handlePriceIncrement($lane, $item, $auction, $activeBidderCount, $lastBidder);
-                } catch (\Exception $e) {
-                    Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - starting freeze");
-                    $this->startFreezeCountdown($lane);
+            $finalizeLock = Cache::lock("bid_inflight:item:{$item->id}", 5);
+            if (!$finalizeLock->get()) {
+                // HTTP 側が入札処理中。確定を見送り 0.5秒後に再判定（キャッシュは書き換えない）。
+                return ['action' => 'finalize_deferred', 'lane_id' => $laneId];
+            }
+
+            try {
+                // ロック取得後に lane キャッシュを読み直す。
+                // 直前に JoinBidAction 等が freeze を書いていれば、確定せず通常フローに戻す。
+                $freshState = Cache::get($this->getCacheKey($laneId));
+                if (!$freshState
+                    || ($freshState['phase'] ?? '') !== 'bidding'
+                    || ($freshState['item_id'] ?? null) !== $item->id
+                    || empty($freshState['is_running'])) {
+                    return ['action' => 'finalize_aborted_state_changed', 'lane_id' => $laneId];
                 }
-                return ['action' => 'price_increment', 'lane_id' => $laneId];
-            } else {
+
+                // 商品状態もロック下で最新化（他経路で確定済みなら抜ける）。
+                $freshItem = $item->fresh();
+                if (!$freshItem || $freshItem->status !== 'live') {
+                    $this->stopCountdown($laneId);
+                    return ['action' => 'finalize_skip_not_live', 'lane_id' => $laneId];
+                }
+
+                // active 数をロック下で読み直す（L278 で読んだ値は古い可能性がある）。
+                $freshCount = BidParticipant::forItem($freshItem->id)->active()->count();
+
+                if ($freshCount >= 2) {
+                    // 入札者2人以上 → 価格上昇 → フリーズカウントダウン
+                    try {
+                        $lastBidder = $freshState['last_bidder_user_id'] ?? null;
+                        $this->handlePriceIncrement($lane, $freshItem, $auction, $freshCount, $lastBidder);
+                    } catch (\Exception $e) {
+                        Log::error("Price increment FAILED lane {$laneId}: {$e->getMessage()} - starting freeze");
+                        $this->startFreezeCountdown($lane);
+                    }
+                    return ['action' => 'price_increment', 'lane_id' => $laneId];
+                }
+
                 // 入札者0人or1人 → 流札or落札して次へ
                 try {
-                    return $this->handleCountdownEnd($lane, $item, $auction, $activeBidderCount);
+                    return $this->handleCountdownEnd($lane, $freshItem, $auction, $freshCount);
                 } catch (\Exception $e) {
-                    Log::error("Countdown end FAILED lane {$laneId}: {$e->getMessage()} - attempting recovery");
-                    $bidSeconds = (float) ($state['bid_countdown_seconds'] ?? 5);
-                    $state['remaining_seconds'] = $bidSeconds;
-                    $state['phase'] = 'bidding';
-                    Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
-                    return ['action' => 'recovery', 'lane_id' => $laneId];
+                    // recovery でカウントダウンを再生成しない（直前 freeze の上書き防止）。
+                    // handleCountdownEnd は冒頭で stopCountdown 済みのため、次tickの
+                    // 「active だが state なし → startCountdown」復旧経路が拾う。
+                    Log::error("Countdown end FAILED lane {$laneId}: {$e->getMessage()} - relying on next-tick recovery");
+                    return ['action' => 'finalize_error', 'lane_id' => $laneId];
                 }
+            } finally {
+                $finalizeLock->release();
             }
         }
 
