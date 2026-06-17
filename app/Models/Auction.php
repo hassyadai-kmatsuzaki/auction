@@ -123,7 +123,7 @@ class Auction extends BaseModel
     public function canStart(): bool
     {
         // 予定状態で、承認済み（registered）の生体が1件以上ある場合のみ開始可能
-        return $this->status === 'scheduled' 
+        return $this->status === 'scheduled'
             && $this->items()->where('status', 'registered')->count() > 0;
     }
 

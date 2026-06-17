@@ -1,10 +1,13 @@
 # AWS インフラ構築 作業指示書
 
 **文書番号**: INFRA-2026-001  
-**版数**: 1.0  
+**事業者**: 株式会社BeerO'Clock  
+**作成者**: 代表取締役 松崎 航平  
+**承認者**: 代表取締役 松崎 航平  
+**版数**: 1.1  
 **作成日**: 2026年4月13日  
-**最終更新**: 2026年4月22日  
-**対象システム**: メダカオークション 本番環境  
+**最終更新**: 2026年6月10日  
+**対象システム**: 日本メダカオンライン市場 本番環境  
 **前提**: 同時接続500人対応（開催スケジュール連動2モード運用）
 
 ---
@@ -346,7 +349,7 @@ VPC `auction-vpc` 内に以下の4つを作成する。
 | パブリックアクセス | **いいえ** |
 | セキュリティグループ | `auction-sg-rds` |
 | データベース名 | `auction` |
-| パラメータグループ | `auction-db-params-micro` |
+| パラメータグループ | `auction-prod-db-params-micro` |
 | ストレージ | gp3 / 20GB / 自動拡張有効（上限100GB） |
 | バックアップ保持期間 | 7日 |
 | パフォーマンスインサイト | 有効 |
@@ -1005,7 +1008,7 @@ php artisan migrate --force
 ; ---- Queue Worker: countdown ----
 [program:auction-queue-countdown]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/auction/artisan queue:work redis --queue=countdown --sleep=1 --tries=3 --timeout=7200 --memory=256
+command=php /var/www/auction/artisan queue:work redis --queue=countdown --sleep=1 --tries=3 --timeout=18000 --memory=256
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -1014,7 +1017,7 @@ user=ec2-user
 numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/queue-countdown.log
-stopwaitsecs=7200
+stopwaitsecs=18000
 
 ; ---- Queue Worker: default ----
 [program:auction-queue-default]
@@ -1028,6 +1031,21 @@ user=ec2-user
 numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/queue-default.log
+
+; ---- Queue Worker: media (動画圧縮・ポスター生成) ----
+; 動画処理は長時間・高メモリのため専用ワーカーに分離。
+[program:auction-queue-media]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/auction/artisan queue:work redis --queue=media --sleep=3 --tries=2 --timeout=3600 --memory=512
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=ec2-user
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/queue-media.log
+stopwaitsecs=3600
 
 ; ---- Queue Worker: notify (バルク配信・LINE通知・落札系メール) ----
 ; メール一斉配信や LINE 通知などの「外部送信系」を捌く専用キュー。
@@ -1244,6 +1262,9 @@ sudo supervisorctl status
 
 > **注意**: `sed` で一括変更すると countdown と default 両方の `numprocs` が変わる。
 > default は 2、countdown は 5 にしたい場合は `vi` で個別編集する。
+>
+> **現行本番（2026-06-10 実機確認）**: `auction-queue-countdown` numprocs=5 / `auction-queue-default` numprocs=2 /
+> `auction-queue-media` numprocs=1 / `auction-queue-notify` numprocs=2 / `auction-queue-notify-priority` numprocs=1 で常時運用中。
 
 #### 手順4: RDS スケールアップ
 
@@ -2234,3 +2255,12 @@ Lambda: SNS にメール通知（成功/失敗）
 □ 新ドメイン名:
 □ EC2 インスタンス ID:
 ```
+
+---
+
+## 改訂履歴
+
+| 版数 | 日付 | 改訂内容 | 作成・承認 |
+|---|---|---|---|
+| 1.0 | 2026-04-22 | 初版作成 | 株式会社BeerO'Clock 松崎 航平 |
+| 1.1 | 2026-06-10 | システム名称・パラメータグループ表記統一、Supervisor 設定を本番実機値に更新（media ワーカー追加、countdown timeout=18000、現行 numprocs 注記） | 株式会社BeerO'Clock 松崎 航平 |

@@ -508,6 +508,9 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::put('/auctions/{auctionId}/address', [ParticipantWonItemController::class, 'updateAddress']);
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
+    // LINE内ブラウザ等ダウンロード不可環境向け: PDFをメール添付で送信
+    Route::post('/auctions/{auctionId}/invoice/email', [InvoiceController::class, 'emailInvoice']);
+    Route::post('/auctions/{auctionId}/receipt/email', [InvoiceController::class, 'emailReceipt']);
     
     // 出品者一覧（フィルタ用）
     Route::get('/sellers', function () {

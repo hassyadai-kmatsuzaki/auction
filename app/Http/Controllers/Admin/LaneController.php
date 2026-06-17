@@ -37,7 +37,9 @@ class LaneController extends Controller
         // 未割り当ての生体
         $assignedItemIds = $lanes->flatMap(fn($lane) => $lane->items->pluck('id'))->toArray();
         $unassignedItems = Item::where('auction_id', $auctionId)
-            ->where('status', 'registered')
+            // 審査中(draft)・承認済み(registered) の両方をレーン割り当て対象にする。
+            // 審査中でも割り当て可能だが、承認(registered)するまで落札ユーザーには非表示・liveに昇格しない。
+            ->whereIn('status', ['draft', 'registered'])
             ->whereNotIn('id', $assignedItemIds)
             ->with(['sellerProfile.user'])
             ->orderBy('item_number')
@@ -107,7 +109,8 @@ class LaneController extends Controller
                     ];
                 }),
                 'statistics' => [
-                    'total_items' => Item::where('auction_id', $auctionId)->where('status', 'registered')->count(),
+                    // 審査中(draft)・承認済み(registered) の両方が割り当て対象。
+                    'total_items' => Item::where('auction_id', $auctionId)->whereIn('status', ['draft', 'registered'])->count(),
                     'assigned_items' => count($assignedItemIds),
                     'unassigned_items' => $unassignedItems->count(),
                 ],
@@ -462,7 +465,8 @@ class LaneController extends Controller
             ->toArray();
 
         $unassignedItems = Item::where('auction_id', $auctionId)
-            ->where('status', 'registered')
+            // 審査中(draft)・承認済み(registered) の両方を自動割り当て対象にする。
+            ->whereIn('status', ['draft', 'registered'])
             ->whereNotIn('id', $assignedItemIds)
             ->orderBy('item_number')
             ->get();

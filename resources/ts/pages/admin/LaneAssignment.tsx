@@ -826,6 +826,9 @@ export default function LaneAssignment() {
                                       {item.is_anonymous && (
                                         <Chip label="匿名" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
                                       )}
+                                      {item.status === 'draft' && (
+                                        <Chip label="審査中" size="small" color="warning" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
+                                      )}
                                       <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                                         {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
                                       </Typography>
@@ -881,6 +884,9 @@ export default function LaneAssignment() {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
                               {item.is_anonymous && (
                                 <Chip label="匿名" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
+                              )}
+                              {item.status === 'draft' && (
+                                <Chip label="審査中" size="small" color="warning" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
                               )}
                               <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                                 {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}
@@ -1026,6 +1032,9 @@ export default function LaneAssignment() {
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
                                     {item.is_anonymous && (
                                       <Chip label="匿名" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
+                                    )}
+                                    {item.status === 'draft' && (
+                                      <Chip label="審査中" size="small" color="warning" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }} />
                                     )}
                                     <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                                       {item.exhibit_code ?? '未発行'} ・ #{item.item_number} {item.species_name}

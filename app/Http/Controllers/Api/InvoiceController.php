@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ParticipantDocumentMail;
 use App\Models\Auction;
 use App\Models\SellerProfile;
 use App\Models\WonItem;
 use App\Services\InvoiceService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class InvoiceController extends Controller
 {
@@ -101,6 +103,59 @@ class InvoiceController extends Controller
             ]);
             return response()->json(['message' => '領収書の生成に失敗しました'], 500);
         }
+    }
+
+    /**
+     * 請求書PDFをメールで送信（落札者向け・LINE内ブラウザ等ダウンロード不可環境用）
+     * POST /api/participant/auctions/{auctionId}/invoice/email
+     */
+    public function emailInvoice(int $auctionId)
+    {
+        return $this->emailDocument($auctionId, 'invoice');
+    }
+
+    /**
+     * 領収書PDFをメールで送信（落札者向け・LINE内ブラウザ等ダウンロード不可環境用）
+     * POST /api/participant/auctions/{auctionId}/receipt/email
+     */
+    public function emailReceipt(int $auctionId)
+    {
+        return $this->emailDocument($auctionId, 'receipt');
+    }
+
+    private function emailDocument(int $auctionId, string $type)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $winner = Auth::user();
+        $label = $type === 'receipt' ? '領収書' : '請求書';
+
+        $wonItems = WonItem::where('winner_id', $winner->id)
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId))
+            ->get();
+
+        if ($wonItems->isEmpty()) {
+            return response()->json(['message' => '該当する落札品がありません'], 404);
+        }
+
+        if ($type === 'receipt' && !$wonItems->contains(fn ($w) => in_array($w->payment_status, ['paid', 'confirmed']))) {
+            return response()->json(['message' => '入金確認済みの落札品がありません'], 404);
+        }
+
+        // 管理者による送料承認チェック（ダウンロードと同条件）
+        if ($wonItems->contains(fn ($w) => $w->shipping_approved_at === null)) {
+            return response()->json(['message' => "送料の確定後に{$label}を送信できます"], 400);
+        }
+
+        if (!$winner->email) {
+            return response()->json(['message' => 'メールアドレスが登録されていません'], 400);
+        }
+
+        Mail::to($winner->email)->queue(new ParticipantDocumentMail($auction, $winner, $type));
+
+        return response()->json([
+            'success' => true,
+            'message' => "ご登録のメールアドレスに{$label}を送信しました。届かない場合は迷惑メールフォルダもご確認ください。",
+        ]);
     }
 
     /**
