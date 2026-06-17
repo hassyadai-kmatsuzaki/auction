@@ -36,6 +36,7 @@ import {
   OpenInNew as OpenInNewIcon,
   ContentCopy as CopyIcon,
   Download as DownloadIcon,
+  Email as EmailIcon,
   ExpandMore as ExpandMoreIcon,
   Event as EventIcon,
   Star as StarIcon,
@@ -54,6 +55,7 @@ interface WonItemData {
     species_name: string;
     quantity: number;
     thumbnail_path?: string;
+    seller_name?: string | null;
   } | null;
   winning_price: number;
   quantity: number;
@@ -140,6 +142,10 @@ const getTrackingUrl = (trackingNumber: string, company: string) => {
 
 // タブ定義
 type FilterTab = 'all' | 'payment_pending' | 'shipping_pending' | 'shipped' | 'completed';
+
+// LINE内ブラウザはBlobダウンロード不可。モバイル端末も保存先が分かりにくいため、
+// これらの環境ではPDFを直接ダウンロードせず、登録メールアドレスへの添付送信に切り替える
+const useEmailDelivery = /Line\/|Android|iPhone|iPod/i.test(navigator.userAgent);
 
 // PDFダウンロードヘルパー
 const downloadPdf = async (url: string, filename: string): Promise<string | null> => {
@@ -247,7 +253,28 @@ export default function WonItems() {
     setSnackbar({ open: true, message: 'コピーしました', severity: 'success' });
   };
 
+  const sendDocumentByEmail = async (url: string, label: string) => {
+    try {
+      const res = await axios.post(url);
+      setSnackbar({
+        open: true,
+        message: res.data?.message || `ご登録のメールアドレスに${label}を送信しました`,
+        severity: 'success',
+      });
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err?.response?.data?.message || `${label}の送信に失敗しました`,
+        severity: 'error',
+      });
+    }
+  };
+
   const handleDownloadInvoice = async (auctionId: number) => {
+    if (useEmailDelivery) {
+      await sendDocumentByEmail(`/api/participant/auctions/${auctionId}/invoice/email`, '請求書');
+      return;
+    }
     try {
       const errMsg = await downloadPdf(
         `/api/participant/auctions/${auctionId}/invoice`,
@@ -266,6 +293,10 @@ export default function WonItems() {
   };
 
   const handleDownloadReceipt = async (auctionId: number) => {
+    if (useEmailDelivery) {
+      await sendDocumentByEmail(`/api/participant/auctions/${auctionId}/receipt/email`, '領収書');
+      return;
+    }
     try {
       const errMsg = await downloadPdf(
         `/api/participant/auctions/${auctionId}/receipt`,
@@ -497,13 +528,13 @@ export default function WonItems() {
                         ? '「その他」種別の送料は管理者が確定します。確定後にダウンロードできます'
                         : !group.shipping.calculated
                           ? '送料計算後にダウンロードできます'
-                          : ''
+                          : useEmailDelivery ? 'ご登録のメールアドレスにPDFをお送りします' : ''
                     }>
                       <span>
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<DownloadIcon />}
+                          startIcon={useEmailDelivery ? <EmailIcon /> : <DownloadIcon />}
                           onClick={() => handleDownloadInvoice(auctionId)}
                           disabled={!group.shipping.calculated}
                         >
@@ -517,7 +548,7 @@ export default function WonItems() {
                         variant="outlined"
                         size="small"
                         color="success"
-                        startIcon={<DownloadIcon />}
+                        startIcon={useEmailDelivery ? <EmailIcon /> : <DownloadIcon />}
                         onClick={() => handleDownloadReceipt(auctionId)}
                         disabled={!group.shipping.calculated}
                       >
@@ -565,7 +596,7 @@ export default function WonItems() {
                                 startIcon={<StarIcon />}
                                 onClick={() => setReviewTarget({
                                   wonItemId: wonItem.id,
-                                  sellerName: wonItem.item?.species_name ?? '出品者',
+                                  sellerName: wonItem.item?.seller_name ?? '出品者',
                                 })}
                                 sx={{ fontSize: '0.7rem' }}
                               >
@@ -576,6 +607,11 @@ export default function WonItems() {
 
                           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
                             {wonItem.item?.species_name || '（削除された商品）'}
+                          </Typography>
+
+                          {/* 出品者（屋号） */}
+                          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+                            出品者: {wonItem.item?.seller_name ?? '-'}
                           </Typography>
 
                           {/* 金額情報 */}

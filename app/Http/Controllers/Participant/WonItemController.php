@@ -28,7 +28,7 @@ class WonItemController extends Controller
 
         $wonItemsQuery = WonItem::forWinner($userId)
             ->whereHas('item.auction', fn ($q) => $q->where('is_published', true))
-            ->with(['item.auction', 'item.media']);
+            ->with(['item.auction', 'item.media', 'item.sellerProfile.user:id,trade_name']);
         $this->testMode->applyToWonItemQuery($wonItemsQuery);
         $wonItems = $wonItemsQuery
             ->orderBy('created_at', 'desc')
@@ -107,6 +107,8 @@ class WonItemController extends Controller
                             'species_name' => $item->species_name,
                             'quantity' => $item->quantity,
                             'thumbnail_path' => $item->thumbnail_path,
+                            // 屋号（users.trade_name）を直参照。未設定は null（フロントで「-」表示）。
+                            'seller_name' => $item->is_anonymous ? '匿名出品' : $item->sellerProfile?->user?->trade_name,
                         ] : null,
                         'winning_price' => $wonItem->winning_price,
                         'quantity' => $wonItem->quantity,

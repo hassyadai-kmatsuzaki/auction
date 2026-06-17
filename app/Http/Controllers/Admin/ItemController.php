@@ -53,7 +53,7 @@ class ItemController extends Controller
         if ($status && $status !== 'all') {
             $query->where('status', $status);
         }
-        
+
         // 検索
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -187,7 +187,10 @@ class ItemController extends Controller
                 'is_premium' => $request->boolean('is_premium', false),
                 'is_anonymous' => $request->boolean('is_anonymous', false),
                 'unsold_action' => $request->unsold_action ?? 'return',
-                'status' => 'registered',
+                // 管理画面からの新規登録は「審査中(draft)」で受け入れる。
+                // 承認(draft→registered)するまで落札ユーザーには非表示・liveにも昇格しない。
+                // レーン割り当ては審査中でも可能（LaneController 参照）。
+                'status' => 'draft',
             ]);
             
             \DB::commit();
@@ -654,8 +657,9 @@ class ItemController extends Controller
 
         $item->update(['status' => $request->input('status')]);
 
-        // ステータスが registered 以外に変更された場合はレーンから除外
-        if ($item->status !== 'registered') {
+        // キャンセル時のみレーンから除外する。
+        // 審査中(draft)はレーン割り当てを保持できる（承認(registered)前から割り当て可能なため）。
+        if ($item->status === 'cancelled') {
             $item->lanes()->detach();
         }
 
@@ -691,8 +695,8 @@ class ItemController extends Controller
         $itemIds = $request->input('item_ids');
         $status = $request->input('status');
         
-        // ステータスが registered 以外の場合、対象アイテムをレーンから除外
-        if ($status !== 'registered') {
+        // キャンセル時のみレーンから除外する（審査中(draft)は割り当てを保持）。
+        if ($status === 'cancelled') {
             DB::table('lane_items')
                 ->whereIn('item_id', $itemIds)
                 ->delete();

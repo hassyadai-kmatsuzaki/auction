@@ -31,3 +31,5 @@ cypress/downloads
 
 *storybook.log
 storybook-static
+.env.backup-before-manual-shoot
+.env.backup*

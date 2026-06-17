@@ -1,8 +1,11 @@
-# メダカオークション API リファレンス
+# 日本メダカオンライン市場 API リファレンス
 
 **文書番号**: API-2026-001  
-**版数**: 2.1  
-**最終更新**: 2026年5月19日
+**事業者**: 株式会社BeerO'Clock  
+**作成者**: 代表取締役 松崎 航平  
+**承認者**: 代表取締役 松崎 航平  
+**版数**: 3.0  
+**最終更新**: 2026年6月10日（routes/api.php・web.php の全ルートと突合）
 
 **Base URL（本番）**: `https://medaka-auction.jp/api`  
 **Base URL（ステージング）**: `https://medaka-auction.com/api`  
@@ -14,6 +17,7 @@
 
 ## 目次
 
+0. [公開・システム API](#0-公開システム-api)
 1. [認証 API](#1-認証-api)
 2. [2FA 管理 API](#2-2fa-管理-api)
 3. [サブスクリプション API](#3-サブスクリプション-api)
@@ -25,14 +29,44 @@
 9. [出品者 API](#9-出品者-api)
 10. [管理者 API](#10-管理者-api)
 11. [メディア編集者 API](#11-メディア編集者-api)
-12. [WebSocket イベント](#12-websocket-イベント)
-13. [共通レスポンス形式](#13-共通レスポンス形式)
+12. [社内ツール用 Internal API](#12-社内ツール用-internal-api)
+13. [WebSocket イベント](#13-websocket-イベント)
+14. [共通レスポンス形式](#14-共通レスポンス形式)
 
 > 🔒 = 要認証（Sanctum Bearer Token）  
 > 👑 = 管理者ロール必須  
 > 🏪 = 出品者ロール必須  
 > 🎯 = 参加者ロール必須  
 > 🎬 = メディア編集者ロール必須
+
+---
+
+## 0. 公開・システム API
+
+認証不要、または署名付き URL / Webhook 専用のエンドポイント。
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/health` | ヘルスチェック（ALB ターゲットグループ用） |
+| GET | `/media/{mediaId}/optimized` | 最適化済み画像の取得（公開） |
+| GET | `/media/optimized-by-path` | パス指定の最適化画像取得（公開） |
+| GET | `/line/invoices/{auctionId}/{winnerId}` | 請求書 PDF（LINE 通知からの**署名付き URL** 専用） |
+| GET | `/auth/line/callback` | LINE OAuth コールバック |
+| POST | `/webhooks/square` | Square Webhook 受信（冪等処理） |
+
+### Web ルート（API 外・routes/web.php）
+
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/buyer` | 買受者向けランディングページ |
+| GET | `/seller` | 出品者向けランディングページ |
+| POST | `/contact` | LP 問い合わせフォーム（throttle 5回/分） |
+| GET | `/unsubscribe/{token}` | メール配信停止リンク |
+| POST | `/webhooks/ses/bounce` | SES → SNS バウンス通知 Webhook |
+| POST | `/webhooks/ses/complaint` | SES → SNS 苦情通知 Webhook |
+| GET | `/{any}` | React SPA catch-all |
+
+> ℹ️ このほか local / testing / staging 環境限定で `routes/api-test.php`（`/api/test-helpers/*`、E2E テスト用シード・スケジュール実行ヘルパー）がロードされる。本番（production）では 404。
 
 ---
 
@@ -274,11 +308,12 @@ LINE OAuth コールバック（Webhook 用）。
 
 ### 8.3 入札
 
-> ⚠️ 入札系 API（POST/DELETE）は **bid サブスクリプション**が必要です。
+> ⚠️ 入札系 API（POST/DELETE）は **bid サブスクリプション**が必要です。  
+> ⚠️ 入札は**単方向**です。`is_active=false`（自発的な離脱）は受け付けず 403 を返します。離脱は価格上昇時の自動離脱（auto-left）と指値到達時のみ発生します。
 
 | メソッド | パス | 説明 |
 |---|---|---|
-| POST | `/participant/bids` | 入札 ON/OFF トグル |
+| POST | `/participant/bids` | 入札参加（単方向・離脱不可。throttle: bids） |
 | GET | `/participant/bids/my-active` | 自分のアクティブ入札一覧 |
 
 ### `POST /participant/bids`
@@ -286,6 +321,7 @@ LINE OAuth コールバック（Webhook 用）。
 | パラメータ | 型 | 必須 | 説明 |
 |---|---|---|---|
 | item_id | integer | ✓ | 商品 ID |
+| is_active | boolean | ✓ | `true` 固定（`false` は 403） |
 
 **レスポンス**
 ```json
@@ -302,13 +338,14 @@ LINE OAuth コールバック（Webhook 用）。
 
 ### 8.4 指値（上限価格）
 
-> ⚠️ 指値設定（POST/DELETE）は **bid サブスクリプション**が必要です。
+> ⚠️ 指値設定（POST/DELETE）は **bid サブスクリプション**が必要です（throttle: bid-limits）。  
+> ℹ️ 指値は **proxy-bid 方式**: ライブ中に複数の指値が競合した場合、2番目の指値+1刻み（または最高指値）まで自動で価格が進み、最高指値者のみが入札参加状態で残ります。現在価格が自分の指値に到達すると自動離脱し `bid.limit.reached` が配信されます。
 
 | メソッド | パス | 説明 |
 |---|---|---|
-| GET | `/participant/bid-limits` | 指値一覧 |
+| GET | `/participant/bid-limits` | 指値一括取得（`item_ids[]` 最大500件） |
 | GET | `/participant/bid-limits/{itemId}` | 特定商品の指値取得 |
-| POST | `/participant/bid-limits` | 指値設定 |
+| POST | `/participant/bid-limits` | 指値設定・更新 |
 | DELETE | `/participant/bid-limits/{itemId}` | 指値削除 |
 
 ### `POST /participant/bid-limits`
@@ -327,7 +364,6 @@ LINE OAuth コールバック（Webhook 用）。
 | GET | `/participant/won-items` | 落札商品一覧 |
 | GET | `/participant/won-items/{id}` | 落札商品詳細 |
 | PUT | `/participant/auctions/{auctionId}/address` | 配送先住所更新 |
-| POST | `/participant/auctions/{auctionId}/calculate-shipping` | 配送料計算 |
 | GET | `/participant/auctions/{auctionId}/invoice` | 請求書 PDF ダウンロード |
 | GET | `/participant/auctions/{auctionId}/receipt` | 領収書 PDF ダウンロード |
 
@@ -553,6 +589,13 @@ LINE OAuth コールバック（Webhook 用）。
 | PUT | `/admin/users/{id}` | ユーザー情報更新（承認/拒否含む） |
 | DELETE | `/admin/users/{id}` | ユーザー削除（ソフトデリート） |
 | POST | `/admin/users/{id}/restore` | ユーザー復元 |
+| POST | `/admin/users/{id}/confirm-bank-transfer` | 年会費の銀行振込確認 |
+| POST | `/admin/users/{id}/renew-bank-transfer` | 銀行振込会員の更新処理 |
+| GET | `/admin/users-bank-transfer-renewals` | 銀行振込の更新対象ユーザー一覧 |
+| POST | `/admin/users/{id}/profile-image` | プロフィール画像アップロード |
+| DELETE | `/admin/users/{id}/profile-image` | プロフィール画像削除 |
+| POST | `/admin/users/{id}/seller-profile-image` | 出品者プロフィール画像アップロード |
+| DELETE | `/admin/users/{id}/seller-profile-image` | 出品者プロフィール画像削除 |
 
 ---
 
@@ -629,6 +672,7 @@ LINE OAuth コールバック（Webhook 用）。
 | PUT | `/admin/auctions/{auctionId}/lanes/{laneId}/items/reorder` | レーン内商品並び替え |
 | POST | `/admin/auctions/{auctionId}/lanes/auto-assign` | 自動レーン割当 |
 | POST | `/admin/auctions/{auctionId}/lanes/bulk-unassign` | 一括割当解除 |
+| POST | `/admin/auctions/{auctionId}/lanes/issue-exhibit-codes` | 出品ID（exhibit_code）一括発行 |
 
 ---
 
@@ -680,7 +724,10 @@ LINE OAuth コールバック（Webhook 用）。
 | POST | `/admin/won-items/{id}/ship` | 発送処理 |
 | POST | `/admin/won-items/{id}/complete` | 取引完了 |
 | PATCH | `/admin/won-items/{id}/notes` | 備考更新 |
-| POST | `/admin/auctions/{auctionId}/winners/{winnerId}/calculate-shipping` | 配送料計算 |
+| POST | `/admin/auctions/{auctionId}/winners/{winnerId}/calculate-shipping` | 配送料計算（自動） |
+| POST | `/admin/auctions/{auctionId}/winners/{winnerId}/approve-shipping` | 配送料の承認確定 |
+| POST | `/admin/auctions/{auctionId}/winners/{winnerId}/manual-shipping-fee` | 配送料の手動設定（調整理由付き） |
+| GET | `/admin/auctions/{auctionId}/shipments` | 出品者別の伝票番号一覧（弊社宛発送分） |
 
 ---
 
@@ -811,7 +858,7 @@ LINE OAuth コールバック（Webhook 用）。
 
 | メソッド | パス | 説明 |
 |---|---|---|
-| GET | `/admin/scaling/status` | Auto Scaling 状態確認 |
+| GET | `/admin/scaling/status` | スケーリング状態確認（EC2 の現在のインスタンスタイプ・モード） |
 | POST | `/admin/scaling/scale-up` | スケールアップ実行 |
 | POST | `/admin/scaling/scale-down` | スケールダウン実行 |
 | POST | `/admin/scaling/release-lock` | スケーリングロック解除 |
@@ -879,6 +926,7 @@ LINE OAuth コールバック（Webhook 用）。
 | GET | `/admin/exports/auctions-summary.csv` | オークション一覧サマリー（1行=1オークション） |
 | GET | `/admin/exports/auction-items.csv` | 出品生体明細（全出品・未落札含む） |
 | GET | `/admin/exports/members.csv` | 会員情報＋年会費の統合 CSV |
+| GET | `/admin/exports/won-items-shipping.csv` | 落札商品の発送先一覧（梱包・発送作業用） |
 
 **`GET /admin/exports/auctions-summary.csv` クエリパラメータ**
 
@@ -935,36 +983,46 @@ LINE OAuth コールバック（Webhook 用）。
 
 ---
 
-## 12. WebSocket イベント
+## 12. 社内ツール用 Internal API
 
-**接続方式**: Laravel Reverb (WebSocket)  
-**チャンネル**: `auction.{auctionId}.live`
+🔒 認証必須。`admin` ロールが必要。AI 動画パイプライン等の社内ツールからのメディア投入用。
+冪等キー（`Idempotency-Key` ヘッダー）による重複リクエスト排除に対応。
+詳細仕様: [internal-item-media-upload.md](internal-item-media-upload.md) / [exhibit-code-media-upload-spec.md](exhibit-code-media-upload-spec.md)
 
-### ライブオークションイベント
-
-| イベント名 | データ | 説明 |
+| メソッド | パス | 説明 |
 |---|---|---|
-| `.price.updated` | `{ lane_id, price, bidders_count }` | 価格更新（入札者が増加） |
-| `.bidder.updated` | `{ lane_id, bidders_count, is_active }` | 入札者数変更 |
-| `.lane.changed` | `{ lane_id, item }` | レーンの現在商品変更 |
-| `.item.sold` | `{ lane_id, item_id, winner_id, price }` | 落札確定 |
-| `.item.unsold` | `{ lane_id, item_id }` | 流札 |
-| `.countdown.tick` | `{ lane_id, seconds, phase }` | カウントダウン（`phase`: `normal`/`warning`/`final`） |
-| `.bid.limit.reached` | `{ lane_id, user_id, item_id }` | 指値到達（該当ユーザーのみ受信） |
-| `.auction.status` | `{ status }` | オークションステータス変更 |
-| `.entrance.opened` | `{ auction_id }` | 入場開放 |
-| `.entrance.closed` | `{ auction_id }` | 入場締め切り |
-
-**プライベートチャンネル**: `private-user.{userId}`  
-
-| イベント名 | 説明 |
-|---|---|
-| `.won.item` | 自分の落札通知 |
-| `.bid.limit.triggered` | 自分の指値トリガー通知 |
+| POST | `/internal/items/{itemId}/media` | メディアアップロード（items.id 指定） |
+| GET | `/internal/items/{itemId}/media/{mediaId}` | メディア取得 |
+| PATCH | `/internal/items/{itemId}/media/{mediaId}/thumbnail` | サムネイル設定 |
+| POST | `/internal/auctions/{auctionId}/items/{exhibitCode}/media` | メディアアップロード（出品ID 指定） |
 
 ---
 
-## 13. 共通レスポンス形式
+## 13. WebSocket イベント
+
+**接続方式**: Laravel Reverb (WebSocket)。本番はポート 6001（nginx の 8080 が WebSocket プロキシ口）  
+**チャンネル**: `auction.{auctionId}.live`（public チャンネル）
+
+### ライブオークションイベント（実装上の broadcastAs 名）
+
+| イベント名 | 主なデータ | 説明 | 配信方式 |
+|---|---|---|---|
+| `countdown.tick` | `lane_id, item_id, remaining_seconds, active_bidders_count, current_price, phase` | カウントダウン tick（`phase`: `pre_bid` / `freeze` / `bidding`。0.5秒 tick を1秒粒度に間引いて配信） | 同期（Now） |
+| `price.updated` | `item_id, lane_id, new_price, active_bidders_count, countdown_seconds, auto_left_user_ids` | 価格更新。自動離脱したユーザー ID 一覧を含む | 同期（Now） |
+| `bidder.updated` | `item_id, lane_id, active_bidders_count, event_type(joined/left)` | 入札参加者数の変動 | キュー経由 |
+| `lane.changed` | `lane_id, lane_number, previous_item_id, current_item` | レーンの現在商品変更 | キュー経由 |
+| `item.sold` | `item_id, lane_id, winner_id, winning_price, species_name, item_number, quantity` | 落札確定 | キュー経由 |
+| `bid.limit.reached` | `lane_id, item_id, user_id, current_price, limit_price, limit_cancelled, message` | 指値到達による自動離脱 | 同期（Now） |
+| `bid.limits.batch.triggered` | `lane_id, item_id, current_price, triggered, count` | 同一価格変動で複数ユーザーの指値が一括発動 | 同期（Now） |
+| `auction.status` | `auction_id, status, message, countdown_seconds` | オークションステータス変更（`preparing`/`starting`/`live`/`paused`/`finished`）。開始前10秒のプレスタートカウントダウン（AuctionStartCountdownTick）も同名で毎秒配信 | 同期（Now）/ キュー |
+
+> ℹ️ 流札（unsold）は専用イベントを持たず、`lane.changed`（次商品への遷移）で検知します。
+> 入場開放/締切は WebSocket ではなく `GET /admin|participant ... entrance-status` 系 API のポーリングで判定します。
+> プライベートチャンネルは未使用（全イベント public チャンネル配信。ユーザー固有判定は payload の `user_id` で行う）。
+
+---
+
+## 14. 共通レスポンス形式
 
 ### 成功レスポンス
 
@@ -1014,3 +1072,12 @@ Authorization: Bearer {token}
 Content-Type: application/json
 Accept: application/json
 ```
+
+---
+
+## 改訂履歴
+
+| 版数 | 日付 | 改訂内容 | 作成・承認 |
+|---|---|---|---|
+| 1.0〜2.1 | 2026-04〜2026-05-19 | 初版作成および継続改訂 | 株式会社BeerO'Clock 松崎 航平 |
+| 3.0 | 2026-06-10 | 全ルートと突合。公開・システム API / Internal API 追加、WebSocket イベントを実装名に修正、入札 API の単方向仕様を明記 | 株式会社BeerO'Clock 松崎 航平 |

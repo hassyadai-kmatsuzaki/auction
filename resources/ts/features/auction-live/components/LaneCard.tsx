@@ -159,6 +159,16 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
               /1{item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}
             </Typography>
           </Typography>
+          {item.quantity != null && (
+            <Typography variant="body2" sx={{ mt: 0.25 }}>
+              <Typography component="span" variant="body2" color="text.secondary">
+                合計（{item.quantity}{item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹'}）
+              </Typography>
+              <Typography component="span" variant="body2" fontWeight="bold" sx={{ ml: 0.5 }}>
+                ¥{formatYen(item.current_price * item.quantity)}
+              </Typography>
+            </Typography>
+          )}
         </Box>
 
         {/* カウントダウン表示 */}

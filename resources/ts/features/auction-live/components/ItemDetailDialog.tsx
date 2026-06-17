@@ -94,6 +94,9 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
   const mediaList = buildMediaList(item);
   const current = mediaList[mediaIndex] ?? mediaList[0];
   const unit = item?.quantity_unit === 'kg' ? 'kg' : item?.quantity_unit === 'bag' ? '袋' : '匹';
+  const displayPrice = priceLabel === 'start'
+    ? (startPrice ?? item?.current_price ?? 0)
+    : (item?.current_price ?? 0);
 
   const handleClose = () => {
     setMediaIndex(0);
@@ -175,16 +178,21 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                   {priceLabel === 'start' ? '開始価格' : '現在単価'}
                 </Typography>
                 <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { md: '2.5rem' }, lineHeight: { md: 1.6 }, color: { xs: 'text.primary', md: 'primary.main' } }}>
-                  ¥{(() => {
-                    const price = priceLabel === 'start'
-                      ? (startPrice ?? item?.current_price ?? 0)
-                      : (item?.current_price ?? 0);
-                    return formatYen(price);
-                  })()}
+                  ¥{formatYen(displayPrice)}
                   <Typography component="span" variant="body2" sx={{ ml: 1, fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
                     /1{unit}
                   </Typography>
                 </Typography>
+                {item?.quantity != null && (
+                  <Typography variant="body2" sx={{ mt: 0.25, fontSize: { md: '1.5rem' }, lineHeight: { md: 1.8 } }}>
+                    <Typography component="span" variant="body2" sx={{ fontSize: { md: '1.5rem' }, color: { xs: 'text.primary', md: 'text.secondary' } }}>
+                      合計（{item.quantity}{unit}）
+                    </Typography>
+                    <Typography component="span" variant="body2" fontWeight="bold" sx={{ ml: 0.5, fontSize: { md: '1.5rem' }, color: 'text.primary' }}>
+                      ¥{formatYen(displayPrice * item.quantity)}
+                    </Typography>
+                  </Typography>
+                )}
               </Box>
 
               {/* 出品者・数量（縦並び） */}

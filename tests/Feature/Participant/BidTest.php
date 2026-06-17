@@ -60,10 +60,11 @@ class BidTest extends TestCase
         ]);
     }
 
-    public function test_participant_can_leave_bid(): void
+    public function test_participant_cannot_leave_bid(): void
     {
-        // 落札権利者（最高入札者）の単独参加では離脱できない仕様。
-        // 2 人いる状態で離脱できることを確認する。
+        // 単方向入札仕様: 自分からの離脱（is_active=false）は他の参加者数に
+        // かかわらず一律 403 で拒否され、参加状態は変化しない。
+        // 離脱は CountdownService 経由の自動離脱（auto-left）のみ。
         BidParticipant::create([
             'item_id' => $this->item->id,
             'user_id' => $this->participant->id,
@@ -82,13 +83,13 @@ class BidTest extends TestCase
                 'is_active' => false,
             ]);
 
-        $response->assertStatus(200)
-            ->assertJson(['success' => true]);
+        $response->assertStatus(403)
+            ->assertJson(['success' => false]);
 
         $this->assertDatabaseHas('bid_participants', [
             'item_id' => $this->item->id,
             'user_id' => $this->participant->id,
-            'is_active' => false,
+            'is_active' => true,
         ]);
     }
 
