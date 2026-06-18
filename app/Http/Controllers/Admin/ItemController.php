@@ -41,28 +41,37 @@ class ItemController extends Controller
         $status = $request->input('status');
         $search = $request->input('search');
         
-        $query = Item::where('auction_id', $auctionId)
+        $query = Item::where('items.auction_id', $auctionId)
             ->with(['sellerProfile:id,seller_name,user_id', 'sellerProfile.user:id,trade_name', 'media', 'speciesType:id,code,name']);
 
         // 種別フィルタ
         if ($request->filled('species_type_id')) {
-            $query->where('species_type_id', $request->input('species_type_id'));
+            $query->where('items.species_type_id', $request->input('species_type_id'));
         }
-        
+
         // ステータスフィルター
         if ($status && $status !== 'all') {
-            $query->where('status', $status);
+            $query->where('items.status', $status);
         }
 
         // 検索
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('species_name', 'like', '%' . $search . '%')
-                  ->orWhere('item_number', 'like', '%' . $search . '%');
+                $q->where('items.species_name', 'like', '%' . $search . '%')
+                  ->orWhere('items.item_number', 'like', '%' . $search . '%');
             });
         }
         
-        $items = $query->orderBy('item_number')->paginate($perPage);
+        // レーン割当がある場合はレーン順→レーン内並び順、未割当は item_number 順で末尾へ
+        $items = $query
+            ->leftJoin('lane_items', 'lane_items.item_id', '=', 'items.id')
+            ->leftJoin('lanes', 'lanes.id', '=', 'lane_items.lane_id')
+            ->select('items.*')
+            ->orderByRaw('lanes.lane_number IS NULL')
+            ->orderBy('lanes.lane_number')
+            ->orderBy('lane_items.sequence_order')
+            ->orderBy('items.item_number')
+            ->paginate($perPage);
         
         return response()->json([
             'success' => true,
