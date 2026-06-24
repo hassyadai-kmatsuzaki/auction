@@ -45,6 +45,7 @@ import {
   Edit as EditIcon,
   CheckCircle as CheckCircleIcon,
   Add as AddIcon,
+  Remove as RemoveIcon,
   Delete as DeleteIcon,
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
@@ -574,7 +575,16 @@ export default function SubmitItem() {
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                           数量（{QTY_MIN}〜{QTY_MAX}{unitLabel(item.quantity_unit)}）
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            aria-label="数量を1減らす"
+                            disabled={clampQty(item.quantity) <= QTY_MIN}
+                            onClick={() => updateItem(index, 'quantity', String(clampQty(item.quantity) - 1))}
+                            sx={{ border: '1px solid', borderColor: 'divider' }}
+                          >
+                            <RemoveIcon fontSize="small" />
+                          </IconButton>
                           <Slider
                             value={clampQty(item.quantity)}
                             min={QTY_MIN}
@@ -582,8 +592,17 @@ export default function SubmitItem() {
                             size="small"
                             valueLabelDisplay="auto"
                             onChange={(_, v) => updateItem(index, 'quantity', String(v))}
-                            sx={{ flex: 1 }}
+                            sx={{ flex: 1, mx: 1 }}
                           />
+                          <IconButton
+                            size="small"
+                            aria-label="数量を1増やす"
+                            disabled={clampQty(item.quantity) >= QTY_MAX}
+                            onClick={() => updateItem(index, 'quantity', String(clampQty(item.quantity) + 1))}
+                            sx={{ border: '1px solid', borderColor: 'divider' }}
+                          >
+                            <AddIcon fontSize="small" />
+                          </IconButton>
                           <TextField
                             required
                             size="small"
@@ -599,7 +618,7 @@ export default function SubmitItem() {
                         </Box>
                       </Grid>
 
-                      <Grid item xs={6} md={3}>
+                      <Grid item xs={6} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
                         <FormControl fullWidth required size="small">
                           <InputLabel>単位</InputLabel>
                           <Select
@@ -614,7 +633,7 @@ export default function SubmitItem() {
                         </FormControl>
                       </Grid>
 
-                      <Grid item xs={6} md={3}>
+                      <Grid item xs={6} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
                         <FormControl fullWidth size="small">
                           <InputLabel>生体月数</InputLabel>
                           <Select
