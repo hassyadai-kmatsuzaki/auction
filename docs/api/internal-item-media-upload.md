@@ -2,11 +2,11 @@
 
 社内ツール (upload_system.py 等) から商品メディア (画像 / 動画) をアップロードするための内部 API です。一般ユーザー向け管理画面 (admin / media_editor) とは別経路で、サーバ間連携用のシンプルなインターフェースを提供します。
 
-- ベース URL: `https://medaka-auction.com/api/internal` (本番ステージング共通)
+- ベース URL: 本番 `https://medaka-ichiba.com/api/internal` / ステージング `https://medaka-auction.com/api/internal`
 - 認証: `auth:sanctum` (Bearer トークン)
 - 権限: `admin` ロール必須
 
-ルート定義: [routes/api.php:413-428](../../routes/api.php#L413-L428)
+ルート定義: [routes/api.php:413-434](../../routes/api.php#L413-L434)
 コントローラ: [app/Http/Controllers/Internal/ItemMediaController.php](../../app/Http/Controllers/Internal/ItemMediaController.php)
 
 ---
@@ -156,6 +156,67 @@ AI 動画自動編集パイプライン用の入口です。`items.id` を扱わ
 > `{lane_name}-{sprintf('%03d', sequence_order)}`（例 `A-001`）で行う。QRカードと**完全一致**するよう
 > ハイフン入りに揃えてある。`exhibit_code` のオークション内一意性は `lane_name`（A/B）＋ `sequence_order`
 > の組み合わせで担保される（DB の UNIQUE 制約ではなく発番ロジックによる）。
+
+---
+
+### 1-c. メディア全削除（出品ID版 / exhibit_code）
+
+`DELETE /api/internal/auctions/{auction_id}/items/{exhibit_code}/media`
+
+AI 動画自動編集パイプラインの **「全削除 → 再作成」** 用の入口です。指定 item に紐づく
+**全メディアを一括削除**します。`items.id` を扱わず、`auction_id` + `exhibit_code` だけで item を
+特定するため、削除のために admin GET で `items.id` を取得する必要がありません
+（＝失効する admin トークンが不要。`POST` と同一の内部トークンで完結します）。
+
+item の特定ロジック・パスパラメータ・エラー条件は [1-b. メディアアップロード（出品ID版）](#1-b-メディアアップロード出品id版--exhibit_code)
+と**完全に同一**（同じ内部ヘルパで解決）。違いは HTTP メソッド（`POST` → `DELETE`）とボディが無いことだけです。
+
+#### リクエスト
+
+- ボディなし
+- パスパラメータ:
+  - `auction_id` (整数) — `auctions.id`
+  - `exhibit_code` (文字列) — 出品ID。`{レーン}-{3桁ゼロ埋め}` 形式（例 `A-001`）
+
+#### 削除されるもの
+
+- 対象 item に紐づく **全 `item_media` レコード**
+- 各メディアの **S3 実体**:
+  - `file_path` … 本体（画像 / 動画。動画は圧縮済み `_enc_` の場合あり）
+  - `poster_path` … 動画の自動生成ポスター（`uuid_poster_xxxxxx.jpg`）
+  - `original_path` … 動画の無圧縮オリジナル（保持していた場合）
+- サムネイル指定があった item の `thumbnail_path`（自動でクリア）
+
+> DB レコードだけでなく S3 実体も消すため、孤児ファイル（例: `..._poster_xxxxxx.jpg`）が残りません。
+
+#### レスポンス
+
+**成功 (200 OK)**
+```json
+{
+  "success": true,
+  "message": "メディアを 5 件削除しました。",
+  "data": {
+    "auction_id": 29,
+    "exhibit_code": "A-011",
+    "item_id": 5035,
+    "deleted_count": 5
+  }
+}
+```
+
+メディアが 0 件でも `200`（`deleted_count: 0`）を返します。空 item への呼び出し・再実行を安全にするための冪等な挙動です。
+全削除〜再作成の間に一瞬「0枚」になりますが、許可状態は開催前のみのため問題ありません。
+
+**エラー**
+
+| ステータス | 条件 |
+|---|---|
+| 401 | トークン未付与 / 不正 |
+| 403 | `admin` ロールでない |
+| 404 | `auction_id` が存在しない / `(auction_id, exhibit_code)` に該当 item なし |
+| 409 | 該当 item が複数（曖昧。本来起きない想定） |
+| 422 | オークションが開催前（`preparing` / `scheduled`）でない（＝開催中・終了・キャンセル） |
 
 ---
 

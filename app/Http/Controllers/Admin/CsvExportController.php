@@ -73,4 +73,30 @@ class CsvExportController extends Controller
 
         return $this->csvExportService->streamWonItemsShipping((int) $request->input('auction_id'));
     }
+
+    /**
+     * GET /api/admin/exports/favorites.csv
+     * オークション開催前のお気に入り登録一覧
+     */
+    public function favorites(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'auction_id' => 'required|integer|exists:auctions,id',
+        ]);
+
+        return $this->csvExportService->streamFavorites((int) $request->input('auction_id'));
+    }
+
+    /**
+     * GET /api/admin/exports/bid-limits.csv
+     * オークション開催前の指値設定一覧
+     */
+    public function bidLimits(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'auction_id' => 'required|integer|exists:auctions,id',
+        ]);
+
+        return $this->csvExportService->streamBidLimits((int) $request->input('auction_id'));
+    }
 }

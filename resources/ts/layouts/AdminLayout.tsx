@@ -109,6 +109,7 @@ export default function AdminLayout() {
   const bottomMenuItems = [
     { text: '設定', icon: <SettingsIcon />, path: '/admin/settings' },
     { text: '種別マスタ', icon: <SettingsIcon />, path: '/admin/masters/species-types' },
+    { text: '品種名マスタ', icon: <SettingsIcon />, path: '/admin/masters/species-names' },
     { text: 'LP CVR設定', icon: <CampaignIcon />, path: '/admin/lp-cvr' },
     { text: 'インフラスケーリング', icon: <CloudIcon />, path: '/admin/scaling' },
     { text: '帳票管理', icon: <ReceiptIcon />, path: '/admin/documents' },

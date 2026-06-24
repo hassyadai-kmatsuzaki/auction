@@ -64,4 +64,16 @@ export const adminCsvExportApi = {
       cleanParams({ auction_id: auctionId }),
       `auction_${auctionId}_shipping_list.csv`,
     ),
+  favorites: (auctionId: number) =>
+    downloadCsv(
+      '/api/admin/exports/favorites.csv',
+      cleanParams({ auction_id: auctionId }),
+      `auction_${auctionId}_favorites.csv`,
+    ),
+  bidLimits: (auctionId: number) =>
+    downloadCsv(
+      '/api/admin/exports/bid-limits.csv',
+      cleanParams({ auction_id: auctionId }),
+      `auction_${auctionId}_bid_limits.csv`,
+    ),
 };

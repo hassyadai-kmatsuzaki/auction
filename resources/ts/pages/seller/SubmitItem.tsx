@@ -34,6 +34,8 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  Autocomplete,
+  Slider,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -47,8 +49,35 @@ import {
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { sellerSpeciesNameApi } from '../../api/seller/speciesNameApi';
 
 const steps = ['出品情報', '確認'];
+
+// 数量の上限（スライダー / 入力共通）
+const QTY_MIN = 1;
+const QTY_MAX = 100;
+
+// 全角数字を半角へ変換し、数字以外を除去する（全角/半角の混入事故を防ぐ）
+const toHalfWidthDigits = (s: string): string =>
+  s
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[^0-9]/g, '');
+
+// 入力途中の空文字は許容しつつ、上限だけ即時クランプ（下限は onBlur で正規化）
+const sanitizeQty = (raw: string): string => {
+  const digits = toHalfWidthDigits(raw);
+  if (digits === '') return '';
+  const n = parseInt(digits, 10);
+  if (Number.isNaN(n)) return '';
+  return String(Math.min(QTY_MAX, n));
+};
+
+// スライダー用に必ず 1〜100 の数値へ丸める
+const clampQty = (str: string): number => {
+  const n = parseInt(str || String(QTY_MIN), 10);
+  if (Number.isNaN(n)) return QTY_MIN;
+  return Math.min(QTY_MAX, Math.max(QTY_MIN, n));
+};
 
 interface AvailableAuction {
   id: number;
@@ -97,7 +126,7 @@ interface SellerSpeciesType {
 const createEmptyItem = (defaults?: { species_type_id?: number; quantity_unit?: string }): ItemFormData => ({
   species_name: '',
   species_type_id: defaults?.species_type_id ?? '',
-  quantity: '',
+  quantity: '1',
   quantity_unit: defaults?.quantity_unit ?? 'fish',
   is_premium: false,
   is_anonymous: false,
@@ -118,6 +147,8 @@ export default function SubmitItem() {
   const [auctionId, setAuctionId] = useState('');
   const [items, setItems] = useState<ItemFormData[]>([createEmptyItem()]);
   const [speciesTypes, setSpeciesTypes] = useState<SellerSpeciesType[]>([]);
+  // 品種名（生体名）の入力補助候補（管理画面の品種名マスタから取得）
+  const [speciesNameOptions, setSpeciesNameOptions] = useState<string[]>([]);
   const [shipments, setShipments] = useState<ShipmentInput[]>([{ carrier: '', tracking_number: '' }]);
   // 当該オークションで既に登録済みの自分の伝票（追加登録時に重複チェック・上限管理に利用）
   const [existingShipments, setExistingShipments] = useState<{ id: number; carrier: Carrier; carrier_label: string; tracking_number: string }[]>([]);
@@ -159,14 +190,22 @@ export default function SubmitItem() {
     const hasNumber = s.tracking_number.trim().length > 0;
     return (hasCarrier && hasNumber) || (!hasCarrier && !hasNumber);
   });
-  const isShipmentsValid = allRowsConsistent && (
-    existingShipments.length > 0 || validShipments.length > 0
-  );
+  // 伝票番号は任意。未入力でも送信可能。ただし片方だけ埋まった不完全行（業者のみ/番号のみ）は不可。
+  const isShipmentsValid = allRowsConsistent;
 
   useEffect(() => {
     fetchAvailableAuctions();
     fetchSpeciesTypes();
+    fetchSpeciesNames();
   }, []);
+
+  const fetchSpeciesNames = async () => {
+    try {
+      setSpeciesNameOptions(await sellerSpeciesNameApi.list());
+    } catch (err) {
+      console.error('品種名候補の取得に失敗:', err);
+    }
+  };
 
   // auction が選択されたら既存伝票を取得（同一オークションへの再出品時に過去登録分を表示・上限計算に使う）
   useEffect(() => {
@@ -498,27 +537,52 @@ export default function SubmitItem() {
                       </Grid>
 
                       <Grid item xs={12} md={8}>
-                        <TextField
+                        <Autocomplete
+                          freeSolo
                           fullWidth
-                          required
-                          label="品種名"
-                          value={item.species_name}
-                          onChange={(e) => updateItem(index, 'species_name', e.target.value)}
-                          placeholder="例: 紅白ラメ、幹之フルボディ"
                           size="small"
+                          options={speciesNameOptions}
+                          inputValue={item.species_name}
+                          onInputChange={(_, value) => updateItem(index, 'species_name', value)}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              required
+                              label="品種名"
+                              placeholder="例: 紅白ラメ、幹之フルボディ"
+                              helperText="入力すると候補が表示されます。候補を選んでも、自由に編集してもOKです。"
+                            />
+                          )}
                         />
                       </Grid>
 
-                      <Grid item xs={6} md={3}>
-                        <TextField
-                          fullWidth
-                          required
-                          type="number"
-                          label="数量"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                          size="small"
-                        />
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                          数量（{QTY_MIN}〜{QTY_MAX}{unitLabel(item.quantity_unit)}）
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Slider
+                            value={clampQty(item.quantity)}
+                            min={QTY_MIN}
+                            max={QTY_MAX}
+                            size="small"
+                            valueLabelDisplay="auto"
+                            onChange={(_, v) => updateItem(index, 'quantity', String(v))}
+                            sx={{ flex: 1 }}
+                          />
+                          <TextField
+                            required
+                            size="small"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', sanitizeQty(e.target.value))}
+                            onBlur={() => updateItem(index, 'quantity', String(clampQty(item.quantity)))}
+                            inputProps={{
+                              inputMode: 'numeric',
+                              'aria-label': '数量',
+                              style: { width: 56, textAlign: 'right' },
+                            }}
+                          />
+                        </Box>
                       </Grid>
 
                       <Grid item xs={6} md={3}>
@@ -708,14 +772,12 @@ export default function SubmitItem() {
                     {/* 伝票番号 */}
                     <Box sx={{ mb: 3 }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        伝票番号 {existingShipments.length === 0 && (
-                          <Typography component="span" color="error" fontWeight={700}>*</Typography>
-                        )}
+                        伝票番号（任意）
                       </Typography>
                       <Alert severity="info" sx={{ mb: 2 }}>
                         {existingShipments.length > 0
                           ? `このオークションには既に${existingShipments.length}件の伝票番号を登録済みです。追加で発送した分があれば下に入力してください（合計最大${MAX_SHIPMENTS}件まで）。新規追加が無い場合は空のまま送信できます。`
-                          : `生体の発送に使用した伝票番号を入力してください。複数の伝票で発送した場合は「+ 伝票を追加」で増やせます（最大${MAX_SHIPMENTS}件）。伝票番号と各生体の紐付けは行いません。`}
+                          : `伝票番号の入力は任意です。生体を発送済みで伝票番号が分かる場合はご入力ください（後から出品履歴でも登録できます）。複数の伝票で発送した場合は「+ 伝票を追加」で増やせます（最大${MAX_SHIPMENTS}件）。伝票番号と各生体の紐付けは行いません。`}
                       </Alert>
                       {existingShipments.length > 0 && (
                         <Box sx={{ mb: 2 }}>
@@ -737,7 +799,7 @@ export default function SubmitItem() {
                       {shipments.map((s, index) => (
                         <Grid container spacing={1.5} key={index} alignItems="center" sx={{ mb: 1 }}>
                           <Grid item xs={12} sm={4} md={3}>
-                            <FormControl fullWidth size="small" required>
+                            <FormControl fullWidth size="small">
                               <InputLabel>配送業者</InputLabel>
                               <Select
                                 value={s.carrier}
@@ -754,7 +816,6 @@ export default function SubmitItem() {
                             <TextField
                               fullWidth
                               size="small"
-                              required
                               label="伝票番号"
                               value={s.tracking_number}
                               onChange={(e) => updateShipment(index, 'tracking_number', e.target.value)}

@@ -143,13 +143,24 @@ export function useAuctionLive(auctionId: number) {
       prices.forEach((event, laneId) => {
         const idx = newLanes.findIndex((l) => l.lane_id === laneId);
         if (idx === -1 || !newLanes[idx].current_item) return;
+        const cur = newLanes[idx].current_item!;
+        // 商品切替直後に届いた「前 item の遅延 price」を新 item に誤適用しない
+        if (event.item_id !== cur.id) return;
+        // 価格上昇 = サーバー側で必ず freeze が開始される合図（handlePriceIncrement /
+        //   adjustPriceByBidLimits は PriceUpdated 直前に startFreezeCountdown 済み）。
+        //   freeze を伝える countdown.tick は次 tick（最大0.5秒後）まで来ないため、
+        //   ここで楽観的に freeze へ遷移させ、「カウントが次ラウンド秒に戻る → 0.5秒遅れて
+        //   ボタンがフリーズ」という見た目のチラつきを防ぐ。
+        //   countdown_seconds（次ラウンド秒）は freeze 表示中は不使用なので上書きしない。
         newLanes[idx] = {
           ...newLanes[idx],
           current_item: {
-            ...newLanes[idx].current_item!,
+            ...cur,
             current_price: event.new_price,
             active_bidders_count: event.active_bidders_count,
-            countdown_seconds: event.countdown_seconds,
+            phase: 'freeze',
+            freeze_remaining_seconds:
+              cur.freeze_countdown_seconds ?? cur.freeze_remaining_seconds,
           },
         };
         changed = true;

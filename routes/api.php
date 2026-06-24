@@ -306,6 +306,25 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::delete('/{id}/mix-restrictions/{rowId}', [\App\Http\Controllers\Admin\SpeciesTypeController::class, 'mixRestrictionsDestroy']);
     });
 
+    // 品種名（生体名）マスタ。出品申込フォームの入力補助（変換候補）のサジェスト元。
+    Route::prefix('masters/species-names')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\SpeciesNameController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Admin\SpeciesNameController::class, 'store']);
+        Route::post('/reorder', [\App\Http\Controllers\Admin\SpeciesNameController::class, 'reorder']);
+        Route::patch('/{id}', [\App\Http\Controllers\Admin\SpeciesNameController::class, 'update'])->whereNumber('id');
+        Route::delete('/{id}', [\App\Http\Controllers\Admin\SpeciesNameController::class, 'destroy'])->whereNumber('id');
+    });
+
+    // 撮影ビュー設定（生体名 → 上見/横見）。サムネ向きを生体名で決定的に固定するための軽量マッピング。
+    Route::prefix('masters/thumbnail-views')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'store']);
+        // ビュー未設定の生体名一覧（items から導出）。{id} ルートより前に置く。
+        Route::get('/unregistered', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'unregistered']);
+        Route::patch('/{id}', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'update'])->whereNumber('id');
+        Route::delete('/{id}', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'destroy'])->whereNumber('id');
+    });
+
     // 出品者精算管理
     Route::get('settlements', [AdminSettlementController::class, 'index']);
     Route::get('settlements/{id}', [AdminSettlementController::class, 'show']);
@@ -348,6 +367,8 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::get('/auction-items.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'auctionItems']);
         Route::get('/members.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'members']);
         Route::get('/won-items-shipping.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'wonItemsShipping']);
+        Route::get('/favorites.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'favorites']);
+        Route::get('/bid-limits.csv', [\App\Http\Controllers\Admin\CsvExportController::class, 'bidLimits']);
     });
 
     // 血統証明書管理
@@ -425,6 +446,13 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('internal')->gro
     Route::post('auctions/{auctionId}/items/{exhibitCode}/media', [\App\Http\Controllers\Internal\ItemMediaController::class, 'uploadByExhibitCode'])
         ->whereNumber('auctionId')
         ->where('exhibitCode', '[A-Za-z]-[0-9]{3}');
+
+    // 出品ID（exhibit_code）版 メディア全削除。撮影パイプラインの「全削除→再作成」用。
+    // DBレコードに加え S3実体（本体・自動生成ポスター・無圧縮オリジナル）も削除する。
+    // 許可は開催前（preparing/scheduled）のみ。POST と同一トークンで叩ける。
+    Route::delete('auctions/{auctionId}/items/{exhibitCode}/media', [\App\Http\Controllers\Internal\ItemMediaController::class, 'deleteAllByExhibitCode'])
+        ->whereNumber('auctionId')
+        ->where('exhibitCode', '[A-Za-z]-[0-9]{3}');
 });
 
 // ユーザーAPI（参加者・出品者共通）
@@ -450,6 +478,9 @@ Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->grou
     
     // 種別マスタ（読み取り専用 - 出品フォームのセレクト用）
     Route::get('/species-types', [\App\Http\Controllers\Seller\SpeciesTypeController::class, 'index']);
+
+    // 品種名（生体名）候補（読み取り専用 - 出品フォームの入力補助用）
+    Route::get('/species-names', [\App\Http\Controllers\Seller\SpeciesNameController::class, 'index']);
 
     // 出品管理（参照は非課金可／作成・編集・削除は allows_sell が必要）
     Route::get('/items', [SellerItemController::class, 'index']);

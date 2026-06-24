@@ -430,6 +430,149 @@ class CsvExportService
     }
 
     /**
+     * 5つ目: お気に入り登録一覧CSV（オークション1件、開催前の事前確認用）
+     *
+     * 1行 = 1お気に入り。対象オークションに紐づく出品(items.auction_id)への
+     * favorites を、会員ごと・登録日時降順で出力する。
+     */
+    public function streamFavorites(int $auctionId): StreamedResponse
+    {
+        Auction::findOrFail($auctionId);
+        $filename = sprintf('auction_%d_favorites.csv', $auctionId);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $query = DB::table('favorites as f')
+            ->join('users as u', 'u.id', '=', 'f.user_id')
+            ->join('items as i', 'i.id', '=', 'f.item_id')
+            ->join('seller_profiles as sp', 'sp.id', '=', 'i.seller_profile_id')
+            ->join('users as su', 'su.id', '=', 'sp.user_id')
+            ->where('i.auction_id', $auctionId)
+            ->orderBy('u.id')
+            ->orderByDesc('f.created_at')
+            ->select([
+                'u.id as user_id',
+                'u.name as user_name',
+                'u.trade_name as trade_name',
+                'i.id as item_id',
+                'i.species_name as species_name',
+                'i.quantity as quantity',
+                'su.trade_name as seller_trade_name',
+                'f.created_at as favorited_at',
+            ]);
+
+        return response()->stream(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($out, [
+                '会員ID',
+                '氏名',
+                '屋号',
+                '出品ID',
+                '品種名',
+                '匹数',
+                '出品者(屋号)',
+                'お気に入り登録日時',
+            ]);
+
+            foreach ($query->lazy(200) as $row) {
+                fputcsv($out, [
+                    $row->user_id,
+                    $row->user_name ?? '',
+                    $row->trade_name ?? '-',
+                    $row->item_id,
+                    $row->species_name ?? '',
+                    $row->quantity,
+                    $row->seller_trade_name ?? '-',
+                    $row->favorited_at ? Carbon::parse($row->favorited_at)->format('Y-m-d H:i:s') : '',
+                ]);
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    /**
+     * 6つ目: 指値設定一覧CSV（オークション1件、開催前の事前確認用）
+     *
+     * 1行 = 1指値。対象オークションに紐づく出品(items.auction_id)への
+     * bid_limit_prices を、会員ごと・設定日時降順で出力する。
+     */
+    public function streamBidLimits(int $auctionId): StreamedResponse
+    {
+        Auction::findOrFail($auctionId);
+        $filename = sprintf('auction_%d_bid_limits.csv', $auctionId);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $query = DB::table('bid_limit_prices as blp')
+            ->join('users as u', 'u.id', '=', 'blp.user_id')
+            ->join('items as i', 'i.id', '=', 'blp.item_id')
+            ->join('seller_profiles as sp', 'sp.id', '=', 'i.seller_profile_id')
+            ->join('users as su', 'su.id', '=', 'sp.user_id')
+            ->where('i.auction_id', $auctionId)
+            ->orderBy('u.id')
+            ->orderByDesc('blp.created_at')
+            ->select([
+                'u.id as user_id',
+                'u.name as user_name',
+                'u.trade_name as trade_name',
+                'i.id as item_id',
+                'i.species_name as species_name',
+                'i.quantity as quantity',
+                'su.trade_name as seller_trade_name',
+                'blp.limit_price as limit_price',
+                'blp.is_triggered as is_triggered',
+                'blp.triggered_at as triggered_at',
+                'blp.created_at as limit_set_at',
+            ]);
+
+        return response()->stream(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($out, [
+                '会員ID',
+                '氏名',
+                '屋号',
+                '出品ID',
+                '品種名',
+                '匹数',
+                '出品者(屋号)',
+                '指値金額',
+                '発動済み',
+                '発動日時',
+                '指値設定日時',
+            ]);
+
+            foreach ($query->lazy(200) as $row) {
+                fputcsv($out, [
+                    $row->user_id,
+                    $row->user_name ?? '',
+                    $row->trade_name ?? '-',
+                    $row->item_id,
+                    $row->species_name ?? '',
+                    $row->quantity,
+                    $row->seller_trade_name ?? '-',
+                    (int) $row->limit_price,
+                    $row->is_triggered ? '発動済' : '未発動',
+                    $row->triggered_at ? Carbon::parse($row->triggered_at)->format('Y-m-d H:i:s') : '',
+                    $row->limit_set_at ? Carbon::parse($row->limit_set_at)->format('Y-m-d H:i:s') : '',
+                ]);
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    /**
      * shipping_breakdown.boxes を発送リスト用に整形。
      * boxes[].bags は ShippingCalculatorService::formatBagsInBox() で
      * 既に "S×7" 形式の文字列配列として保存されているため、そのまま並べる。

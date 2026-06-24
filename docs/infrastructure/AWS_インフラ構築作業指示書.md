@@ -66,9 +66,9 @@
 
 | コンポーネント | スペック | 備考 |
 |--------------|---------|------|
-| EC2 | t3.small (2vCPU / 2GB) | オークション時 → t3.large |
-| RDS | db.t3.micro Single-AZ | オークション時 → db.t3.medium Multi-AZ |
-| ElastiCache | cache.t3.micro | オークション時 → cache.t3.medium + Replica |
+| EC2 | t3.small (2vCPU / 2GB) | オークション時 → c6i.2xlarge (8vCPU / 16GB) |
+| RDS | db.t3.micro Single-AZ | オークション時 → db.t3.large Multi-AZ |
+| ElastiCache | cache.t3.micro | オークション時 → cache.m7g.large + Replica |
 | ALB | 標準 | 常時稼働 |
 | S3 | 標準 | 画像・メディアストレージ |
 
@@ -316,12 +316,12 @@ VPC `auction-vpc` 内に以下の4つを作成する。
   スケールアップ/ダウン時は必ずインスタンスクラスとパラメータグループをセットで変更すること。
 
   スケールアップ時:
-    db.t3.micro → db.t3.medium に変更
+    db.t3.micro → db.t3.large に変更
     auction-prod-db-params-micro → auction-prod-db-params-large に変更
     → 再起動が発生する（数分間のダウンタイム）
 
   スケールダウン時:
-    db.t3.medium → db.t3.micro に変更
+    db.t3.large → db.t3.micro に変更
     auction-prod-db-params-large → auction-prod-db-params-micro に変更
     → 再起動が発生する（数分間のダウンタイム）
 
@@ -1091,7 +1091,7 @@ stdout_logfile=/var/log/supervisor/reverb.log
 ```
 
 > **注意**: 通常モード（t3.small）では countdown×1, default×1, notify×2, notify-priority×1 で運用。
-> オークションモード（t3.large）にスケールアップ時は `numprocs` を countdown×5, default×2 に変更。
+> オークションモード（c6i.2xlarge）にスケールアップ時は `numprocs` を countdown×5, default×2 に変更。
 > notify / notify-priority はメール SES の TPS 制限がボトルネックなので、ワーカーを増やしても上限以上は出ない。スケール対象外。
 
 ### 11-2. Supervisor 反映
@@ -1224,7 +1224,7 @@ APP_URL=https://{旧ドメイン}
 1. EC2 コンソール → `auction-app-01` を選択
 2. 「インスタンスの状態」→「インスタンスを停止」
 3. 停止確認後 →「アクション」→「インスタンスの設定」→「インスタンスタイプを変更」
-4. `t3.small` → **`t3.large`** に変更 → 「適用」
+4. `t3.small` → **`c6i.2xlarge`** に変更 → 「適用」
 5. 「インスタンスの状態」→「インスタンスを開始」
 6. ステータスチェックが 2/2 合格になるまで待つ
 
@@ -1233,14 +1233,15 @@ APP_URL=https://{旧ドメイン}
 EC2 に接続して実行:
 
 ```bash
-# PHP-FPM の max_children を変更
-sudo sed -i 's/pm.max_children = 30/pm.max_children = 80/' /etc/php-fpm.d/www.conf
-sudo sed -i 's/pm.start_servers = 5/pm.start_servers = 20/' /etc/php-fpm.d/www.conf
-sudo sed -i 's/pm.min_spare_servers = 3/pm.min_spare_servers = 10/' /etc/php-fpm.d/www.conf
-sudo sed -i 's/pm.max_spare_servers = 10/pm.max_spare_servers = 40/' /etc/php-fpm.d/www.conf
+# PHP-FPM を c6i.2xlarge（8vCPU）実証済み値へ変更（max_children=100 は禁忌）
+sudo sed -i 's/pm.max_children = 30/pm.max_children = 64/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.start_servers = 5/pm.start_servers = 16/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.min_spare_servers = 3/pm.min_spare_servers = 12/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.max_spare_servers = 10/pm.max_spare_servers = 32/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.max_requests = 500/pm.max_requests = 1000/' /etc/php-fpm.d/www.conf
 
-# 反映
-sudo systemctl restart php8.2-fpm
+# 反映（AL2023 のサービス名は php-fpm）
+sudo systemctl restart php-fpm
 ```
 
 #### 手順3: Supervisor ワーカー数変更
@@ -1273,7 +1274,7 @@ sudo supervisorctl status
 
 | 項目 | 変更前 | 変更後 |
 |------|--------|--------|
-| DB インスタンスクラス | db.t3.micro | **db.t3.medium** |
+| DB インスタンスクラス | db.t3.micro | **db.t3.large** |
 | DB パラメータグループ | auction-prod-db-params-micro | **auction-prod-db-params-large** |
 | Multi-AZ 配置 | いいえ | **はい** |
 
@@ -1288,7 +1289,7 @@ sudo supervisorctl status
 #### 手順5: ElastiCache スケールアップ
 
 1. ElastiCache コンソール → `auction-redis` → 「変更」
-2. ノードタイプ: `cache.t3.micro` → **`cache.t3.medium`**
+2. ノードタイプ: `cache.t3.micro` → **`cache.m7g.large`**
 3. 「すぐに適用」→ 保存
 4. 完了後、レプリカを追加:
    - 「レプリカを追加」→ AZ: `ap-northeast-1c` → 作成
@@ -1319,7 +1320,7 @@ php artisan tinker                 # DB/Redis 接続確認
 #### 手順1: ElastiCache スケールダウン
 
 1. レプリカを削除（レプリカノードを選択 →「削除」）
-2. ノードタイプ: `cache.t3.medium` → **`cache.t3.micro`**
+2. ノードタイプ: `cache.m7g.large` → **`cache.t3.micro`**
 
 #### 手順2: RDS スケールダウン
 
@@ -1327,7 +1328,7 @@ php artisan tinker                 # DB/Redis 接続確認
 
 | 項目 | 変更前 | 変更後 |
 |------|--------|--------|
-| DB インスタンスクラス | db.t3.medium | **db.t3.micro** |
+| DB インスタンスクラス | db.t3.large | **db.t3.micro** |
 | DB パラメータグループ | auction-prod-db-params-large | **auction-prod-db-params-micro** |
 | Multi-AZ 配置 | はい | **いいえ** |
 
@@ -1336,12 +1337,13 @@ php artisan tinker                 # DB/Redis 接続確認
 #### 手順3: Supervisor・PHP-FPM を戻す
 
 ```bash
-# PHP-FPM を通常モードに戻す
-sudo sed -i 's/pm.max_children = 80/pm.max_children = 30/' /etc/php-fpm.d/www.conf
-sudo sed -i 's/pm.start_servers = 20/pm.start_servers = 5/' /etc/php-fpm.d/www.conf
-sudo sed -i 's/pm.min_spare_servers = 10/pm.min_spare_servers = 3/' /etc/php-fpm.d/www.conf
-sudo sed -i 's/pm.max_spare_servers = 40/pm.max_spare_servers = 10/' /etc/php-fpm.d/www.conf
-sudo systemctl restart php8.2-fpm
+# PHP-FPM を通常モード（t3.small）に戻す
+sudo sed -i 's/pm.max_children = 64/pm.max_children = 30/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.start_servers = 16/pm.start_servers = 5/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.min_spare_servers = 12/pm.min_spare_servers = 3/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.max_spare_servers = 32/pm.max_spare_servers = 10/' /etc/php-fpm.d/www.conf
+sudo sed -i 's/pm.max_requests = 1000/pm.max_requests = 500/' /etc/php-fpm.d/www.conf
+sudo systemctl restart php-fpm
 
 # Supervisor ワーカー数を戻す（vi で個別編集推奨）
 sudo vi /etc/supervisord.d/auction.ini
@@ -1354,7 +1356,7 @@ sudo supervisorctl update
 #### 手順4: EC2 インスタンスタイプ変更
 
 1. EC2 → `auction-app-01` →「インスタンスを停止」
-2. インスタンスタイプ: `t3.large` → **`t3.small`**
+2. インスタンスタイプ: `c6i.2xlarge` → **`t3.small`**
 3. 「インスタンスを開始」
 
 #### 手順5: 動作確認（スケールアップ時と同じ）
@@ -1365,20 +1367,20 @@ sudo supervisorctl update
 
 **スケールアップ（開催2日前）:**
 
-- [ ] EC2: t3.small → t3.large
-- [ ] PHP-FPM: max_children 30 → 80
+- [ ] EC2: t3.small → c6i.2xlarge
+- [ ] PHP-FPM: max_children 30 → 64（start 16 / min_spare 12 / max_spare 32 / max_requests 1000）
 - [ ] Supervisor: countdown×5, default×2
-- [ ] RDS: db.t3.micro → db.t3.medium + Multi-AZ + パラメータグループ変更
-- [ ] ElastiCache: cache.t3.micro → cache.t3.medium + レプリカ追加
+- [ ] RDS: db.t3.micro → db.t3.large + Multi-AZ + パラメータグループ変更
+- [ ] ElastiCache: cache.t3.micro → cache.m7g.large + レプリカ追加
 - [ ] 動作確認完了
 
 **スケールダウン（開催2日後）:**
 
-- [ ] ElastiCache: レプリカ削除 + cache.t3.medium → cache.t3.micro
-- [ ] RDS: db.t3.medium → db.t3.micro + Multi-AZ 無効 + パラメータグループ変更
+- [ ] ElastiCache: レプリカ削除 + cache.m7g.large → cache.t3.micro
+- [ ] RDS: db.t3.large → db.t3.micro + Multi-AZ 無効 + パラメータグループ変更
 - [ ] Supervisor: countdown×1, default×1
-- [ ] PHP-FPM: max_children 80 → 30
-- [ ] EC2: t3.large → t3.small
+- [ ] PHP-FPM: max_children 64 → 30（max_requests 1000 → 500）
+- [ ] EC2: c6i.2xlarge → t3.small
 - [ ] 動作確認完了
 
 ---
@@ -1535,15 +1537,15 @@ def wait_ec2_running(instance_id, timeout=300):
     waiter.wait(InstanceIds=[instance_id], WaiterConfig={'Delay': 15, 'MaxAttempts': timeout // 15})
 
 def scale_up_ec2():
-    """EC2: t3.small → t3.large"""
+    """EC2: t3.small → c6i.2xlarge"""
     print("EC2: Stopping instance...")
     ec2.stop_instances(InstanceIds=[EC2_INSTANCE_ID])
     wait_ec2_stopped(EC2_INSTANCE_ID)
 
-    print("EC2: Changing instance type to t3.large...")
+    print("EC2: Changing instance type to c6i.2xlarge...")
     ec2.modify_instance_attribute(
         InstanceId=EC2_INSTANCE_ID,
-        InstanceType={'Value': 't3.large'}
+        InstanceType={'Value': 'c6i.2xlarge'}
     )
 
     print("EC2: Starting instance...")
@@ -1552,11 +1554,11 @@ def scale_up_ec2():
     print("EC2: Scale-up complete")
 
 def scale_up_rds():
-    """RDS: db.t3.micro → db.t3.medium + Multi-AZ + パラメータグループ変更"""
+    """RDS: db.t3.micro → db.t3.large + Multi-AZ + パラメータグループ変更"""
     print("RDS: Scaling up...")
     rds.modify_db_instance(
         DBInstanceIdentifier=RDS_INSTANCE_ID,
-        DBInstanceClass='db.t3.medium',
+        DBInstanceClass='db.t3.large',
         DBParameterGroupName='auction-prod-db-params-large',
         MultiAZ=True,
         ApplyImmediately=True
@@ -1570,11 +1572,11 @@ def scale_up_rds():
     print("RDS: Scale-up complete")
 
 def scale_up_elasticache():
-    """ElastiCache: cache.t3.micro → cache.t3.medium"""
+    """ElastiCache: cache.t3.micro → cache.m7g.large"""
     print("ElastiCache: Scaling up...")
     elasticache.modify_replication_group(
         ReplicationGroupId=ELASTICACHE_REPL_GROUP,
-        CacheNodeType='cache.t3.medium',
+        CacheNodeType='cache.m7g.large',
         ApplyImmediately=True
     )
     # 完了待機（ポーリング）
@@ -1592,12 +1594,13 @@ def update_app_config():
     """SSM Run Command で PHP-FPM / Supervisor 設定を変更"""
     print("App: Updating PHP-FPM and Supervisor config...")
     commands = [
-        # PHP-FPM
-        "sed -i 's/pm.max_children = 30/pm.max_children = 80/' /etc/php-fpm.d/www.conf",
-        "sed -i 's/pm.start_servers = 5/pm.start_servers = 20/' /etc/php-fpm.d/www.conf",
-        "sed -i 's/pm.min_spare_servers = 3/pm.min_spare_servers = 10/' /etc/php-fpm.d/www.conf",
-        "sed -i 's/pm.max_spare_servers = 10/pm.max_spare_servers = 40/' /etc/php-fpm.d/www.conf",
-        "systemctl restart php8.2-fpm",
+        # PHP-FPM（c6i.2xlarge / 8vCPU 実証済み値。max_children=100 は禁忌）
+        "sed -i 's/pm.max_children = 30/pm.max_children = 64/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.start_servers = 5/pm.start_servers = 16/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.min_spare_servers = 3/pm.min_spare_servers = 12/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.max_spare_servers = 10/pm.max_spare_servers = 32/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.max_requests = 500/pm.max_requests = 1000/' /etc/php-fpm.d/www.conf",
+        "systemctl restart php-fpm",
         # Supervisor - countdown を 5 に変更
         "sed -i '/auction-queue-countdown/,/numprocs/{s/numprocs=1/numprocs=5/}' /etc/supervisord.d/auction.ini",
         # Supervisor - default を 2 に変更
@@ -1703,7 +1706,7 @@ def wait_ec2_running(instance_id, timeout=300):
     waiter.wait(InstanceIds=[instance_id], WaiterConfig={'Delay': 15, 'MaxAttempts': timeout // 15})
 
 def scale_down_ec2():
-    """EC2: t3.large → t3.small"""
+    """EC2: c6i.2xlarge → t3.small"""
     print("EC2: Stopping instance...")
     ec2.stop_instances(InstanceIds=[EC2_INSTANCE_ID])
     wait_ec2_stopped(EC2_INSTANCE_ID)
@@ -1720,7 +1723,7 @@ def scale_down_ec2():
     print("EC2: Scale-down complete")
 
 def scale_down_rds():
-    """RDS: db.t3.medium → db.t3.micro + Multi-AZ 無効 + パラメータグループ変更"""
+    """RDS: db.t3.large → db.t3.micro + Multi-AZ 無効 + パラメータグループ変更"""
     print("RDS: Scaling down...")
     rds.modify_db_instance(
         DBInstanceIdentifier=RDS_INSTANCE_ID,
@@ -1737,7 +1740,7 @@ def scale_down_rds():
     print("RDS: Scale-down complete")
 
 def scale_down_elasticache():
-    """ElastiCache: cache.t3.medium → cache.t3.micro"""
+    """ElastiCache: cache.m7g.large → cache.t3.micro"""
     print("ElastiCache: Scaling down...")
     # レプリカがある場合は先に削除
     try:
@@ -1782,12 +1785,13 @@ def update_app_config():
     """SSM Run Command で PHP-FPM / Supervisor を通常モードに戻す"""
     print("App: Reverting PHP-FPM and Supervisor config...")
     commands = [
-        # PHP-FPM
-        "sed -i 's/pm.max_children = 80/pm.max_children = 30/' /etc/php-fpm.d/www.conf",
-        "sed -i 's/pm.start_servers = 20/pm.start_servers = 5/' /etc/php-fpm.d/www.conf",
-        "sed -i 's/pm.min_spare_servers = 10/pm.min_spare_servers = 3/' /etc/php-fpm.d/www.conf",
-        "sed -i 's/pm.max_spare_servers = 40/pm.max_spare_servers = 10/' /etc/php-fpm.d/www.conf",
-        "systemctl restart php8.2-fpm",
+        # PHP-FPM（通常モード t3.small へ戻す）
+        "sed -i 's/pm.max_children = 64/pm.max_children = 30/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.start_servers = 16/pm.start_servers = 5/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.min_spare_servers = 12/pm.min_spare_servers = 3/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.max_spare_servers = 32/pm.max_spare_servers = 10/' /etc/php-fpm.d/www.conf",
+        "sed -i 's/pm.max_requests = 1000/pm.max_requests = 500/' /etc/php-fpm.d/www.conf",
+        "systemctl restart php-fpm",
         # Supervisor
         "sed -i '/auction-queue-countdown/,/numprocs/{s/numprocs=5/numprocs=1/}' /etc/supervisord.d/auction.ini",
         "sed -i '/auction-queue-default/,/numprocs/{s/numprocs=2/numprocs=1/}' /etc/supervisord.d/auction.ini",
@@ -2056,7 +2060,7 @@ STEP 16 の Lambda を管理画面から手動で呼び出せる機能を実装�
 # === AWS インフラスケーリング ===
 AWS_EC2_INSTANCE_ID=i-xxxxxxxxxxxxxxxxx
 AWS_NORMAL_INSTANCE_TYPE=t3.small
-AWS_AUCTION_INSTANCE_TYPE=t3.large
+AWS_AUCTION_INSTANCE_TYPE=c6i.2xlarge
 AWS_LAMBDA_SCALE_UP=auction-scale-up
 AWS_LAMBDA_SCALE_DOWN=auction-scale-down
 ```
@@ -2149,7 +2153,7 @@ Lambda: SNS にメール通知（成功/失敗）
 - CloudWatch Logs で Lambda の実行ログを確認
 
 **モードが `custom` と表示される場合:**
-- EC2 のインスタンスタイプが `t3.small` / `t3.large` 以外になっている
+- EC2 のインスタンスタイプが `t3.small` / `c6i.2xlarge` 以外になっている
 - AWS コンソールで手動変更されたか、.env の `AWS_NORMAL_INSTANCE_TYPE` / `AWS_AUCTION_INSTANCE_TYPE` と実際の値が違う
 
 ---
@@ -2222,16 +2226,18 @@ Lambda: SNS にメール通知（成功/失敗）
 
 | リソース | スペック | 追加コスト (USD) |
 |---------|---------|---------------|
-| EC2 | t3.large (差分) | ~$20 |
-| RDS | db.t3.medium Multi-AZ (差分) | ~$40 |
-| ElastiCache | cache.t3.medium + Replica (差分) | ~$30 |
-| **追加分** | | **~$90 (10日分按分で~$30)** |
+| EC2 | c6i.2xlarge (差分) | ~$95 |
+| RDS | db.t3.large Multi-AZ (差分) | ~$120 |
+| ElastiCache | cache.m7g.large + Replica (差分) | ~$80 |
+| **追加分** | | **~$295（10日稼働の概算・要再見積もり）** |
+
+> ⚠️ 旧構成（t3.large / db.t3.medium / cache.t3.medium）から実証済みの c6i.2xlarge / db.t3.large / cache.m7g.large へ引き上げたため、オークションモードの追加コストは約3倍になっている。値は ap-northeast-1 オンデマンドの概算。
 
 ### 月額合計（2モード運用）
 
 | パターン | 月額 (USD) | 月額 (JPY) |
 |---------|-----------|-----------|
-| **通常 + オークション連動** | **~$97** | **~¥14,500** |
+| **通常 + オークション連動** | **~$360** | **~¥54,000** |
 | 常時500人対応（参考） | ~$376 | ~¥56,400 |
 
 > ドメイン取得費: 年間 $10〜$15 程度（.com の場合）
@@ -2264,3 +2270,4 @@ Lambda: SNS にメール通知（成功/失敗）
 |---|---|---|---|
 | 1.0 | 2026-04-22 | 初版作成 | 株式会社BeerO'Clock 松崎 航平 |
 | 1.1 | 2026-06-10 | システム名称・パラメータグループ表記統一、Supervisor 設定を本番実機値に更新（media ワーカー追加、countdown timeout=18000、現行 numprocs 注記） | 株式会社BeerO'Clock 松崎 航平 |
+| 1.2 | 2026-06-23 | スケールアップ/ダウンを実証済み本番構成に更新。オークションモード EC2 t3.large→c6i.2xlarge / php-fpm 80-20-10-40→64-16-12-32 + max_requests 500→1000（max_children=100 は禁忌）/ RDS db.t3.medium→db.t3.large / ElastiCache cache.t3.medium→cache.m7g.large。FPM サービス名を AL2023 準拠の php-fpm に統一（旧 php8.2-fpm を修正）。コスト概算も更新 | 株式会社BeerO'Clock 松崎 航平 |

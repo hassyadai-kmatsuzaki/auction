@@ -141,7 +141,7 @@ class AwsScalingService
         }
 
         $normalMode = config('aws.normal_instance_type', 't3.small');
-        $auctionMode = config('aws.auction_instance_type', 't3.large');
+        $auctionMode = config('aws.auction_instance_type', 'c6i.2xlarge');
 
         return match ($instanceType) {
             $normalMode  => 'normal',

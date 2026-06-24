@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Internal;
 
+use App\Actions\Item\DeleteMediaAction;
 use App\Actions\Item\UploadMediaAction;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
@@ -20,6 +21,7 @@ class ItemMediaController extends Controller
 
     public function __construct(
         private readonly UploadMediaAction  $uploadMediaAction,
+        private readonly DeleteMediaAction  $deleteMediaAction,
         private readonly StorageService     $storage,
         private readonly IdempotencyService $idempotency,
     ) {}
@@ -45,7 +47,68 @@ class ItemMediaController extends Controller
      */
     public function uploadByExhibitCode(Request $request, int $auctionId, string $exhibitCode): JsonResponse
     {
-        // ① auction の存在と「メディアを受け付けられる状態」を検証（誤った auction_id での誤爆防止）。
+        $resolved = $this->resolveItemByExhibitCode($auctionId, $exhibitCode);
+        if ($resolved instanceof JsonResponse) {
+            return $resolved;
+        }
+
+        return $this->performUpload($resolved, $request);
+    }
+
+    /**
+     * 社内ツール用 メディア全削除（出品ID版）。
+     * AI動画パイプラインの「全削除 → 再作成」のための入口。
+     * exhibit_code（出品コード）と auction_id だけで item を解決するため、items.id 取得（admin GET）が不要。
+     * 認証は uploadByExhibitCode と同一（auth:sanctum + check.role:admin、routes/api.php 側で適用）なので、
+     * 既存の内部メディアPOSTと同じトークンでそのまま叩ける。
+     *
+     * 動作:
+     *   - item に紐づく全 ItemMedia を {@see DeleteMediaAction} で削除（DBレコード + S3実体）。
+     *     S3実体は file_path（本体）/ poster_path（自動生成ポスター）/ original_path（無圧縮オリジナル）の3点。
+     *   - サムネイル指定があれば items.thumbnail_path もクリアされる（DeleteMediaAction 内で処理）。
+     *   - 許可状態は preparing / scheduled のみ（live 以降は 422）。全削除〜再作成の間に一瞬0枚になるが開催前なので問題なし。
+     *   - メディアが0件でも 200（冪等。再実行・空itemへの呼び出しを安全にする）。
+     *
+     * 認証: auth:sanctum + check.role:admin（routes/api.php 側で適用）。
+     */
+    public function deleteAllByExhibitCode(int $auctionId, string $exhibitCode): JsonResponse
+    {
+        $resolved = $this->resolveItemByExhibitCode($auctionId, $exhibitCode);
+        if ($resolved instanceof JsonResponse) {
+            return $resolved;
+        }
+
+        $item  = $resolved;
+        $media = $item->media()->get();
+
+        $deleted = 0;
+        foreach ($media as $m) {
+            // 1メディア = 1 DeleteMediaAction。S3本体・ポスター・オリジナルとDBレコードをまとめて消す。
+            $this->deleteMediaAction->execute($item, $m);
+            $deleted++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "メディアを {$deleted} 件削除しました。",
+            'data'    => [
+                'auction_id'    => $auctionId,
+                'exhibit_code'  => $exhibitCode,
+                'item_id'       => $item->id,
+                'deleted_count' => $deleted,
+            ],
+        ]);
+    }
+
+    /**
+     * (auction_id, exhibit_code) から Item を一意解決する。
+     * upload / delete の両系で同一の検証（auction存在・開催前状態・item一意性）を共有するためのヘルパ。
+     *
+     * @return Item|JsonResponse 解決できれば Item、できなければエラーレスポンス（呼び出し側でそのまま return）。
+     */
+    private function resolveItemByExhibitCode(int $auctionId, string $exhibitCode): Item|JsonResponse
+    {
+        // ① auction の存在と「メディアを操作できる状態」を検証（誤った auction_id での誤爆防止）。
         //    exhibit_code は非ユニーク（オークション毎に再利用）なので auction_id がスコープキー。
         //    撮影〜編集〜登録は開催前に行われるため、許可は preparing / scheduled のみ（live 以降は不可）。
         $auction = Auction::find($auctionId);
@@ -59,7 +122,7 @@ class ItemMediaController extends Controller
         if (! in_array($auction->status, ['preparing', 'scheduled'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'このオークションは現在メディアを受け付けられる状態（開催前）ではありません。',
+                'message' => 'このオークションは現在メディアを操作できる状態（開催前）ではありません。',
             ], 422);
         }
 
@@ -83,7 +146,7 @@ class ItemMediaController extends Controller
             ], 409);
         }
 
-        return $this->performUpload($matches->first(), $request);
+        return $matches->first();
     }
 
     /**

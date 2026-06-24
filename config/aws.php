@@ -8,7 +8,7 @@ return [
 
     // インスタンスタイプ定義（モード判定に使用）
     'normal_instance_type'  => env('AWS_NORMAL_INSTANCE_TYPE', 't3.small'),
-    'auction_instance_type' => env('AWS_AUCTION_INSTANCE_TYPE', 't3.large'),
+    'auction_instance_type' => env('AWS_AUCTION_INSTANCE_TYPE', 'c6i.2xlarge'),
 
     // Lambda関数名（スケーリング実行用）
     'lambda_scale_up'   => env('AWS_LAMBDA_SCALE_UP'),

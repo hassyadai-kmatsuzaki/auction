@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
 use App\Models\Item;
+use App\Models\SpeciesThumbnailView;
 use App\Models\WonItem;
 use App\Models\User;
 use Carbon\Carbon;
@@ -52,6 +53,12 @@ class DashboardController extends Controller
                 'total' => User::count(),
                 'pending_approval' => User::where('status', 'pending')->count(),
                 'active' => User::where('status', 'approved')->count(),
+            ],
+            // 撮影ビュー未設定の生体名（サムネが上見デフォルトのまま放置される地雷の検知用）
+            'thumbnail_views' => [
+                'unregistered' => SpeciesThumbnailView::unregisteredItemsQuery()
+                    ->distinct()
+                    ->count('species_name'),
             ],
         ];
 

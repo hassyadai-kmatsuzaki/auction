@@ -51,12 +51,15 @@ import {
   Event as EventIcon,
   ViewKanban as LaneIcon,
   AccessTime as TimeIcon,
+  Favorite as FavoriteIcon,
+  PriceCheck as PriceCheckIcon,
 } from '@mui/icons-material';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ja } from 'date-fns/locale';
 import axios from '../../lib/axios';
 import { useUserPreference } from '../../hooks/useUserPreference';
+import { adminCsvExportApi } from '../../api/admin/csvExportApi';
 
 type ViewMode = 'card' | 'list';
 
@@ -258,6 +261,34 @@ export default function AuctionManagement() {
       navigate(`/admin/auctions/${selectedAuction.id}/won-items`);
     }
     handleMenuClose();
+  };
+
+  /** お気に入り登録一覧CSVをダウンロード（開催前の事前確認用） */
+  const handleExportFavorites = async () => {
+    if (!selectedAuction) return;
+    const id = selectedAuction.id;
+    handleMenuClose();
+    try {
+      setError(null);
+      await adminCsvExportApi.favorites(id);
+    } catch (err: any) {
+      console.error('お気に入りCSV出力エラー:', err);
+      setError(err.response?.data?.message || 'お気に入りCSVの出力に失敗しました。');
+    }
+  };
+
+  /** 指値設定一覧CSVをダウンロード（開催前の事前確認用） */
+  const handleExportBidLimits = async () => {
+    if (!selectedAuction) return;
+    const id = selectedAuction.id;
+    handleMenuClose();
+    try {
+      setError(null);
+      await adminCsvExportApi.bidLimits(id);
+    } catch (err: any) {
+      console.error('指値CSV出力エラー:', err);
+      setError(err.response?.data?.message || '指値CSVの出力に失敗しました。');
+    }
   };
 
   /**
@@ -635,7 +666,17 @@ export default function AuctionManagement() {
             <PetsIcon sx={{ mr: 1, fontSize: 20 }} />
             生体管理
           </MenuItem>
-          
+
+          <MenuItem onClick={handleExportFavorites}>
+            <FavoriteIcon sx={{ mr: 1, fontSize: 20 }} />
+            お気に入りCSV出力
+          </MenuItem>
+
+          <MenuItem onClick={handleExportBidLimits}>
+            <PriceCheckIcon sx={{ mr: 1, fontSize: 20 }} />
+            指値CSV出力
+          </MenuItem>
+
           {selectedAuction?.status === 'live' && (
             <MenuItem onClick={handleLiveControl}>
               <GavelIcon sx={{ mr: 1, fontSize: 20 }} />

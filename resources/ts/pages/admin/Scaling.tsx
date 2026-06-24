@@ -195,7 +195,7 @@ export default function Scaling() {
                     <Typography variant="subtitle1" fontWeight={600}>スケールアップ</Typography>
                   </Stack>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    通常モード (t3.small) → オークションモード (t3.large) に切り替えます。
+                    通常モード (t3.small) → オークションモード (c6i.2xlarge) に切り替えます。
                     所要時間: 10〜20分、EC2 再起動あり。
                   </Typography>
                 </Box>
@@ -220,7 +220,7 @@ export default function Scaling() {
                     <Typography variant="subtitle1" fontWeight={600}>スケールダウン</Typography>
                   </Stack>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    オークションモード (t3.large) → 通常モード (t3.small) に戻します。
+                    オークションモード (c6i.2xlarge) → 通常モード (t3.small) に戻します。
                     所要時間: 10〜20分、EC2 再起動あり。
                   </Typography>
                 </Box>

@@ -62,6 +62,7 @@ const UserDetail             = lazy(() => import('./pages/admin/UserDetail'));
 const UserCreate             = lazy(() => import('./pages/admin/UserCreate'));
 const Settings               = lazy(() => import('./pages/admin/Settings'));
 const SpeciesTypeManagement  = lazy(() => import('./pages/admin/SpeciesTypeManagement'));
+const SpeciesNameManagement  = lazy(() => import('./pages/admin/SpeciesNameManagement'));
 const LpCvrSettings          = lazy(() => import('./pages/admin/LpCvrSettings'));
 const Scaling                = lazy(() => import('./pages/admin/Scaling'));
 const SellerManagement       = lazy(() => import('./pages/admin/SellerManagement'));
@@ -260,6 +261,7 @@ function App() {
             {/* 設定 */}
             <Route path="settings" element={<Settings />} />
             <Route path="masters/species-types" element={<SpeciesTypeManagement />} />
+            <Route path="masters/species-names" element={<SpeciesNameManagement />} />
             <Route path="lp-cvr" element={<LpCvrSettings />} />
 
             {/* インフラスケーリング */}

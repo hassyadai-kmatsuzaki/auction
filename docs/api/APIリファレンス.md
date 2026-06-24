@@ -7,7 +7,7 @@
 **版数**: 3.0  
 **最終更新**: 2026年6月10日（routes/api.php・web.php の全ルートと突合）
 
-**Base URL（本番）**: `https://medaka-auction.jp/api`  
+**Base URL（本番）**: `https://medaka-ichiba.com/api`  
 **Base URL（ステージング）**: `https://medaka-auction.com/api`  
 **認証方式**: Bearer Token (Laravel Sanctum)  
 **Content-Type**: `application/json`  
