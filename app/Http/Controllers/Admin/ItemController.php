@@ -535,12 +535,19 @@ class ItemController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        return $this->uploadMediaAction->execute(
+        $response = $this->uploadMediaAction->execute(
             $item,
             $request->file('file'),
             $request->input('media_type'),
             $request->boolean('is_thumbnail', false)
         )->toResponse(201);
+
+        // 人が明示的にサムネ指定した画像は「手動」として、品種ビューの自動サムネ適用の対象外にする。
+        if ($request->boolean('is_thumbnail', false) && $request->input('media_type') === 'image') {
+            $item->forceFill(['thumbnail_is_manual' => true])->save();
+        }
+
+        return $response;
     }
 
     /** メディアを削除 */
@@ -622,8 +629,10 @@ class ItemController extends Controller
         $media->is_thumbnail = true;
         $media->save();
 
-        // アイテムのサムネイルパスを更新
-        $item->thumbnail_path = $this->getFileUrl($media->file_path);
+        // アイテムのサムネイルパスを更新。人が選んだので「手動」フラグを立て、
+        // 品種ビューによる自動サムネ適用の上書き対象から外す。
+        $item->thumbnail_path      = $this->getFileUrl($media->file_path);
+        $item->thumbnail_is_manual = true;
         $item->save();
 
         return response()->json([

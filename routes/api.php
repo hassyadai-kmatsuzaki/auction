@@ -323,6 +323,8 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::get('/unregistered', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'unregistered']);
         Route::patch('/{id}', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'update'])->whereNumber('id');
         Route::delete('/{id}', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'destroy'])->whereNumber('id');
+        // 既存出品へ撮影ビューを手動で遡及再適用（写真を後から追加した時など）。
+        Route::post('/{id}/reapply', [\App\Http\Controllers\Admin\SpeciesThumbnailViewController::class, 'reapply'])->whereNumber('id');
     });
 
     // 出品者精算管理

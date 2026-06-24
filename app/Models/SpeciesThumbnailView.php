@@ -23,15 +23,19 @@ class SpeciesThumbnailView extends BaseModel
      * = items に出現する species_name のうち、この表に未登録のもの。
      * 収集テーブルを持たず実データから導出するため、初回分・後追い分とも取りこぼさない。
      *
+     * 突合は前後スペースを TRIM して行う（登録側も保存時に trim 済み）。
+     * これにより「白ブチ 」と「白ブチ」が別物として未設定に湧くのを防ぐ。
+     * ※ ひらがな/カタカナ・漢字の正規化は意図的に行わない（別品種の誤統合を避けるため運用で個別登録）。
+     *
      * 一覧（件数集計つき）とダッシュボードのカウントで共有する。
      */
     public static function unregisteredItemsQuery(): Builder
     {
+        $table = (new self)->getTable();
+
         return Item::query()
             ->whereNotNull('species_name')
-            ->where('species_name', '!=', '')
-            ->whereNotIn('species_name', function ($q) {
-                $q->select('species_name')->from((new self)->getTable());
-            });
+            ->whereRaw('TRIM(species_name) <> ?', [''])
+            ->whereRaw("TRIM(species_name) NOT IN (SELECT species_name FROM {$table})");
     }
 }

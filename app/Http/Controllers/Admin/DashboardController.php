@@ -55,10 +55,11 @@ class DashboardController extends Controller
                 'active' => User::where('status', 'approved')->count(),
             ],
             // 撮影ビュー未設定の生体名（サムネが上見デフォルトのまま放置される地雷の検知用）
+            // TRIM 後の distinct で数える（一覧の集計と件数を一致させる）
             'thumbnail_views' => [
                 'unregistered' => SpeciesThumbnailView::unregisteredItemsQuery()
                     ->distinct()
-                    ->count('species_name'),
+                    ->count(DB::raw('TRIM(species_name)')),
             ],
         ];
 

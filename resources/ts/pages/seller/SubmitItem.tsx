@@ -79,6 +79,15 @@ const clampQty = (str: string): number => {
   return Math.min(QTY_MAX, Math.max(QTY_MIN, n));
 };
 
+// 品種名サジェストの照合用キー。
+// NFKC で半角カナ→全角カナ・全角英数→半角英数を揃え、ひらがな→カタカナに寄せ、英字は小文字化する。
+// これで「さふぁいや」と打っても「サファイヤ」がヒットする（ひらがな⇄カタカナ非区別）。
+const kanaNormalize = (s: string): string =>
+  s
+    .normalize('NFKC')
+    .replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
+    .toLowerCase();
+
 interface AvailableAuction {
   id: number;
   title: string;
@@ -542,6 +551,11 @@ export default function SubmitItem() {
                           fullWidth
                           size="small"
                           options={speciesNameOptions}
+                          filterOptions={(options, { inputValue }) => {
+                            const q = kanaNormalize(inputValue.trim());
+                            if (!q) return options;
+                            return options.filter((o) => kanaNormalize(o).includes(q));
+                          }}
                           inputValue={item.species_name}
                           onInputChange={(_, value) => updateItem(index, 'species_name', value)}
                           renderInput={(params) => (

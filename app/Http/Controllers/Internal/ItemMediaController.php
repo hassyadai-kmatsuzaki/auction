@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Internal;
 
+use App\Actions\Item\ApplyThumbnailByViewAction;
 use App\Actions\Item\DeleteMediaAction;
 use App\Actions\Item\UploadMediaAction;
 use App\Http\Controllers\Controller;
@@ -20,10 +21,11 @@ class ItemMediaController extends Controller
     private const IDEMPOTENCY_SCOPE = 'internal-upload';
 
     public function __construct(
-        private readonly UploadMediaAction  $uploadMediaAction,
-        private readonly DeleteMediaAction  $deleteMediaAction,
-        private readonly StorageService     $storage,
-        private readonly IdempotencyService $idempotency,
+        private readonly UploadMediaAction          $uploadMediaAction,
+        private readonly DeleteMediaAction          $deleteMediaAction,
+        private readonly ApplyThumbnailByViewAction $applyThumbnailByView,
+        private readonly StorageService             $storage,
+        private readonly IdempotencyService         $idempotency,
     ) {}
 
     /**
@@ -166,6 +168,8 @@ class ItemMediaController extends Controller
             ],
             'media_type'   => 'required|in:image,video',
             'is_thumbnail' => 'nullable|boolean',
+            // 撮影向き。パイプラインが各写真の上見/横見を送る（サムネ判定はサーバが品種ビューで行う）。
+            'view'         => 'nullable|in:top,side',
         ], [
             'file.required'       => 'ファイルを選択してください。',
             'file.file'           => 'ファイルが正しくアップロードされていません。',
@@ -173,6 +177,7 @@ class ItemMediaController extends Controller
             'file.max'            => 'ファイルサイズは 100MB 以下にしてください。',
             'media_type.required' => 'メディア種別を指定してください。',
             'media_type.in'       => 'メディア種別が不正です。',
+            'view.in'             => '撮影向き(view)は top または side のいずれかです。',
         ]);
 
         if ($validator->fails()) {
@@ -181,6 +186,7 @@ class ItemMediaController extends Controller
 
         $mediaType    = $request->input('media_type');
         $isThumbnail  = $request->boolean('is_thumbnail', false);
+        $view         = $request->input('view');
         $idempotencyKey = $this->extractIdempotencyKey($request);
 
         if ($idempotencyKey !== null) {
@@ -189,6 +195,7 @@ class ItemMediaController extends Controller
                 $mediaType,
                 $isThumbnail,
                 $request->file('file'),
+                $view,
             );
 
             $claim = $this->idempotency->claim(self::IDEMPOTENCY_SCOPE, $idempotencyKey, $requestHash);
@@ -214,7 +221,7 @@ class ItemMediaController extends Controller
         }
 
         try {
-            $response = $this->runUpload($item, $request->file('file'), $mediaType, $isThumbnail);
+            $response = $this->runUpload($item, $request->file('file'), $mediaType, $isThumbnail, $view);
         } catch (\Throwable $e) {
             if ($idempotencyKey !== null) {
                 $this->idempotency->release(self::IDEMPOTENCY_SCOPE, $idempotencyKey);
@@ -238,25 +245,48 @@ class ItemMediaController extends Controller
         return $response;
     }
 
-    private function runUpload(Item $item, \Illuminate\Http\UploadedFile $file, string $mediaType, bool $isThumbnail): JsonResponse
+    private function runUpload(Item $item, \Illuminate\Http\UploadedFile $file, string $mediaType, bool $isThumbnail, ?string $view = null): JsonResponse
     {
-        $result = $this->uploadMediaAction->execute($item, $file, $mediaType, $isThumbnail);
+        $result = $this->uploadMediaAction->execute($item, $file, $mediaType, $isThumbnail, $view);
         $response = $result->toResponse(201);
 
         if (!$result->success) {
             return $response;
         }
 
+        // サムネはパイプラインではなくサーバが品種ビューで決定する。
+        // 写真追加のたびに冪等に再評価し、向きが一致する写真へ is_thumbnail を付け替える。
+        $applied = ['changed' => false, 'reason' => 'skipped', 'view' => '', 'media_id' => null];
+        if ($mediaType === 'image') {
+            $applied = $this->applyThumbnailByView->execute($item->fresh());
+        }
+
         $payload = $response->getData(true);
         $mediaPayload = $payload['data']['media'] ?? null;
+
+        // 自動サムネ適用後の最新 is_thumbnail をレスポンスに反映する。
+        $uploadedMediaId = $payload['data']['media_id'] ?? ($mediaPayload['id'] ?? null);
+        if ($mediaPayload && $uploadedMediaId) {
+            $fresh = ItemMedia::find($uploadedMediaId);
+            if ($fresh) {
+                $payload['data']['media']['is_thumbnail'] = (bool) $fresh->is_thumbnail;
+            }
+        }
+        $payload['data']['thumbnail'] = [
+            'auto_applied'  => $applied['changed'],
+            'reason'        => $applied['reason'],
+            'view'          => $applied['view'],
+            'thumbnail_media_id' => $applied['media_id'],
+        ];
 
         if ($mediaType === 'video' && $mediaPayload) {
             $payload['data']['processing'] = [
                 'poster_generated'   => !empty($mediaPayload['poster_path']),
                 'compression_status' => 'queued',
             ];
-            $response->setData($payload);
         }
+
+        $response->setData($payload);
 
         return $response;
     }
@@ -274,13 +304,14 @@ class ItemMediaController extends Controller
         return $key;
     }
 
-    private function buildRequestHash(int $itemId, string $mediaType, bool $isThumbnail, ?\Illuminate\Http\UploadedFile $file): string
+    private function buildRequestHash(int $itemId, string $mediaType, bool $isThumbnail, ?\Illuminate\Http\UploadedFile $file, ?string $view = null): string
     {
         $fileHash = $file ? hash_file('sha256', $file->getRealPath()) : '';
         return hash('sha256', implode('|', [
             $itemId,
             $mediaType,
             $isThumbnail ? '1' : '0',
+            $view ?? '',
             $fileHash,
         ]));
     }

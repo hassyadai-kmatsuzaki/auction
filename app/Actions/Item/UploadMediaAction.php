@@ -23,6 +23,7 @@ class UploadMediaAction
         UploadedFile $file,
         string       $mediaType,
         bool         $isThumbnail = false,
+        ?string      $view = null,
     ): AuctionResultDto {
         // 動画はサムネイルにしない
         if ($mediaType !== 'image') {
@@ -59,7 +60,11 @@ class UploadMediaAction
             $item->update(['thumbnail_path' => $this->storage->url($path)]);
         }
 
-        $dbMediaType   = $mediaType === 'image' ? 'photo_other' : 'video_top';
+        // 撮影向き(view)が来ていれば media_type に反映する。
+        // 画像: top→photo_top / side→photo_side / 無→photo_other（従来どおり）
+        // 動画: top→video_top / side→video_side / 無→video_top（従来どおり）
+        // この向きラベルを元に ApplyThumbnailByViewAction が品種ビューに一致する写真をサムネにする。
+        $dbMediaType   = $this->resolveDbMediaType($mediaType, $view);
         $displayOrder  = ItemMedia::where('item_id', $item->id)->max('display_order') ?? 0;
 
         // 動画の場合はポスター画像を同期生成（一覧・サムネで即使うため）
@@ -86,6 +91,7 @@ class UploadMediaAction
         // 圧縮を復活させる場合はここで ProcessItemVideoJob::dispatch($media->id) を呼ぶ。
 
         return AuctionResultDto::success('ファイルをアップロードしました。', [
+            'media_id' => $media->id,
             'media' => [
                 'id'            => $media->id,
                 'media_type'    => $media->media_type,
@@ -98,5 +104,27 @@ class UploadMediaAction
                 'display_order' => $media->display_order,
             ],
         ]);
+    }
+
+    /**
+     * media_type('image'/'video') と撮影向き(view: top/side/null) から
+     * item_media.media_type の enum 値を決める。
+     */
+    private function resolveDbMediaType(string $mediaType, ?string $view): string
+    {
+        $view = in_array($view, ['top', 'side'], true) ? $view : null;
+
+        if ($mediaType === 'image') {
+            return match ($view) {
+                'top'   => 'photo_top',
+                'side'  => 'photo_side',
+                default => 'photo_other',
+            };
+        }
+
+        return match ($view) {
+            'side'  => 'video_side',
+            default => 'video_top',
+        };
     }
 }

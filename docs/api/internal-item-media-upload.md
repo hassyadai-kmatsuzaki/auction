@@ -45,7 +45,8 @@ Authorization: Bearer <sanctum-token>
 |---|---|---|---|
 | `file` | 必須 | File | 拡張子: jpg / jpeg / png / gif / webp / mp4 / mov / webm。最大 100 MB |
 | `media_type` | 必須 | string | `image` または `video` |
-| `is_thumbnail` | 任意 | boolean | `true` の場合、当該 item の他メディアの `is_thumbnail` を false に揃え、サムネイルとして設定する。`media_type=video` の場合は無視される |
+| `view` | 任意 | string | 撮影向き `top`（上見）/ `side`（横見）。画像は `photo_top` / `photo_side`、動画は `video_top` / `video_side` として保存。**サムネはこの向きと生体名の撮影ビュー設定からサーバが自動決定する**（下記「撮影ビューによる自動サムネ」参照）。未指定なら画像は `photo_other` |
+| `is_thumbnail` | 任意 | boolean | 旧来の手動指定。Stage 2 では `view` ＋撮影ビュー設定によるサーバ自動サムネが優先されるため、内部APIでは指定不要（送っても自動再評価で上書きされる）。`media_type=video` の場合は無視される |
 
 #### レスポンス
 
@@ -156,6 +157,21 @@ AI 動画自動編集パイプライン用の入口です。`items.id` を扱わ
 > `{lane_name}-{sprintf('%03d', sequence_order)}`（例 `A-001`）で行う。QRカードと**完全一致**するよう
 > ハイフン入りに揃えてある。`exhibit_code` のオークション内一意性は `lane_name`（A/B）＋ `sequence_order`
 > の組み合わせで担保される（DB の UNIQUE 制約ではなく発番ロジックによる）。
+
+---
+
+### 撮影ビューによる自動サムネ（Stage 2）
+
+パイプラインは各写真の向き（`view=top|side`）を送るだけで、**どの写真をサムネにするかはサーバが決定的に決める**。
+
+- サーバは生体名（`items.species_name`、前後trim）の撮影ビュー設定（`/api/admin/masters/thumbnail-views`）を引き、
+  一致する向きの写真（top→`photo_top` / side→`photo_side`）へ `is_thumbnail` を付ける。
+- **未登録の生体名は上見(top)デフォルト**。一致する向きの写真がまだ無ければ、サムネ未設定時のみ暫定で先頭写真を立て、
+  後から正しい向きが届いた時点で自動で切り替わる（写真追加のたびに冪等に再評価）。
+- 管理画面で人が選んだサムネ（`items.thumbnail_is_manual=true`）は自動適用の対象外（上書きしない）。
+- レスポンス `data.thumbnail` に適用結果（`auto_applied` / `reason` / `view` / `thumbnail_media_id`）を返す。
+- 撮影ビューを後から登録/更新すると、開催前（preparing/scheduled）かつ非手動の既存出品へ**遡及で再適用**される
+  （`ReapplyThumbnailViewJob`。手動で `/api/admin/masters/thumbnail-views/{id}/reapply` も可）。
 
 ---
 

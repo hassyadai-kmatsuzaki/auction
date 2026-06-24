@@ -15,9 +15,10 @@ class DeleteMediaAction
 
     public function execute(Item $item, ItemMedia $media): AuctionResultDto
     {
-        // サムネイルだった場合はアイテムのサムネイルパスもクリア
+        // サムネイルだった場合はアイテムのサムネイルパスをクリア。
+        // 手動指定だった写真が消えたら手動フラグも解除し、再び自動サムネ適用の対象に戻す。
         if ($media->is_thumbnail) {
-            $item->update(['thumbnail_path' => null]);
+            $item->update(['thumbnail_path' => null, 'thumbnail_is_manual' => false]);
         }
 
         // ストレージからファイル削除（本体・ポスター・オリジナルすべて）
