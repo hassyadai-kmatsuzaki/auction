@@ -34,7 +34,7 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
-  Autocomplete,
+  InputAdornment,
   Slider,
 } from '@mui/material';
 import {
@@ -51,6 +51,7 @@ import {
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { sellerSpeciesNameApi } from '../../api/seller/speciesNameApi';
+import SpeciesNamePickerDialog from './SpeciesNamePickerDialog';
 
 const steps = ['出品情報', '確認'];
 
@@ -165,6 +166,8 @@ export default function SubmitItem() {
   const [completedItems, setCompletedItems] = useState<{ id: number; species_name: string; item_number?: string }[]>([]);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // 品種名入力モーダルの開閉対象（どの生体行を編集中か）
+  const [speciesPicker, setSpeciesPicker] = useState<{ open: boolean; index: number | null }>({ open: false, index: null });
 
   const copyToClipboard = async (text: string, key: string) => {
     try {
@@ -547,27 +550,25 @@ export default function SubmitItem() {
                       </Grid>
 
                       <Grid item xs={12} md={8}>
-                        <Autocomplete
-                          freeSolo
+                        <TextField
                           fullWidth
                           size="small"
-                          options={speciesNameOptions}
-                          filterOptions={(options, { inputValue }) => {
-                            const q = kanaNormalize(inputValue.trim());
-                            if (!q) return options;
-                            return options.filter((o) => kanaNormalize(o).includes(q));
+                          required
+                          label="品種名"
+                          placeholder="タップして品種名を入力"
+                          value={item.species_name}
+                          onClick={() => setSpeciesPicker({ open: true, index })}
+                          // 直接編集は不可。タップでモーダルを開き、確定後はフォーム上で候補が出ない。
+                          inputProps={{ readOnly: true }}
+                          InputProps={{
+                            sx: { cursor: 'pointer' },
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <EditIcon fontSize="small" color="action" />
+                              </InputAdornment>
+                            ),
                           }}
-                          inputValue={item.species_name}
-                          onInputChange={(_, value) => updateItem(index, 'species_name', value)}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              required
-                              label="品種名"
-                              placeholder="例: 紅白ラメ、幹之フルボディ"
-                              helperText="入力すると候補が表示されます。候補を選んでも、自由に編集してもOKです。"
-                            />
-                          )}
+                          helperText="タップすると入力画面が開きます"
                         />
                       </Grid>
 
@@ -984,6 +985,19 @@ export default function SubmitItem() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 品種名（生体名）入力モーダル */}
+      <SpeciesNamePickerDialog
+        open={speciesPicker.open}
+        initialValue={speciesPicker.index !== null ? items[speciesPicker.index]?.species_name ?? '' : ''}
+        options={speciesNameOptions}
+        normalize={kanaNormalize}
+        onClose={() => setSpeciesPicker({ open: false, index: null })}
+        onConfirm={(value) => {
+          if (speciesPicker.index !== null) updateItem(speciesPicker.index, 'species_name', value);
+          setSpeciesPicker({ open: false, index: null });
+        }}
+      />
 
       {/* スナックバー */}
       <Snackbar
