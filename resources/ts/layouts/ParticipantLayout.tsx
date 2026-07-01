@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import SubscriptionGate from '../components/SubscriptionGate';
 import ShippingAddressGate from '../components/ShippingAddressGate';
+import LineLinkGate from '../components/LineLinkGate';
 import {
   AppBar,
   Box,
@@ -344,7 +345,9 @@ export default function ParticipantLayout() {
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
         <SubscriptionGate>
           <ShippingAddressGate>
-            <Outlet />
+            <LineLinkGate>
+              <Outlet />
+            </LineLinkGate>
           </ShippingAddressGate>
         </SubscriptionGate>
       </Box>

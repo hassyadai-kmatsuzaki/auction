@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBlockingGate } from '../contexts/BlockingGateContext';
 import ShippingAddressRegisterModal from './ShippingAddressRegisterModal';
 
 interface Props {
@@ -14,6 +15,7 @@ const isMissing = (v?: string | null) => !v || !v.trim();
  */
 export default function ShippingAddressGate({ children }: Props) {
   const { user, hasRole, refreshUser } = useAuth();
+  const { setBlocking } = useBlockingGate();
   const [open, setOpen] = useState(false);
 
   const requiresRegistration = useMemo(() => {
@@ -32,6 +34,12 @@ export default function ShippingAddressGate({ children }: Props) {
   useEffect(() => {
     setOpen(requiresRegistration);
   }, [requiresRegistration]);
+
+  // 配送先住所モーダル（閉じられない必須ゲート）の表示状態を共有する。
+  useEffect(() => {
+    setBlocking('shipping', open);
+    return () => setBlocking('shipping', false);
+  }, [open, setBlocking]);
 
   return (
     <>

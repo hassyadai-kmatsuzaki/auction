@@ -4,6 +4,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Box,
   TextField,
   Button,
   List,
@@ -70,9 +71,14 @@ const SpeciesNamePickerDialog: React.FC<Props> = ({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
-        品種名を入力
-        <IconButton onClick={onClose} size="small" aria-label="閉じる">
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, pr: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 1, rowGap: 0.25 }}>
+          <span>品種名を入力</span>
+          <Typography component="span" variant="caption" color="text.secondary" sx={{ fontWeight: 400 }}>
+            検索後、編集・追記が可能です。
+          </Typography>
+        </Box>
+        <IconButton onClick={onClose} size="small" aria-label="閉じる" sx={{ flexShrink: 0 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>

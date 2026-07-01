@@ -3,6 +3,7 @@ import axios from '../lib/axios';
 import SubscriptionRegisterModal from './SubscriptionRegisterModal';
 import BankTransferInfoModal from './BankTransferInfoModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useBlockingGate } from '../contexts/BlockingGateContext';
 import { Backdrop, CircularProgress } from '@mui/material';
 
 /**
@@ -40,11 +41,18 @@ const markBankInfoShownToday = (userId: number | string): void => {
 
 export default function SubscriptionGate({ children }: Props) {
   const { user, hasRole } = useAuth();
+  const { setBlocking } = useBlockingGate();
   const [checking, setChecking] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [bankInfoOpen, setBankInfoOpen] = useState(false);
 
   const isAdmin = hasRole('admin');
+
+  // サブスク登録モーダル（閉じられない必須ゲート）の表示状態を共有する。
+  useEffect(() => {
+    setBlocking('subscription', modalOpen);
+    return () => setBlocking('subscription', false);
+  }, [modalOpen, setBlocking]);
 
   const check = async () => {
     if (!user || isAdmin) { setChecking(false); return; }

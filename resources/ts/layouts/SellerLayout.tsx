@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import SubscriptionGate from '../components/SubscriptionGate';
+import LineLinkGate from '../components/LineLinkGate';
 import {
   Box,
   Typography,
@@ -441,7 +442,9 @@ export default function SellerLayout() {
         {/* コンテンツエリア */}
         <Box sx={{ flex: 1, p: 3 }}>
           <SubscriptionGate>
-            <Outlet />
+            <LineLinkGate>
+              <Outlet />
+            </LineLinkGate>
           </SubscriptionGate>
         </Box>
 

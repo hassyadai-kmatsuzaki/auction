@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
+import { BlockingGateProvider } from './contexts/BlockingGateContext';
 import PrivateRoute from './components/PrivateRoute';
 import GuestRoute from './components/GuestRoute';
 import RootRedirect from './components/RootRedirect';
@@ -111,6 +112,7 @@ const PageLoader = () => (
 function App() {
   return (
     <AuthProvider>
+      <BlockingGateProvider>
       <Router>
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
           <Suspense fallback={<PageLoader />}>
@@ -280,6 +282,7 @@ function App() {
           </Suspense>
       </Box>
     </Router>
+      </BlockingGateProvider>
     </AuthProvider>
   );
 }
