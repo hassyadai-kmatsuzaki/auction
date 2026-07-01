@@ -373,9 +373,45 @@ class CountdownService
             }
         }
 
+        // ── 通常 bidding tick の書き戻し前ガード（DEV-2026-008 / 2026-06-19 item 1875・1843・1936）──
+        //   $state は tick 冒頭（この関数先頭）でロックなしに read した値。ここへ来るまでの間に、
+        //   並行入札（JoinBidAction が bid_inflight 下で handleImmediatePriceIncrement → startFreezeCountdown）
+        //   が freeze を書いていた場合、古い bidding state をそのまま Cache::put すると freeze を上書き破壊し、
+        //   freeze→bidding の新ラウンド（10秒）を飛ばして即落札する事故になる。
+        //   書き戻し直前に最新 state を読み直し、phase が bidding でなくなっていれば上書きを見送る。
+        //   ※これは最小ガード（B案）。get→put 間のマイクロ秒 TOCTOU は残る。完全直列化は
+        //     bidding ブランチ全体の bid_inflight 化（DEV-2026-008 §3 / A案）で別途対応する。
+        if ($this->shouldSkipBiddingWriteback($laneId, $item->id)) {
+            return ['action' => 'tick_yield_state_changed', 'lane_id' => $laneId];
+        }
+
         Cache::put($this->getCacheKey($laneId), $state, self::CACHE_TTL);
 
         return ['action' => 'tick', 'remaining_seconds' => $state['remaining_seconds']];
+    }
+
+    /**
+     * 通常 bidding tick の書き戻しをスキップすべきか（DEV-2026-008 / 最小ガードB）。
+     *
+     * tick 冒頭でロックなしに read した bidding state を Cache::put する直前に呼ぶ。
+     * 並行入札が bid_inflight 下で freeze / 世代交代を書いていた場合、古い bidding state で
+     * 上書きすると freeze が消え、新ラウンドを飛ばして即落札する事故（item 1875 等）になるため、
+     * 最新 state を読み直して「bidding 以外」なら true（上書き見送り）を返す。
+     *
+     * ※ get→put 間のマイクロ秒 TOCTOU は残る最小ガード。完全な直列化は tick bidding ブランチ
+     *    全体の bid_inflight 化（DEV-2026-008 §3 / A案）で別途対応する。
+     */
+    protected function shouldSkipBiddingWriteback(int $laneId, int $itemId): bool
+    {
+        $latest = Cache::get($this->getCacheKey($laneId));
+        if ($latest === null) {
+            // キャッシュ未存在（stopCountdown 等）は従来どおり書き戻す（挙動を変えない）。
+            return false;
+        }
+
+        return ($latest['phase'] ?? 'bidding') !== 'bidding'
+            || ($latest['item_id'] ?? null) !== $itemId
+            || empty($latest['is_running']);
     }
 
     /**

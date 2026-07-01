@@ -553,4 +553,42 @@ class CountdownServiceTest extends TestCase
         // status='sold' なので状態に変更がない
         $this->assertSame('sold', $lane->currentItem->fresh()->status);
     }
+
+    /**
+     * DEV-2026-008 回帰テスト（2026-06-19 item 1875 / 1843 / 1936 の即落札事故）。
+     *
+     * 通常 bidding tick の書き戻し直前ガード `shouldSkipBiddingWriteback` が、
+     * 並行入札由来の freeze / 世代交代 / 一時停止を検知して「上書き見送り」を返すことを検証する。
+     * これが false を返して古い bidding state を書き戻すと、freeze を潰して新ラウンドを飛ばし即落札する。
+     */
+    public function test_shouldSkipBiddingWriteback_は_freeze等の割り込みを検知して上書きを見送る(): void
+    {
+        $lane = $this->makeLiveLane();
+        $item = $lane->currentItem;
+        $svc  = app(CountdownService::class);
+        $key  = "countdown:lane:{$lane->id}";
+
+        $method = new \ReflectionMethod($svc, 'shouldSkipBiddingWriteback');
+        $method->setAccessible(true);
+
+        // 1) 並行入札が freeze を書いた → 上書き見送り(true)。これが本事故の核心。
+        Cache::put($key, ['phase' => 'freeze', 'item_id' => $item->id, 'is_running' => true, 'remaining_seconds' => 2], 3600);
+        $this->assertTrue($method->invoke($svc, $lane->id, $item->id), 'freeze 割り込み時は書き戻しを見送る');
+
+        // 2) 通常の bidding 継続 → 従来どおり書き戻す(false)。ホットパスを壊さないことの確認。
+        Cache::put($key, ['phase' => 'bidding', 'item_id' => $item->id, 'is_running' => true, 'remaining_seconds' => 5], 3600);
+        $this->assertFalse($method->invoke($svc, $lane->id, $item->id), 'bidding 継続中は通常どおり書き戻す');
+
+        // 3) 世代交代で別 item に切替済み → 古い item の書き戻しを見送り(true)。
+        Cache::put($key, ['phase' => 'bidding', 'item_id' => $item->id + 999, 'is_running' => true, 'remaining_seconds' => 5], 3600);
+        $this->assertTrue($method->invoke($svc, $lane->id, $item->id), 'item 切替後は古い item の書き戻しを見送る');
+
+        // 4) 一時停止中 → 書き戻さない(true)。
+        Cache::put($key, ['phase' => 'bidding', 'item_id' => $item->id, 'is_running' => false, 'remaining_seconds' => 5], 3600);
+        $this->assertTrue($method->invoke($svc, $lane->id, $item->id), '一時停止中は書き戻さない');
+
+        // 5) キャッシュ未存在 → 従来挙動を維持して書き戻す(false)。
+        Cache::forget($key);
+        $this->assertFalse($method->invoke($svc, $lane->id, $item->id), 'キャッシュ未存在は従来挙動を維持');
+    }
 }
