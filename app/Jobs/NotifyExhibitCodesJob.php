@@ -43,6 +43,7 @@ class NotifyExhibitCodesJob implements ShouldQueue
     public function __construct(
         public int $sellerProfileId,
         public int $auctionId,
+        public bool $force = false,
     ) {
         $this->onQueue('notify');
         $this->delay(now()->addSeconds(self::DEBOUNCE_SECONDS));
@@ -51,10 +52,14 @@ class NotifyExhibitCodesJob implements ShouldQueue
     /**
      * 既に同一 seller × auction のジョブがウィンドウ内なら追加 dispatch しない。
      * Cache::add は SETNX 相当で、競合した場合は false が返る。
+     *
+     * $force=true は管理画面からの「再送」用。通知済みフィルタを外して
+     * 発行済みの全出品IDを送り直す。デバウンスキーは通常送信と分離し、
+     * 発行直後に再送を押しても互いに握り潰されないようにする。
      */
-    public static function dispatchIfNotPending(int $sellerProfileId, int $auctionId): void
+    public static function dispatchIfNotPending(int $sellerProfileId, int $auctionId, bool $force = false): void
     {
-        $key = self::debounceKey($sellerProfileId, $auctionId);
+        $key = self::debounceKey($sellerProfileId, $auctionId, $force);
         // ウィンドウは 60秒 + ジョブ実行の遅延に多少の余裕を持たせる
         $added = Cache::add($key, 1, self::DEBOUNCE_SECONDS + 30);
         if (! $added) {
@@ -62,20 +67,22 @@ class NotifyExhibitCodesJob implements ShouldQueue
         }
 
         try {
-            self::dispatch($sellerProfileId, $auctionId);
+            self::dispatch($sellerProfileId, $auctionId, $force);
         } catch (\Throwable $e) {
             // 失敗時はロックを消して次回再 dispatch を可能にする
             Cache::forget($key);
             Log::warning('NotifyExhibitCodesJob dispatch failed: ' . $e->getMessage(), [
                 'seller_profile_id' => $sellerProfileId,
                 'auction_id' => $auctionId,
+                'force' => $force,
             ]);
         }
     }
 
-    private static function debounceKey(int $sellerProfileId, int $auctionId): string
+    private static function debounceKey(int $sellerProfileId, int $auctionId, bool $force = false): string
     {
-        return "exhibit_code:notify:debounce:{$sellerProfileId}:{$auctionId}";
+        $suffix = $force ? ':force' : '';
+        return "exhibit_code:notify:debounce:{$sellerProfileId}:{$auctionId}{$suffix}";
     }
 
     public function handle(
@@ -84,7 +91,7 @@ class NotifyExhibitCodesJob implements ShouldQueue
         TestModeService $testMode,
     ): void {
         // 実行時にロックを開放（次回以降の発行で再度 dispatch できるように）
-        Cache::forget(self::debounceKey($this->sellerProfileId, $this->auctionId));
+        Cache::forget(self::debounceKey($this->sellerProfileId, $this->auctionId, $this->force));
 
         $auction = Auction::find($this->auctionId);
         if (! $auction) {
@@ -123,8 +130,13 @@ class NotifyExhibitCodesJob implements ShouldQueue
             return;
         }
 
-        $alreadyNotifiedItemIds = $this->fetchAlreadyNotifiedItemIds($user->id);
-        $pending = $candidates->reject(fn ($item) => in_array($item->id, $alreadyNotifiedItemIds, true))->values();
+        if ($this->force) {
+            // 再送: 通知済みかどうかに関わらず発行済みの全出品IDを送り直す
+            $pending = $candidates->values();
+        } else {
+            $alreadyNotifiedItemIds = $this->fetchAlreadyNotifiedItemIds($user->id);
+            $pending = $candidates->reject(fn ($item) => in_array($item->id, $alreadyNotifiedItemIds, true))->values();
+        }
 
         if ($pending->isEmpty()) {
             return;

@@ -100,24 +100,18 @@ $w->setRelation('item', $mkItem('紅帝リアルロングフィン', $IMG['紅�
 $w->winning_price = 25000; $w->quantity = 2; $w->seller_amount = 45000;
 $push('⑨出品落札(出品者)', $flexBuilder->itemSold($w));
 
-// ⑩ 入金確認→発送依頼（出品者）
-$w = new \App\Models\WonItem();
-$w->setRelation('item', $mkItem('和墨ミッドナイトフリル', $IMG['和墨ミッドナイトフリル']));
-$w->shipping_name = '山田 太郎'; $w->shipping_prefecture = '東京都'; $w->shipping_city = '渋谷区';
-$push('⑩入金確認→発送依頼(出品者)', $flexBuilder->sellerPaymentReceived($w));
-
-// ⑪ 出品ID発行（出品者）
+// ⑩ 出品ID発行（出品者）
 $items = [
     ['exhibit_code' => 'A-001', 'item_number' => 1, 'species_name' => 'エメキン'],
     ['exhibit_code' => 'A-002', 'item_number' => 2, 'species_name' => '三色体外光亜種'],
     ['exhibit_code' => 'A-003', 'item_number' => 3, 'species_name' => '和墨白銀'],
 ];
-$push('⑪出品ID発行(出品者)', $withHero($flexBuilder->exhibitCodeIssued($auction, $items), $IMG['和墨白銀']));
+$push('⑩出品ID発行(出品者)', $withHero($flexBuilder->exhibitCodeIssued($auction, $items), $IMG['和墨白銀']));
 
-// ⑫ オークション開始（出品者）
-$push('⑫オークション開始(出品者)', $withHero($flexBuilder->sellerAuctionStart($auction), $IMG['紅帝リアルロングフィン']));
+// ⑪ オークション開始（出品者）
+$push('⑪オークション開始(出品者)', $withHero($flexBuilder->sellerAuctionStart($auction), $IMG['紅帝リアルロングフィン']));
 
-// ⑬ 請求書発行（PDFボタン・画像なし）
-$push('⑬請求書発行', $flexBuilder->invoiceReady($auction, 39600, 'https://medaka-ichiba.com/storage/invoices/demo.pdf'));
+// ⑫ 請求書発行（PDFボタン・画像なし）
+$push('⑫請求書発行', $flexBuilder->invoiceReady($auction, 39600, 'https://medaka-ichiba.com/storage/invoices/demo.pdf'));
 
 echo "---- 完了 ----\n";

@@ -35,6 +35,7 @@ import {
   Reorder as ReorderIcon,
   Store as StoreIcon,
   ConfirmationNumber as ConfirmationNumberIcon,
+  ForwardToInbox as ForwardToInboxIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
@@ -120,6 +121,10 @@ export default function LaneAssignment() {
   // 出品ID 一括発行
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [issueLoading, setIssueLoading] = useState(false);
+
+  // 出品ID通知 再送
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   // レーン管理
   const [addingLane, setAddingLane] = useState(false);
@@ -429,6 +434,20 @@ export default function LaneAssignment() {
     }
   };
 
+  // 出品ID通知の再送（発行済みの出品IDを全出品者へメール/LINEでもう一度案内）
+  const handleResendExhibitCodes = async () => {
+    try {
+      setResendLoading(true);
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/resend-exhibit-codes`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setResendDialogOpen(false);
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '出品ID通知の再送に失敗しました', severity: 'error' });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   // 一括割り当て解除
   const handleBulkUnassign = async () => {
     if (!confirm('全レーンの割り当てを解除しますか？すべての生体が未割当に戻ります。')) return;
@@ -660,22 +679,42 @@ export default function LaneAssignment() {
               (acc, l) => acc + l.items.filter((it) => !it.exhibit_code).length,
               0,
             );
+            const issuedCount = lanes.reduce(
+              (acc, l) => acc + l.items.filter((it) => !!it.exhibit_code).length,
+              0,
+            );
             return (
-              <Button
-                startIcon={<ConfirmationNumberIcon />}
-                onClick={() => setIssueDialogOpen(true)}
-                variant="contained"
-                color="secondary"
-                size="small"
-                disabled={
-                  auction?.status === 'live' ||
-                  issueLoading ||
-                  unissuedCount === 0
-                }
-              >
-                出品ID発行
-                {unissuedCount > 0 ? `（${unissuedCount}件）` : ''}
-              </Button>
+              <>
+                <Button
+                  startIcon={<ConfirmationNumberIcon />}
+                  onClick={() => setIssueDialogOpen(true)}
+                  variant="contained"
+                  color="secondary"
+                  size="small"
+                  disabled={
+                    auction?.status === 'live' ||
+                    issueLoading ||
+                    unissuedCount === 0
+                  }
+                >
+                  出品ID発行
+                  {unissuedCount > 0 ? `（${unissuedCount}件）` : ''}
+                </Button>
+                <Button
+                  startIcon={<ForwardToInboxIcon />}
+                  onClick={() => setResendDialogOpen(true)}
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  disabled={
+                    auction?.status === 'live' ||
+                    resendLoading ||
+                    issuedCount === 0
+                  }
+                >
+                  通知を再送
+                </Button>
+              </>
             );
           })()}
         </Box>
@@ -1158,6 +1197,48 @@ export default function LaneAssignment() {
             color="secondary"
           >
             {issueLoading ? <CircularProgress size={20} /> : '発行して通知'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 出品ID通知 再送ダイアログ */}
+      <Dialog open={resendDialogOpen} onClose={() => !resendLoading && setResendDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>出品ID通知を再送</DialogTitle>
+        <DialogContent>
+          {(() => {
+            const issuedItems = lanes.flatMap((l) => l.items.filter((it) => !!it.exhibit_code));
+            const sellerCount = new Set(
+              issuedItems
+                .map((it) => it.seller_profile_id)
+                .filter((sid): sid is number => !!sid),
+            ).size;
+            return (
+              <>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  発行済みの出品ID <strong>{issuedItems.length}件</strong> を、
+                  対象の出品者（{sellerCount}名）へメール / LINE でもう一度案内します。
+                </Typography>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  新しい出品IDの発行は行いません。前回と同じ内容の通知が再度届きます（約1分後に送信）。
+                </Alert>
+                <Alert severity="warning">
+                  すでに案内済みの出品者にも重複して届きます。誤送信にご注意ください。
+                </Alert>
+              </>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResendDialogOpen(false)} disabled={resendLoading}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleResendExhibitCodes}
+            disabled={resendLoading}
+            variant="contained"
+            color="secondary"
+          >
+            {resendLoading ? <CircularProgress size={20} /> : '再送する'}
           </Button>
         </DialogActions>
       </Dialog>

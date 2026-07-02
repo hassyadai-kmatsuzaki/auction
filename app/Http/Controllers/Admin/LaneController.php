@@ -718,6 +718,58 @@ class LaneController extends Controller
     }
 
     /**
+     * 発行済みの出品ID通知を全出品者へ再送する。
+     *
+     * issueExhibitCodes と違い新規発行は行わず、exhibit_code 発行済みの item を
+     * (seller_profile_id, auction_id) 単位で NotifyExhibitCodesJob(force: true) に投入する。
+     * force ジョブは line_notification_logs の通知済みフィルタを外すため、
+     * 前回と同じ内容のメール / LINE がもう一度届く。
+     */
+    public function resendExhibitCodeNotifications($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは再送できません。',
+            ], 400);
+        }
+
+        // キャンセル済みは通知対象から外す（発行後にキャンセルされた item が混ざり得るため）
+        $pairs = Item::where('auction_id', $auction->id)
+            ->whereNotNull('exhibit_code')
+            ->whereNotNull('seller_profile_id')
+            ->where('status', '!=', 'cancelled')
+            ->select('seller_profile_id', 'auction_id')
+            ->distinct()
+            ->get();
+
+        if ($pairs->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => '発行済みの出品IDがありません。先に出品IDを発行してください。',
+            ], 422);
+        }
+
+        foreach ($pairs as $pair) {
+            \App\Jobs\NotifyExhibitCodesJob::dispatchIfNotPending(
+                $pair->seller_profile_id,
+                $pair->auction_id,
+                force: true,
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $pairs->count() . '名の出品者へ出品ID通知の再送を投入しました（約1分後に送信されます）。',
+            'data' => [
+                'notified_sellers' => $pairs->count(),
+            ],
+        ]);
+    }
+
+    /**
      * 全レーンの割り当てを一括解除
      */
     public function bulkUnassign($auctionId)
