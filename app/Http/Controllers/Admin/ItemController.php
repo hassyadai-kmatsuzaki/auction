@@ -720,9 +720,12 @@ class ItemController extends Controller
                 ->delete();
         }
 
+        // 一括操作は cancelled を対象外にする。
+        // キャンセルからの復活は「個別ステータス変更（1件ずつの明示操作）」のみに限定し、
+        // 一括承認などでキャンセル品がまとめて registered に戻る事故を防ぐ。
         $updated = Item::where('auction_id', $auctionId)
             ->whereIn('id', $itemIds)
-            ->whereNotIn('status', ['live', 'sold'])
+            ->whereNotIn('status', ['live', 'sold', 'cancelled'])
             ->update(['status' => $status]);
 
         return response()->json([

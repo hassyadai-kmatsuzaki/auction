@@ -49,6 +49,7 @@ interface Item {
   start_price: number;
   current_price: number;
   is_premium: boolean;
+  is_anonymous: boolean;
   status: string;
   thumbnail_path: string | null;
   auction: {
@@ -362,9 +363,24 @@ export default function ItemHistory() {
                               <PetsIcon sx={{ fontSize: 18, color: '#059669' }} />
                             </Avatar>
                             <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {item.species_name}
-                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {item.species_name}
+                                </Typography>
+                                {item.is_anonymous && (
+                                  <Chip
+                                    label="匿名出品"
+                                    size="small"
+                                    sx={{
+                                      bgcolor: '#F1F5F9',
+                                      color: '#475569',
+                                      fontWeight: 600,
+                                      fontSize: '0.65rem',
+                                      height: 20,
+                                    }}
+                                  />
+                                )}
+                              </Box>
                               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 {item.exhibit_code ?? `#${item.item_number}`} | #{item.item_number} | {new Date(item.created_at).toLocaleDateString('ja-JP')}
                               </Typography>

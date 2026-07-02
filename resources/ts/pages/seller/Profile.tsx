@@ -58,14 +58,6 @@ const SELLER_NOTIFICATION_ROWS: NotificationRow[] = [
     lineType: 'item_sold',
   },
   {
-    category: 'transaction',
-    label: '入金確認通知',
-    description: '落札者からの入金が確認された際にお知らせ',
-    emailKey: 'email_payment_received',
-    emailTestType: 'payment_received',
-    lineType: 'payment_received',
-  },
-  {
     category: 'reminder',
     label: '発送リマインダー',
     description: '発送期限が近づいた際にリマインド',
@@ -124,7 +116,6 @@ interface SellerProfile {
   notification_settings: {
     email_new_auction?: boolean;
     email_item_sold?: boolean;
-    email_payment_received?: boolean;
     email_shipping_reminder?: boolean;
   } | null;
   display_settings: {
@@ -193,7 +184,6 @@ export default function SellerProfile() {
   const [notificationSettings, setNotificationSettings] = useState({
     email_new_auction: true,
     email_item_sold: true,
-    email_payment_received: true,
     email_shipping_reminder: true,
   });
 
@@ -249,7 +239,6 @@ export default function SellerProfile() {
           setNotificationSettings({
             email_new_auction: p.notification_settings.email_new_auction ?? true,
             email_item_sold: p.notification_settings.email_item_sold ?? true,
-            email_payment_received: p.notification_settings.email_payment_received ?? true,
             email_shipping_reminder: p.notification_settings.email_shipping_reminder ?? true,
           });
         }

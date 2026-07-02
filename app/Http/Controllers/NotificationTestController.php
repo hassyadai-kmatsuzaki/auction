@@ -100,9 +100,6 @@ class NotificationTestController extends Controller
                 case 'item_sold':
                     $this->sendTestItemSoldMail($user);
                     break;
-                case 'payment_received':
-                    $this->sendTestSellerPaymentReceivedMail($user);
-                    break;
                 case 'shipping_reminder':
                     // 発送リマインダーはシンプルなテストメール
                     $this->sendTestSellerPaymentReceivedMail($user);

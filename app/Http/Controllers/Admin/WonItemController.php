@@ -286,17 +286,9 @@ class WonItemController extends Controller
             ->where('delivery_status', 'pending')
             ->update(['delivery_status' => 'preparing']);
 
-        // 落札者通知は代表1件で1回、出品者通知は出品者ごとに1回。
+        // 落札者通知は代表1件で1回だけ送る（出品者への入金/発送依頼通知は弊社発送のため送らない）
         $representative = WonItem::with(['item.seller', 'user'])->find($wonItem->id);
         $this->notificationService->sendPaymentConfirmedNotification($representative);
-
-        $bySeller = WonItem::with(['item.seller', 'user'])
-            ->whereIn('id', $ids)
-            ->get()
-            ->groupBy(fn ($w) => $w->item->seller_profile_id);
-        foreach ($bySeller as $items) {
-            $this->notificationService->sendSellerPaymentReceivedNotification($items->first());
-        }
 
         return response()->json([
             'success' => true,

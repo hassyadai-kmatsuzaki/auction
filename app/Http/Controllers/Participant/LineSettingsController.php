@@ -35,7 +35,6 @@ class LineSettingsController extends Controller
         'invoice_ready'        => '請求書発行通知（PDFダウンロードリンク付き）',
         // 出品者向け
         'item_sold'            => '出品商品の落札通知（出品者）',
-        'payment_received'     => '入金確認通知（出品者）',
     ];
 
     /** タイプ別のテストメッセージ */
@@ -50,7 +49,6 @@ class LineSettingsController extends Controller
         'favorite_approaching' => "⏰ [テスト] お気に入りの【テスト】三色ラメ体外光の出番まであと3つです！\n準備してください！",
         'invoice_ready' => "🧾 [テスト] 請求書が発行されました\n【テスト】第99回日本メダカオンライン市場\n請求金額: ¥16,500（税込）\nPDF ダウンロードリンクをタップしてください。",
         'item_sold' => "🎉 [テスト] 出品した生体が落札されました！\n【テスト】三色ラメ体外光\n落札価格: ¥15,000/匹",
-        'payment_received' => "💰 [テスト] 入金が確認されました\n【テスト】三色ラメ体外光\n発送をお願いします。",
     ];
 
     /** 通知設定一覧を取得 */
@@ -192,7 +190,6 @@ class LineSettingsController extends Controller
                 (string) config('app.url'),
             ),
             'item_sold'            => $this->flex->itemSold($wonItem),
-            'payment_received'     => $this->flex->sellerPaymentReceived($wonItem),
             default                => null,
         };
     }

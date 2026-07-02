@@ -41,7 +41,6 @@ class ProfileController extends Controller
                 'notification_settings' => [
                     'email_new_auction' => true,
                     'email_item_sold' => true,
-                    'email_payment_received' => true,
                     'email_shipping_reminder' => true,
                 ],
                 'display_settings' => [
@@ -307,7 +306,6 @@ class ProfileController extends Controller
         $validator = Validator::make($request->all(), [
             'email_new_auction' => 'boolean',
             'email_item_sold' => 'boolean',
-            'email_payment_received' => 'boolean',
             'email_shipping_reminder' => 'boolean',
         ]);
 
@@ -322,7 +320,6 @@ class ProfileController extends Controller
         $newSettings = array_merge($currentSettings, $request->only([
             'email_new_auction',
             'email_item_sold',
-            'email_payment_received',
             'email_shipping_reminder',
         ]));
 

@@ -665,7 +665,11 @@ class LaneController extends Controller
             ->whereIn('lane_id', $laneIds)
             ->pluck('item_id');
 
+        // キャンセル/進行中/落札済みには出品IDを発行しない。
+        // 特に、レーン割当後に出品者がキャンセルした item は lane_items が残るため、
+        // ここで status ガードしないと cancelled のまま exhibit_code が振られてしまう。
         $targets = Item::whereIn('id', $assignedItemIds)
+            ->whereNotIn('status', ['cancelled', 'live', 'sold'])
             ->whereNull('exhibit_code')
             ->get();
 

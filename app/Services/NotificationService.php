@@ -10,7 +10,6 @@ use App\Mail\NewAuctionNotificationMail;
 use App\Mail\PaymentConfirmedMail;
 use App\Mail\PaymentReminderMail;
 use App\Mail\SellerAuctionStartMail;
-use App\Mail\SellerPaymentReceivedMail;
 use App\Mail\ShippingFeeFinalizedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
@@ -105,10 +104,11 @@ class NotificationService
 
             Mail::to($user->email)->queue(new PaymentConfirmedMail($wonItem));
 
+            $auctionTitle = $wonItem->item?->auction?->title ?? 'オークション';
             $this->sendLine($user->id, 'payment_reminder',
                 "✅ 入金が確認されました\n"
-                . ($wonItem->item ? $wonItem->item->species_name : '商品') . "\n"
-                . "発送をお待ちください。",
+                . $auctionTitle . "\n"
+                . "ご入金ありがとうございました。",
                 $this->flex->paymentConfirmed($wonItem),
             );
 
@@ -453,17 +453,6 @@ class NotificationService
             Log::error('出品者向け落札通知送信エラー', ['error' => $e->getMessage()]);
             return false;
         }
-    }
-
-    /**
-     * ⑨ 入金確認・発送依頼通知（出品者向け）
-     *
-     * 弊社が出品者から生体を預かり、弊社から発送する運用のため、
-     * 出品者に発送依頼を流す必要がない。当面 no-op で停止する。
-     */
-    public function sendSellerPaymentReceivedNotification(WonItem $wonItem): bool
-    {
-        return false;
     }
 
     /** ⑩ オークション開始通知（出品者向け） */

@@ -52,17 +52,15 @@ class LineFlexBuilder
     public function paymentConfirmed(WonItem $wonItem): array
     {
         $item = $wonItem->item;
-        $speciesName = $item?->species_name ?? '商品';
+        $auctionTitle = $item?->auction?->title ?? 'オークション';
 
         return $this->bubble(
-            heroImageUrl: $this->itemHeroImage($item),
+            heroImageUrl: null,
             headerText: '✅ 入金が確認されました',
             headerColor: self::ACCENT_COLOR,
-            bodyRows: [
-                ['生体', $speciesName],
-                ['状態', '発送準備中'],
-            ],
-            bodyNote: '出品者からの発送をお待ちください。',
+            bodyRows: [],
+            bodyLead: $auctionTitle,
+            bodyNote: 'ご入金ありがとうございました。',
             footerButton: ($url = $this->appUrl('/participant/won-items'))
                 ? ['label' => '落札状況を確認', 'uri' => $url]
                 : null,
@@ -210,27 +208,6 @@ class LineFlexBuilder
         );
     }
 
-    /** ⑩ 出品者向け入金確認（発送依頼） */
-    public function sellerPaymentReceived(WonItem $wonItem): array
-    {
-        $item = $wonItem->item;
-
-        return $this->bubble(
-            heroImageUrl: $this->itemHeroImage($item),
-            headerText: '💰 入金が確認されました',
-            headerColor: self::ACCENT_COLOR,
-            bodyRows: [
-                ['生体',     $item?->species_name ?? '商品'],
-                ['落札者',   (string) ($wonItem->shipping_name ?? '')],
-                ['配送先',   (string) ($wonItem->shipping_prefecture ?? '') . ($wonItem->shipping_city ?? '')],
-            ],
-            bodyNote: '発送をお願いします。',
-            footerButton: ($url = $this->appUrl('/seller/shipping'))
-                ? ['label' => '発送管理へ', 'uri' => $url]
-                : null,
-        );
-    }
-
     /**
      * 出品者向け 出品ID発行通知
      *
@@ -328,6 +305,7 @@ class LineFlexBuilder
         array $bodyRows,
         ?string $bodyNote = null,
         ?array $footerButton = null,
+        ?string $bodyLead = null,
     ): array {
         $bubble = [
             'type' => 'bubble',
@@ -360,6 +338,16 @@ class LineFlexBuilder
         ];
 
         $bodyContents = [];
+        if ($bodyLead) {
+            $bodyContents[] = [
+                'type'   => 'text',
+                'text'   => $bodyLead,
+                'size'   => 'md',
+                'weight' => 'bold',
+                'color'  => '#111827',
+                'wrap'   => true,
+            ];
+        }
         foreach ($bodyRows as [$label, $value]) {
             if ($value === '' || $value === null) continue;
             $bodyContents[] = [
@@ -473,6 +461,9 @@ class LineFlexBuilder
         if ($base === '') return null;
         $url = $base . '/' . ltrim($path, '/');
         $url = $this->forceHttps($url);
-        return str_starts_with($url, 'https://') ? $url : null;
+        if (!str_starts_with($url, 'https://')) return null;
+        // LINEアプリ内ブラウザではなく端末の標準ブラウザで開かせる
+        $url .= (str_contains($url, '?') ? '&' : '?') . 'openExternalBrowser=1';
+        return $url;
     }
 }

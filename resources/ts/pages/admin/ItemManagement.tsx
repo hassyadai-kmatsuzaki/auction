@@ -302,9 +302,13 @@ export default function ItemManagement() {
     }
   };
 
+  // live/sold/cancelled は一括操作の対象外。全選択でも拾わない
+  // （キャンセル品の復活は個別ステータス変更の専用操作のみ）。
+  const isBulkSelectable = (status: string) => !['live', 'sold', 'cancelled'].includes(status);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(items.map(item => item.id));
+      setSelectedIds(items.filter(item => isBulkSelectable(item.status)).map(item => item.id));
     } else {
       setSelectedIds([]);
     }
@@ -572,8 +576,14 @@ export default function ItemManagement() {
             <TableRow>
               <TableCell padding="checkbox">
                 <Checkbox
-                  checked={items.length > 0 && selectedIds.length === items.length}
-                  indeterminate={selectedIds.length > 0 && selectedIds.length < items.length}
+                  checked={
+                    items.some(item => isBulkSelectable(item.status)) &&
+                    selectedIds.length === items.filter(item => isBulkSelectable(item.status)).length
+                  }
+                  indeterminate={
+                    selectedIds.length > 0 &&
+                    selectedIds.length < items.filter(item => isBulkSelectable(item.status)).length
+                  }
                   onChange={(e) => handleSelectAll(e.target.checked)}
                 />
               </TableCell>
@@ -603,7 +613,8 @@ export default function ItemManagement() {
                     <Checkbox
                       checked={selectedIds.includes(item.id)}
                       onChange={(e) => handleSelectItem(item.id, e.target.checked)}
-                      disabled={['live', 'sold'].includes(item.status)}
+                      // cancelled は一括操作の対象外（復活は個別ステータス変更の専用操作のみ）。
+                      disabled={!isBulkSelectable(item.status)}
                     />
                   </TableCell>
                   <TableCell>

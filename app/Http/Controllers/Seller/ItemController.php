@@ -505,7 +505,12 @@ class ItemController extends Controller
         
         $item->status = 'cancelled';
         $item->save();
-        
+
+        // レーン割当済みの item を出品者がキャンセルした場合、lane_items を残すと
+        // 出品ID発行の対象に含まれてしまう（cancelled のまま exhibit_code が振られる）。
+        // 管理者側キャンセルと同様にここでもレーンから外す。
+        $item->lanes()->detach();
+
         return response()->json([
             'success' => true,
             'message' => '出品をキャンセルしました。',
