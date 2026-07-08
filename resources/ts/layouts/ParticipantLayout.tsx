@@ -52,6 +52,14 @@ export default function ParticipantLayout() {
     setDrawerOpen(false);
   }, [location.pathname]);
 
+  // 横持ちスマホのライブ画面では AppBar を隠すため（auction-live.css）、
+  // ライブ画面ヘッダーのメニューアイコンからカスタムイベント経由でドロワーを開けるようにする
+  useEffect(() => {
+    const open = () => setDrawerOpen(true);
+    window.addEventListener('participant:open-menu', open);
+    return () => window.removeEventListener('participant:open-menu', open);
+  }, []);
+
   // ライブ画面では Reverb が状態を担うため、レイアウト直下のポーリングは不要。
   // 加えて 100〜300名規模の同時参加時は 30秒同期の一斉ポーリングが PHP-FPM を圧迫する
   // （負荷レビュー C6 指摘）。pathname で /live 配下を判定して disable し、

@@ -140,6 +140,14 @@
   will-change: transform;
 }
 
+/* ─── 横持ちスマホのライブ画面: グローバルヘッダーを隠して1列に ───────
+ * AuctionLive.tsx が isPhoneLandscape のとき body に付与するクラス。
+ * ロゴ+ハンバーガーの AppBar(64px) を回収して 2x2 の4レーンを画面内に収める。
+ * メニューが必要な場合は縦向きに戻せば表示される */
+body.live-landscape-compact header.MuiAppBar-root {
+  display: none;
+}
+
 /* ─── CelebrationOverlay: 落札ポップ ───────────────────────────
  * 旧: sx 内に @keyframes 直書き → MUI styled-component が毎レンダー再生成
  * 新: static CSS で GPU 合成（transform/opacity のみ） */

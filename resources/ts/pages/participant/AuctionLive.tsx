@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Grid, CircularProgress, Alert, Button,
-  Paper, Typography, Snackbar,
+  Paper, Typography, Snackbar, useMediaQuery,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import { EmojiEvents as EmojiEventsIcon } from '@mui/icons-material';
@@ -38,12 +38,31 @@ interface CelebrationItem {
   winning_price: number;
 }
 
+/** SPコンパクトカードにサムネイルを表示するか（比較検討用スイッチ） */
+const SHOW_COMPACT_THUMBNAIL = true;
+
 export default function AuctionLive() {
   const { auctionId: auctionIdStr } = useParams<{ auctionId: string }>();
   const auctionId = Number(auctionIdStr);
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // SP判定（4レーンを画面内に収めるコンパクト表示）
+  //   縦向き: 幅 600px 未満のスマホ → リスト形式（1列）
+  //   横向き: 高さ 500px 以下の横持ちスマホ → 2x2 グリッド
+  //   ※ 横持ちスマホは幅が 800px 超になり breakpoints では拾えないため orientation で判定する
+  const isPhonePortrait = useMediaQuery('(max-width: 599.95px) and (orientation: portrait)');
+  const isPhoneLandscape = useMediaQuery('(max-height: 500px) and (orientation: landscape)');
+  const isCompactLive = isPhonePortrait || isPhoneLandscape;
+
+  // 横持ちスマホではグローバルヘッダー（ロゴ+メニュー）を隠してヘッダーを1列に集約し、
+  // 4レーン（2x2）が縦に収まる高さを確保する（auction-live.css 参照）
+  useEffect(() => {
+    if (!isPhoneLandscape) return;
+    document.body.classList.add('live-landscape-compact');
+    return () => document.body.classList.remove('live-landscape-compact');
+  }, [isPhoneLandscape]);
 
   // グローバルストア
   const socketConnected = useAuctionLiveStore((s) => s.socketConnected);
@@ -684,13 +703,20 @@ export default function AuctionLive() {
         socketConnected={socketConnected}
         onRefresh={refetch}
         onNavigateItems={SHOW_AUCTION_ITEM_LIST ? () => navigate(`/participant/auction/${auctionId}/items`) : undefined}
+        compact={isCompactLive}
+        onMenuOpen={
+          // 横持ちではグローバルヘッダー（ハンバーガー）が隠れるため、代替のメニュー起動を右端に出す
+          isPhoneLandscape
+            ? () => window.dispatchEvent(new Event('participant:open-menu'))
+            : undefined
+        }
       />
 
-      <Container maxWidth="xl" sx={{ py: 2 }}>
-        {/* レーングリッド */}
-        <Grid container spacing={2}>
+      <Container maxWidth="xl" sx={{ py: isCompactLive ? 0.5 : 2, px: isCompactLive ? 1 : undefined }}>
+        {/* レーングリッド（横持ちスマホは 2x2 固定） */}
+        <Grid container spacing={isCompactLive ? 1 : 2}>
           {liveState.lanes.map((lane) => (
-            <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+            <Grid item xs={12} sm={6} md={isPhoneLandscape ? 6 : 4} key={lane.lane_id}>
               {/* 実装書 H2: inline lambda を削除して固定 ref ハンドラを渡す
                    →  LaneCard の React.memo が浅比較で正しく機能する */}
               <LaneCard
@@ -700,6 +726,8 @@ export default function AuctionLive() {
                 onDetailOpen={setDetailLane}
                 onLimitEdit={setLimitModalItemId}
                 onLimitRemove={setLimitModalItemId}
+                compact={isCompactLive}
+                showThumbnail={SHOW_COMPACT_THUMBNAIL}
               />
             </Grid>
           ))}

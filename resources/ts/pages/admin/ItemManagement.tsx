@@ -109,6 +109,11 @@ export default function ItemManagement() {
   
   // 選択・一括操作
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // 現在の絞り込みに一致する「一括操作可能」件数（全ページ選択のラベル用）
+  const [selectableTotal, setSelectableTotal] = useState(0);
+  // 「検索条件に一致する全件」を選択中か（ページをまたいだ全件選択の状態）
+  const [allMatchingSelected, setAllMatchingSelected] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
   const [bulkAnonymousDialogOpen, setBulkAnonymousDialogOpen] = useState(false);
@@ -193,6 +198,7 @@ export default function ItemManagement() {
         setItems(response.data.data.items);
         setLastPage(response.data.data.pagination.last_page);
         setTotal(response.data.data.pagination.total);
+        setSelectableTotal(response.data.data.pagination.selectable_total ?? 0);
       }
     } catch (err: any) {
       console.error('生体一覧取得エラー:', err);
@@ -203,6 +209,8 @@ export default function ItemManagement() {
   };
 
   const handleSearch = () => {
+    // 絞り込みが変わると対象集合が変わるので選択はリセットする
+    clearSelection();
     setCurrentPage(1);
     fetchItems();
   };
@@ -233,7 +241,7 @@ export default function ItemManagement() {
         status: bulkStatus,
       });
       setSnackbar({ open: true, message: 'ステータスを更新しました。', severity: 'success' });
-      setSelectedIds([]);
+      clearSelection();
       setBulkDialogOpen(false);
       fetchItems();
     } catch (err: any) {
@@ -255,7 +263,7 @@ export default function ItemManagement() {
         message: bulkAnonymousValue ? '匿名化しました。' : '匿名解除しました。',
         severity: 'success',
       });
-      setSelectedIds([]);
+      clearSelection();
       setBulkAnonymousDialogOpen(false);
       fetchItems();
     } catch (err: any) {
@@ -306,11 +314,15 @@ export default function ItemManagement() {
   // （キャンセル品の復活は個別ステータス変更の専用操作のみ）。
   const isBulkSelectable = (status: string) => !['live', 'sold', 'cancelled'].includes(status);
 
+  // ヘッダのチェックは「現在ページの一括操作可能な生体」を選択/解除する。
+  // 他ページの選択は保持したまま現在ページ分だけ足し引きする。
   const handleSelectAll = (checked: boolean) => {
+    setAllMatchingSelected(false);
+    const pageIds = items.filter(item => isBulkSelectable(item.status)).map(item => item.id);
     if (checked) {
-      setSelectedIds(items.filter(item => isBulkSelectable(item.status)).map(item => item.id));
+      setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
     } else {
-      setSelectedIds([]);
+      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
     }
   };
 
@@ -413,11 +425,40 @@ export default function ItemManagement() {
   };
 
   const handleSelectItem = (id: number, checked: boolean) => {
+    // 手動でチェックを変えたら「全件選択中」状態は解除する（対象がずれるため）
+    setAllMatchingSelected(false);
     if (checked) {
       setSelectedIds([...selectedIds, id]);
     } else {
       setSelectedIds(selectedIds.filter(i => i !== id));
     }
+  };
+
+  // 検索条件に一致する（ページをまたいだ）全件を選択する
+  const handleSelectAllMatching = async () => {
+    try {
+      setSelectingAll(true);
+      const params = new URLSearchParams();
+      if (filterStatus !== 'all') params.append('status', filterStatus);
+      if (searchTerm) params.append('search', searchTerm);
+      const response = await axios.get(
+        `/api/admin/auctions/${auctionId}/items/selectable-ids?${params}`,
+      );
+      if (response.data.success) {
+        setSelectedIds(response.data.data.item_ids);
+        setSelectableTotal(response.data.data.total);
+        setAllMatchingSelected(true);
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '全件の選択に失敗しました。', severity: 'error' });
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setAllMatchingSelected(false);
   };
 
   const getStatusLabel = (status: string) => {
@@ -516,6 +557,7 @@ export default function ItemManagement() {
               value={filterStatus}
               label="ステータス"
               onChange={(e) => {
+                clearSelection();
                 setFilterStatus(e.target.value);
                 setCurrentPage(1);
               }}
@@ -569,6 +611,41 @@ export default function ItemManagement() {
         </Box>
       </Paper>
 
+      {/* 全ページ選択バナー（ページをまたいだ一括操作用） */}
+      {(() => {
+        const pageSelectable = items.filter(item => isBulkSelectable(item.status));
+        const allCurrentPageSelected =
+          pageSelectable.length > 0 && pageSelectable.every(item => selectedIds.includes(item.id));
+        const hasMoreAcrossPages = selectableTotal > pageSelectable.length;
+
+        if (allMatchingSelected) {
+          return (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              検索条件に一致する全 <strong>{selectedIds.length}</strong> 件を選択中です。
+              <Button size="small" onClick={clearSelection} sx={{ ml: 1 }}>
+                選択を解除
+              </Button>
+            </Alert>
+          );
+        }
+        if (allCurrentPageSelected && hasMoreAcrossPages) {
+          return (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              このページの <strong>{pageSelectable.length}</strong> 件を選択中です。
+              <Button
+                size="small"
+                onClick={handleSelectAllMatching}
+                disabled={selectingAll}
+                sx={{ ml: 1 }}
+              >
+                {selectingAll ? <CircularProgress size={16} /> : `検索条件に一致する全 ${selectableTotal} 件を選択`}
+              </Button>
+            </Alert>
+          );
+        }
+        return null;
+      })()}
+
       {/* テーブル */}
       <TableContainer component={Paper}>
         <Table>
@@ -578,11 +655,11 @@ export default function ItemManagement() {
                 <Checkbox
                   checked={
                     items.some(item => isBulkSelectable(item.status)) &&
-                    selectedIds.length === items.filter(item => isBulkSelectable(item.status)).length
+                    items.filter(item => isBulkSelectable(item.status)).every(item => selectedIds.includes(item.id))
                   }
                   indeterminate={
-                    selectedIds.length > 0 &&
-                    selectedIds.length < items.filter(item => isBulkSelectable(item.status)).length
+                    items.filter(item => isBulkSelectable(item.status)).some(item => selectedIds.includes(item.id)) &&
+                    !items.filter(item => isBulkSelectable(item.status)).every(item => selectedIds.includes(item.id))
                   }
                   onChange={(e) => handleSelectAll(e.target.checked)}
                 />

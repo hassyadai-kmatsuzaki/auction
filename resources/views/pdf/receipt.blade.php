@@ -122,6 +122,11 @@
             font-size: 13px;
             font-weight: bold;
         }
+        .issuer .registration-number {
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 2px;
+        }
         .note {
             font-size: 9px;
             color: #aaa;
@@ -226,6 +231,7 @@
 
     <div class="issuer">
         <div class="company-name">{{ $company_name }}</div>
+        @if(!empty($company_registration_number))<div class="registration-number">登録番号: {{ $company_registration_number }}</div>@endif
         @if($company_address)<div>{{ $company_address }}</div>@endif
         @if($company_phone)<div>TEL: {{ $company_phone }}</div>@endif
         @if($company_email)<div>{{ $company_email }}</div>@endif

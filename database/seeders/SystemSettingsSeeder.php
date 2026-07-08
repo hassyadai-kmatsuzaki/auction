@@ -208,6 +208,14 @@ class SystemSettingsSeeder extends Seeder
                 'description' => '帳票に表示するメールアドレス',
             ],
             [
+                'key' => 'company_invoice_registration_number',
+                'value' => 'T9010001247770',
+                'type' => 'string',
+                'category' => 'document',
+                'label' => 'インボイス登録番号',
+                'description' => '適格請求書発行事業者の登録番号（T+13桁）。帳票に表示されます。',
+            ],
+            [
                 'key' => 'bank_name',
                 'value' => '三菱UFJ銀行',
                 'type' => 'string',

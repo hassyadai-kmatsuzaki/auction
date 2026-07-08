@@ -636,7 +636,8 @@ class LaneController extends Controller
      *
      * 動作:
      *  - lane_items に割当済み × exhibit_code が未発行 の items を対象に IssueExhibitCodeAction を実行
-     *  - 発行成功した items から (seller_profile_id, auction_id) 単位で NotifyExhibitCodesJob を投入
+     *  - 発行のみ行い、出品者への通知は自動送信しない。通知は管理画面の「出品者へ通知」
+     *    （resendExhibitCodeNotifications）から手動で送信する
      *  - 既発行 item は IssueExhibitCodeAction 側で早期 return されるため再採番されない（冪等）
      *
      * 注意: lane_name 未設定や seller_profile_id null の item は IssueExhibitCodeAction 側で
@@ -677,42 +678,26 @@ class LaneController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => '未発行の出品IDはありません。',
-                'data' => ['issued_count' => 0, 'notified_sellers' => 0],
+                'data' => ['issued_count' => 0],
             ]);
         }
 
         $issuedIds = [];
         DB::transaction(function () use ($targets, $issueExhibitCode, &$issuedIds) {
             foreach ($targets as $item) {
-                // silent=true で発行のみ。通知は commit 後に出品者×オークション単位で投入する。
+                // silent=true で発行のみ。出品者への通知は自動送信せず、
+                // 管理画面の「出品者へ通知」ボタン（resendExhibitCodeNotifications）から手動送信する。
                 if ($issueExhibitCode->execute($item, silent: true) !== null) {
                     $issuedIds[] = $item->id;
                 }
             }
         });
 
-        $notifiedSellers = 0;
-        if (!empty($issuedIds)) {
-            $pairs = Item::whereIn('id', $issuedIds)
-                ->whereNotNull('seller_profile_id')
-                ->select('seller_profile_id', 'auction_id')
-                ->distinct()
-                ->get();
-            foreach ($pairs as $pair) {
-                \App\Jobs\NotifyExhibitCodesJob::dispatchIfNotPending(
-                    $pair->seller_profile_id,
-                    $pair->auction_id
-                );
-                $notifiedSellers++;
-            }
-        }
-
         return response()->json([
             'success' => true,
-            'message' => count($issuedIds) . '件の出品IDを発行し、' . $notifiedSellers . '名の出品者へ通知を投入しました。',
+            'message' => count($issuedIds) . '件の出品IDを発行しました。出品者への通知は「出品者へ通知」から送信してください。',
             'data' => [
-                'issued_count'     => count($issuedIds),
-                'notified_sellers' => $notifiedSellers,
+                'issued_count' => count($issuedIds),
             ],
         ]);
     }

@@ -1,9 +1,9 @@
 import React from 'react';
 import {
   Card, CardMedia, CardContent, CardActions,
-  Box, Typography, Chip, IconButton, Avatar,
+  Box, Typography, Chip, IconButton, Avatar, Button,
 } from '@mui/material';
-import { Info as InfoIcon } from '@mui/icons-material';
+import { Info as InfoIcon, Timer as TimerIcon } from '@mui/icons-material';
 import type { LiveLane } from '@/types';
 import { CountdownChip } from './CountdownChip';
 import { BidButton } from './BidButton';
@@ -27,16 +27,35 @@ interface Props {
   onLimitRemove?: (itemId: number) => void;
   /** 詳細ボタンを無効化 */
   disableDetail?: boolean;
+  /**
+   * SP向けコンパクト表示（サムネイル非表示・情報左/ボタン右の高密度レイアウト）
+   * 縦向き=リスト1列、横向き=2x2 グリッドで 4 レーンが画面内に収まることを狙う
+   */
+  compact?: boolean;
+  /** compact 時にサムネイルを表示する（比較検討用スイッチ） */
+  showThumbnail?: boolean;
 }
 
 /**
  * レーンカード1枚
  * React.memo + 細粒度メモ化で不要な再レンダリングを防ぐ
  */
-export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove, disableDetail }: Props) => {
+export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove, disableDetail, compact, showThumbnail }: Props) => {
   const item = lane.current_item;
 
   if (!item) {
+    if (compact) {
+      return (
+        <Card sx={{ height: '100%', display: 'flex', alignItems: 'center', px: 1.5, py: 1 }}>
+          <Typography variant="subtitle2" color="text.secondary">
+            {lane.lane_name ?? `レーン ${lane.lane_number}`}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+            {lane.status === 'finished' ? '全出品終了' : '待機中'}
+          </Typography>
+        </Card>
+      );
+    }
     return (
       <Card sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CardContent>
@@ -55,6 +74,168 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
   const isFreeze = item.phase === 'freeze';
   const isCompetitive = item.active_bidders_count >= 2;
   const isMyBidActive = item.my_bid_status === 'active';
+  const unitLabel = item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹';
+
+  if (compact) {
+    return (
+      <Card
+        className={isMyBidActive ? 'active-bid-card' : ''}
+        sx={{
+          height: '100%',
+          position: 'relative',
+          overflow: 'visible',
+          border: isMyBidActive ? '2px solid transparent' : 1,
+          borderColor: isMyBidActive ? undefined : 'divider',
+          borderRadius: 2,
+          transition: 'border 0.3s ease',
+        }}
+      >
+        {isMyBidActive && <Box className="active-bid-shimmer" />}
+        {isMyBidActive && <Box className="active-bid-badge">最高入札者</Box>}
+
+        <Box sx={{ p: 1 }}>
+          {/* 1行目: レーン名 / プレミアム / カウントダウン */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box
+              sx={{
+                bgcolor: 'primary.main', color: 'white', flexShrink: 0,
+                px: 1, py: 0.25, borderRadius: 1, fontWeight: 'bold', fontSize: '0.7rem',
+              }}
+            >
+              {lane.lane_name ?? `レーン ${lane.lane_number}`}
+            </Box>
+            {item.is_premium && (
+              <Chip label="プレミアム" color="warning" size="small" sx={{ height: 20, fontSize: '0.65rem', flexShrink: 0 }} />
+            )}
+            {/* 品種名はレーン名の横（テーマの subtitle2 は薄色のため太字ブラックを明示） */}
+            <Typography noWrap sx={{ minWidth: 0, flex: 1, color: 'text.primary', fontWeight: 700, fontSize: '0.875rem', lineHeight: 1.3 }}>
+              <Typography component="span" variant="caption" color="text.secondary" sx={{ mr: 0.5, fontWeight: 400 }}>
+                {item.exhibit_code ?? `No.${item.item_number}`}
+              </Typography>
+              {item.species_name}
+            </Typography>
+            <Box sx={{ flexShrink: 0 }}>
+              {isPreBid ? (
+                <Chip
+                  icon={<TimerIcon sx={{ fontSize: 14 }} />}
+                  label={`開始まで ${Math.max(0, Math.ceil(item.pre_bid_remaining_seconds ?? 0))}秒`}
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  sx={{ fontWeight: 'bold' }}
+                />
+              ) : (
+                <CountdownChip
+                  seconds={item.countdown_seconds}
+                  isCompetitive={isCompetitive}
+                  phase={isFreeze ? 'freeze' : 'bidding'}
+                  freezeTotalSeconds={item.freeze_countdown_seconds}
+                  freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
+                />
+              )}
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 1, mt: 0.25 }}>
+            {/* サムネイル（比較検討用スイッチ） */}
+            {showThumbnail && (
+              <Box
+                component="img"
+                src={optimizedImageUrl(item.thumbnail_path, 'small')}
+                alt={item.species_name}
+                loading="lazy"
+                sx={{ width: 64, height: 64, borderRadius: 1, objectFit: 'cover', flexShrink: 0, alignSelf: 'center' }}
+              />
+            )}
+            {/* 左: 商品情報（品種名はヘッダー行へ移動済み） */}
+            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, minWidth: 0 }}>
+                <Avatar
+                  src={(!item.is_anonymous && item.seller_profile_image_url) || undefined}
+                  sx={{ width: 16, height: 16, fontSize: '0.6rem', bgcolor: 'grey.300', flexShrink: 0, mt: 0.25 }}
+                >
+                  {!item.is_anonymous && !item.seller_profile_image_url && (item.seller_name?.charAt(0) ?? '-')}
+                </Avatar>
+                {/* 数量は合計行（合計（N匹））で分かるため、屋号横には出さない */}
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.4 }}>
+                  {item.is_anonymous ? '-' : (item.seller_name || '-')}
+                </Typography>
+              </Box>
+              {/* 説明文（検査情報）はSPでは非表示。個体詳細ダイアログで確認できる */}
+              <Box sx={{ display: 'flex', alignItems: 'baseline', columnGap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+                <Typography variant="h5" color="primary.main" fontWeight="bold" sx={{ lineHeight: 1.2 }} noWrap>
+                  ¥{formatYen(item.current_price)}
+                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                    /1{unitLabel}
+                  </Typography>
+                </Typography>
+                {/* サムネイル表示時など幅が狭い場合に「¥37,7…」と欠けないよう折返しを許可。金額の途中では折り返さない */}
+                {item.quantity != null && (
+                  <Typography variant="caption" color="text.secondary">
+                    合計（{item.quantity}{unitLabel}）
+                    <Typography component="span" variant="caption" color="text.primary" sx={{ ml: 0.5, whiteSpace: 'nowrap' }}>
+                      ¥{formatYen(item.current_price * item.quantity)}
+                    </Typography>
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+
+            {/* 右: 入札ボタン / 指値 / 詳細 */}
+            <Box
+              sx={{
+                width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0.5, justifyContent: 'flex-end',
+                // ボタンの高さ（今のサイズ）は維持しつつ、150px 幅で「入札準備中...」が折り返さないよう左右のみ圧縮
+                '& .MuiButton-root': { px: 1, whiteSpace: 'nowrap', minWidth: 0 },
+              }}
+            >
+              <BidButton
+                myBidStatus={item.my_bid_status}
+                isPreBid={isPreBid}
+                isFreeze={isFreeze}
+                freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
+                freezeTotalSeconds={item.freeze_countdown_seconds}
+                isLoading={isLoading}
+                isTopBidder={item.my_bid_status === 'active' && item.active_bidders_count === 1}
+                activeBidderCount={item.active_bidders_count}
+                onToggle={() => onBidToggle(item.id, item.my_bid_status, item.phase)}
+              />
+              {/* 上限設定が「上限: ¥X,XXX」表示になった時は 150px に収まらないため折返しを許可。
+                  上限設定(Chip)と個体詳細(Button)は高さ30pxのピル形状に統一 */}
+              <Box
+                sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5, flexWrap: 'wrap',
+                  '& .MuiChip-root': { height: 30, borderRadius: '15px' },
+                }}
+              >
+                {onLimitEdit ? (
+                  <BidLimitBadge
+                    limitPrice={item.my_limit_price ?? null}
+                    isTriggered={item.my_limit_triggered ?? false}
+                    onEdit={() => onLimitEdit(item.id)}
+                    onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
+                  />
+                ) : <Box />}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => onDetailOpen(lane)}
+                  disabled={disableDetail}
+                  sx={{
+                    fontSize: '0.7rem', lineHeight: 1.6, height: 30, borderRadius: '15px',
+                    ...(disableDetail ? { opacity: 0.5, pointerEvents: 'none' } : {}),
+                  }}
+                >
+                  個体詳細
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </Card>
+    );
+  }
 
   return (
     // 実装書 F2/F6: 動的 sx animation を static CSS class に切替

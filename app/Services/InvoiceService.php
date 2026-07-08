@@ -92,6 +92,8 @@ class InvoiceService
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
+        // 適格請求書（インボイス）発行事業者の登録番号（T+13桁）
+        $companyRegistrationNumber = SystemSetting::get('company_invoice_registration_number', '');
 
         // 振込先情報を個別設定から組み立て
         $bankName = SystemSetting::get('bank_name', '');
@@ -188,6 +190,7 @@ class InvoiceService
             'company_address' => $companyAddress,
             'company_phone' => $companyPhone,
             'company_email' => $companyEmail,
+            'company_registration_number' => $companyRegistrationNumber,
             'bank_info' => $bankInfo,
         ];
     }
@@ -205,6 +208,7 @@ class InvoiceService
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
+        $companyRegistrationNumber = SystemSetting::get('company_invoice_registration_number', '');
 
         $firstItem = $wonItems->first();
 
@@ -272,6 +276,7 @@ class InvoiceService
             'company_address' => $companyAddress,
             'company_phone' => $companyPhone,
             'company_email' => $companyEmail,
+            'company_registration_number' => $companyRegistrationNumber,
         ];
 
         return Pdf::loadView('pdf.delivery_note', $data)
@@ -410,6 +415,7 @@ class InvoiceService
         $companyAddress = SystemSetting::get('company_address', '');
         $companyPhone = SystemSetting::get('company_phone', '');
         $companyEmail = SystemSetting::get('company_email', '');
+        $companyRegistrationNumber = SystemSetting::get('company_invoice_registration_number', '');
 
         // 明細（落札金額=winning_price×quantity 税抜、手数料=買い手手数料 税抜）
         $items = $wonItems->map(function ($wonItem) {
@@ -478,6 +484,7 @@ class InvoiceService
             'company_address' => $companyAddress,
             'company_phone' => $companyPhone,
             'company_email' => $companyEmail,
+            'company_registration_number' => $companyRegistrationNumber,
         ];
 
         return Pdf::loadView('pdf.seller_payment_notice', $data)

@@ -115,6 +115,8 @@ class ItemController extends Controller
                     'per_page' => $items->perPage(),
                     'current_page' => $items->currentPage(),
                     'last_page' => $items->lastPage(),
+                    // 現在の絞り込みに一致する「一括操作可能」件数（全ページ選択のラベル用）
+                    'selectable_total' => $this->bulkSelectableQuery($request, $auctionId)->count(),
                 ],
             ],
         ]);
@@ -413,8 +415,10 @@ class ItemController extends Controller
             $item->save();
         }
 
-        // ステータスが registered 以外に変更された場合はレーンから除外
-        if ($request->has('status') && $item->status !== 'registered') {
+        // ステータスが registered 以外へ「実際に変更された」場合のみレーンから除外。
+        // フロントは編集時に status を常に同送するため、品名/匹数/スタート金額だけの
+        // 編集で status が変わらないケースでは detach させない（レーンから外さない）。
+        if ($request->has('status') && $oldStatus !== $item->status && $item->status !== 'registered') {
             $item->lanes()->detach();
         }
         
@@ -686,6 +690,56 @@ class ItemController extends Controller
             'message' => 'ステータスを更新しました。',
             'data' => ['item' => $item],
         ]);
+    }
+
+    /**
+     * 現在の絞り込み条件（status / search / species_type_id）に一致する
+     * 「一括操作可能な」item の id 一覧を返す。
+     *
+     * 一覧はページネーションで現在ページ分しかフロントに載らないため、
+     * 「検索条件に一致する全件を選択」用にページをまたいだ id をまとめて返す。
+     * live/sold/cancelled は一括操作の対象外なので除外する（index の isBulkSelectable と一致）。
+     */
+    public function selectableIds(Request $request, $auctionId)
+    {
+        $ids = $this->bulkSelectableQuery($request, $auctionId)
+            ->pluck('items.id');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'item_ids' => $ids,
+                'total'    => $ids->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * index と同じ絞り込み（status / search / species_type_id）を適用し、
+     * 一括操作対象外の live/sold/cancelled を除外したクエリを返す。
+     */
+    private function bulkSelectableQuery(Request $request, $auctionId)
+    {
+        $query = Item::where('items.auction_id', $auctionId)
+            ->whereNotIn('items.status', ['live', 'sold', 'cancelled']);
+
+        if ($request->filled('species_type_id')) {
+            $query->where('items.species_type_id', $request->input('species_type_id'));
+        }
+
+        $status = $request->input('status');
+        if ($status && $status !== 'all') {
+            $query->where('items.status', $status);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('items.species_name', 'like', '%' . $search . '%')
+                  ->orWhere('items.item_number', 'like', '%' . $search . '%');
+            });
+        }
+
+        return $query;
     }
 
     /**

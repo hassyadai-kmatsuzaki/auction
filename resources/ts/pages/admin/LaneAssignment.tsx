@@ -419,7 +419,7 @@ export default function LaneAssignment() {
     }
   };
 
-  // 出品ID一括発行（レーン割当済み × 未発行の item に対して exhibit_code を発行 + 出品者へ通知）
+  // 出品ID一括発行（レーン割当済み × 未発行の item に exhibit_code を発行するのみ。出品者への通知は手動）
   const handleIssueExhibitCodes = async () => {
     try {
       setIssueLoading(true);
@@ -434,7 +434,7 @@ export default function LaneAssignment() {
     }
   };
 
-  // 出品ID通知の再送（発行済みの出品IDを全出品者へメール/LINEでもう一度案内）
+  // 出品ID通知の手動送信（発行済みの出品IDを対象出品者へメール/LINEで案内。押すたびに送信＝再送も兼ねる）
   const handleResendExhibitCodes = async () => {
     try {
       setResendLoading(true);
@@ -712,7 +712,7 @@ export default function LaneAssignment() {
                     issuedCount === 0
                   }
                 >
-                  通知を再送
+                  出品者へ通知
                 </Button>
               </>
             );
@@ -1176,7 +1176,8 @@ export default function LaneAssignment() {
                   レーン割当済みで未発行の生体 <strong>{unissuedItems.length}件</strong> に出品IDを発行します。
                 </Typography>
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  発行後、対象の出品者（{sellerCount}名）に出品IDをまとめたメール通知が送信されます。
+                  発行だけでは出品者へ通知は送信されません。対象の出品者（{sellerCount}名）への案内は、
+                  発行後に「出品者へ通知」ボタンから手動で送信してください。
                 </Alert>
                 <Alert severity="warning">
                   発行された出品IDは固定され、以後レーン移動や並び替えで変わりません。
@@ -1196,14 +1197,14 @@ export default function LaneAssignment() {
             variant="contained"
             color="secondary"
           >
-            {issueLoading ? <CircularProgress size={20} /> : '発行して通知'}
+            {issueLoading ? <CircularProgress size={20} /> : '発行する'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* 出品ID通知 再送ダイアログ */}
+      {/* 出品ID通知 送信ダイアログ */}
       <Dialog open={resendDialogOpen} onClose={() => !resendLoading && setResendDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>出品ID通知を再送</DialogTitle>
+        <DialogTitle>出品者へ出品ID通知を送信</DialogTitle>
         <DialogContent>
           {(() => {
             const issuedItems = lanes.flatMap((l) => l.items.filter((it) => !!it.exhibit_code));
@@ -1216,13 +1217,13 @@ export default function LaneAssignment() {
               <>
                 <Typography variant="body2" sx={{ mb: 2 }}>
                   発行済みの出品ID <strong>{issuedItems.length}件</strong> を、
-                  対象の出品者（{sellerCount}名）へメール / LINE でもう一度案内します。
+                  対象の出品者（{sellerCount}名）へメール / LINE で案内します。
                 </Typography>
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  新しい出品IDの発行は行いません。前回と同じ内容の通知が再度届きます（約1分後に送信）。
+                  新しい出品IDの発行は行いません（約1分後に送信）。
                 </Alert>
                 <Alert severity="warning">
-                  すでに案内済みの出品者にも重複して届きます。誤送信にご注意ください。
+                  このボタンを押すたびに送信されます。すでに案内済みの出品者にも同じ内容が重複して届くため、誤送信にご注意ください。
                 </Alert>
               </>
             );
@@ -1238,7 +1239,7 @@ export default function LaneAssignment() {
             variant="contained"
             color="secondary"
           >
-            {resendLoading ? <CircularProgress size={20} /> : '再送する'}
+            {resendLoading ? <CircularProgress size={20} /> : '送信する'}
           </Button>
         </DialogActions>
       </Dialog>
