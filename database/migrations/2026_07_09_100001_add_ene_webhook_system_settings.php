@@ -23,10 +23,10 @@ return new class extends Migration
         ],
         [
             'setting_key'   => 'ene_email_field_name',
-            'setting_value' => 'email',
+            'setting_value' => 'メールアドレス',
             'value_type'    => 'string',
             'display_name'  => 'E-NE メールアドレス フィールド名',
-            'description'   => 'E-NEのCRMでメールアドレスを持つフィールドのシステム名（crm_fields[].name）。',
+            'description'   => 'E-NEのCRMでメールアドレスを持つフィールドの表示名(label) または システム名(name)。本番の label は「メールアドレス」。',
         ],
         [
             'setting_key'   => 'ene_default_member_type',

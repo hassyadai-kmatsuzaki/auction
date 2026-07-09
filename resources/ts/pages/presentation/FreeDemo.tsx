@@ -13,20 +13,17 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Box, Container, Typography, Button, Paper, Grid, IconButton,
-  Chip, Alert, Snackbar,
+  Box, Container, Typography, Paper, Grid,
+  Alert, Snackbar, useMediaQuery,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
   Pets as PetsIcon,
-  Wifi as WifiIcon,
-  PlayArrow as PlayArrowIcon,
-  ViewList as ViewListIcon,
-  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem, UpcomingItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
+import { AuctionHeader } from '../../features/auction-live/components/AuctionHeader';
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
@@ -58,6 +55,9 @@ const LANE_QUEUES: LaneItem[][] = [
   FREE_LANE2_ITEMS.map(i => ({ ...i })),
 ];
 
+/** SPコンパクトカードにサムネイルを表示するか（本番 AuctionLive と同値に揃える） */
+const SHOW_COMPACT_THUMBNAIL = true;
+
 export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   const [phase, setPhase] = useState<FreeDemoPhase>('home');
 
@@ -65,6 +65,18 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // SP判定（本番 AuctionLive と同じ。縦=リスト1列 / 横持ち=2x2）
+  const isPhonePortrait = useMediaQuery('(max-width: 599.95px) and (orientation: portrait)');
+  const isPhoneLandscape = useMediaQuery('(max-height: 500px) and (orientation: landscape)');
+  const isCompactLive = isPhonePortrait || isPhoneLandscape;
+
+  // 横持ちスマホのオークション画面ではグローバルヘッダーを隠して4レーンを収める（auction-live.css）
+  useEffect(() => {
+    if (!isPhoneLandscape || phase !== 'auction') return;
+    document.body.classList.add('live-landscape-compact');
+    return () => document.body.classList.remove('live-landscape-compact');
+  }, [isPhoneLandscape, phase]);
 
   // ─── Shared state (出品一覧 ↔ お気に入り ↔ オークション で共有) ───
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
@@ -642,41 +654,28 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
       <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative' }}>
         {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 
-        {/* Header — matches real AuctionHeader */}
-        <Container maxWidth="xl" sx={{ pt: 2 }}>
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-              <Box>
-                <Typography variant="h5" fontWeight="bold">
-                  {MOCK_AUCTIONS[0].title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {2 - completedLanes.size}/{2}レーン進行中
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip icon={<WifiIcon />} label="リアルタイム接続中" color="success" size="small" />
-                <Chip icon={<PlayArrowIcon />} label="開催中" color="success" size="small" />
-                <Button size="small" variant="outlined" startIcon={<ViewListIcon />}
-                  onClick={() => setPhase('items')}>
-                  出品一覧
-                </Button>
-                <IconButton size="small" onClick={() => {}}>
-                  <RefreshIcon />
-                </IconButton>
-              </Box>
-            </Box>
-          </Paper>
-        </Container>
+        {/* Header — 本番と同じ AuctionHeader を共有（SP はコンパクト表示） */}
+        <AuctionHeader
+          title={MOCK_AUCTIONS[0].title}
+          activeLaneCount={2 - completedLanes.size}
+          totalLaneCount={2}
+          socketConnected
+          onRefresh={() => {}}
+          onNavigateItems={() => setPhase('items')}
+          compact={isCompactLive}
+          onMenuOpen={isPhoneLandscape ? () => window.dispatchEvent(new Event('participant:open-menu')) : undefined}
+        />
 
-        <Container maxWidth="xl" sx={{ py: 2 }}>
+        <Container maxWidth="xl" sx={{ py: isCompactLive ? 0.5 : 2, px: isCompactLive ? 1 : undefined }}>
           {/* Lane grid */}
-          <Grid container spacing={2}>
+          <Grid container spacing={isCompactLive ? 1 : 2}>
             {lanes.map(lane => (
-              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+              <Grid item xs={12} sm={6} md={isPhoneLandscape ? 6 : 4} key={lane.lane_id}>
                 {lane.current_item ? (
                   <LaneCard
                     lane={lane} isLoading={false}
+                    compact={isCompactLive}
+                    showThumbnail={SHOW_COMPACT_THUMBNAIL}
                     onBidToggle={handleBidToggle}
                     onDetailOpen={(l) => setDetailLane(l)}
                     onLimitEdit={(itemId) => {

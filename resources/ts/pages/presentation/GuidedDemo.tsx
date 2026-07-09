@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Box, Container, Typography, Paper, Grid, Button,
+  Box, Container, Typography, Paper, Grid,
   Chip, IconButton, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   useMediaQuery, useTheme,
@@ -14,13 +14,10 @@ import {
   Pets as PetsIcon,
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
-  Wifi as WifiIcon,
-  PlayArrow as PlayArrowIcon,
-  ViewList as ViewListIcon,
-  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import type { LiveLane, LaneItem } from '@/types';
 import { LaneCard } from '../../features/auction-live/components/LaneCard';
+import { AuctionHeader } from '../../features/auction-live/components/AuctionHeader';
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
@@ -64,9 +61,16 @@ const DEMO_PRICES = {
 // メインコンポーネント
 // ====================================================================
 
+/** SPコンパクトカードにサムネイルを表示するか（本番 AuctionLive と同値に揃える） */
+const SHOW_COMPACT_THUMBNAIL = true;
+
 export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // SP判定（本番 AuctionLive と同じ。縦=リスト1列 / 横持ち=2x2）
+  const isPhonePortrait = useMediaQuery('(max-width: 599.95px) and (orientation: portrait)');
+  const isPhoneLandscape = useMediaQuery('(max-height: 500px) and (orientation: landscape)');
+  const isCompactLive = isPhonePortrait || isPhoneLandscape;
   const [phase, setPhase] = useState<GuidedPhase>('home');
 
   // ─── Auction state ───
@@ -93,6 +97,14 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   const timersRef = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
   // 入札合戦のラウンド数（step 13で使用）
   const battleRoundRef = useRef(0);
+
+  // 横持ちスマホのオークション画面ではグローバルヘッダーを隠して4レーンを収める（auction-live.css）。
+  // ただしガイドツアー中はヘッダー内メニュー/ナビを導線に使うため隠さない。
+  useEffect(() => {
+    if (!isPhoneLandscape || phase !== 'auction' || tourActive) return;
+    document.body.classList.add('live-landscape-compact');
+    return () => document.body.classList.remove('live-landscape-compact');
+  }, [isPhoneLandscape, phase, tourActive]);
 
   // Post-auction controlled tab
   const [postAuctionTab, setPostAuctionTab] = useState<string>('won-items');
@@ -736,46 +748,37 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
       <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative', overflow: 'hidden' }}>
         {celebration && <CelebrationOverlay speciesName={celebration.species_name} winningPrice={celebration.winning_price} />}
 
-        {/* Auction header — matches real AuctionHeader */}
-        <Container maxWidth="xl" sx={{ pt: 2 }}>
-          <Paper ref={demoHeaderRef} sx={{ p: 2, mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-              <Box>
-                <Typography variant="h5" fontWeight="bold">
-                  {MOCK_AUCTIONS[0].title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  6/6レーン進行中
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                <Chip icon={<WifiIcon />} label="リアルタイム接続中" color="success" size="small" />
-                <Chip icon={<PlayArrowIcon />} label="開催中" color="success" size="small" />
-                <Button size="small" variant="outlined" startIcon={<ViewListIcon />}
-                  onClick={() => setPhase('items')}
-                  sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
-                  出品一覧
-                </Button>
-                <IconButton size="small" onClick={() => {}}>
-                  <RefreshIcon />
-                </IconButton>
-              </Box>
-            </Box>
-            {tourActive && (
+        {/* Auction header — 本番と同じ AuctionHeader を共有（SP はコンパクト表示）。
+            demoHeaderRef はガイドツアーのスポットライト位置決めに使うため div でラップして保持 */}
+        <div ref={demoHeaderRef}>
+          <AuctionHeader
+            title={MOCK_AUCTIONS[0].title}
+            activeLaneCount={6}
+            totalLaneCount={6}
+            socketConnected
+            onRefresh={() => {}}
+            onNavigateItems={() => setPhase('items')}
+            compact={isCompactLive}
+            onMenuOpen={isPhoneLandscape && !tourActive ? () => window.dispatchEvent(new Event('participant:open-menu')) : undefined}
+          />
+          {tourActive && (
+            <Box sx={{ px: isCompactLive ? 1.5 : 2, mb: 1 }}>
               <Chip label={`ガイド進行中 (${tourStep + 1}/${tourSteps.length})`}
-                color="primary" size="small" sx={{ mt: 1, fontWeight: 700, fontSize: '0.85rem' }} />
-            )}
-          </Paper>
-        </Container>
+                color="primary" size="small" sx={{ fontWeight: 700, fontSize: '0.85rem' }} />
+            </Box>
+          )}
+        </div>
 
-        <Container maxWidth="xl" sx={{ py: 3, pb: tourActive && isMobile ? '220px' : 3 }}>
+        <Container maxWidth="xl" sx={{ py: isCompactLive ? 0.5 : 3, px: isCompactLive ? 1 : undefined, pb: tourActive && isMobile ? '220px' : (isCompactLive ? 0.5 : 3) }}>
           {/* Lane grid */}
-          <Grid container spacing={2}>
+          <Grid container spacing={isCompactLive ? 1 : 2}>
             {lanes.map((lane, idx) => (
-              <Grid item xs={12} sm={6} md={4} key={lane.lane_id}>
+              <Grid item xs={12} sm={6} md={isPhoneLandscape ? 6 : 4} key={lane.lane_id}>
                 <Box ref={(el: HTMLDivElement | null) => { laneCardRefs.current[idx] = el; }}>
                   <LaneCard
                     lane={lane} isLoading={false}
+                    compact={isCompactLive}
+                    showThumbnail={SHOW_COMPACT_THUMBNAIL}
                     onBidToggle={handleBidToggle}
                     onDetailOpen={(l) => setDetailLane(l)}
                     disableDetail={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16)}

@@ -74,6 +74,15 @@ export function DemoLayout({ currentPage, onNavigate, children, showAuctionBanne
     setDrawerOpen(false);
   }, [currentPage]);
 
+  // 横持ちスマホのオークション画面ではグローバルヘッダーが隠れるため（auction-live.css）、
+  // ライブヘッダーのメニューアイコンからカスタムイベント経由でドロワーを開く（本番 ParticipantLayout と同じ）
+  useEffect(() => {
+    const open = () => handleDrawerOpen();
+    window.addEventListener('participant:open-menu', open);
+    return () => window.removeEventListener('participant:open-menu', open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* ヘッダー */}

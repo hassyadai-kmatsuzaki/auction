@@ -384,7 +384,7 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
                 <br />
                 【銀行振込で申し込む】を押していただけると、すぐに使えるようになります。
                 <br />
-                5月18日までに指定の口座へお振込ください。
+                本日より、1週間以内にお支払いをお願いいたします。次回開催時に、商品代金と合わせてお振込をご希望の場合はLINEにてご一報ください。
               </Alert>
             )}
           </Stack>
