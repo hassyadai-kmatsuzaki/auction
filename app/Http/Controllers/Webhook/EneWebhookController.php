@@ -26,6 +26,24 @@ class EneWebhookController extends Controller
         $body   = $request->getContent();
         $secret = (string) config('services.ene.webhook_secret');
 
+        // [一時デバッグ] 署名検証・トグルより前に、受信した生データをそのまま記録する。
+        //   連携初期は署名ミスマッチで下の 401 に落ちて中身が見えないため、ここで拾う。
+        //   個人情報が production.log に残るので ene_webhook_debug=true のときだけ出す。
+        //   確認が済んだらトグルを false に戻すこと（コードは残しておいてよい）。
+        if (SystemSetting::get('ene_webhook_debug', false)) {
+            Log::info('ENE webhook raw receive [debug]', [
+                'ip'      => $request->ip(),
+                'headers' => [
+                    'X-ENE-Signature' => $request->header('X-ENE-Signature'),
+                    'X-ENE-Delivery'  => $request->header('X-ENE-Delivery'),
+                    'Content-Type'    => $request->header('Content-Type'),
+                    'User-Agent'      => $request->header('User-Agent'),
+                ],
+                'body'         => $body,
+                'sig_expected' => $secret !== '' ? 'sha256=' . hash_hmac('sha256', $body, $secret) : null,
+            ]);
+        }
+
         // 0. 未設定は誤配線 → 5xx で気付けるようにする（正常時は .env に設定済みの前提）
         if ($secret === '') {
             Log::error('ENE webhook secret is not configured');
