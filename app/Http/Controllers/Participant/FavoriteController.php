@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Favorite;
 use App\Models\Item;
+use App\Services\ActivityLogger;
 use App\Services\TestModeService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
@@ -110,8 +111,12 @@ class FavoriteController extends Controller
             ->where('item_id', $itemId)
             ->first();
 
+        // 集計軸となる auction_id を非正規化で記録するため item から引く
+        $auctionId = Item::where('id', $itemId)->value('auction_id');
+
         if ($existing) {
             $existing->delete();
+            ActivityLogger::favoriteRemove((int) $itemId, $auctionId, $userId);
             return response()->json([
                 'success' => true,
                 'is_favorited' => false,
@@ -123,6 +128,7 @@ class FavoriteController extends Controller
             'user_id' => $userId,
             'item_id' => $itemId,
         ]);
+        ActivityLogger::favoriteAdd((int) $itemId, $auctionId, false, $userId);
 
         return response()->json([
             'success' => true,

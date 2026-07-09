@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, TextField, Button, Grid, Divider,
-  Card, CardContent, InputAdornment, Alert, Tabs, Tab,
+  Card, CardContent, InputAdornment, Alert, Tabs, Tab, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, Switch, FormControlLabel, CircularProgress, Snackbar,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -9,7 +9,7 @@ import {
 import {
   Save as SaveIcon, Settings as SettingsIcon, AttachMoney as MoneyIcon,
   LocalShipping as ShippingIcon, Receipt as ReceiptIcon, Gavel as GavelIcon,
-  Edit as EditIcon,
+  Edit as EditIcon, Link as LinkIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
@@ -57,6 +57,9 @@ interface SettingsState {
   bank_name: string; bank_branch: string; bank_account_type: string; bank_account_number: string;
   bank_account_holder: string; invoice_prefix: string; payment_notice_prefix: string;
   warranty_validity_days: string; auto_generate_invoice: boolean; auto_generate_payment_notice: boolean;
+  // 外部連携（E-NE）
+  ene_webhook_enabled: boolean; ene_email_field_name: string;
+  ene_default_member_type: string; ene_duplicate_behavior: string;
 }
 
 const DEFAULT_PRICE_INCREMENT_TIERS: PriceIncrementTier[] = [
@@ -90,6 +93,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   bank_name: '', bank_branch: '', bank_account_type: '', bank_account_number: '', bank_account_holder: '',
   invoice_prefix: '', payment_notice_prefix: '', warranty_validity_days: '14',
   auto_generate_invoice: false, auto_generate_payment_notice: false,
+  ene_webhook_enabled: false, ene_email_field_name: 'email',
+  ene_default_member_type: 'buyer', ene_duplicate_behavior: 'skip',
 };
 
 export default function AdminSettings() {
@@ -148,6 +153,10 @@ export default function AdminSettings() {
       warranty_validity_days:         String(d.document?.warranty_validity_days?.value ?? '14'),
       auto_generate_invoice:          d.document?.auto_generate_invoice?.value ?? false,
       auto_generate_payment_notice:   d.document?.auto_generate_payment_notice?.value ?? false,
+      ene_webhook_enabled:            d.external_integration?.ene_webhook_enabled?.value ?? false,
+      ene_email_field_name:           d.external_integration?.ene_email_field_name?.value ?? 'email',
+      ene_default_member_type:        String(d.external_integration?.ene_default_member_type?.value ?? 'buyer'),
+      ene_duplicate_behavior:         String(d.external_integration?.ene_duplicate_behavior?.value ?? 'skip'),
     });
     if (d.shipping?.shipping_rates?.value) setShippingRates(d.shipping.shipping_rates.value);
     if (d.auction?.default_price_increment_tiers?.value) setIncrementTiers(d.auction.default_price_increment_tiers.value);
@@ -230,6 +239,7 @@ export default function AdminSettings() {
           <Tab icon={<MoneyIcon />}    iconPosition="start" label="料金設定" />
           <Tab icon={<ShippingIcon />} iconPosition="start" label="配送・梱包" />
           <Tab icon={<ReceiptIcon />}  iconPosition="start" label="帳票" />
+          <Tab icon={<LinkIcon />}     iconPosition="start" label="外部連携" />
         </Tabs>
       </Paper>
 
@@ -638,6 +648,49 @@ export default function AdminSettings() {
             </Card>
           </Grid>
         </Grid>
+      </TabPanel>
+
+      {/* 外部連携（E-NE） */}
+      <TabPanel value={tabValue} index={5}>
+        <Card>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>E-NE 連携（契約締結で会員自動作成）</Typography>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              E-NE の契約締結Webhookを受けて<strong>承認済み会員</strong>を自動作成します。共有シークレット（whsec_…）はサーバーの <code>.env</code>（ENE_WEBHOOK_SECRET）で管理し、この画面には表示しません。
+            </Alert>
+            <Box sx={{ mb: 3 }}>
+              <FormControlLabel
+                control={<Switch checked={s.ene_webhook_enabled} onChange={bool('ene_webhook_enabled')} />}
+                label="E-NE連携を有効にする" />
+              <Typography variant="body2" color="text.secondary">
+                OFFの間はWebhookを受信しても会員作成をスキップします（疎通確認用）。
+              </Typography>
+            </Box>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="メールアドレスのフィールド名"
+                  value={s.ene_email_field_name} onChange={str('ene_email_field_name')}
+                  helperText="E-NEのCRMでメールを持つ項目のシステム名（crm_fields[].name）" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField select fullWidth label="既定の会員種別"
+                  value={s.ene_default_member_type} onChange={str('ene_default_member_type')}
+                  helperText="ペイロードに種別があればそちらを優先">
+                  <MenuItem value="buyer">買受者（participant）</MenuItem>
+                  <MenuItem value="seller">買受者＆出品者（participant + seller）</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField select fullWidth label="メール重複時の挙動"
+                  value={s.ene_duplicate_behavior} onChange={str('ene_duplicate_behavior')}>
+                  <MenuItem value="skip">スキップ（何もしない）</MenuItem>
+                  <MenuItem value="promote">既存を承認済みに昇格</MenuItem>
+                  <MenuItem value="error">失敗として記録</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
       </TabPanel>
 
       {/* スナックバー */}

@@ -18,6 +18,7 @@ import {
   Gavel as LiveIcon,
   Receipt as WonIcon,
   LocalShipping as ShipIcon,
+  Insights as AnalyticsIcon,
 } from '@mui/icons-material';
 import axios from '../lib/axios';
 
@@ -46,6 +47,7 @@ const TABS: { value: string; label: string; icon: React.ReactElement; match: str
   { value: 'shipments',    label: '伝票番号',     icon: <ShipIcon fontSize="small" />,   match: '/shipments' },
   { value: 'live',         label: 'ライブ',       icon: <LiveIcon fontSize="small" />,   match: '/live' },
   { value: 'won-items',    label: '落札者',       icon: <WonIcon fontSize="small" />,    match: '/won-items' },
+  { value: 'analytics',    label: '分析',         icon: <AnalyticsIcon fontSize="small" />, match: '/analytics' },
 ];
 
 export default function AuctionWorkspace() {

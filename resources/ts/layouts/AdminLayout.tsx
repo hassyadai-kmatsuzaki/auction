@@ -43,6 +43,7 @@ import {
   WorkspacePremium as PlanIcon,
   Email as EmailIcon,
   FileDownload as FileDownloadIcon,
+  Insights as InsightsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
@@ -96,6 +97,7 @@ export default function AdminLayout() {
 
   const menuItems = [
     { text: 'ダッシュボード', icon: <DashboardIcon />, path: '/admin/dashboard' },
+    { text: '行動分析', icon: <InsightsIcon />, path: '/admin/analytics' },
     { text: 'お知らせ管理', icon: <CampaignIcon />, path: '/admin/announcements' },
     { text: 'メール配信', icon: <EmailIcon />, path: '/admin/email-campaigns' },
   ];

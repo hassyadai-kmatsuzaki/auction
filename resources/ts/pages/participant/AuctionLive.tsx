@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { EmojiEvents as EmojiEventsIcon } from '@mui/icons-material';
 import axios from '@/lib/axios';
+import { trackEvent } from '@/lib/track';
 import { formatYen } from '@/lib/formatPrice';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -47,6 +48,12 @@ export default function AuctionLive() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // 計測: 「オークション会場へ」＝ライブ画面到達（venue_enter）。全経路（ボタン/直リンク）を
+  // ここ1点で捕捉。サーバ側で1ユーザー1オークション1行に重複排除（ライブ中も記録）。
+  useEffect(() => {
+    if (auctionId) trackEvent('venue_enter', { auction_id: auctionId });
+  }, [auctionId]);
 
   // SP判定（4レーンを画面内に収めるコンパクト表示）
   //   縦向き: 幅 600px 未満のスマホ → リスト形式（1列）

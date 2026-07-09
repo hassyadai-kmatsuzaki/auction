@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
+import { trackEvent } from '../../lib/track';
 import { formatYen } from '../../lib/formatPrice';
 import { ItemCard } from '../../features/auction-items/components/ItemCard';
 import type { ItemData } from '../../features/auction-items/components/ItemCard';
@@ -105,6 +106,12 @@ export default function AuctionItems() {
     enabled: allItemIds.length > 0,
     staleTime: 10_000,
   });
+
+  // 計測: 生体詳細を開いたとき（item_view）。サーバ側で開始前(preparing/scheduled)のみ・
+  // 1ユーザー1日×item 1行に絞る。ライブ中は記録されない。
+  useEffect(() => {
+    if (selectedItem) trackEvent('item_view', { item_id: selectedItem.id });
+  }, [selectedItem]);
 
   // お気に入り取得（商品ID集合が変わったときのみ）
   useEffect(() => {

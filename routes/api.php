@@ -67,6 +67,12 @@ Route::get('auth/line/callback', [\App\Http\Controllers\Auth\LineAuthController:
 Route::post('/webhooks/square', [\App\Http\Controllers\Webhook\SquareWebhookController::class, 'handle'])
     ->name('webhooks.square');
 
+// E-NE 外部連携 Webhook（認証不要。HMAC署名で検証。契約締結で承認済み会員を自動作成）
+// ライブ非影響: 即202＋notifyキューで非同期。rate.limit でフラッド保護（G2）
+Route::post('/webhooks/ene', [\App\Http\Controllers\Webhook\EneWebhookController::class, 'handle'])
+    ->middleware('rate.limit:120,1')
+    ->name('webhooks.ene');
+
 // 認証API（ゲスト・レート制限付き）
 Route::middleware('rate.limit:10,1')->prefix('auth')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
@@ -171,7 +177,13 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::patch('auctions/{id}/publish', [AdminAuctionController::class, 'updatePublish']);
     Route::patch('auctions/{id}/lane-count', [AdminAuctionController::class, 'updateLaneCount']);
     Route::get('auctions-item-management', [AdminAuctionController::class, 'itemManagementList']);
-    
+
+    // 行動分析（オークション別 KPI / 生体別 / 誰が / 全体）
+    Route::get('analytics/overview', [\App\Http\Controllers\Admin\AdminAnalyticsController::class, 'overview']);
+    Route::get('auctions/{auctionId}/analytics', [\App\Http\Controllers\Admin\AdminAnalyticsController::class, 'auctionSummary'])->whereNumber('auctionId');
+    Route::get('auctions/{auctionId}/analytics/items', [\App\Http\Controllers\Admin\AdminAnalyticsController::class, 'auctionItems'])->whereNumber('auctionId');
+    Route::get('auctions/{auctionId}/analytics/users', [\App\Http\Controllers\Admin\AdminAnalyticsController::class, 'auctionUsers'])->whereNumber('auctionId');
+
     // システム設定管理
     Route::get('settings', [SystemSettingController::class, 'index']);
     Route::get('settings/defaults', [SystemSettingController::class, 'getAuctionDefaults']);
@@ -616,6 +628,11 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::middleware('throttle:favorites')->group(function () {
         Route::post('/favorites/toggle', [ParticipantFavoriteController::class, 'toggle']);
         Route::post('/favorites/check', [ParticipantFavoriteController::class, 'checkBulk']);
+    });
+
+    // 行動計測（会場入場・生体閲覧・当日アクセス）。副作用計測なので throttle で連打抑制。
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('/track', [\App\Http\Controllers\Participant\TrackController::class, 'store']);
     });
 
     // 評価

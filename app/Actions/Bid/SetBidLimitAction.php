@@ -10,6 +10,7 @@ use App\Models\BidParticipant;
 use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
+use App\Services\ActivityLogger;
 use App\Services\CountdownService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -67,7 +68,14 @@ class SetBidLimitAction
             );
         }, 3);
 
-        Favorite::firstOrCreate(['user_id' => $userId, 'item_id' => $item->id]);
+        $autoFav = Favorite::firstOrCreate(['user_id' => $userId, 'item_id' => $item->id]);
+
+        // 計測: 指値保存の tx（items ロック）は上で閉じ、ロックは解放済み。
+        // 入札ロック内で記録しない鉄則に従い、ここ（ロック外）で撃つ。失敗しても本処理に影響しない。
+        ActivityLogger::bidLimitSet($item->id, $item->auction_id, $limitPrice, $userId);
+        if ($autoFav->wasRecentlyCreated) {
+            ActivityLogger::favoriteAdd($item->id, $item->auction_id, true, $userId);
+        }
 
         $triggered  = false;
         $autoBidded = false;
@@ -358,9 +366,20 @@ class SetBidLimitAction
             }
         }
 
+        // 解除前に指値額を控えておく（物理削除で履歴が消えるため、meta 用に取得）
+        $removedPrice = BidLimitPrice::forItem($item->id)->forUser($userId)->value('limit_price');
+
         BidLimitPrice::forItem($item->id)->forUser($userId)->delete();
         // 指値設定時に自動付与したお気に入りも併せて解除する
         Favorite::where('user_id', $userId)->where('item_id', $item->id)->delete();
+
+        // 計測: ロック外で記録（失敗しても本処理に影響しない）
+        ActivityLogger::bidLimitRemove(
+            $item->id,
+            $item->auction_id,
+            $removedPrice !== null ? (float) $removedPrice : null,
+            $userId
+        );
 
         return BidResultDto::success([], '上限価格を解除し、入札から離脱しました');
     }

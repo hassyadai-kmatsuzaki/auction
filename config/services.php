@@ -87,4 +87,10 @@ return [
         'api_version'        => env('SQUARE_API_VERSION', '2024-10-17'),
     ],
 
+    // E-NE（Cal-Connect）外部連携 Webhook。契約締結で承認済み会員を自動作成する。
+    // 共有シークレット（whsec_...）は system_settings に平文で置かず .env に格納する。
+    'ene' => [
+        'webhook_secret' => env('ENE_WEBHOOK_SECRET', ''),
+    ],
+
 ];

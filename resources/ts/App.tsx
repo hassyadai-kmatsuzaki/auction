@@ -58,6 +58,8 @@ const ItemManagement         = lazy(() => import('./pages/admin/ItemManagement')
 const ItemForm               = lazy(() => import('./pages/admin/ItemForm'));
 const LiveControl            = lazy(() => import('./pages/admin/LiveControl'));
 const WonItemManagement      = lazy(() => import('./pages/admin/WonItemManagement'));
+const AuctionAnalytics       = lazy(() => import('./pages/admin/AuctionAnalytics'));
+const AnalyticsDashboard     = lazy(() => import('./pages/admin/AnalyticsDashboard'));
 const UserManagement         = lazy(() => import('./pages/admin/UserManagement'));
 const UserDetail             = lazy(() => import('./pages/admin/UserDetail'));
 const UserCreate             = lazy(() => import('./pages/admin/UserCreate'));
@@ -192,6 +194,7 @@ function App() {
           }>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="analytics" element={<AnalyticsDashboard />} />
             
             {/* お知らせ管理 */}
             <Route path="announcements" element={<AnnouncementManagement />} />
@@ -226,6 +229,7 @@ function App() {
               <Route path="shipments"    element={<AuctionShipments />} />
               <Route path="live"         element={<LiveControl />} />
               <Route path="won-items"    element={<WonItemManagement />} />
+              <Route path="analytics"    element={<AuctionAnalytics />} />
             </Route>
             
             {/* 出品者管理 */}

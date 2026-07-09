@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Auth\Concerns\EnforcesSingleSession;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -84,6 +85,9 @@ class LoginController extends Controller
 
         // トークン発行
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        // 計測: ログイン（2FA 経由は TwoFactorController::verify 側で記録）
+        ActivityLogger::login($user->id);
 
         return response()->json([
             'success' => true,

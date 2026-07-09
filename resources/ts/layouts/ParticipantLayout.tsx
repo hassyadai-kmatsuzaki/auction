@@ -36,6 +36,7 @@ import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
 // import TutorialGuide from '../features/tutorial/TutorialGuide';
 import axios from '../lib/axios';
+import { trackEvent } from '../lib/track';
 import type { Auction } from '../types';
 
 export default function ParticipantLayout() {
@@ -46,6 +47,11 @@ export default function ParticipantLayout() {
 
   const [liveAuction, setLiveAuction] = useState<Auction | null>(null);
   const [scheduledAuction, setScheduledAuction] = useState<Auction | null>(null);
+
+  // 計測: その日最初のアクセス（daily_access）。サーバ側で1ユーザー1日1行に重複排除。
+  useEffect(() => {
+    if (user?.id) trackEvent('daily_access');
+  }, [user?.id]);
 
   // ページ遷移時にサイドバーを閉じる
   useEffect(() => {
