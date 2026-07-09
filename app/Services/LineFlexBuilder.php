@@ -298,6 +298,32 @@ class LineFlexBuilder
      * @param  array<array{0: string, 1: string}>  $bodyRows  [ [ラベル, 値], ... ]
      * @param  array{label: string, uri: string}|null  $footerButton
      */
+    /**
+     * E-NE 契約締結 → 会員自動発行後の「パスワード設定」案内。
+     *
+     * $setPasswordUrl は frontend の /auth/set-password?token=… を渡す。
+     * LINE 内ブラウザだと設定後のログインが不安定なため、端末の標準ブラウザで開かせる。
+     */
+    public function setPasswordInvite(string $name, string $setPasswordUrl): array
+    {
+        $url = $this->forceHttps($setPasswordUrl);
+        if (str_starts_with($url, 'https://')) {
+            $url .= (str_contains($url, '?') ? '&' : '?') . 'openExternalBrowser=1';
+        }
+
+        return $this->bubble(
+            heroImageUrl: null,
+            headerText: '✅ 会員登録が完了しました',
+            headerColor: self::ACCENT_COLOR,
+            bodyRows: [],
+            bodyLead: $name . ' 様',
+            bodyNote: "下のボタンからパスワードを設定してください。設定後、そのままログインいただけます。\n（リンクの有効期限は7日間です）",
+            footerButton: str_starts_with($url, 'https://')
+                ? ['label' => 'パスワードを設定する', 'uri' => $url]
+                : null,
+        );
+    }
+
     private function bubble(
         ?string $heroImageUrl,
         string $headerText,

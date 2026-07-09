@@ -76,8 +76,8 @@ class ProcessEneWebhookJob implements ShouldQueue
     {
         $customer = $this->payload['customer'] ?? [];
 
-        // メールアドレス抽出（設定のシステム名で crm_fields から）
-        $emailFieldName = (string) SystemSetting::get('ene_email_field_name', 'email');
+        // メールアドレス抽出（crm_fields の label/name で照合。既定は表示名「メールアドレス」）
+        $emailFieldName = (string) SystemSetting::get('ene_email_field_name', 'メールアドレス');
         $email = $this->extractEmail($customer, $emailFieldName);
         if (!$email) {
             throw new \RuntimeException("email not found in crm_fields (field name: {$emailFieldName})");
@@ -91,16 +91,43 @@ class ProcessEneWebhookJob implements ShouldQueue
             return $this->handleDuplicate($existing);
         }
 
-        $memberType = (string) SystemSetting::get('ene_default_member_type', 'buyer');
-
         $created = $createMember->execute([
-            'name'        => $name,
-            'email'       => $email,
-            'member_type' => $memberType,
-            'is_test'     => false,
+            'name'              => $name,
+            'email'             => $email,
+            'member_type'       => $this->resolveMemberType($customer),
+            'is_test'           => false,
+            'line_user_id'      => $customer['line_user_id'] ?? null,
+            'line_display_name' => $customer['display_name'] ?? $name,
         ]);
 
         return ['user_id' => $created['user']->id, 'result' => 'created'];
+    }
+
+    /**
+     * アカウントロール（crm_fields）から会員種別を決める。
+     *   「出品」を含む → seller（seller+participant ロール = 出品も可能）
+     *   含まない       → buyer（participant = 買受のみ）
+     *   ※ 1day 会員は後日対応。現状は上記2択にフォールバックする。
+     *
+     * @param array<string, mixed> $customer
+     */
+    private function resolveMemberType(array $customer): string
+    {
+        $roleFieldName = (string) SystemSetting::get('ene_role_field_name', 'アカウントロール');
+
+        $roleText = '';
+        foreach ($customer['crm_fields'] ?? [] as $field) {
+            if (($field['name'] ?? null) === $roleFieldName || ($field['label'] ?? null) === $roleFieldName) {
+                // display_value（"出品, 買受" 等の表示名）を優先。無ければ value 配列を連結。
+                $roleText = (string) ($field['display_value'] ?? '');
+                if ($roleText === '' && is_array($field['value'] ?? null)) {
+                    $roleText = implode(',', array_map('strval', $field['value']));
+                }
+                break;
+            }
+        }
+
+        return mb_strpos($roleText, '出品') !== false ? 'seller' : 'buyer';
     }
 
     /**
@@ -109,7 +136,10 @@ class ProcessEneWebhookJob implements ShouldQueue
     private function extractEmail(array $customer, string $fieldName): ?string
     {
         foreach ($customer['crm_fields'] ?? [] as $field) {
-            if (($field['name'] ?? null) === $fieldName) {
+            // name（自動生成スラッグ）と label（管理画面で設定した表示名）の両方で照合する。
+            // Cal-Connect の crm_fields.name は "field_xxxx" 形式のため、設定値には label
+            // （例:「メールアドレス」）を入れる運用を基本とする。
+            if (($field['name'] ?? null) === $fieldName || ($field['label'] ?? null) === $fieldName) {
                 $value = $field['value'] ?? $field['display_value'] ?? null;
                 // multi_select 等で配列が来た場合は先頭を採用
                 $value = is_array($value) ? ($value[0] ?? null) : $value;

@@ -61,8 +61,14 @@ class EneWebhookController extends Controller
         $event      = $payload['event'] ?? 'unknown';
         $deliveryId = $payload['delivery_id'] ?? $request->header('X-ENE-Delivery');
 
-        // 2. テスト送信は本処理せず 200（会員登録はスキップ）
+        // 2. テスト送信は本処理せず 200（会員登録はスキップ）。
+        //    疎通確認用途なので、トグルに関係なく常時ログを出す（個人情報を含まない前提）。
         if ($event === 'webhook.test') {
+            Log::info('ENE webhook test received', [
+                'ip'          => $request->ip(),
+                'delivery_id' => $deliveryId,
+                'body'        => $body,
+            ]);
             return response()->json(['message' => 'test received']);
         }
 
