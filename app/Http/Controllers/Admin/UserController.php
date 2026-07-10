@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\SellerProfile;
+use App\Models\Subscription;
 use App\Models\EmailVerificationToken;
 use App\Mail\AccountApprovedMail;
 use App\Mail\SetPasswordMail;
@@ -98,7 +99,7 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $user = User::with(['roles', 'sellerProfile', 'sellerProfile.user:id,profile_image_path'])->findOrFail($id);
+        $user = User::with(['roles', 'sellerProfile', 'sellerProfile.user:id,profile_image_path', 'subscription.plan'])->findOrFail($id);
 
         // 出品者プロフィールがある場合は口座情報も含める（管理者用）
         $userData = $user->toArray();
@@ -472,6 +473,112 @@ class UserController extends Controller
             'data' => [
                 'user' => $user->fresh(['roles']),
                 'subscription' => $subscription,
+            ],
+        ]);
+    }
+
+    /**
+     * 会員種別切替: 1Day会員 → 落札者(buyer) / 落札出品者(seller)。
+     * （1Day会員_実装方針書_20260710.md §3.6-3.7）
+     *
+     * やること:
+     *   1. 1Dayサブスクを即時解約（Squareカード無効化込み・reason=switched_by_admin）
+     *   2. seller 切替なら seller ロール + SellerProfile を整備
+     *
+     * 年会費の課金は行わない。本人が次回ログイン時の加入モーダルで満額を決済する。
+     * switched_by_admin マーカーが立っている間、加入モーダルには年会費プランのみが
+     * 表示され（1Day再選択ブロック）、本人の決済完了でマーカーは自動で消える。
+     */
+    public function switchMembership(Request $request, $id, SubscriptionService $service)
+    {
+        $request->validate([
+            'member_type' => 'required|string|in:buyer,seller',
+        ]);
+
+        $user = User::with(['roles', 'subscription.plan', 'sellerProfile'])->findOrFail($id);
+
+        if ($user->roles->contains('name', 'admin')) {
+            return response()->json([
+                'success' => false,
+                'message' => '管理者ユーザーは切替できません',
+            ], 422);
+        }
+
+        $subscription = $user->subscription;
+        if (!$subscription || !$subscription->plan || !$subscription->plan->isOneShot()) {
+            return response()->json([
+                'success' => false,
+                'message' => '1Day会員のユーザーのみ切替できます',
+            ], 422);
+        }
+
+        // 1) 1Dayサブスクの即時解約。cancel() は Square API（カード無効化）を伴うため
+        //    DBトランザクションの外で行う。失敗したら何も変えずに 422 で返し、管理者が再実行する。
+        try {
+            if ($subscription->status !== Subscription::STATUS_CANCELED) {
+                $service->cancel($subscription, Subscription::REASON_SWITCHED_BY_ADMIN);
+            } else {
+                // 自然失効(one_day_expired)済みでもマーカーを切替に揃えて 1Day 再選択を塞ぐ
+                $subscription->update(['suspended_reason' => Subscription::REASON_SWITCHED_BY_ADMIN]);
+            }
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '1Dayプランの解約処理に失敗しました: ' . $e->getMessage(),
+            ], 422);
+        }
+
+        // 2) ロール整備（冪等）。落札出品者は seller + participant、落札者は participant のみ。
+        DB::transaction(function () use ($request, $user) {
+            $ensureRole = function (string $roleName) use ($user): void {
+                if (!$user->roles()->where('name', $roleName)->exists()) {
+                    $role = Role::where('name', $roleName)->firstOrFail();
+                    $user->roles()->attach($role->id, [
+                        'assigned_at' => now(),
+                        'assigned_by' => auth()->id(),
+                    ]);
+                }
+            };
+
+            $ensureRole('participant');
+
+            if ($request->member_type === 'seller') {
+                $ensureRole('seller');
+
+                // SellerProfile が無ければ作成。切替対象は承認済みユーザーのため、
+                // update() の承認時自動有効化と同じ扱いで is_active=true にする。
+                if (!$user->sellerProfile) {
+                    SellerProfile::create([
+                        'user_id'        => $user->id,
+                        'seller_code'    => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
+                        'seller_name'    => $user->trade_name ?? $user->name,
+                        'corporate_name' => $user->company_name,
+                        'contact_name'   => $user->name,
+                        'email'          => $user->email,
+                        'phone'          => $user->phone ?? '',
+                        'postal_code'    => $user->postal_code,
+                        'prefecture'     => $user->prefecture,
+                        'city'           => $user->city,
+                        'address_line1'  => $user->address_line1,
+                        'address_line2'  => $user->address_line2,
+                        'is_active'      => true,
+                    ]);
+                } elseif (!$user->sellerProfile->is_active) {
+                    $user->sellerProfile->update(['is_active' => true]);
+                }
+            }
+        });
+
+        $memberTypeLabel = $request->member_type === 'seller' ? '落札出品者' : '落札者';
+
+        return response()->json([
+            'success' => true,
+            'message' => sprintf(
+                '%sへの切替を受け付けました。1Day会員は解約済みです。ご本人が次回ログイン時に年会費プランを決済すると切替が完了します。',
+                $memberTypeLabel
+            ),
+            'data' => [
+                'user' => $user->fresh(['roles', 'sellerProfile', 'subscription.plan']),
             ],
         ]);
     }

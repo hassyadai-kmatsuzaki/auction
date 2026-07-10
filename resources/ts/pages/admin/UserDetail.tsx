@@ -27,6 +27,8 @@ import {
   ListItem,
   ListItemText,
   Switch,
+  RadioGroup,
+  Radio,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -39,6 +41,7 @@ import {
   AccountBalance as AccountBalanceIcon,
   Email as EmailIcon,
   PhotoCamera as PhotoCameraIcon,
+  SwapHoriz as SwapHorizIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -88,6 +91,25 @@ interface SellerProfile {
   profile_image_url: string | null;
 }
 
+interface SubscriptionPlan {
+  id: number;
+  code: string;
+  name: string;
+  amount: number;
+  /** 有効日数。null=1年（年会費）。値あり=単発プラン（1Day会員） */
+  duration_days: number | null;
+  allows_bid: boolean;
+  allows_sell: boolean;
+}
+
+interface UserSubscription {
+  id: number;
+  status: 'pending' | 'active' | 'past_due' | 'canceled' | 'suspended';
+  current_period_end: string | null;
+  suspended_reason: string | null;
+  plan: SubscriptionPlan | null;
+}
+
 interface User {
   id: number;
   name: string;
@@ -117,6 +139,7 @@ interface User {
   profile_image_url: string | null;
   roles: Role[];
   seller_profile: SellerProfile | null;
+  subscription: UserSubscription | null;
 }
 
 export default function UserDetail() {
@@ -134,6 +157,9 @@ export default function UserDetail() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmBankDialogOpen, setConfirmBankDialogOpen] = useState(false);
+  const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState<'buyer' | 'seller'>('buyer');
+  const [switchSubmitting, setSwitchSubmitting] = useState(false);
   
   // 編集フォーム
   const [editForm, setEditForm] = useState({
@@ -307,6 +333,28 @@ export default function UserDetail() {
     } catch (err: any) {
       setError(err.response?.data?.message || '振込確認の処理に失敗しました');
       setConfirmBankDialogOpen(false);
+    }
+  };
+
+  // 1Day会員 → 落札者/落札出品者 への会員種別切替。
+  // 1Dayサブスクを即時解約し、本人が次回ログイン時に年会費プランを決済する。
+  const handleSwitchMembership = async () => {
+    setSwitchSubmitting(true);
+    try {
+      const response = await axios.post(`/api/admin/users/${id}/switch-membership`, {
+        member_type: switchTarget,
+      });
+
+      if (response.data.success) {
+        setSuccess(response.data.message || '会員種別を切替えました');
+        setSwitchDialogOpen(false);
+        fetchUser();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || '会員種別の切替に失敗しました');
+      setSwitchDialogOpen(false);
+    } finally {
+      setSwitchSubmitting(false);
     }
   };
 
@@ -1125,6 +1173,17 @@ export default function UserDetail() {
                 </Button>
               )}
 
+              {user.subscription?.plan?.duration_days != null && (
+                <Button
+                  variant="contained"
+                  color="warning"
+                  startIcon={<SwapHorizIcon />}
+                  onClick={() => setSwitchDialogOpen(true)}
+                >
+                  会員種別切替
+                </Button>
+              )}
+
               <Button
                 variant="outlined"
                 color="error"
@@ -1291,6 +1350,43 @@ export default function UserDetail() {
           <Button onClick={() => setConfirmBankDialogOpen(false)}>キャンセル</Button>
           <Button onClick={handleConfirmBankTransfer} variant="contained" color="primary">
             確認済みにする
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 会員種別切替ダイアログ（1Day会員 → 年会員） */}
+      <Dialog open={switchDialogOpen} onClose={() => !switchSubmitting && setSwitchDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>会員種別切替（1Day会員 → 年会員）</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            切替先の会員種別を選択してください。
+          </Typography>
+          <RadioGroup value={switchTarget} onChange={(e) => setSwitchTarget(e.target.value as 'buyer' | 'seller')}>
+            <FormControlLabel
+              value="buyer"
+              control={<Radio />}
+              label="落札者（年会費 5,500円 / 落札のみ）"
+            />
+            <FormControlLabel
+              value="seller"
+              control={<Radio />}
+              label="落札出品者（年会費 11,000円 / 落札＋出品）"
+            />
+          </RadioGroup>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            実行すると1Day会員プランは即時解約されます。ご本人が次回ログイン時に年会費プランを決済するまで入札はできません（500円の充当・日割りはありません）。
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSwitchDialogOpen(false)} disabled={switchSubmitting}>キャンセル</Button>
+          <Button
+            onClick={handleSwitchMembership}
+            variant="contained"
+            color="warning"
+            disabled={switchSubmitting}
+            startIcon={switchSubmitting ? <CircularProgress size={16} /> : <SwapHorizIcon />}
+          >
+            切替を実行
           </Button>
         </DialogActions>
       </Dialog>

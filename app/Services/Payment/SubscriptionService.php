@@ -34,6 +34,18 @@ class SubscriptionService
     ) {}
 
     /**
+     * プランに応じた有効期限を計算する。
+     * duration_days あり（1Day会員などの単発プラン）= 起点 + duration_days 日、なし = 起点 + 1年。
+     * 期間計算はここに一本化する（addYear ハードコードを散らさない）。
+     */
+    private function periodEnd(Plan $plan, \Carbon\CarbonInterface $base): \Carbon\CarbonInterface
+    {
+        return $plan->duration_days
+            ? $base->copy()->addDays($plan->duration_days)
+            : $base->copy()->addYear();
+    }
+
+    /**
      * 新規加入: カード登録 + 初回課金 + subscription 作成
      *
      * @param User   $user
@@ -121,7 +133,7 @@ class SubscriptionService
                     'card_exp_year'        => isset($card['exp_year']) ? (string) $card['exp_year'] : null,
                     'status'               => Subscription::STATUS_ACTIVE,
                     'current_period_start' => $now,
-                    'current_period_end'   => $now->copy()->addYear(),
+                    'current_period_end'   => $this->periodEnd($plan, $now),
                     'canceled_at'          => null,
                     'suspended_at'         => null,
                     'suspended_reason'     => null,
@@ -290,10 +302,12 @@ class SubscriptionService
                 ? $subscription->current_period_end
                 : $now;
 
+            $plan = $subscription->plan ?? Plan::find($subscription->plan_id);
+
             $subscription->update([
                 'status'               => Subscription::STATUS_ACTIVE,
                 'current_period_start' => $now,
-                'current_period_end'   => $base->copy()->addYear(),
+                'current_period_end'   => $plan ? $this->periodEnd($plan, $base) : $base->copy()->addYear(),
                 'canceled_at'          => null,
                 'suspended_at'         => null,
                 'suspended_reason'     => null,
@@ -455,14 +469,14 @@ class SubscriptionService
                 'raw_response'     => $payment,
             ]);
 
-            // 次回更新日を1年後に進める
+            // 次回更新日をプラン期間ぶん進める（年会費=1年。単発プランはそもそも renew 対象外）
             $base = $subscription->current_period_end && $subscription->current_period_end->isFuture()
                 ? $subscription->current_period_end
                 : $now;
             $subscription->update([
                 'status'               => Subscription::STATUS_ACTIVE,
                 'current_period_start' => $now,
-                'current_period_end'   => $base->copy()->addYear(),
+                'current_period_end'   => $this->periodEnd($plan, $base),
                 'suspended_at'         => null,
                 'suspended_reason'     => null,
             ]);

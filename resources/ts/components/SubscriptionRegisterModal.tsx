@@ -20,6 +20,8 @@ interface Plan {
   name: string;
   description: string | null;
   amount: number;
+  /** 有効日数。null=1年（年会費・自動更新）。値あり=単発プラン（1Day会員） */
+  duration_days: number | null;
   allows_bid: boolean;
   allows_sell: boolean;
   is_active: boolean;
@@ -131,6 +133,19 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
       setSelectedPlanId(visiblePlans[0].id);
     }
   }, [visiblePlans, replaceCardOnly, selectedPlanId]);
+
+  // 単発プラン（1Day会員）はクレジットカード決済のみ（サーバ側でも422でガード）
+  const selectedPlan = useMemo(
+    () => plans.find((p) => p.id === selectedPlanId) ?? null,
+    [plans, selectedPlanId],
+  );
+  const isOneShotSelected = selectedPlan?.duration_days != null;
+
+  useEffect(() => {
+    if (isOneShotSelected && paymentMethod === 'bank_transfer') {
+      setPaymentMethod('card');
+    }
+  }, [isOneShotSelected, paymentMethod]);
 
   // Square Card UI を生成（カード払い時のみ）
   useEffect(() => {
@@ -264,7 +279,7 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        {replaceCardOnly ? 'カード情報の更新' : '年会費プラン加入'}
+        {replaceCardOnly ? 'カード情報の更新' : '会員プラン加入'}
       </DialogTitle>
       <DialogContent dividers>
         {loading ? (
@@ -315,7 +330,9 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
                                   </Box>
                                   <Box textAlign="right">
                                     <Typography variant="h6" fontWeight={700}>{formatYen(p.amount)}</Typography>
-                                    <Typography variant="caption" color="text.secondary">/年（税込）</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {p.duration_days != null ? `${p.duration_days}日間有効（税込）` : '/年（税込）'}
+                                    </Typography>
                                   </Box>
                                 </Stack>
                               </Box>
@@ -325,6 +342,13 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
                       ))}
                     </Stack>
                   </RadioGroup>
+                )}
+
+                {isOneShotSelected && (
+                  <Alert severity="info" variant="outlined">
+                    1Day会員は決済完了から{selectedPlan?.duration_days}日間ご利用いただけます。
+                    期間終了後の自動更新・返金はありません。お支払いはクレジットカードのみです。
+                  </Alert>
                 )}
 
                 <Divider />
@@ -346,16 +370,18 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
                     }
                     sx={{ mr: 3 }}
                   />
-                  <FormControlLabel
-                    value="bank_transfer"
-                    control={<Radio />}
-                    label={
-                      <Stack direction="row" alignItems="center" spacing={0.75}>
-                        <AccountBalance fontSize="small" />
-                        <span>銀行振込</span>
-                      </Stack>
-                    }
-                  />
+                  {!isOneShotSelected && (
+                    <FormControlLabel
+                      value="bank_transfer"
+                      control={<Radio />}
+                      label={
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <AccountBalance fontSize="small" />
+                          <span>銀行振込</span>
+                        </Stack>
+                      }
+                    />
+                  )}
                 </RadioGroup>
               </>
             )}

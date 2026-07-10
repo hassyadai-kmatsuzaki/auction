@@ -26,6 +26,12 @@ class SubscriptionController extends Controller
 
         $plans = Plan::active()->ordered()->get();
 
+        // 管理者による会員種別切替（1Day → 年会員）後は年会費プランのみ提示し、
+        // 1Day（単発プラン）の再選択を塞ぐ。マーカーは本人が年会費を決済すると自動で消える。
+        if ($subscription && $subscription->isSwitchedByAdmin()) {
+            $plans = $plans->reject(fn ($p) => $p->isOneShot())->values();
+        }
+
         // 銀行振込モードで管理者の振込確認待ち
         // 初回申込中 (status=pending) も、年次更新案内中 (status=active で confirmed_at がリセットされた状態) も含む。
         // テストユーザー (id<=509) は除外。
@@ -82,6 +88,25 @@ class SubscriptionController extends Controller
 
         $plan = Plan::active()->findOrFail($request->input('plan_id'));
         $user = $request->user();
+
+        if ($plan->isOneShot()) {
+            // 1Day会員はクレジットカード決済のみ（振込確認の運用対象にしない）
+            if ($paymentMethod === 'bank_transfer') {
+                return response()->json([
+                    'success' => false,
+                    'message' => '1Day会員はクレジットカード決済のみご利用いただけます',
+                ], 422);
+            }
+
+            // 会員種別切替後（switched_by_admin マーカー）は年会費プランのみ選択可
+            $current = $user->subscription;
+            if ($current && $current->isSwitchedByAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => '会員種別の切替手続き中のため、年会費プランをご選択ください',
+                ], 422);
+            }
+        }
 
         try {
             if ($paymentMethod === 'bank_transfer') {

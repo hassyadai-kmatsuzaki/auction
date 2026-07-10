@@ -15,6 +15,7 @@ class Plan extends BaseModel
         'name',
         'description',
         'amount',
+        'duration_days',
         'allows_bid',
         'allows_sell',
         'is_active',
@@ -23,11 +24,21 @@ class Plan extends BaseModel
 
     protected $casts = [
         'amount' => 'integer',
+        'duration_days' => 'integer',
         'allows_bid' => 'boolean',
         'allows_sell' => 'boolean',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
+
+    /**
+     * 単発プラン（1Day会員など）か。
+     * duration_days が設定されているプランは自動更新の対象外（subscriptions:renew から除外）。
+     */
+    public function isOneShot(): bool
+    {
+        return $this->duration_days !== null;
+    }
 
     public function subscriptions(): HasMany
     {
