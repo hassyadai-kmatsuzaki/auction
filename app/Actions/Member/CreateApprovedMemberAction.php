@@ -43,11 +43,16 @@ class CreateApprovedMemberAction
      * ⚠ seller ロールが無いと出品系ルート(check.role:seller)に入れないため、
      *   出品もする会員には作成時に必ず seller を付ける。
      *
+     * one_day はロール的には buyer と同一（participant のみ）。違いは
+     * intended_plan_code='one_day' が付き、決済モーダルに1Dayプランのみが
+     * 提示されること（1Day会員_実装方針書_20260710.md §3.8）。
+     *
      * @var array<string, array<int, string>>
      */
     private const MEMBER_TYPE_ROLES = [
-        'buyer'  => ['participant'],
-        'seller' => ['seller', 'participant'],
+        'buyer'   => ['participant'],
+        'seller'  => ['seller', 'participant'],
+        'one_day' => ['participant'],
     ];
 
     /**
@@ -75,6 +80,8 @@ class CreateApprovedMemberAction
                 'is_test'     => (bool) ($data['is_test'] ?? false),
                 'approved_at' => now(),
                 'approved_by' => null,                        // システム（E-NE連携）発行
+                // 1Day契約は加入予定プランを固定（決済モーダルに1Dayのみ提示。決済完了で自動解除）
+                'intended_plan_code' => ($data['member_type'] ?? null) === 'one_day' ? 'one_day' : null,
             ]);
 
             foreach ($roleNames as $roleName) {

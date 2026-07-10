@@ -26,6 +26,16 @@ class SubscriptionController extends Controller
 
         $plans = Plan::active()->ordered()->get();
 
+        // 加入予定プランのマーカー（E-NE 1Day契約 / 管理者の会員種別切替）が立っていれば
+        // そのプランのみ提示する。決済完了で自動解除。プランが無効化済み等で1件も
+        // 該当しない場合は安全側に倒して全件提示（誰も加入できなくなる事故を防ぐ）。
+        if ($user->intended_plan_code) {
+            $intended = $plans->where('code', $user->intended_plan_code)->values();
+            if ($intended->isNotEmpty()) {
+                $plans = $intended;
+            }
+        }
+
         // 管理者による会員種別切替（1Day → 年会員）後は年会費プランのみ提示し、
         // 1Day（単発プラン）の再選択を塞ぐ。マーカーは本人が年会費を決済すると自動で消える。
         if ($subscription && $subscription->isSwitchedByAdmin()) {
@@ -88,6 +98,18 @@ class SubscriptionController extends Controller
 
         $plan = Plan::active()->findOrFail($request->input('plan_id'));
         $user = $request->user();
+
+        // 加入予定プランのマーカー（E-NE 1Day契約 / 管理者の会員種別切替）が立っている場合、
+        // そのプラン以外は選択不可（show() の絞り込みを直接POSTで迂回させない）。
+        // マーカーのプランが無効化済みなら show() 同様に制限しない。
+        if ($user->intended_plan_code
+            && $plan->code !== $user->intended_plan_code
+            && Plan::active()->where('code', $user->intended_plan_code)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ご契約の会員種別のプランをご選択ください',
+            ], 422);
+        }
 
         if ($plan->isOneShot()) {
             // 1Day会員はクレジットカード決済のみ（振込確認の運用対象にしない）

@@ -133,6 +133,8 @@ interface User {
   rejection_reason: string | null;
   payment_method_preference: 'card' | 'bank_transfer' | null;
   bank_transfer_confirmed_at: string | null;
+  /** 加入予定プランcode（E-NE 1Day契約・会員種別切替で設定。決済完了で解除） */
+  intended_plan_code: string | null;
   last_login_at: string | null;
   created_at: string;
   profile_image_path: string | null;
@@ -1173,7 +1175,7 @@ export default function UserDetail() {
                 </Button>
               )}
 
-              {user.subscription?.plan?.duration_days != null && (
+              {(user.subscription?.plan?.duration_days != null || user.intended_plan_code === 'one_day') && (
                 <Button
                   variant="contained"
                   color="warning"

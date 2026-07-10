@@ -43,6 +43,7 @@ class User extends Authenticatable
         'rejection_reason',
         'payment_method_preference',
         'bank_transfer_confirmed_at',
+        'intended_plan_code',
         'last_login_at',
         'is_active',
         'email_verified_at',

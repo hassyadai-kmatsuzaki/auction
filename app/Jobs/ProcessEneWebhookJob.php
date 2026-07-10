@@ -105,9 +105,14 @@ class ProcessEneWebhookJob implements ShouldQueue
 
     /**
      * アカウントロール（crm_fields）から会員種別を決める。
+     *   「1Day」を含む → one_day（participant ロール + intended_plan_code=one_day。
+     *                     決済モーダルには1Dayプランのみ提示される）
      *   「出品」を含む → seller（seller+participant ロール = 出品も可能）
-     *   含まない       → buyer（participant = 買受のみ）
-     *   ※ 1day 会員は後日対応。現状は上記2択にフォールバックする。
+     *   いずれも無し   → buyer（participant = 買受のみ）
+     *
+     * 1Day は落札専用のため出品より優先して判定する（「1Day」と「出品」が同時に来る
+     * 契約は業務上存在しない想定。万一来ても安全側=出品不可に倒す）。
+     * 表記は半角「1Day」で E-NE と合意（大文字小文字は不問で拾う）。
      *
      * @param array<string, mixed> $customer
      */
@@ -125,6 +130,10 @@ class ProcessEneWebhookJob implements ShouldQueue
                 }
                 break;
             }
+        }
+
+        if (stripos($roleText, '1day') !== false) {
+            return 'one_day';
         }
 
         return mb_strpos($roleText, '出品') !== false ? 'seller' : 'buyer';

@@ -505,27 +505,35 @@ class UserController extends Controller
         }
 
         $subscription = $user->subscription;
-        if (!$subscription || !$subscription->plan || !$subscription->plan->isOneShot()) {
+
+        // 切替対象は「1Dayサブスクを持つユーザー」または「E-NE 1Day契約で作成された未決済ユーザー
+        // （intended_plan_code=one_day）」のみ。
+        $hasOneShotSub   = $subscription && $subscription->plan && $subscription->plan->isOneShot();
+        $hasOneDayIntent = $user->intended_plan_code === 'one_day';
+        if (!$hasOneShotSub && !$hasOneDayIntent) {
             return response()->json([
                 'success' => false,
                 'message' => '1Day会員のユーザーのみ切替できます',
             ], 422);
         }
 
-        // 1) 1Dayサブスクの即時解約。cancel() は Square API（カード無効化）を伴うため
-        //    DBトランザクションの外で行う。失敗したら何も変えずに 422 で返し、管理者が再実行する。
-        try {
-            if ($subscription->status !== Subscription::STATUS_CANCELED) {
-                $service->cancel($subscription, Subscription::REASON_SWITCHED_BY_ADMIN);
-            } else {
-                // 自然失効(one_day_expired)済みでもマーカーを切替に揃えて 1Day 再選択を塞ぐ
-                $subscription->update(['suspended_reason' => Subscription::REASON_SWITCHED_BY_ADMIN]);
+        // 1) 1Dayサブスクの即時解約（未決済ユーザーはサブスクが無いのでスキップ）。
+        //    cancel() は Square API（カード無効化）を伴うため DBトランザクションの外で行う。
+        //    失敗したら何も変えずに 422 で返し、管理者が再実行する。
+        if ($hasOneShotSub) {
+            try {
+                if ($subscription->status !== Subscription::STATUS_CANCELED) {
+                    $service->cancel($subscription, Subscription::REASON_SWITCHED_BY_ADMIN);
+                } else {
+                    // 自然失効(one_day_expired)済みでもマーカーを切替に揃えて 1Day 再選択を塞ぐ
+                    $subscription->update(['suspended_reason' => Subscription::REASON_SWITCHED_BY_ADMIN]);
+                }
+            } catch (\RuntimeException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => '1Dayプランの解約処理に失敗しました: ' . $e->getMessage(),
+                ], 422);
             }
-        } catch (\RuntimeException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => '1Dayプランの解約処理に失敗しました: ' . $e->getMessage(),
-            ], 422);
         }
 
         // 2) ロール整備（冪等）。落札出品者は seller + participant、落札者は participant のみ。
@@ -567,6 +575,12 @@ class UserController extends Controller
                     $user->sellerProfile->update(['is_active' => true]);
                 }
             }
+
+            // 3) 次回決済プランを切替先の年会費プランに固定（決済モーダルはこのプランのみ提示。
+            //    決済完了で自動解除）。未決済のE-NE 1Day契約ユーザーの one_day マーカーもここで上書きされる。
+            $user->forceFill([
+                'intended_plan_code' => $request->member_type === 'seller' ? 'both' : 'bid_only',
+            ])->save();
         });
 
         $memberTypeLabel = $request->member_type === 'seller' ? '落札出品者' : '落札者';
