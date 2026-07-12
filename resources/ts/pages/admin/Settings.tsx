@@ -58,7 +58,7 @@ interface SettingsState {
   bank_account_holder: string; invoice_prefix: string; payment_notice_prefix: string;
   warranty_validity_days: string; auto_generate_invoice: boolean; auto_generate_payment_notice: boolean;
   // 外部連携（E-NE）
-  ene_webhook_enabled: boolean; ene_email_field_name: string;
+  ene_webhook_enabled: boolean; ene_email_field_name: string; ene_phone_field_name: string;
   ene_default_member_type: string; ene_duplicate_behavior: string;
 }
 
@@ -93,7 +93,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   bank_name: '', bank_branch: '', bank_account_type: '', bank_account_number: '', bank_account_holder: '',
   invoice_prefix: '', payment_notice_prefix: '', warranty_validity_days: '14',
   auto_generate_invoice: false, auto_generate_payment_notice: false,
-  ene_webhook_enabled: false, ene_email_field_name: 'email',
+  ene_webhook_enabled: false, ene_email_field_name: 'email', ene_phone_field_name: '電話番号',
   ene_default_member_type: 'buyer', ene_duplicate_behavior: 'skip',
 };
 
@@ -155,6 +155,7 @@ export default function AdminSettings() {
       auto_generate_payment_notice:   d.document?.auto_generate_payment_notice?.value ?? false,
       ene_webhook_enabled:            d.external_integration?.ene_webhook_enabled?.value ?? false,
       ene_email_field_name:           d.external_integration?.ene_email_field_name?.value ?? 'email',
+      ene_phone_field_name:           d.external_integration?.ene_phone_field_name?.value ?? '電話番号',
       ene_default_member_type:        String(d.external_integration?.ene_default_member_type?.value ?? 'buyer'),
       ene_duplicate_behavior:         String(d.external_integration?.ene_duplicate_behavior?.value ?? 'skip'),
     });
@@ -671,6 +672,11 @@ export default function AdminSettings() {
                 <TextField fullWidth label="メールアドレスのフィールド名"
                   value={s.ene_email_field_name} onChange={str('ene_email_field_name')}
                   helperText="E-NEのCRMでメールを持つ項目のシステム名（crm_fields[].name）" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="電話番号のフィールド名"
+                  value={s.ene_phone_field_name} onChange={str('ene_phone_field_name')}
+                  helperText="任意項目。見つからない場合は電話番号なしで会員を作成します" />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField select fullWidth label="既定の会員種別"

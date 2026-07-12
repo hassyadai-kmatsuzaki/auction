@@ -111,16 +111,9 @@ class SubscriptionController extends Controller
             ], 422);
         }
 
+        // 会員種別切替後（switched_by_admin マーカー）は年会費プランのみ選択可
+        // ※ 1Day×銀行振込の制限は 2026-07-13 に撤回（振込でも加入可。入金確認時点から期間起算）
         if ($plan->isOneShot()) {
-            // 1Day会員はクレジットカード決済のみ（振込確認の運用対象にしない）
-            if ($paymentMethod === 'bank_transfer') {
-                return response()->json([
-                    'success' => false,
-                    'message' => '1Day会員はクレジットカード決済のみご利用いただけます',
-                ], 422);
-            }
-
-            // 会員種別切替後（switched_by_admin マーカー）は年会費プランのみ選択可
             $current = $user->subscription;
             if ($current && $current->isSwitchedByAdmin()) {
                 return response()->json([

@@ -134,18 +134,12 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
     }
   }, [visiblePlans, replaceCardOnly, selectedPlanId]);
 
-  // 単発プラン（1Day会員）はクレジットカード決済のみ（サーバ側でも422でガード）
+  // 単発プラン（1Day会員）選択時は注意書きを表示する
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) ?? null,
     [plans, selectedPlanId],
   );
   const isOneShotSelected = selectedPlan?.duration_days != null;
-
-  useEffect(() => {
-    if (isOneShotSelected && paymentMethod === 'bank_transfer') {
-      setPaymentMethod('card');
-    }
-  }, [isOneShotSelected, paymentMethod]);
 
   // Square Card UI を生成（カード払い時のみ）
   useEffect(() => {
@@ -346,8 +340,8 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
 
                 {isOneShotSelected && (
                   <Alert severity="info" variant="outlined">
-                    1Day会員は決済完了から{selectedPlan?.duration_days}日間ご利用いただけます。
-                    期間終了後の自動更新・返金はありません。お支払いはクレジットカードのみです。
+                    1Day会員はお支払い完了（銀行振込の場合は入金確認）から{selectedPlan?.duration_days}日間ご利用いただけます。
+                    期間終了後の自動更新・返金はありません。
                   </Alert>
                 )}
 
@@ -370,18 +364,16 @@ export default function SubscriptionRegisterModal({ open, onClose, onCompleted, 
                     }
                     sx={{ mr: 3 }}
                   />
-                  {!isOneShotSelected && (
-                    <FormControlLabel
-                      value="bank_transfer"
-                      control={<Radio />}
-                      label={
-                        <Stack direction="row" alignItems="center" spacing={0.75}>
-                          <AccountBalance fontSize="small" />
-                          <span>銀行振込</span>
-                        </Stack>
-                      }
-                    />
-                  )}
+                  <FormControlLabel
+                    value="bank_transfer"
+                    control={<Radio />}
+                    label={
+                      <Stack direction="row" alignItems="center" spacing={0.75}>
+                        <AccountBalance fontSize="small" />
+                        <span>銀行振込</span>
+                      </Stack>
+                    }
+                  />
                 </RadioGroup>
               </>
             )}

@@ -78,12 +78,16 @@ class ProcessEneWebhookJob implements ShouldQueue
 
         // メールアドレス抽出（crm_fields の label/name で照合。既定は表示名「メールアドレス」）
         $emailFieldName = (string) SystemSetting::get('ene_email_field_name', 'メールアドレス');
-        $email = $this->extractEmail($customer, $emailFieldName);
+        $email = $this->extractField($customer, $emailFieldName);
         if (!$email) {
             throw new \RuntimeException("email not found in crm_fields (field name: {$emailFieldName})");
         }
 
         $name = $customer['name'] ?? $customer['display_name'] ?? Str::before($email, '@');
+
+        // 電話番号抽出（任意項目: 無ければ null のまま会員を作成する）
+        $phoneFieldName = (string) SystemSetting::get('ene_phone_field_name', '電話番号');
+        $phone = $this->normalizePhone($this->extractField($customer, $phoneFieldName));
 
         // メール重複時の挙動（users.email は unique。無効化ユーザー is_active=false も含めて検出）
         $existing = User::where('email', $email)->first();
@@ -94,6 +98,7 @@ class ProcessEneWebhookJob implements ShouldQueue
         $created = $createMember->execute([
             'name'              => $name,
             'email'             => $email,
+            'phone'             => $phone,
             'member_type'       => $this->resolveMemberType($customer),
             'is_test'           => false,
             'line_user_id'      => $customer['line_user_id'] ?? null,
@@ -140,9 +145,11 @@ class ProcessEneWebhookJob implements ShouldQueue
     }
 
     /**
+     * crm_fields から指定フィールドの値を取り出す（email / 電話番号 共通）。
+     *
      * @param array<string, mixed> $customer
      */
-    private function extractEmail(array $customer, string $fieldName): ?string
+    private function extractField(array $customer, string $fieldName): ?string
     {
         foreach ($customer['crm_fields'] ?? [] as $field) {
             // name（自動生成スラッグ）と label（管理画面で設定した表示名）の両方で照合する。
@@ -156,6 +163,33 @@ class ProcessEneWebhookJob implements ShouldQueue
             }
         }
         return null;
+    }
+
+    /**
+     * 電話番号の正規化。全角→半角に直し、電話番号として妥当（数字9〜16桁）でなければ
+     * null を返して「電話番号なし」で作成する（会員作成は止めない）。
+     *
+     * ⚠ 不正な文字列を users.phone に残すと、決済時の Square Customer 作成
+     *   （phone_number の形式検証あり）が失敗して初回課金ごと落ちるため、ここで弾く。
+     */
+    private function normalizePhone(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $phone = mb_convert_kana(trim($raw), 'as'); // 全角英数・スペース→半角
+        $phone = preg_replace('/[^\d+\-() ]/', '', $phone) ?? '';
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+        if (strlen($digits) < 9 || strlen($digits) > 16 || mb_strlen($phone) > 20) {
+            Log::warning('ENE webhook: invalid phone format, stored as null', [
+                'delivery_id' => $this->deliveryId,
+            ]);
+            return null;
+        }
+
+        return $phone;
     }
 
     /**

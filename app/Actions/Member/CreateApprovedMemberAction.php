@@ -56,7 +56,7 @@ class CreateApprovedMemberAction
     ];
 
     /**
-     * @param array{name: string, email: string, member_type?: string, is_test?: bool, line_user_id?: ?string, line_display_name?: ?string} $data
+     * @param array{name: string, email: string, phone?: ?string, member_type?: string, is_test?: bool, line_user_id?: ?string, line_display_name?: ?string} $data
      * @return array{user: User, verification_url: string}
      */
     public function execute(array $data): array
@@ -74,6 +74,7 @@ class CreateApprovedMemberAction
             $user = User::create([
                 'name'        => $data['name'],
                 'email'       => $data['email'],
+                'phone'       => $data['phone'] ?? null,      // E-NE から取得（任意。正規化済み）
                 'password'    => Hash::make(Str::random(32)), // 一時パスワード（本人が設定メールで再設定）
                 'status'      => 'approved',                  // 契約締結済み = 承認済み
                 'is_active'   => true,
