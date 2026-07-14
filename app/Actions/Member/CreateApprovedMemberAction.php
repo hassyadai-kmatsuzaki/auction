@@ -56,7 +56,7 @@ class CreateApprovedMemberAction
     ];
 
     /**
-     * @param array{name: string, email: string, phone?: ?string, member_type?: string, is_test?: bool, line_user_id?: ?string, line_display_name?: ?string} $data
+     * @param array{name: string, email: string, phone?: ?string, trade_name?: ?string, company_name?: ?string, invoice_registration_number?: ?string, member_type?: string, is_test?: bool, line_user_id?: ?string, line_display_name?: ?string} $data
      * @return array{user: User, verification_url: string}
      */
     public function execute(array $data): array
@@ -75,6 +75,8 @@ class CreateApprovedMemberAction
                 'name'        => $data['name'],
                 'email'       => $data['email'],
                 'phone'       => $data['phone'] ?? null,      // E-NE から取得（任意。正規化済み）
+                'trade_name'  => $data['trade_name'] ?? null,   // E-NE 会社名/屋号（任意。出品者表示名の参照元）
+                'company_name' => $data['company_name'] ?? null, // 同上（SellerProfile.corporate_name の参照元）
                 'password'    => Hash::make(Str::random(32)), // 一時パスワード（本人が設定メールで再設定）
                 'status'      => 'approved',                  // 契約締結済み = 承認済み
                 'is_active'   => true,
@@ -102,6 +104,8 @@ class CreateApprovedMemberAction
                     'seller_code'   => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
                     'seller_name'   => $user->trade_name ?? $user->name,
                     'corporate_name' => $user->company_name,
+                    // インボイス登録番号（T+13桁）。未登録なら null → InvoiceTaxResolver が免税扱い
+                    'business_registration_number' => $data['invoice_registration_number'] ?? null,
                     'contact_name'  => $user->name,
                     'email'         => $user->email,
                     'phone'         => $user->phone ?? '',

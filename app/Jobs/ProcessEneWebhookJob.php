@@ -89,6 +89,20 @@ class ProcessEneWebhookJob implements ShouldQueue
         $phoneFieldName = (string) SystemSetting::get('ene_phone_field_name', '電話番号');
         $phone = $this->normalizePhone($this->extractField($customer, $phoneFieldName));
 
+        // 会社名/屋号（任意項目）: E-NE 側は1フィールドのため、users.trade_name
+        // （出品者表示名の参照元）と users.company_name の両方に同じ値を保存する。
+        // E-NE 側で未入力の場合は文字列「未設定」が来る合意のため、その場合は null。
+        $companyFieldName = (string) SystemSetting::get('ene_company_field_name', '会社名 / 屋号');
+        $companyOrTradeName = $this->rejectUnset($this->extractField($customer, $companyFieldName));
+
+        // インボイス登録番号（任意項目）: 出品者の場合のみ SellerProfile に保存される。
+        // 全角入力でも免税判定（T+13桁, InvoiceTaxResolver）に一致するよう半角化する。
+        $invoiceFieldName = (string) SystemSetting::get('ene_invoice_field_name', 'インボイス登録番号');
+        $invoiceNumber = $this->rejectUnset($this->extractField($customer, $invoiceFieldName));
+        if ($invoiceNumber !== null) {
+            $invoiceNumber = strtoupper(trim(mb_convert_kana($invoiceNumber, 'as')));
+        }
+
         // メール重複時の挙動（users.email は unique。無効化ユーザー is_active=false も含めて検出）
         $existing = User::where('email', $email)->first();
         if ($existing) {
@@ -96,13 +110,16 @@ class ProcessEneWebhookJob implements ShouldQueue
         }
 
         $created = $createMember->execute([
-            'name'              => $name,
-            'email'             => $email,
-            'phone'             => $phone,
-            'member_type'       => $this->resolveMemberType($customer),
-            'is_test'           => false,
-            'line_user_id'      => $customer['line_user_id'] ?? null,
-            'line_display_name' => $customer['display_name'] ?? $name,
+            'name'                        => $name,
+            'email'                       => $email,
+            'phone'                       => $phone,
+            'trade_name'                  => $companyOrTradeName,
+            'company_name'                => $companyOrTradeName,
+            'invoice_registration_number' => $invoiceNumber,
+            'member_type'                 => $this->resolveMemberType($customer),
+            'is_test'                     => false,
+            'line_user_id'                => $customer['line_user_id'] ?? null,
+            'line_display_name'           => $customer['display_name'] ?? $name,
         ]);
 
         return ['user_id' => $created['user']->id, 'result' => 'created'];
@@ -163,6 +180,18 @@ class ProcessEneWebhookJob implements ShouldQueue
             }
         }
         return null;
+    }
+
+    /**
+     * E-NE の未入力プレースホルダ「未設定」を null に落とす（任意項目共通）。
+     */
+    private function rejectUnset(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim($value);
+        return ($trimmed === '' || $trimmed === '未設定') ? null : $trimmed;
     }
 
     /**
