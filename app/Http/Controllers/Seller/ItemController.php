@@ -623,6 +623,7 @@ class ItemController extends Controller
                 'user_id' => $user->id,
                 'seller_code' => $sellerCode,
                 'seller_name' => $user->name,
+                'business_registration_number' => $user->business_registration_number,
                 'contact_name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone ?? '000-0000-0000',

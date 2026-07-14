@@ -696,7 +696,7 @@ export default function AdminSettings() {
               <Grid item xs={12} sm={6}>
                 <TextField fullWidth label="インボイス登録番号のフィールド名"
                   value={s.ene_invoice_field_name} onChange={str('ene_invoice_field_name')}
-                  helperText="任意項目。出品者の場合のみ保存（免税判定に使用）。「未設定」の場合は保存しません" />
+                  helperText="任意項目。全会員に保存し、出品者は免税判定にも使用（買受→出品昇格時も引き継ぎ）。「未設定」の場合は保存しません" />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField select fullWidth label="既定の会員種別"

@@ -26,6 +26,7 @@ class User extends Authenticatable
         'name',
         'trade_name',
         'company_name',
+        'business_registration_number',
         'email',
         'password',
         'profile_image_path',

@@ -77,6 +77,8 @@ class CreateApprovedMemberAction
                 'phone'       => $data['phone'] ?? null,      // E-NE から取得（任意。正規化済み）
                 'trade_name'  => $data['trade_name'] ?? null,   // E-NE 会社名/屋号（任意。出品者表示名の参照元）
                 'company_name' => $data['company_name'] ?? null, // 同上（SellerProfile.corporate_name の参照元）
+                // インボイス登録番号は買受者にも保持する（買受→出品昇格時に SellerProfile へコピーされる）
+                'business_registration_number' => $data['invoice_registration_number'] ?? null,
                 'password'    => Hash::make(Str::random(32)), // 一時パスワード（本人が設定メールで再設定）
                 'status'      => 'approved',                  // 契約締結済み = 承認済み
                 'is_active'   => true,
@@ -105,7 +107,7 @@ class CreateApprovedMemberAction
                     'seller_name'   => $user->trade_name ?? $user->name,
                     'corporate_name' => $user->company_name,
                     // インボイス登録番号（T+13桁）。未登録なら null → InvoiceTaxResolver が免税扱い
-                    'business_registration_number' => $data['invoice_registration_number'] ?? null,
+                    'business_registration_number' => $user->business_registration_number,
                     'contact_name'  => $user->name,
                     'email'         => $user->email,
                     'phone'         => $user->phone ?? '',

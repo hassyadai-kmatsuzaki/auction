@@ -204,6 +204,7 @@ class UserController extends Controller
                         'user_id' => $user->id,
                         'seller_code' => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
                         'seller_name' => $user->name,
+                        'business_registration_number' => $user->business_registration_number,
                         'contact_name' => $user->name,
                         'email' => $user->email,
                         'phone' => $user->phone ?? '',
@@ -561,6 +562,8 @@ class UserController extends Controller
                         'seller_code'    => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
                         'seller_name'    => $user->trade_name ?? $user->name,
                         'corporate_name' => $user->company_name,
+                        // E-NE Webhook等で買受者時代に保持した番号を昇格時に引き継ぐ
+                        'business_registration_number' => $user->business_registration_number,
                         'contact_name'   => $user->name,
                         'email'          => $user->email,
                         'phone'          => $user->phone ?? '',
@@ -572,7 +575,12 @@ class UserController extends Controller
                         'is_active'      => true,
                     ]);
                 } elseif (!$user->sellerProfile->is_active) {
-                    $user->sellerProfile->update(['is_active' => true]);
+                    $updates = ['is_active' => true];
+                    // 番号が未設定なら users 側の保持値を補完（既存プロフィールの値は上書きしない）
+                    if (!$user->sellerProfile->business_registration_number && $user->business_registration_number) {
+                        $updates['business_registration_number'] = $user->business_registration_number;
+                    }
+                    $user->sellerProfile->update($updates);
                 }
             }
 

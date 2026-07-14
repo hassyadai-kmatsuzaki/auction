@@ -24,7 +24,7 @@ return new class extends Migration
             'setting_key'   => 'ene_invoice_field_name',
             'setting_value' => 'インボイス登録番号',
             'display_name'  => 'E-NE インボイス登録番号 フィールド名',
-            'description'   => 'E-NEのCRMでインボイス登録番号(T+13桁)を持つフィールドの表示名(label) または システム名(name)。任意項目: 出品者の場合のみ seller_profiles.business_registration_number に保存（免税判定に使用）。「未設定」の場合は保存しない。',
+            'description'   => 'E-NEのCRMでインボイス登録番号(T+13桁)を持つフィールドの表示名(label) または システム名(name)。任意項目: users.business_registration_number に全会員分保存し、出品者は seller_profiles にもコピー（免税判定に使用）。買受→出品昇格時も引き継がれる。「未設定」の場合は保存しない。',
         ],
     ];
 

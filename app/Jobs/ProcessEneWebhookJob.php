@@ -169,24 +169,50 @@ class ProcessEneWebhookJob implements ShouldQueue
     }
 
     /**
-     * crm_fields から指定フィールドの値を取り出す（email / 電話番号 共通）。
+     * crm_fields から指定フィールドの値を取り出す（email / 電話番号 等 共通）。
      *
      * @param array<string, mixed> $customer
      */
     private function extractField(array $customer, string $fieldName): ?string
     {
-        foreach ($customer['crm_fields'] ?? [] as $field) {
+        $fields = $customer['crm_fields'] ?? [];
+
+        foreach ($fields as $field) {
             // name（自動生成スラッグ）と label（管理画面で設定した表示名）の両方で照合する。
             // Cal-Connect の crm_fields.name は "field_xxxx" 形式のため、設定値には label
             // （例:「メールアドレス」）を入れる運用を基本とする。
             if (($field['name'] ?? null) === $fieldName || ($field['label'] ?? null) === $fieldName) {
-                $value = $field['value'] ?? $field['display_value'] ?? null;
-                // multi_select 等で配列が来た場合は先頭を採用
-                $value = is_array($value) ? ($value[0] ?? null) : $value;
-                return is_string($value) && $value !== '' ? $value : null;
+                return $this->fieldValue($field);
             }
         }
+
+        // 完全一致で見つからない場合は空白（全角含む）を無視して再照合する。
+        // 「会社名 / 屋号」と「会社名/屋号」のようなスペース表記ゆれで
+        // 取りこぼすと silent にデータが落ちるため（E-NE側labelの正確な表記は画面から確定できない）。
+        $target = preg_replace('/[\s　]+/u', '', $fieldName);
+        foreach ($fields as $field) {
+            foreach (['name', 'label'] as $key) {
+                $candidate = $field[$key] ?? null;
+                if (is_string($candidate) && preg_replace('/[\s　]+/u', '', $candidate) === $target) {
+                    return $this->fieldValue($field);
+                }
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * crm_fields の1要素から文字列値を取り出す。
+     *
+     * @param array<string, mixed> $field
+     */
+    private function fieldValue(array $field): ?string
+    {
+        $value = $field['value'] ?? $field['display_value'] ?? null;
+        // multi_select 等で配列が来た場合は先頭を採用
+        $value = is_array($value) ? ($value[0] ?? null) : $value;
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**
