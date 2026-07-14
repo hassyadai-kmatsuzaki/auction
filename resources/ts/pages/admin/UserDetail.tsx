@@ -294,7 +294,8 @@ export default function UserDetail() {
       });
       
       if (response.data.success) {
-        setSuccess('ロールを更新しました');
+        // プラン切替が起きた場合はAPI側メッセージに含まれる（次回更新から新料金 等）
+        setSuccess(response.data.message || 'ロールを更新しました');
         setRoleDialogOpen(false);
         fetchUser();
       }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Plan;
 use App\Models\Role;
 use App\Models\SellerProfile;
 use App\Models\Subscription;
@@ -282,6 +283,7 @@ class UserController extends Controller
         ]);
 
         $shouldNotifyApproval = false;
+        $planSyncMessage = null;
 
         DB::beginTransaction();
         try {
@@ -319,6 +321,9 @@ class UserController extends Controller
                         'assigned_by' => auth()->id(),
                     ]);
                 }
+
+                // 会員種別の変化に合わせて年会費サブスクのプランも切替（次回更新から新料金適用）
+                $planSyncMessage = $this->syncSubscriptionPlanWithRoles($user, $request->roles);
             }
 
             DB::commit();
@@ -330,13 +335,69 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => ['user' => $user->fresh(['roles'])],
-                'message' => 'ユーザー情報を更新しました',
+                'message' => 'ユーザー情報を更新しました' . ($planSyncMessage ? '。' . $planSyncMessage : ''),
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * ロール変更に合わせて年会費サブスクの plan_id を切り替える。
+     *
+     * 即時決済・返金・期間変更は行わない。renew() は課金時に plan->amount を
+     * 参照するため、plan_id を変えるだけで次回更新から新料金が適用される
+     * （カード・銀行振込どちらの更新経路も同様）。
+     *   - seller ロールあり → both / participant のみ → bid_only
+     *   - 1Day(単発)プランは対象外（renew 対象外の単発を年会費プランに変えると
+     *     意図せぬ自動課金になる。切替は switchMembership の解約→本人決済フロー）
+     *   - canceled のサブスク、会員ロールなし（admin/media_editor のみ）は触らない
+     *
+     * @param array<int, string> $roleNames
+     * @return string|null 変更した場合の管理者向けメッセージ
+     */
+    private function syncSubscriptionPlanWithRoles(User $user, array $roleNames): ?string
+    {
+        $subscription = $user->subscription()->with('plan')->first();
+        if (!$subscription || $subscription->status === Subscription::STATUS_CANCELED) {
+            return null;
+        }
+        if ($subscription->plan && $subscription->plan->isOneShot()) {
+            return null;
+        }
+
+        $isSeller = in_array('seller', $roleNames, true);
+        if (!$isSeller && !in_array('participant', $roleNames, true)) {
+            return null;
+        }
+
+        $targetCode = $isSeller ? 'both' : 'bid_only';
+        if ($subscription->plan && $subscription->plan->code === $targetCode) {
+            return null;
+        }
+
+        $targetPlan = Plan::where('code', $targetCode)->first();
+        if (!$targetPlan) {
+            \Illuminate\Support\Facades\Log::warning('syncSubscriptionPlanWithRoles: target plan not found', [
+                'user_id' => $user->id,
+                'code'    => $targetCode,
+            ]);
+            return null;
+        }
+
+        $oldPlanName = $subscription->plan->name ?? ('plan_id=' . $subscription->plan_id);
+        $subscription->update(['plan_id' => $targetPlan->id]);
+
+        \Illuminate\Support\Facades\Log::info('Admin role change synced subscription plan', [
+            'user_id'    => $user->id,
+            'from'       => $oldPlanName,
+            'to'         => $targetPlan->code,
+            'changed_by' => auth()->id(),
+        ]);
+
+        return sprintf('サブスクプランを「%s」に変更しました（次回更新から新料金が適用されます）', $targetPlan->name);
     }
 
     /**
