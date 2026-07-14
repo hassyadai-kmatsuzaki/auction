@@ -83,7 +83,14 @@ class ProcessEneWebhookJob implements ShouldQueue
             throw new \RuntimeException("email not found in crm_fields (field name: {$emailFieldName})");
         }
 
-        $name = $customer['name'] ?? $customer['display_name'] ?? Str::before($email, '@');
+        // 名前は CRM フィールド「名前」を優先する。payload の customer.name は E-NE の
+        // 「顧客名フィールド」(use_for=customer_name) と同期しており、E-NE では会社名/屋号が
+        // 顧客名に指定されているため、customer.name だと users.name に会社名が入ってしまう。
+        $nameFieldName = (string) SystemSetting::get('ene_name_field_name', '名前');
+        $name = $this->rejectUnset($this->extractField($customer, $nameFieldName))
+            ?? $customer['name']
+            ?? $customer['display_name']
+            ?? Str::before($email, '@');
 
         // 電話番号抽出（任意項目: 無ければ null のまま会員を作成する）
         $phoneFieldName = (string) SystemSetting::get('ene_phone_field_name', '電話番号');

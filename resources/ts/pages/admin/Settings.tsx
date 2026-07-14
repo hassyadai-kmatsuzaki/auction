@@ -59,7 +59,7 @@ interface SettingsState {
   warranty_validity_days: string; auto_generate_invoice: boolean; auto_generate_payment_notice: boolean;
   // 外部連携（E-NE）
   ene_webhook_enabled: boolean; ene_email_field_name: string; ene_phone_field_name: string;
-  ene_company_field_name: string; ene_invoice_field_name: string;
+  ene_name_field_name: string; ene_company_field_name: string; ene_invoice_field_name: string;
   ene_default_member_type: string; ene_duplicate_behavior: string;
 }
 
@@ -95,7 +95,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   invoice_prefix: '', payment_notice_prefix: '', warranty_validity_days: '14',
   auto_generate_invoice: false, auto_generate_payment_notice: false,
   ene_webhook_enabled: false, ene_email_field_name: 'email', ene_phone_field_name: '電話番号',
-  ene_company_field_name: '会社名 / 屋号', ene_invoice_field_name: 'インボイス登録番号',
+  ene_name_field_name: '名前', ene_company_field_name: '会社名 / 屋号', ene_invoice_field_name: 'インボイス登録番号',
   ene_default_member_type: 'buyer', ene_duplicate_behavior: 'skip',
 };
 
@@ -158,6 +158,7 @@ export default function AdminSettings() {
       ene_webhook_enabled:            d.external_integration?.ene_webhook_enabled?.value ?? false,
       ene_email_field_name:           d.external_integration?.ene_email_field_name?.value ?? 'email',
       ene_phone_field_name:           d.external_integration?.ene_phone_field_name?.value ?? '電話番号',
+      ene_name_field_name:            d.external_integration?.ene_name_field_name?.value ?? '名前',
       ene_company_field_name:         d.external_integration?.ene_company_field_name?.value ?? '会社名 / 屋号',
       ene_invoice_field_name:         d.external_integration?.ene_invoice_field_name?.value ?? 'インボイス登録番号',
       ene_default_member_type:        String(d.external_integration?.ene_default_member_type?.value ?? 'buyer'),
@@ -681,6 +682,11 @@ export default function AdminSettings() {
                 <TextField fullWidth label="電話番号のフィールド名"
                   value={s.ene_phone_field_name} onChange={str('ene_phone_field_name')}
                   helperText="任意項目。見つからない場合は電話番号なしで会員を作成します" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="名前のフィールド名"
+                  value={s.ene_name_field_name} onChange={str('ene_name_field_name')}
+                  helperText="氏名として保存します。見つからない場合はE-NEの顧客名にフォールバックします" />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField fullWidth label="会社名/屋号のフィールド名"
