@@ -380,6 +380,23 @@ class Auction extends BaseModel
     }
 
     /**
+     * オークション開始前の待機カウントダウン秒数
+     *
+     * 設定値が無い/不正な場合は 10。UI の許容範囲 0〜3600 にクランプする
+     * （StoreAuctionRequest 側にバリデーションが無いため、ここが最後の砦）。
+     */
+    public function getStartCountdownSeconds(): int
+    {
+        $seconds = $this->getAuctionSettings()['auction_start_countdown_seconds'] ?? 10;
+
+        if (!is_numeric($seconds)) {
+            $seconds = 10;
+        }
+
+        return max(0, min(3600, (int) $seconds));
+    }
+
+    /**
      * @deprecated フロントエンドで未使用。後方互換のため残存。
      */
     public function getPostSaleDisplaySeconds(): float

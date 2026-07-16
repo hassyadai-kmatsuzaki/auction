@@ -18,10 +18,10 @@ use Illuminate\Support\Facades\Log;
  */
 class StartAuctionAction
 {
-    private const PRE_START_COUNTDOWN = 10; // 秒
-
     public function execute(Auction $auction): void
     {
+        $preStartCountdown = $auction->getStartCountdownSeconds();
+
         if ($auction->status !== 'scheduled') {
             throw new \RuntimeException('このオークションは開始できません。（ステータス: ' . $auction->status . '）');
         }
@@ -57,18 +57,22 @@ class StartAuctionAction
 
         // 二重dispatch ガード: start_at を Cache::add で確保。
         // 既に存在 = 別経路で開始処理が in-flight → 上書きしない（フロントが「10→5→10」に戻る事故防止）
+        // TTL はカウントダウンより必ず長く。短いとカウントダウン中にキーが消え、
+        // 二重dispatchガードが外れる／APIポーリングが starting を返さなくなる。
+        $cacheTtl = max(120, $preStartCountdown + 60);
+
         $added = Cache::add(
             "auction:{$auction->id}:start_at",
-            now()->addSeconds(self::PRE_START_COUNTDOWN)->timestamp,
-            120
+            now()->addSeconds($preStartCountdown)->timestamp,
+            $cacheTtl
         );
         if (!$added) {
             Log::info("StartAuctionAction: pre-start already in flight, skipping duplicate broadcast/dispatch", ['auction_id' => $auction->id]);
             return;
         }
 
-        Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, 120);
-        broadcast(new AuctionStatusChanged($auction->id, 'starting', 'オークションが間もなく開始されます', self::PRE_START_COUNTDOWN));
+        Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, $cacheTtl);
+        broadcast(new AuctionStatusChanged($auction->id, 'starting', 'オークションが間もなく開始されます', $preStartCountdown));
 
         ProcessAuctionCountdownJob::dispatch($auction->id);
         Log::info("Dispatched auction countdown job for auction {$auction->id}");

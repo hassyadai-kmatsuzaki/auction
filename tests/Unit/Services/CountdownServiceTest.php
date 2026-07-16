@@ -541,6 +541,59 @@ class CountdownServiceTest extends TestCase
         $this->assertFalse((bool) $laterActive, '後発者は離脱');
     }
 
+    public function test_adjustPriceByBidLimits_は_現在価格と同額の指値タイでも後発者を離脱させる(): void
+    {
+        // 現在価格 == 同額指値 のケース（開始価格ちょうどの指値が2件など）。
+        // 価格が上がらないため、旧版は早期 return して後発者の脱落処理に到達せず、
+        // 両者 active のまま膠着していた。
+        $lane = $this->makeLiveLane(1400);
+        $svc = app(CountdownService::class);
+        $svc->startCountdown($lane);
+
+        $earlier = $this->createParticipant();
+        $later   = $this->createParticipant();
+        \App\Models\BidParticipant::create([
+            'item_id' => $lane->currentItem->id, 'user_id' => $earlier->id,
+            'is_active' => true, 'activated_at' => now()->subMinutes(10),
+        ]);
+        \App\Models\BidParticipant::create([
+            'item_id' => $lane->currentItem->id, 'user_id' => $later->id,
+            'is_active' => true, 'activated_at' => now()->subMinutes(5),
+        ]);
+
+        // 両者とも現在価格ちょうどの指値
+        \App\Models\BidLimitPrice::create([
+            'item_id' => $lane->currentItem->id, 'user_id' => $earlier->id,
+            'limit_price' => 1400, 'is_triggered' => false,
+            'created_at' => now()->subMinutes(10), 'updated_at' => now()->subMinutes(10),
+        ]);
+        \App\Models\BidLimitPrice::create([
+            'item_id' => $lane->currentItem->id, 'user_id' => $later->id,
+            'limit_price' => 1400, 'is_triggered' => false,
+        ]);
+
+        $svc->adjustPriceByBidLimits($lane->currentItem, $lane->auction, $lane);
+
+        // 同額タイでは競り上げないので価格は据え置き
+        $this->assertSame(1400, (int) $lane->currentItem->fresh()->current_price);
+
+        // 先設定者は落札権利者として active のまま、指値も生きている
+        $earlierActive = \App\Models\BidParticipant::where('item_id', $lane->currentItem->id)
+            ->where('user_id', $earlier->id)->value('is_active');
+        $this->assertTrue((bool) $earlierActive, '先設定者はアクティブのまま残る');
+        $this->assertDatabaseHas('bid_limit_prices', [
+            'item_id' => $lane->currentItem->id, 'user_id' => $earlier->id, 'is_triggered' => false,
+        ]);
+
+        // 後発者は離脱し、指値は削除される（再入札をブロックしないため）
+        $laterActive = \App\Models\BidParticipant::where('item_id', $lane->currentItem->id)
+            ->where('user_id', $later->id)->value('is_active');
+        $this->assertFalse((bool) $laterActive, '後発者は離脱');
+        $this->assertDatabaseMissing('bid_limit_prices', [
+            'item_id' => $lane->currentItem->id, 'user_id' => $later->id,
+        ]);
+    }
+
     public function test_adjustPriceByBidLimits_は_live以外の商品で何もしない(): void
     {
         $lane = $this->makeLiveLane();

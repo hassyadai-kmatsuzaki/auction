@@ -274,12 +274,20 @@ class LiveController extends Controller
 
             DB::commit();
 
-            // 10秒カウントダウン開始をキャッシュに記録
-            $countdownSeconds = 10;
+            // カウントダウン開始をキャッシュに記録
+            $countdownSeconds = $auction->getStartCountdownSeconds();
+
+            // TTL はカウントダウンより必ず長く（StartAuctionAction と揃える）
+            $cacheTtl = max(120, $countdownSeconds + 60);
+
+            // ここは Cache::put のまま（Cache::add ガードにしない）。
+            // status ガード（preparing/scheduled のみ）が上流にあるため二重起動は防がれており、
+            // add にすると「start_at が残存 → 管理者の再押下が無言で no-op」という
+            // 復旧手段を潰す事故のほうが重い。
             \Illuminate\Support\Facades\Cache::put(
                 "auction:{$auction->id}:start_at",
                 now()->addSeconds($countdownSeconds)->timestamp,
-                120
+                $cacheTtl
             );
 
             // 開始予告イベントをブロードキャスト（カウントダウン付き）
@@ -291,10 +299,12 @@ class LiveController extends Controller
             ));
 
             // レーン情報をキャッシュに保存（ジョブ側でカウントダウン後に開始するため）
+            // TTL は start_at と同じ $cacheTtl。120 固定だと待機120秒超の設定で
+            // カウントダウン中に失効し、ジョブが空配列を受け取って1レーンも開始しない。
             \Illuminate\Support\Facades\Cache::put(
                 "auction:{$auction->id}:lanes_to_start",
                 $lanesToStart,
-                120
+                $cacheTtl
             );
 
             // オークション全体のカウントダウンジョブをディスパッチ（1つで全レーン処理）

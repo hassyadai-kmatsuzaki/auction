@@ -1359,16 +1359,28 @@ class CountdownService
             }
         }
 
-        if ($targetPrice <= $currentPrice) {
+        // ■ 同額指値の膠着対策（2026-07-16 / E2E item 2528 で再現）:
+        //   同額タイでは $targetPrice = $highestLimit なので、現在価格が既にその同額と
+        //   一致していると $targetPrice == $currentPrice になる（開始価格ちょうどの
+        //   指値が2件並んだケースなど）。旧版はこれを「価格が上がらない＝何もしない」と
+        //   解釈して return していたため、後段の「同額後発者を強制脱落させる」処理に
+        //   到達せず、全員 active のまま膠着 → カウントダウン終了時に全員が指値超過で
+        //   離脱 → 流札していた。価格更新の要否と、指値トリガー処理の要否を分離する。
+        $samePriceTie = ($highestLimit == $secondHighestLimit);
+        if ($targetPrice < $currentPrice || ($targetPrice == $currentPrice && !$samePriceTie)) {
             DB::rollBack();
             return;
         }
 
-        Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, highest_limit={$highestLimit}, second_highest_limit={$secondHighestLimit}, protected=" . json_encode($protectedUserIds) . ", startFreeze={$startFreeze}");
+        Log::info("adjustPriceByBidLimits: item={$item->id}, from={$currentPrice}, to={$targetPrice}, highest_limit={$highestLimit}, second_highest_limit={$secondHighestLimit}, protected=" . json_encode($protectedUserIds) . ", same_price_tie=" . ($samePriceTie ? 1 : 0) . ", startFreeze={$startFreeze}");
 
         try {
-            $item->update(['current_price' => $targetPrice]);
-            \App\Models\PriceEvent::recordAutoIncrement($item->id, $currentPrice, $targetPrice, $limits->count());
+            // 同額タイ（$targetPrice == $currentPrice）では価格を動かさない。
+            // from == to の PriceEvent も作らない。
+            if ($targetPrice > $currentPrice) {
+                $item->update(['current_price' => $targetPrice]);
+                \App\Models\PriceEvent::recordAutoIncrement($item->id, $currentPrice, $targetPrice, $limits->count());
+            }
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error("adjustPriceByBidLimits: price update failed — " . $e->getMessage());

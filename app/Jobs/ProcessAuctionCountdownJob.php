@@ -137,6 +137,12 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                 $remaining = max(0, $startAt - now()->timestamp);
                 if ($remaining <= 0) break;
 
+                // pre-start 中も heartbeat を更新する。
+                // 更新しないと MonitorAuctionJobs (everyMinute / stale 30秒) が
+                // カウントダウン中のジョブを「死亡」と誤判定して再ディスパッチする。
+                // 待機時間が30秒以上に設定されると顕在化する。
+                Cache::put("countdown_job_heartbeat:auction:{$this->auctionId}", now()->timestamp, self::HEARTBEAT_TTL);
+
                 // 120名規模で「10→0」が綺麗にいかない事象への対策。
                 // AuctionStatusChanged(ShouldBroadcast) だと broadcasts キュー経由で
                 // 順序逆転・遅延が出るため、pre-start tick だけ専用 Now イベントに切替。
@@ -198,11 +204,23 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             }
 
             // ライブ開始イベントをブロードキャスト
-            broadcast(new AuctionStatusChanged(
-                $this->auctionId,
-                'live',
-                'オークションが開始されました'
-            ));
+            // 失敗してもジョブ本体を殺さない: ここで未捕捉例外が出るとカウントダウンループに
+            // 到達しないままジョブが死に、Monitor の stale 検知（最大約90秒）まで全レーンが
+            // 停止する。'live' への遷移はフロントの API ポーリングと CountdownTick でも
+            // 伝わるため、broadcast 失敗は握りつぶしてログに残すのが正しい。
+            try {
+                broadcast(new AuctionStatusChanged(
+                    $this->auctionId,
+                    'live',
+                    'オークションが開始されました'
+                ));
+            } catch (\Throwable $e) {
+                BroadcastFailureLogger::warn(
+                    'AuctionStatusChanged',
+                    $e->getMessage(),
+                    ['auction_id' => $this->auctionId, 'status' => 'live']
+                );
+            }
 
             // オークション開始通知を送信（参加者 + 出品者）
             // 通常運用では `auctions:dispatch-start-notice` scheduler が開始30分前に送信し

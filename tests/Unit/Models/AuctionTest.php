@@ -165,4 +165,69 @@ class AuctionTest extends TestCase
         $this->assertTrue($result);
         $this->assertEquals('cancelled', $auction->fresh()->status);
     }
+
+    // ─── getStartCountdownSeconds（開始前待機カウントダウン秒数） ───
+    // StoreAuctionRequest にバリデーションが無いため、モデル側のクランプが最後の砦。
+
+    public function test_getStartCountdownSeconds_は_設定なしなら10を返す(): void
+    {
+        $auction = Auction::factory()->create(['created_by' => $this->admin->id]);
+
+        $this->assertSame(10, $auction->getStartCountdownSeconds());
+    }
+
+    public function test_getStartCountdownSeconds_は_カスタム設定値を返す(): void
+    {
+        $auction = Auction::factory()->create([
+            'created_by' => $this->admin->id,
+            'use_custom_settings' => true,
+            'custom_auction_settings' => ['auction_start_countdown_seconds' => 30],
+        ]);
+
+        $this->assertSame(30, $auction->getStartCountdownSeconds());
+    }
+
+    public function test_getStartCountdownSeconds_は_数値文字列も整数化して返す(): void
+    {
+        $auction = Auction::factory()->create([
+            'created_by' => $this->admin->id,
+            'use_custom_settings' => true,
+            'custom_auction_settings' => ['auction_start_countdown_seconds' => '60'],
+        ]);
+
+        $this->assertSame(60, $auction->getStartCountdownSeconds());
+    }
+
+    public function test_getStartCountdownSeconds_は_非数値なら10にフォールバックする(): void
+    {
+        $auction = Auction::factory()->create([
+            'created_by' => $this->admin->id,
+            'use_custom_settings' => true,
+            'custom_auction_settings' => ['auction_start_countdown_seconds' => 'abc'],
+        ]);
+
+        $this->assertSame(10, $auction->getStartCountdownSeconds());
+    }
+
+    public function test_getStartCountdownSeconds_は_負値を0にクランプする(): void
+    {
+        $auction = Auction::factory()->create([
+            'created_by' => $this->admin->id,
+            'use_custom_settings' => true,
+            'custom_auction_settings' => ['auction_start_countdown_seconds' => -5],
+        ]);
+
+        $this->assertSame(0, $auction->getStartCountdownSeconds());
+    }
+
+    public function test_getStartCountdownSeconds_は_3600超を3600にクランプする(): void
+    {
+        $auction = Auction::factory()->create([
+            'created_by' => $this->admin->id,
+            'use_custom_settings' => true,
+            'custom_auction_settings' => ['auction_start_countdown_seconds' => 99999],
+        ]);
+
+        $this->assertSame(3600, $auction->getStartCountdownSeconds());
+    }
 }
