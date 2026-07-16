@@ -779,6 +779,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                     lane={lane} isLoading={false}
                     compact={isCompactLive}
                     showThumbnail={SHOW_COMPACT_THUMBNAIL}
+                    roomy={isPhonePortrait && lanes.length <= 3}
                     onBidToggle={handleBidToggle}
                     onDetailOpen={(l) => setDetailLane(l)}
                     disableDetail={tourActive && (tourStep === 11 || tourStep === 13 || tourStep === 16)}

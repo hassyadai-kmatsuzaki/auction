@@ -676,6 +676,7 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                     lane={lane} isLoading={false}
                     compact={isCompactLive}
                     showThumbnail={SHOW_COMPACT_THUMBNAIL}
+                    roomy={isPhonePortrait && lanes.length <= 3}
                     onBidToggle={handleBidToggle}
                     onDetailOpen={(l) => setDetailLane(l)}
                     onLimitEdit={(itemId) => {

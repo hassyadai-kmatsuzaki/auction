@@ -34,13 +34,18 @@ interface Props {
   compact?: boolean;
   /** compact 時にサムネイルを表示する（比較検討用スイッチ） */
   showThumbnail?: boolean;
+  /**
+   * compact 時にカードを縦に余裕を持たせる（高さ約1.5倍）
+   * レーン数が少ない（3以下）SP縦向きで、余った縦スペースをサムネ拡大と情報の1行化に使う
+   */
+  roomy?: boolean;
 }
 
 /**
  * レーンカード1枚
  * React.memo + 細粒度メモ化で不要な再レンダリングを防ぐ
  */
-export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove, disableDetail, compact, showThumbnail }: Props) => {
+export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen, onLimitEdit, onLimitRemove, disableDetail, compact, showThumbnail, roomy }: Props) => {
   const item = lane.current_item;
 
   if (!item) {
@@ -77,6 +82,46 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
   const unitLabel = item.quantity_unit === 'kg' ? 'kg' : item.quantity_unit === 'bag' ? '袋' : '匹';
 
   if (compact) {
+    // 入札ボタン（roomy かどうかで置き場所が変わるだけで、サイズは共通）
+    const bidButton = (
+      <BidButton
+        myBidStatus={item.my_bid_status}
+        isPreBid={isPreBid}
+        isFreeze={isFreeze}
+        freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
+        freezeTotalSeconds={item.freeze_countdown_seconds}
+        isLoading={isLoading}
+        isTopBidder={item.my_bid_status === 'active' && item.active_bidders_count === 1}
+        activeBidderCount={item.active_bidders_count}
+        onToggle={() => onBidToggle(item.id, item.my_bid_status, item.phase)}
+      />
+    );
+    const limitBadge = onLimitEdit ? (
+      <BidLimitBadge
+        limitPrice={item.my_limit_price ?? null}
+        isTriggered={item.my_limit_triggered ?? false}
+        onEdit={() => onLimitEdit(item.id)}
+        onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
+      />
+    ) : <Box />;
+    const detailButton = (
+      <Button
+        size="small"
+        variant="outlined"
+        color="primary"
+        onClick={() => onDetailOpen(lane)}
+        disabled={disableDetail}
+        sx={{
+          fontSize: '0.7rem', lineHeight: 1.6, height: 30, borderRadius: '15px',
+          ...(disableDetail ? { opacity: 0.5, pointerEvents: 'none' } : {}),
+        }}
+      >
+        個体詳細
+      </Button>
+    );
+    // 入札ボタンの横幅（今のサイズ）と「入札準備中...」の折返し防止は roomy でも共通
+    const bidButtonBoxSx = { width: 150, '& .MuiButton-root': { px: 1, whiteSpace: 'nowrap', minWidth: 0 } } as const;
+
     return (
       <Card
         className={isMyBidActive ? 'active-bid-card' : ''}
@@ -91,9 +136,9 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         }}
       >
         {isMyBidActive && <Box className="active-bid-shimmer" />}
-        {isMyBidActive && <Box className="active-bid-badge">最高入札者</Box>}
+        {/* 「最高入札者」バッジは SP では出さない（入札ボタンに同じ表記が出るため重複になる） */}
 
-        <Box sx={{ p: 1 }}>
+        <Box sx={{ p: roomy ? 1.5 : 1 }}>
           {/* 1行目: レーン名 / プレミアム / カウントダウン */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box
@@ -136,15 +181,18 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 1, mt: 0.25 }}>
-            {/* サムネイル（比較検討用スイッチ） */}
+          <Box sx={{ display: 'flex', gap: 1, mt: roomy ? 0.75 : 0.25 }}>
+            {/* サムネイル（比較検討用スイッチ）。roomy はボタンが下段に降りる分ここを大きく取れる */}
             {showThumbnail && (
               <Box
                 component="img"
                 src={optimizedImageUrl(item.thumbnail_path, 'small')}
                 alt={item.species_name}
                 loading="lazy"
-                sx={{ width: 64, height: 64, borderRadius: 1, objectFit: 'cover', flexShrink: 0, alignSelf: 'center' }}
+                sx={{
+                  width: roomy ? 84 : 64, height: roomy ? 84 : 64,
+                  borderRadius: 1, objectFit: 'cover', flexShrink: 0, alignSelf: 'center',
+                }}
               />
             )}
             {/* 左: 商品情報（品種名はヘッダー行へ移動済み） */}
@@ -181,57 +229,45 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
               </Box>
             </Box>
 
-            {/* 右: 入札ボタン / 指値 / 詳細 */}
-            <Box
-              sx={{
-                width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0.5, justifyContent: 'flex-end',
-                // ボタンの高さ（今のサイズ）は維持しつつ、150px 幅で「入札準備中...」が折り返さないよう左右のみ圧縮
-                '& .MuiButton-root': { px: 1, whiteSpace: 'nowrap', minWidth: 0 },
-              }}
-            >
-              <BidButton
-                myBidStatus={item.my_bid_status}
-                isPreBid={isPreBid}
-                isFreeze={isFreeze}
-                freezeRemainingSeconds={item.freeze_remaining_seconds ?? item.countdown_seconds}
-                freezeTotalSeconds={item.freeze_countdown_seconds}
-                isLoading={isLoading}
-                isTopBidder={item.my_bid_status === 'active' && item.active_bidders_count === 1}
-                activeBidderCount={item.active_bidders_count}
-                onToggle={() => onBidToggle(item.id, item.my_bid_status, item.phase)}
-              />
-              {/* 上限設定が「上限: ¥X,XXX」表示になった時は 150px に収まらないため折返しを許可。
-                  上限設定(Chip)と個体詳細(Button)は高さ30pxのピル形状に統一 */}
+            {/* 右: 入札ボタン / 指値 / 詳細（roomy では下段に降ろして情報カラムを広く取る） */}
+            {!roomy && (
               <Box
                 sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5, flexWrap: 'wrap',
-                  '& .MuiChip-root': { height: 30, borderRadius: '15px' },
+                  ...bidButtonBoxSx,
+                  flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0.5, justifyContent: 'flex-end',
                 }}
               >
-                {onLimitEdit ? (
-                  <BidLimitBadge
-                    limitPrice={item.my_limit_price ?? null}
-                    isTriggered={item.my_limit_triggered ?? false}
-                    onEdit={() => onLimitEdit(item.id)}
-                    onRemove={onLimitRemove ? () => onLimitRemove(item.id) : undefined}
-                  />
-                ) : <Box />}
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => onDetailOpen(lane)}
-                  disabled={disableDetail}
+                {bidButton}
+                {/* 上限設定が「上限: ¥X,XXX」表示になった時は 150px に収まらないため折返しを許可。
+                    上限設定(Chip)と個体詳細(Button)は高さ30pxのピル形状に統一 */}
+                <Box
                   sx={{
-                    fontSize: '0.7rem', lineHeight: 1.6, height: 30, borderRadius: '15px',
-                    ...(disableDetail ? { opacity: 0.5, pointerEvents: 'none' } : {}),
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5, flexWrap: 'wrap',
+                    '& .MuiChip-root': { height: 30, borderRadius: '15px' },
                   }}
                 >
-                  個体詳細
-                </Button>
+                  {limitBadge}
+                  {detailButton}
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* roomy: 下段に 上限設定 / 個体詳細 / 入札ボタン（サイズは非roomyと同一） */}
+          {roomy && (
+            <Box
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.75, flexWrap: 'wrap',
+                '& .MuiChip-root': { height: 30, borderRadius: '15px' },
+              }}
+            >
+              {limitBadge}
+              {detailButton}
+              <Box sx={{ ...bidButtonBoxSx, ml: 'auto' }}>
+                {bidButton}
               </Box>
             </Box>
-          </Box>
+          )}
         </Box>
       </Card>
     );

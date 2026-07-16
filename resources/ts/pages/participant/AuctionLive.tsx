@@ -735,6 +735,7 @@ export default function AuctionLive() {
                 onLimitRemove={setLimitModalItemId}
                 compact={isCompactLive}
                 showThumbnail={SHOW_COMPACT_THUMBNAIL}
+                roomy={isPhonePortrait && liveState.lanes.length <= 3}
               />
             </Grid>
           ))}
