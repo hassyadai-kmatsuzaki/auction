@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmailVerificationToken;
+use App\Models\EneCrmRequest;
+use App\Services\Ene\EneCrmPushService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +54,7 @@ class SetPasswordController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function setPassword(Request $request)
+    public function setPassword(Request $request, EneCrmPushService $eneCrmPush)
     {
         $request->validate([
             'token' => 'required|string',
@@ -89,6 +91,10 @@ class SetPasswordController extends Controller
             ]);
 
             DB::commit();
+
+            // E-NE のCRMを更新する（設定がONのときだけ。実送信は notify キューの Job）。
+            // push() は内部で例外を握るため、ここでパスワード設定が失敗することはない。
+            $eneCrmPush->push($user, EneCrmRequest::EVENT_PASSWORD_SET);
 
             return response()->json([
                 'success' => true,

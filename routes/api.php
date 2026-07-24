@@ -193,6 +193,14 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::get('settings/shipping/rates', [SystemSettingController::class, 'getShippingRates']);
     Route::put('settings/shipping/rates', [SystemSettingController::class, 'updateShippingRates']);
 
+    // E-NE CRM 更新（送信）の運用。設定値そのものは上の settings に含まれる。
+    Route::prefix('ene-crm')->group(function () {
+        Route::post('test', [\App\Http\Controllers\Admin\EneCrmController::class, 'test']);
+        Route::post('send', [\App\Http\Controllers\Admin\EneCrmController::class, 'send']);
+        Route::get('logs', [\App\Http\Controllers\Admin\EneCrmController::class, 'logs']);
+        Route::post('logs/{id}/retry', [\App\Http\Controllers\Admin\EneCrmController::class, 'retry'])->whereNumber('id');
+    });
+
     // LP CVR 設定（買受者LP / 出品者LP の流入経路別CTA URL）
     Route::prefix('lp-cvr/{lpType}')->where(['lpType' => 'buyer|seller'])->group(function () {
         Route::get('/', [LpCvrSettingController::class, 'index']);

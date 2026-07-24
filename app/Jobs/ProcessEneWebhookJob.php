@@ -127,6 +127,8 @@ class ProcessEneWebhookJob implements ShouldQueue
             'is_test'                     => false,
             'line_user_id'                => $customer['line_user_id'] ?? null,
             'line_display_name'           => $customer['display_name'] ?? $name,
+            // E-NE 側の識別子。CRM 更新 API（送信）のキーになるので users に保持する。
+            'ene_customer_id'             => $customer['ene_id'] ?? null,
         ]);
 
         return ['user_id' => $created['user']->id, 'result' => 'created'];

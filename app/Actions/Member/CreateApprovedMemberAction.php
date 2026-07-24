@@ -56,7 +56,7 @@ class CreateApprovedMemberAction
     ];
 
     /**
-     * @param array{name: string, email: string, phone?: ?string, trade_name?: ?string, company_name?: ?string, invoice_registration_number?: ?string, member_type?: string, is_test?: bool, line_user_id?: ?string, line_display_name?: ?string} $data
+     * @param array{name: string, email: string, phone?: ?string, trade_name?: ?string, company_name?: ?string, invoice_registration_number?: ?string, member_type?: string, is_test?: bool, line_user_id?: ?string, line_display_name?: ?string, ene_customer_id?: mixed} $data
      * @return array{user: User, verification_url: string}
      */
     public function execute(array $data): array
@@ -85,6 +85,10 @@ class CreateApprovedMemberAction
                 'is_test'     => (bool) ($data['is_test'] ?? false),
                 'approved_at' => now(),
                 'approved_by' => null,                        // システム（E-NE連携）発行
+                // E-NE 側の識別子。CRM 更新API（送信）のキーは line_user_id なので、
+                // 本人が LINE 連携を解除しても送信先を見失わないよう users 側にも保持する。
+                'ene_line_user_id'   => $lineUserId,
+                'ene_customer_id'    => is_numeric($data['ene_customer_id'] ?? null) ? (int) $data['ene_customer_id'] : null,
                 // 1Day契約は加入予定プランを固定（決済モーダルに1Dayのみ提示。決済完了で自動解除）
                 'intended_plan_code' => ($data['member_type'] ?? null) === 'one_day' ? 'one_day' : null,
             ]);

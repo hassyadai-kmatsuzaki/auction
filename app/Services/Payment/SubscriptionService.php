@@ -4,10 +4,12 @@ namespace App\Services\Payment;
 
 use App\Mail\SubscriptionPaidAdminMail;
 use App\Mail\SubscriptionPaidMail;
+use App\Models\EneCrmRequest;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Ene\EneCrmPushService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -31,6 +33,7 @@ class SubscriptionService
 
     public function __construct(
         private readonly SquareClient $square,
+        private readonly EneCrmPushService $eneCrmPush,
     ) {}
 
     /**
@@ -170,6 +173,14 @@ class SubscriptionService
 
         $this->sendPaidNotifications($user, $subscription, $paymentRecord, 'new');
 
+        // E-NE のCRMを更新する（設定がONのときだけ。実送信は notify キューの Job）。
+        $this->eneCrmPush->push($user, EneCrmRequest::EVENT_SUBSCRIPTION_PAID, [
+            'plan_name'      => $plan->name,
+            'plan_code'      => $plan->code,
+            'amount'         => $amount,
+            'payment_method' => 'card',
+        ]);
+
         return $subscription;
     }
 
@@ -187,7 +198,7 @@ class SubscriptionService
             throw new RuntimeException('既にサブスクリプションが存在します');
         }
 
-        return DB::transaction(function () use ($user, $plan) {
+        $subscription = DB::transaction(function () use ($user, $plan) {
             $subscription = Subscription::updateOrCreate(
                 ['user_id' => $user->id],
                 [
@@ -227,6 +238,16 @@ class SubscriptionService
 
             return $subscription->fresh('plan');
         });
+
+        // E-NE のCRMを更新する（振込申請の段階。入金確認はまだ）。
+        $this->eneCrmPush->push($user, EneCrmRequest::EVENT_BANK_TRANSFER_REQUESTED, [
+            'plan_name'      => $plan->name,
+            'plan_code'      => $plan->code,
+            'amount'         => (int) $plan->amount,
+            'payment_method' => 'bank_transfer',
+        ]);
+
+        return $subscription;
     }
 
     /**

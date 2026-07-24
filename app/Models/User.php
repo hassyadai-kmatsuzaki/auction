@@ -53,6 +53,8 @@ class User extends Authenticatable
         'two_factor_recovery_codes',
         'two_factor_confirmed_at',
         'google_id',
+        'ene_line_user_id',
+        'ene_customer_id',
         'trust_score',
         'review_count',
         'email_bounced_at',
@@ -73,6 +75,8 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_recovery_codes',
         'unsubscribe_token',
+        // LINEユーザーIDは LineAccount と同様にAPIレスポンスへ出さない
+        'ene_line_user_id',
     ];
 
     /**

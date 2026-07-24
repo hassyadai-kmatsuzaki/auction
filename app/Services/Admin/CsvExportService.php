@@ -4,10 +4,12 @@ namespace App\Services\Admin;
 
 use App\Models\Auction;
 use App\Models\Item;
+use App\Models\SellerProfile;
 use App\Models\Subscription;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\WonItem;
+use App\Services\InvoiceTaxResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -16,8 +18,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * 管理者向けCSVエクスポート
  *
  * 集計方針:
- * - 「売上/手数料/送料」は won_items の合算（落札確定全件、支払い状況は問わない）
- * - 「税金」は (売上 + 手数料 + 送料) × SystemSetting('tax_rate', 10) / 100
+ * - 「落札金額/手数料/送料」は won_items の合算（落札確定全件、支払い状況は問わない）
+ * - 消費税は3区分（落札者 / インボイス有出品者 / インボイス無出品者）。
+ *   帳票（請求書・支払通知書）と同じ単位で floor 丸めしてから合算し、帳票合計と一致させる
  * - 「会員数」のみ全体スナップショット（実行時点の有効会員数）。他の人数はオークション単位のユニーク数
  * - is_test=true のオークションはデフォルトで除外（クエリ ?include_test=1 で含める）
  */
@@ -73,24 +76,24 @@ class CsvExportService
                 '落札数',
                 '落札人数',
                 '参加数',
-                '売上(税抜)',
-                '手数料(税抜)',
+                '落札金額(税抜)',
+                '買手手数料(税抜)',
+                '売手手数料(税抜)',
                 '送料(税抜)',
-                '税金',
-                '合計(税込)',
+                '消費税(落札者)',
+                '消費税(インボイス有出品者)',
+                '消費税(インボイス無出品者)',
+                '落札者請求合計(税込)',
+                '出品者支払合計(税込)',
             ]);
 
             $auctions = $auctionsQuery->get();
             $stats = $this->aggregateAuctionStats($auctions->pluck('id')->all());
+            $taxStats = $this->aggregateAuctionTaxStats($auctions, $taxRate);
 
             foreach ($auctions as $auction) {
                 $s = $stats[$auction->id] ?? $this->emptyStats();
-
-                $sales = (float) $s['sales'];
-                $commission = (float) $s['commission'];
-                $shipping = (float) $s['shipping'];
-                $tax = floor(($sales + $commission + $shipping) * $taxRate / 100);
-                $grand = $sales + $commission + $shipping + $tax;
+                $t = $taxStats[$auction->id] ?? $this->emptyTaxStats();
 
                 fputcsv($out, [
                     $auction->id,
@@ -103,11 +106,16 @@ class CsvExportService
                     $s['won_count'],
                     $s['winners_count'],
                     $s['participants_count'],
-                    (int) $sales,
-                    (int) $commission,
-                    (int) $shipping,
-                    (int) $tax,
-                    (int) $grand,
+                    (int) $s['sales'],
+                    (int) $s['commission'],
+                    // 売手手数料 = 支払通知書で出品者から控除する額。現状は買手と同率(10%)・同額
+                    (int) $s['commission'],
+                    (int) $s['shipping'],
+                    $t['buyer_tax'],
+                    $t['seller_tax_registered'],
+                    $t['seller_tax_exempt'],
+                    $t['buyer_total'],
+                    $t['seller_payout_total'],
                 ]);
             }
 
@@ -717,6 +725,99 @@ class CsvExportService
             'sales' => 0.0,
             'commission' => 0.0,
             'shipping' => 0.0,
+        ];
+    }
+
+    /**
+     * 消費税3区分と税込合計をオークション別に集計する。
+     *
+     * 丸めは帳票と同じ単位で floor してから合算する（帳票合計との一致が目的）:
+     * - 落札者分: 請求書と同じ「落札者×オークション」単位で
+     *   (落札金額 + 買手手数料 + 送料) × tax_rate
+     * - 出品者分: 支払通知書と同じ「出品者×オークション」単位で
+     *   落札金額×税率 − 手数料×tax_rate のネット額。
+     *   落札金額の税率は InvoiceTaxResolver（インボイス登録有=10% / 未登録=経過措置率、
+     *   基準日は event_date）。手数料は自社の課税売上のため登録有無によらず常に tax_rate
+     *
+     * @param \Illuminate\Support\Collection<int, Auction> $auctions
+     * @return array<int, array<string, int>>  key=auction_id
+     */
+    private function aggregateAuctionTaxStats($auctions, float $taxRate): array
+    {
+        $auctionIds = $auctions->pluck('id')->all();
+        if (empty($auctionIds)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($auctionIds as $id) {
+            $result[$id] = $this->emptyTaxStats();
+        }
+
+        // 落札者×オークション単位（請求書と同じ丸め）
+        $buyerGroups = DB::table('won_items')
+            ->join('items', 'items.id', '=', 'won_items.item_id')
+            ->whereIn('items.auction_id', $auctionIds)
+            ->groupBy('items.auction_id', 'won_items.winner_id')
+            ->select(
+                'items.auction_id',
+                'won_items.winner_id',
+                DB::raw('COALESCE(SUM(won_items.winning_price * won_items.quantity), 0) as winning'),
+                DB::raw('COALESCE(SUM(won_items.commission_amount), 0) as commission'),
+                DB::raw('COALESCE(SUM(won_items.shipping_fee), 0) as shipping'),
+            )
+            ->get();
+
+        foreach ($buyerGroups as $g) {
+            $base = (float) $g->winning + (float) $g->commission + (float) $g->shipping;
+            $tax = (int) floor($base * $taxRate / 100);
+            $result[$g->auction_id]['buyer_tax'] += $tax;
+            $result[$g->auction_id]['buyer_total'] += (int) $base + $tax;
+        }
+
+        // 出品者×オークション単位（支払通知書と同じ丸め）
+        $resolver = app(InvoiceTaxResolver::class);
+        $auctionById = $auctions->keyBy('id');
+        $sellerStub = new SellerProfile();
+
+        $sellerGroups = DB::table('won_items')
+            ->join('items', 'items.id', '=', 'won_items.item_id')
+            ->join('seller_profiles', 'seller_profiles.id', '=', 'items.seller_profile_id')
+            ->whereIn('items.auction_id', $auctionIds)
+            ->groupBy('items.auction_id', 'items.seller_profile_id', 'seller_profiles.business_registration_number')
+            ->select(
+                'items.auction_id',
+                'items.seller_profile_id',
+                'seller_profiles.business_registration_number',
+                DB::raw('COALESCE(SUM(won_items.winning_price * won_items.quantity), 0) as winning'),
+                DB::raw('COALESCE(SUM(won_items.commission_amount), 0) as commission'),
+            )
+            ->get();
+
+        foreach ($sellerGroups as $g) {
+            $sellerStub->business_registration_number = $g->business_registration_number;
+            $taxMeta = $resolver->resolve($auctionById[$g->auction_id], $sellerStub);
+
+            $taxWinning = (int) floor((float) $g->winning * $taxMeta['winning_tax_rate'] / 100);
+            $taxCommission = (int) floor((float) $g->commission * $taxMeta['commission_tax_rate'] / 100);
+
+            $key = $taxMeta['is_tax_exempt'] ? 'seller_tax_exempt' : 'seller_tax_registered';
+            $result[$g->auction_id][$key] += $taxWinning - $taxCommission;
+            $result[$g->auction_id]['seller_payout_total'] +=
+                ((int) $g->winning + $taxWinning) - ((int) $g->commission + $taxCommission);
+        }
+
+        return $result;
+    }
+
+    private function emptyTaxStats(): array
+    {
+        return [
+            'buyer_tax' => 0,
+            'buyer_total' => 0,
+            'seller_tax_registered' => 0,
+            'seller_tax_exempt' => 0,
+            'seller_payout_total' => 0,
         ];
     }
 

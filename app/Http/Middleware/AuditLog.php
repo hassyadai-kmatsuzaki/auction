@@ -34,8 +34,16 @@ class AuditLog
             'status_code' => $response->getStatusCode(),
         ];
 
-        // パスワードなど機密情報を除外
-        $params = $request->except(['password', 'password_confirmation', 'two_factor_secret', 'code']);
+        // パスワードなど機密情報を除外。
+        // settings.ene_crm_api_key は管理画面から平文で送られてくる外部連携のAPIキーなので、
+        // 監査ログに残すと「マスクして保存」の意味が無くなる（ドット記法でネストも除外できる）。
+        $params = $request->except([
+            'password',
+            'password_confirmation',
+            'two_factor_secret',
+            'code',
+            'settings.ene_crm_api_key',
+        ]);
         if (!empty($params)) {
             $logData['params'] = $params;
         }

@@ -21,15 +21,19 @@ interface Props {
   onLimitEdit?: (itemId: number) => void;
 }
 
-export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
-  const [infoItem, setInfoItem] = useState<(UpcomingItem & { laneNumber: number }) | null>(null);
+type UpcomingRow = UpcomingItem & { laneNumber: number; laneName: string };
 
-  const items: (UpcomingItem & { laneNumber: number })[] = [];
+export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
+  const [infoItem, setInfoItem] = useState<UpcomingRow | null>(null);
+
+  const items: UpcomingRow[] = [];
 
   for (const lane of lanes) {
     if (!lane.upcoming_items?.length) continue;
+    // レーン名は LaneCard と同じ表示ルール（未設定なら「レーン{番号}」）
+    const laneName = lane.lane_name?.trim() || `レーン${lane.lane_number}`;
     for (const item of lane.upcoming_items) {
-      items.push({ ...item, laneNumber: lane.lane_number });
+      items.push({ ...item, laneNumber: lane.lane_number, laneName });
     }
   }
 
@@ -80,9 +84,9 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
               <Box sx={{ p: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
                   <Chip
-                    label={`L${item.laneNumber}`}
+                    label={item.laneName}
                     size="small"
-                    sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }}
+                    sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, maxWidth: 108 }}
                     color="primary"
                     variant="outlined"
                   />
@@ -157,7 +161,7 @@ export function UpcomingItems({ lanes, onFavoriteToggle, onLimitEdit }: Props) {
                 />
               )}
               <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-                <Chip label={`レーン ${infoItem.laneNumber}`} size="small" color="primary" />
+                <Chip label={infoItem.laneName} size="small" color="primary" />
                 {infoItem.is_premium && <Chip label="プレミアム" size="small" color="warning" />}
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

@@ -743,6 +743,10 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
   }
 
   // phase === 'auction'
+  // 「次の商品」のレーン表示はレーン名（未設定なら「レーン{番号}」）
+  const laneNameOf = (laneNumber: number) =>
+    lanes.find(l => l.lane_number === laneNumber)?.lane_name?.trim() || `レーン${laneNumber}`;
+
   return (
     <DemoLayout currentPage="items" onNavigate={handleNavigate} tourActive={tourActive} onDrawerToggle={setDrawerOpen}>
       <Box sx={{ bgcolor: 'grey.100', minHeight: '60vh', position: 'relative', overflow: 'hidden' }}>
@@ -814,7 +818,7 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                   </Box>
                   <Box sx={{ p: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
-                      <Chip label={`L${item.laneNumber}`} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} color="primary" variant="outlined" />
+                      <Chip label={laneNameOf(item.laneNumber)} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, maxWidth: 100 }} color="primary" variant="outlined" />
                       {item.is_premium && <Chip label="P" size="small" color="warning" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />}
                     </Box>
                     <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600 }}>{item.species_name}</Typography>

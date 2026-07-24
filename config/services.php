@@ -91,6 +91,14 @@ return [
     // 共有シークレット（whsec_...）は system_settings に平文で置かず .env に格納する。
     'ene' => [
         'webhook_secret' => env('ENE_WEBHOOK_SECRET', ''),
+
+        // auction → E-NE の CRM 更新 API（送信側）。
+        // 正は管理画面「設定 → 外部連携」(system_settings) 側で、ここは未設定時のフォールバック。
+        'crm' => [
+            'base_url'  => env('ENE_CRM_BASE_URL', ''),
+            'tenant_id' => env('ENE_CRM_TENANT_ID', ''),
+            'api_key'   => env('ENE_CRM_API_KEY', ''),
+        ],
     ],
 
 ];

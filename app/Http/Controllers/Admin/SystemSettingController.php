@@ -10,6 +10,22 @@ use Illuminate\Support\Facades\Validator;
 class SystemSettingController extends Controller
 {
     /**
+     * 平文で画面に返してはいけない設定キー（APIキー等）。
+     *
+     * 読み出し時は先頭数文字だけ残してマスクし、保存時はマスク済みの値が
+     * 送り返されてきたら「変更なし」として無視する（フォーム全体を PUT する
+     * 作りのため、無視しないと開くだけでキーが壊れる）。
+     *
+     * @var array<int, string>
+     */
+    private const MASKED_KEYS = ['ene_crm_api_key'];
+
+    /**
+     * マスク表示の先頭に残す文字数（cc_live_xxxx… まで見えれば取り違えを防げる）。
+     */
+    private const MASK_VISIBLE_PREFIX = 12;
+
+    /**
      * すべての設定を取得
      *
      * @return \Illuminate\Http\JsonResponse
@@ -17,13 +33,13 @@ class SystemSettingController extends Controller
     public function index()
     {
         $settings = SystemSetting::all()->groupBy('category');
-        
+
         $result = [];
         foreach ($settings as $category => $items) {
             $result[$category] = [];
             foreach ($items as $item) {
                 $result[$category][$item->setting_key] = [
-                    'value' => $this->castValue($item->setting_value, $item->value_type),
+                    'value' => $this->maskIfSecret($item->setting_key, $this->castValue($item->setting_value, $item->value_type)),
                     'type' => $item->value_type,
                     'label' => $item->display_name,
                     'description' => $item->description,
@@ -31,7 +47,7 @@ class SystemSettingController extends Controller
                 ];
             }
         }
-        
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -53,7 +69,7 @@ class SystemSettingController extends Controller
         $result = [];
         foreach ($settings as $item) {
             $result[$item->setting_key] = [
-                'value' => $this->castValue($item->setting_value, $item->value_type),
+                'value' => $this->maskIfSecret($item->setting_key, $this->castValue($item->setting_value, $item->value_type)),
                 'type' => $item->value_type,
                 'label' => $item->display_name,
                 'description' => $item->description,
@@ -79,10 +95,16 @@ class SystemSettingController extends Controller
     public function update(Request $request)
     {
         $settings = $request->input('settings', []);
-        
+
         foreach ($settings as $key => $value) {
+            // マスク済みの値（画面に表示されたまま送り返された値）は保存しない。
+            // 空文字も「未入力＝現状維持」とみなす（消したい場合は無効化トグルを使う）。
+            if (in_array($key, self::MASKED_KEYS, true) && $this->isUnchangedSecret($value)) {
+                continue;
+            }
+
             $setting = SystemSetting::where('setting_key', $key)->first();
-            
+
             if ($setting) {
                 // JSONの場合はエンコード
                 if ($setting->value_type === 'json' && is_array($value)) {
@@ -196,5 +218,30 @@ class SystemSettingController extends Controller
             default:
                 return $value;
         }
+    }
+
+    /**
+     * APIキー等を「cc_live_3f8a…」形式にマスクする。未設定なら空文字のまま返す。
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function maskIfSecret(string $key, $value)
+    {
+        if (!in_array($key, self::MASKED_KEYS, true) || !is_string($value) || $value === '') {
+            return $value;
+        }
+
+        return mb_substr($value, 0, self::MASK_VISIBLE_PREFIX) . '…';
+    }
+
+    /**
+     * 保存要求の値が「マスク済み（＝画面で編集されていない）」かどうか。
+     *
+     * @param mixed $value
+     */
+    private function isUnchangedSecret($value): bool
+    {
+        return !is_string($value) || trim($value) === '' || str_ends_with($value, '…');
     }
 }

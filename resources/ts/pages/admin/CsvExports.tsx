@@ -117,7 +117,7 @@ export default function CsvExports() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>オークション一覧サマリー</Typography>
         <Typography variant="body2" color="text.secondary" gutterBottom>
-          1行=1オークション。期間内のオークションについて、売上・会員数（全体スナップショット）・送料・税金・出品数・出品人数・落札数・落札人数・手数料・参加数を出力します。
+          1行=1オークション。期間内のオークションについて、出品/落札/参加の件数・会員数（全体スナップショット）に加え、落札金額・買手/売手手数料・送料（税抜）、消費税3区分（落札者・インボイス有出品者・インボイス無出品者）、落札者請求合計・出品者支払合計（税込）を出力します。消費税は請求書・支払通知書と同じ単位で丸めるため帳票合計と一致します。
         </Typography>
         <Divider sx={{ my: 2 }} />
         <Grid container spacing={2} alignItems="center">

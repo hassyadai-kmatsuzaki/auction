@@ -16,6 +16,9 @@ import { formatYen } from '../../lib/formatPrice';
 import { useSettings } from '../../features/settings/hooks/useSettings';
 import { useNotificationStore } from '../../stores/notificationStore';
 import TestModeCard from '../../features/settings/components/TestModeCard';
+import EneCrmPushCard, {
+  DEFAULT_ENE_CRM_EVENT_MAP, type EneCrmEventMap,
+} from '../../features/settings/components/EneCrmPushCard';
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) => (
@@ -61,6 +64,9 @@ interface SettingsState {
   ene_webhook_enabled: boolean; ene_email_field_name: string; ene_phone_field_name: string;
   ene_name_field_name: string; ene_company_field_name: string; ene_invoice_field_name: string;
   ene_default_member_type: string; ene_duplicate_behavior: string;
+  // 外部連携（E-NE へのCRM更新 = 送信側）
+  ene_crm_push_enabled: boolean; ene_crm_base_url: string;
+  ene_crm_tenant_id: string; ene_crm_api_key: string;
 }
 
 const DEFAULT_PRICE_INCREMENT_TIERS: PriceIncrementTier[] = [
@@ -97,6 +103,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   ene_webhook_enabled: false, ene_email_field_name: 'email', ene_phone_field_name: '電話番号',
   ene_name_field_name: '名前', ene_company_field_name: '会社名 / 屋号', ene_invoice_field_name: 'インボイス登録番号',
   ene_default_member_type: 'buyer', ene_duplicate_behavior: 'skip',
+  ene_crm_push_enabled: false, ene_crm_base_url: '', ene_crm_tenant_id: '', ene_crm_api_key: '',
 };
 
 export default function AdminSettings() {
@@ -112,6 +119,7 @@ export default function AdminSettings() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
   const [incrementTiers, setIncrementTiers]           = useState<PriceIncrementTier[]>(DEFAULT_PRICE_INCREMENT_TIERS);
   const [countdownTiers, setCountdownTiers]           = useState<CountdownTier[]>(DEFAULT_COUNTDOWN_TIERS);
+  const [eneCrmEventMap, setEneCrmEventMap]           = useState<EneCrmEventMap>(DEFAULT_ENE_CRM_EVENT_MAP);
 
   const { rawSettings, isLoading, isSaving, save } = useSettings();
 
@@ -163,7 +171,15 @@ export default function AdminSettings() {
       ene_invoice_field_name:         d.external_integration?.ene_invoice_field_name?.value ?? 'インボイス登録番号',
       ene_default_member_type:        String(d.external_integration?.ene_default_member_type?.value ?? 'buyer'),
       ene_duplicate_behavior:         String(d.external_integration?.ene_duplicate_behavior?.value ?? 'skip'),
+      ene_crm_push_enabled:           d.external_integration?.ene_crm_push_enabled?.value ?? false,
+      ene_crm_base_url:               d.external_integration?.ene_crm_base_url?.value ?? '',
+      ene_crm_tenant_id:              String(d.external_integration?.ene_crm_tenant_id?.value ?? ''),
+      // APIキーはサーバー側でマスク済み（cc_live_xxxx…）。触らず保存しても上書きされない。
+      ene_crm_api_key:                d.external_integration?.ene_crm_api_key?.value ?? '',
     });
+    if (d.external_integration?.ene_crm_event_map?.value) {
+      setEneCrmEventMap({ ...DEFAULT_ENE_CRM_EVENT_MAP, ...d.external_integration.ene_crm_event_map.value });
+    }
     if (d.shipping?.shipping_rates?.value) setShippingRates(d.shipping.shipping_rates.value);
     if (d.auction?.default_price_increment_tiers?.value) setIncrementTiers(d.auction.default_price_increment_tiers.value);
     if (d.auction?.default_countdown_tiers?.value) setCountdownTiers(d.auction.default_countdown_tiers.value);
@@ -177,6 +193,7 @@ export default function AdminSettings() {
       auto_generate_payment_notice: s.auto_generate_payment_notice,
       default_price_increment_tiers: incrementTiers,
       default_countdown_tiers: countdownTiers,
+      ene_crm_event_map: eneCrmEventMap,
     });
   };
 
@@ -717,6 +734,17 @@ export default function AdminSettings() {
             </Grid>
           </CardContent>
         </Card>
+
+        <EneCrmPushCard
+          enabled={s.ene_crm_push_enabled}
+          baseUrl={s.ene_crm_base_url}
+          tenantId={s.ene_crm_tenant_id}
+          apiKey={s.ene_crm_api_key}
+          eventMap={eneCrmEventMap}
+          onChangeSetting={(key, value) => setS((p) => ({ ...p, [key]: value }))}
+          onChangeText={(key, value) => setS((p) => ({ ...p, [key]: value }))}
+          onChangeEventMap={setEneCrmEventMap}
+        />
       </TabPanel>
 
       {/* スナックバー */}
