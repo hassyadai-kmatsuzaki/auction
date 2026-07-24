@@ -2,6 +2,7 @@
 
 namespace App\Services\Admin;
 
+use App\Models\ActivityEvent;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
@@ -85,15 +86,23 @@ class CsvExportService
                 '消費税(インボイス無出品者)',
                 '落札者請求合計(税込)',
                 '出品者支払合計(税込)',
+                // 行動分析（activity_events / is_test ユーザー除外）
+                '閲覧数',
+                '閲覧UU',
+                'お気に入り数',
+                '指値数',
             ]);
 
             $auctions = $auctionsQuery->get();
-            $stats = $this->aggregateAuctionStats($auctions->pluck('id')->all());
+            $auctionIds = $auctions->pluck('id')->all();
+            $stats = $this->aggregateAuctionStats($auctionIds);
             $taxStats = $this->aggregateAuctionTaxStats($auctions, $taxRate);
+            $activity = $this->aggregateAuctionActivityStats($auctionIds);
 
             foreach ($auctions as $auction) {
                 $s = $stats[$auction->id] ?? $this->emptyStats();
                 $t = $taxStats[$auction->id] ?? $this->emptyTaxStats();
+                $a = $activity[$auction->id] ?? $this->emptyActivityStats();
 
                 fputcsv($out, [
                     $auction->id,
@@ -116,6 +125,10 @@ class CsvExportService
                     $t['seller_tax_exempt'],
                     $t['buyer_total'],
                     $t['seller_payout_total'],
+                    $a['views'],
+                    $a['view_users'],
+                    $a['favorites'],
+                    $a['bid_limits'],
                 ]);
             }
 
@@ -167,7 +180,9 @@ class CsvExportService
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ];
 
-        return response()->stream(function () use ($query, $taxRate) {
+        $activity = $this->aggregateItemActivityStats($auctionId, $from, $to, $includeTest);
+
+        return response()->stream(function () use ($query, $taxRate, $activity) {
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
@@ -188,6 +203,11 @@ class CsvExportService
                 '手数料(税抜)',
                 '税金',
                 '合計(税込)',
+                // 行動分析（activity_events / is_test ユーザー除外）
+                '閲覧数',
+                '閲覧UU',
+                'お気に入り数',
+                '指値数',
             ]);
 
             foreach ($query->lazy(200) as $item) {
@@ -195,6 +215,7 @@ class CsvExportService
                 $sellerName = $this->resolveSellerName($item);
                 $sellerId = $item->sellerProfile?->user?->id;
                 $won = $item->wonItem;
+                $act = $activity[$item->id] ?? $this->emptyActivityStats();
 
                 if ($won) {
                     // 落札金額(税抜) = 落札価格 × 匹数。total_amount は手数料込みのため使わない。
@@ -228,6 +249,10 @@ class CsvExportService
                     $commission !== null ? (int) $commission : '',
                     $tax !== null ? (int) $tax : '',
                     $grand !== null ? (int) $grand : '',
+                    $act['views'],
+                    $act['view_users'],
+                    $act['favorites'],
+                    $act['bid_limits'],
                 ]);
             }
 
@@ -725,6 +750,129 @@ class CsvExportService
             'sales' => 0.0,
             'commission' => 0.0,
             'shipping' => 0.0,
+        ];
+    }
+
+    /**
+     * オークション別の行動指標（activity_events）を1クエリで集計する。
+     *
+     * - 閲覧数/閲覧UU … item_view の件数と distinct ユーザー数
+     * - お気に入り数   … favorite_add の累計発生回数（解除しても減らない）
+     * - 指値数         … bid_limit_set の累計発生回数（同上）
+     * 分析ダッシュボードと数値を一致させるため is_test ユーザーは除外する（確定仕様）。
+     * item_view は開催前(preparing/scheduled)のみ記録されるため、
+     * 終了オークションの閲覧数は「開始前の閲覧」を表す点に注意。
+     *
+     * @param int[] $auctionIds
+     * @return array<int, array{views:int,view_users:int,favorites:int,bid_limits:int}>  key=auction_id
+     */
+    private function aggregateAuctionActivityStats(array $auctionIds): array
+    {
+        if (empty($auctionIds)) {
+            return [];
+        }
+
+        $rows = DB::table('activity_events as ae')
+            ->join('users as u', 'u.id', '=', 'ae.user_id')
+            ->where('u.is_test', false)
+            ->whereIn('ae.auction_id', $auctionIds)
+            ->whereIn('ae.event_type', [
+                ActivityEvent::ITEM_VIEW,
+                ActivityEvent::FAVORITE_ADD,
+                ActivityEvent::BID_LIMIT_SET,
+            ])
+            ->groupBy('ae.auction_id', 'ae.event_type')
+            ->selectRaw('ae.auction_id, ae.event_type, COUNT(*) as cnt, COUNT(DISTINCT ae.user_id) as uu')
+            ->get();
+
+        $result = [];
+        foreach ($auctionIds as $id) {
+            $result[$id] = $this->emptyActivityStats();
+        }
+
+        foreach ($rows as $r) {
+            $this->applyActivityRow($result[$r->auction_id], $r);
+        }
+
+        return $result;
+    }
+
+    /**
+     * 生体（item）別の行動指標（activity_events）を1クエリで集計する。
+     * 出品明細CSVと同じ絞り込み（auction_id / event_date 期間 / is_test オークション）を
+     * activity_events→auctions の JOIN で再現し、item_id ごとにまとめる。
+     * 集計方針は aggregateAuctionActivityStats と同じ（is_test ユーザー除外）。
+     *
+     * @return array<int, array{views:int,view_users:int,favorites:int,bid_limits:int}>  key=item_id
+     */
+    private function aggregateItemActivityStats(?int $auctionId, ?Carbon $from, ?Carbon $to, bool $includeTest): array
+    {
+        $q = DB::table('activity_events as ae')
+            ->join('users as u', 'u.id', '=', 'ae.user_id')
+            ->join('auctions as a', 'a.id', '=', 'ae.auction_id')
+            ->whereNull('a.deleted_at')
+            ->where('u.is_test', false)
+            ->whereNotNull('ae.item_id')
+            ->whereIn('ae.event_type', [
+                ActivityEvent::ITEM_VIEW,
+                ActivityEvent::FAVORITE_ADD,
+                ActivityEvent::BID_LIMIT_SET,
+            ]);
+
+        if ($auctionId) {
+            $q->where('ae.auction_id', $auctionId);
+        }
+        if ($from) {
+            $q->whereDate('a.event_date', '>=', $from->toDateString());
+        }
+        if ($to) {
+            $q->whereDate('a.event_date', '<=', $to->toDateString());
+        }
+        if (! $includeTest) {
+            $q->where('a.is_test', false);
+        }
+
+        $rows = $q->groupBy('ae.item_id', 'ae.event_type')
+            ->selectRaw('ae.item_id, ae.event_type, COUNT(*) as cnt, COUNT(DISTINCT ae.user_id) as uu')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $r) {
+            if (! isset($result[$r->item_id])) {
+                $result[$r->item_id] = $this->emptyActivityStats();
+            }
+            $this->applyActivityRow($result[$r->item_id], $r);
+        }
+
+        return $result;
+    }
+
+    /**
+     * 集計行（event_type/cnt/uu）を行動指標の連想配列に反映する。
+     */
+    private function applyActivityRow(array &$stats, object $row): void
+    {
+        switch ($row->event_type) {
+            case ActivityEvent::ITEM_VIEW:
+                $stats['views'] = (int) $row->cnt;
+                $stats['view_users'] = (int) $row->uu;
+                break;
+            case ActivityEvent::FAVORITE_ADD:
+                $stats['favorites'] = (int) $row->cnt;
+                break;
+            case ActivityEvent::BID_LIMIT_SET:
+                $stats['bid_limits'] = (int) $row->cnt;
+                break;
+        }
+    }
+
+    private function emptyActivityStats(): array
+    {
+        return [
+            'views' => 0,
+            'view_users' => 0,
+            'favorites' => 0,
+            'bid_limits' => 0,
         ];
     }
 
