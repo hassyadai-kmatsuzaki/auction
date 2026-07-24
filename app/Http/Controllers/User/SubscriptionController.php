@@ -29,11 +29,21 @@ class SubscriptionController extends Controller
         // 加入予定プランのマーカー（E-NE 1Day契約 / 管理者の会員種別切替）が立っていれば
         // そのプランのみ提示する。決済完了で自動解除。プランが無効化済み等で1件も
         // 該当しない場合は安全側に倒して全件提示（誰も加入できなくなる事故を防ぐ）。
+        $intendedMatched = false;
         if ($user->intended_plan_code) {
             $intended = $plans->where('code', $user->intended_plan_code)->values();
             if ($intended->isNotEmpty()) {
                 $plans = $intended;
+                $intendedMatched = true;
             }
+        }
+
+        // 単発プラン（1Day）はマーカー保持者＝E-NE「1Day」契約者の専用プラン。
+        // 1Day は allows_sell=false のため、放置すると落札者ロール全員のモーダルに
+        // 「年会費5,500円 / 1Day 500円」の2択で並んでしまう（2026-07-24 報告）。
+        // マーカーが立っていない利用者には年会費プランのみを提示する。
+        if (!$intendedMatched) {
+            $plans = $plans->reject(fn ($p) => $p->isOneShot())->values();
         }
 
         // 管理者による会員種別切替（1Day → 年会員）後は年会費プランのみ提示し、
@@ -105,6 +115,15 @@ class SubscriptionController extends Controller
         if ($user->intended_plan_code
             && $plan->code !== $user->intended_plan_code
             && Plan::active()->where('code', $user->intended_plan_code)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ご契約の会員種別のプランをご選択ください',
+            ], 422);
+        }
+
+        // 単発プラン（1Day）は intended_plan_code マーカー保持者専用（show() の絞り込みと対）。
+        // マーカー無しの落札者が直接 POST しても 500円プランに加入できないようにする。
+        if ($plan->isOneShot() && $user->intended_plan_code !== $plan->code) {
             return response()->json([
                 'success' => false,
                 'message' => 'ご契約の会員種別のプランをご選択ください',

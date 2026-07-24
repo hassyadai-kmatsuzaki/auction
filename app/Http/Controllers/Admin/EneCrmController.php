@@ -28,6 +28,49 @@ class EneCrmController extends Controller
     }
 
     /**
+     * E-NE の CRM 項目カタログを取得する（会員の指定は不要）。
+     *
+     * E-NE 側の項目名は field_xxxxxxxx、選択肢の値は opt_xxxxxxxx という自動採番のため、
+     * 人が手で入力できない。管理画面はこれを読んでプルダウンを作る。
+     * APIキー・テナントID・ベースURLの検証も兼ねる。
+     */
+    public function fields()
+    {
+        if (!$this->client->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ベースURL / テナントID / APIキー のいずれかが未設定です。',
+            ], 422);
+        }
+
+        try {
+            $response = $this->client->listFields();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '接続に失敗しました: ' . Str::limit($e->getMessage(), 200),
+            ], 422);
+        }
+
+        if (!$response->successful()) {
+            return response()->json([
+                'success' => false,
+                'message' => $response->status() === 404
+                    // /fields は後から追加されたエンドポイント。E-NE 側が旧版だとここに来る。
+                    ? 'E-NE 側が項目一覧API（/fields）に未対応です。E-NE のデプロイ状況をご確認ください。'
+                    : $this->describeHttpError($response->status()),
+                'http_status' => $response->status(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => '項目を読み込みました。',
+            'data'    => ['fields' => $response->json('fields') ?? []],
+        ]);
+    }
+
+    /**
      * 接続テスト。会員（users.id）を指定し、その会員の line_user_id で GET を叩く。
      * 更新は行わないので、E-NE 側のデータには影響しない。
      */
@@ -81,14 +124,25 @@ class EneCrmController extends Controller
             unset($customer['line_user_id']);
         }
 
+        // E-NE 側に存在する CRM フィールドの対応表。
+        // 更新APIは name（"field_xxxx"）でしか解決しないため、表示名(label)だけ見て設定すると
+        // 200 が返るのに黙って無視される。管理画面で label と name を必ず並べて出す。
+        $fields = [];
+        foreach (($body['fields'] ?? []) as $name => $field) {
+            $fields[] = [
+                'name'          => (string) $name,
+                'label'         => $field['label'] ?? (string) $name,
+                'type'          => $field['type'] ?? '',
+                'display_value' => is_scalar($field['display_value'] ?? null) ? (string) $field['display_value'] : '',
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'message' => '接続に成功しました。',
             'data'    => [
                 'customer' => $customer,
-                // E-NE 側に存在する CRM フィールド名の一覧。管理画面の入力補助に使う。
-                'field_names' => array_keys($body['fields'] ?? []),
-                'fields'      => $body['fields'] ?? [],
+                'fields'   => $fields,
             ],
         ]);
     }

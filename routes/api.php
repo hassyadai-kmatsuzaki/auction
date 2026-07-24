@@ -153,6 +153,8 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::post('users/{id}/confirm-bank-transfer', [UserController::class, 'confirmBankTransfer']);
     Route::post('users/{id}/renew-bank-transfer', [UserController::class, 'renewBankTransfer']);
     Route::post('users/{id}/switch-membership', [UserController::class, 'switchMembership']);
+    Route::post('users/{id}/grant-one-day', [UserController::class, 'grantOneDay']);
+    Route::delete('users/{id}/grant-one-day', [UserController::class, 'revokeOneDay']);
     Route::post('users/{id}/profile-image', [UserController::class, 'uploadProfileImage']);
     Route::delete('users/{id}/profile-image', [UserController::class, 'deleteProfileImage']);
     Route::post('users/{id}/seller-profile-image', [UserController::class, 'uploadSellerProfileImage']);
@@ -195,6 +197,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
 
     // E-NE CRM 更新（送信）の運用。設定値そのものは上の settings に含まれる。
     Route::prefix('ene-crm')->group(function () {
+        Route::get('fields', [\App\Http\Controllers\Admin\EneCrmController::class, 'fields']);
         Route::post('test', [\App\Http\Controllers\Admin\EneCrmController::class, 'test']);
         Route::post('send', [\App\Http\Controllers\Admin\EneCrmController::class, 'send']);
         Route::get('logs', [\App\Http\Controllers\Admin\EneCrmController::class, 'logs']);

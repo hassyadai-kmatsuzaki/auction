@@ -68,6 +68,22 @@ class SendEneCrmUpdateJob implements ShouldQueue
         $status = $response->status();
 
         if ($response->successful()) {
+            // ⚠ E-NE は存在しないフィールド名を 200 のまま skipped_fields で黙って捨てる
+            //   （CrmField は name = "field_xxxx" でしか解決しない。label を送っても一致しない）。
+            //   これを成功として記録すると「ログは成功なのに E-NE 側が変わっていない」事故になるため、
+            //   unknown_field が1つでもあれば失敗として扱い、管理画面に理由を出す。
+            $unknown = $this->unknownFields($response->json());
+
+            if ($unknown) {
+                $this->recordFailure(
+                    $request,
+                    $status,
+                    'E-NE に存在しないフィールド名です: ' . implode(', ', $unknown)
+                        . '（表示名ではなくシステム名 field_xxxx を設定してください）',
+                );
+                return;
+            }
+
             $request->update([
                 'status'      => EneCrmRequest::STATUS_SUCCESS,
                 'http_status' => $status,
@@ -85,6 +101,30 @@ class SendEneCrmUpdateJob implements ShouldQueue
         if ($status >= 500 || $status === 429) {
             throw new \RuntimeException("E-NE CRM update failed (HTTP {$status})");
         }
+    }
+
+    /**
+     * レスポンスの skipped_fields から「E-NE に存在しないフィールド名」を抜き出す。
+     * reason=unchanged（値が同じ）は正常なので対象外。
+     *
+     * @param mixed $body
+     * @return array<int, string>
+     */
+    private function unknownFields($body): array
+    {
+        $skipped = is_array($body) ? ($body['skipped_fields'] ?? []) : [];
+        if (!is_array($skipped)) {
+            return [];
+        }
+
+        $unknown = [];
+        foreach ($skipped as $item) {
+            if (is_array($item) && ($item['reason'] ?? null) === 'unknown_field') {
+                $unknown[] = (string) ($item['field'] ?? '?');
+            }
+        }
+
+        return $unknown;
     }
 
     private function recordFailure(EneCrmRequest $request, ?int $httpStatus, string $error): void

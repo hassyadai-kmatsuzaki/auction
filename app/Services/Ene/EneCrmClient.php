@@ -52,6 +52,21 @@ class EneCrmClient
     }
 
     /**
+     * CRM フィールド定義の一覧（表示名 ↔ 送信キー、選択肢の対応表）を取得する。
+     *
+     * E-NE 側の name（field_xxxxxxxx）と選択肢の value（opt_xxxxxxxx）は管理画面で
+     * 項目を作った際の自動採番のため、人が推測できない。管理画面の入力補助はこれが要る。
+     */
+    public function listFields(): Response
+    {
+        return $this->request()->get(sprintf(
+            '%s/api/external/%s/fields',
+            $this->baseUrl(),
+            rawurlencode($this->tenantId()),
+        ));
+    }
+
+    /**
      * 顧客の CRM を取得する（接続テスト用）。
      */
     public function getCustomer(string $lineUserId): Response

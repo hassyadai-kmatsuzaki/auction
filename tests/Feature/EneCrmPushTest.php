@@ -278,6 +278,50 @@ class EneCrmPushTest extends TestCase
         $this->assertNotNull($request->sent_at);
     }
 
+    public function test_存在しないフィールド名は200でも失敗として記録する(): void
+    {
+        Queue::fake();
+        // E-NE は未知のフィールド名を 200 のまま skipped_fields で黙って捨てる。
+        // これを成功にすると「ログは成功なのにE-NE側が変わらない」事故になる。
+        Http::fake(['*' => Http::response([
+            'message'        => '更新しました',
+            'updated_fields' => [],
+            'skipped_fields' => [
+                ['field' => 'auction_status', 'reason' => 'unknown_field'],
+                ['field' => 'auction_pw_at',  'reason' => 'unchanged'],
+            ],
+        ], 200)]);
+
+        $user = $this->eneMember();
+        $request = app(EneCrmPushService::class)->push($user, EneCrmRequest::EVENT_PASSWORD_SET);
+
+        (new SendEneCrmUpdateJob($request->id))->handle(app(\App\Services\Ene\EneCrmClient::class));
+
+        $request->refresh();
+        $this->assertSame(EneCrmRequest::STATUS_FAILED, $request->status);
+        $this->assertStringContainsString('auction_status', (string) $request->error);
+        // reason=unchanged は正常なのでエラー文言に混ぜない
+        $this->assertStringNotContainsString('auction_pw_at', (string) $request->error);
+    }
+
+    public function test_すべてunchangedなら成功として記録する(): void
+    {
+        Queue::fake();
+        Http::fake(['*' => Http::response([
+            'message'        => '更新しました',
+            'updated_fields' => [],
+            'skipped_fields' => [['field' => 'auction_status', 'reason' => 'unchanged']],
+        ], 200)]);
+
+        $user = $this->eneMember();
+        $request = app(EneCrmPushService::class)->push($user, EneCrmRequest::EVENT_PASSWORD_SET);
+
+        (new SendEneCrmUpdateJob($request->id))->handle(app(\App\Services\Ene\EneCrmClient::class));
+
+        $request->refresh();
+        $this->assertSame(EneCrmRequest::STATUS_SUCCESS, $request->status);
+    }
+
     public function test_404はリトライせずfailedで記録する(): void
     {
         Queue::fake(); // sync ドライバで push() 内から即実行されるのを防ぎ、Job を明示的に走らせる

@@ -50,6 +50,41 @@ export const DEFAULT_ENE_CRM_EVENT_MAP: EneCrmEventMap = EVENTS.reduce((acc, e) 
   return acc;
 }, {} as EneCrmEventMap);
 
+/** 接続テストで取得した、対象会員のCRM現在値 */
+interface EneCrmRemoteField {
+  name: string;
+  label: string;
+  type: string;
+  display_value: string;
+}
+
+/**
+ * GET /fields で取得する E-NE の項目カタログ。
+ * name（field_xxxxxxxx）も choices[].value（opt_xxxxxxxx）も自動採番の機械キーなので、
+ * 人が手で入力することは想定せず、必ずここから選ばせる。
+ */
+interface EneCrmCatalogField {
+  name: string;
+  label: string;
+  type: string;
+  is_required?: boolean;
+  choices?: { value: string; label: string }[];
+}
+
+const CHOICE_TYPES = ['select', 'multi_select'];
+
+/** 保存値（'["opt_x"]' 形式の文字列）を配列に戻す */
+const parseArrayValue = (raw: string): string[] => {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed.startsWith('[')) return trimmed ? [trimmed] : [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
 interface LogRow {
   id: number;
   event_label: string;
@@ -92,7 +127,7 @@ export default function EneCrmPushCard({
 }: Props) {
   const [testUserId, setTestUserId] = useState('');
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; fieldNames?: string[] } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; fields?: EneCrmRemoteField[] } | null>(null);
 
   const [sendEvent, setSendEvent] = useState(EVENTS[0].key);
   const [sending, setSending] = useState(false);
@@ -100,6 +135,26 @@ export default function EneCrmPushCard({
 
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+
+  const [catalog, setCatalog] = useState<EneCrmCatalogField[] | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const catalogField = (name: string): EneCrmCatalogField | undefined =>
+    catalog?.find((f) => f.name === name);
+
+  const fetchCatalog = async () => {
+    setCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const res = await axios.get('/api/admin/ene-crm/fields');
+      setCatalog(res.data?.data?.fields ?? []);
+    } catch (e: any) {
+      setCatalog(null);
+      setCatalogError(e?.response?.data?.message ?? '項目の読み込みに失敗しました。');
+    }
+    setCatalogLoading(false);
+  };
 
   const config = (key: string): EneCrmEventConfig =>
     eventMap?.[key] ?? { enabled: false, trigger_automation: false, fields: [] };
@@ -129,7 +184,7 @@ export default function EneCrmPushCard({
       setTestResult({
         ok: true,
         message: res.data?.message ?? '接続に成功しました。',
-        fieldNames: res.data?.data?.field_names ?? [],
+        fields: res.data?.data?.fields ?? [],
       });
     } catch (e: any) {
       setTestResult({ ok: false, message: e?.response?.data?.message ?? '接続に失敗しました。' });
@@ -162,6 +217,79 @@ export default function EneCrmPushCard({
       setLogs([]);
     }
     setLogsLoading(false);
+  };
+
+  /** 項目名の入力欄。カタログがあればプルダウン、無ければ従来の自由入力 */
+  const renderNameInput = (eventKey: string, index: number, field: EneCrmFieldDef) => {
+    if (!catalog) {
+      return (
+        <TextField fullWidth size="small" label="CRMフィールド名（field_xxxx）" value={field.name}
+          onChange={(e) => updateField(eventKey, index, { name: e.target.value })}
+          helperText="「E-NEの項目を読み込む」を押すと一覧から選べます" />
+      );
+    }
+
+    const missing = field.name !== '' && !catalogField(field.name);
+    return (
+      <TextField select fullWidth size="small" label="CRM項目" value={field.name} error={missing}
+        helperText={missing ? 'E-NE に存在しない項目です' : undefined}
+        // 項目を変えると型が変わるので値はクリアする（select の opt_ が残ると事故る）
+        onChange={(e) => updateField(eventKey, index, { name: e.target.value, value: '' })}>
+        {missing && <MenuItem value={field.name}>{field.name}（E-NEに存在しません）</MenuItem>}
+        {catalog.map((f) => (
+          <MenuItem key={f.name} value={f.name}>
+            {f.label}
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              {f.type}
+            </Typography>
+          </MenuItem>
+        ))}
+      </TextField>
+    );
+  };
+
+  /** 値の入力欄。E-NE の型に応じて選択肢／真偽／自由入力を出し分ける */
+  const renderValueInput = (eventKey: string, index: number, field: EneCrmFieldDef) => {
+    const def = catalogField(field.name);
+
+    if (def && CHOICE_TYPES.includes(def.type)) {
+      const multiple = def.type === 'multi_select';
+      const selected = parseArrayValue(field.value);
+      const labelOf = (v: string) => def.choices?.find((c) => c.value === v)?.label ?? v;
+
+      return (
+        <TextField select fullWidth size="small" label="値（選択肢から選ぶ）"
+          SelectProps={{
+            multiple,
+            ...(multiple ? { renderValue: (sel: unknown) => (sel as string[]).map(labelOf).join('、') } : {}),
+          }}
+          value={multiple ? selected : (selected[0] ?? '')}
+          onChange={(e) => {
+            const raw = e.target.value as unknown as string | string[];
+            updateField(eventKey, index, { value: JSON.stringify(Array.isArray(raw) ? raw : [raw]) });
+          }}>
+          {(def.choices ?? []).map((ch) => (
+            <MenuItem key={ch.value} value={ch.value}>{ch.label}</MenuItem>
+          ))}
+        </TextField>
+      );
+    }
+
+    if (def?.type === 'checkbox') {
+      return (
+        <TextField select fullWidth size="small" label="値" value={field.value}
+          onChange={(e) => updateField(eventKey, index, { value: e.target.value })}>
+          <MenuItem value="true">チェックを付ける</MenuItem>
+          <MenuItem value="false">チェックを外す</MenuItem>
+        </TextField>
+      );
+    }
+
+    return (
+      <TextField fullWidth size="small" label="値" value={field.value}
+        onChange={(e) => updateField(eventKey, index, { value: e.target.value })}
+        helperText={def ? `型: ${def.type}` : undefined} />
+    );
   };
 
   const handleRetry = async (id: number) => {
@@ -214,8 +342,29 @@ export default function EneCrmPushCard({
         <Divider sx={{ my: 3 }} />
 
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>イベントごとの送信内容</Typography>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          <Button variant="outlined" size="small" startIcon={<RefreshIcon />}
+            onClick={fetchCatalog} disabled={catalogLoading}>
+            {catalogLoading ? '読み込み中…' : 'E-NEの項目を読み込む'}
+          </Button>
+          {catalog && (
+            <Typography variant="body2" color="text.secondary">
+              {catalog.length} 項目を読み込みました。項目名・選択肢がプルダウンで選べます。
+            </Typography>
+          )}
+        </Box>
+
+        {catalogError && <Alert severity="error" sx={{ mb: 2 }}>{catalogError}</Alert>}
+        {!catalog && !catalogError && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            E-NE 側の項目名（<code>field_xxxxxxxx</code>）と選択肢の値（<code>opt_xxxxxxxx</code>）は
+            自動採番のため手入力できません。まず「E-NEの項目を読み込む」を押してください。
+          </Alert>
+        )}
+
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          「フィールド名」は E-NE 側 CRM 項目のシステム名（name）または表示名（label）です。値には次のプレースホルダが使えます:
+          テキスト・日付などの自由入力欄では、次のプレースホルダが使えます:
         </Typography>
         <Stack direction="row" spacing={1} sx={{ mb: 3, flexWrap: 'wrap', gap: 1 }}>
           {PLACEHOLDERS.map((p) => <Chip key={p} size="small" label={`{{${p}}}`} />)}
@@ -247,12 +396,10 @@ export default function EneCrmPushCard({
               {c.fields.map((field, index) => (
                 <Grid container spacing={2} key={index} sx={{ mb: 1 }} alignItems="center">
                   <Grid item xs={12} sm={5}>
-                    <TextField fullWidth size="small" label="CRMフィールド名" value={field.name}
-                      onChange={(e) => updateField(event.key, index, { name: e.target.value })} />
+                    {renderNameInput(event.key, index, field)}
                   </Grid>
                   <Grid item xs={11} sm={6}>
-                    <TextField fullWidth size="small" label="値" value={field.value}
-                      onChange={(e) => updateField(event.key, index, { value: e.target.value })} />
+                    {renderValueInput(event.key, index, field)}
                   </Grid>
                   <Grid item xs={1}>
                     <IconButton size="small" onClick={() => removeField(event.key, index)} aria-label="項目を削除">
@@ -267,11 +414,9 @@ export default function EneCrmPushCard({
           );
         })}
 
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          値は E-NE 側の項目の型に合わせて入力してください。選択肢（select / multi_select）はラベルではなく
-          value を <code>["gold"]</code> の形で、チェックボックスは <code>true</code> / <code>false</code>、
-          数値・金額は <code>11000</code> のように数字だけで入力すると、その型のまま送られます。
-          それ以外はテキストとして送られます。
+        <Alert severity="info" sx={{ mb: 3 }}>
+          自由入力欄の値は型を自動判定して送ります。数値・金額は <code>11000</code> のように数字だけを入れると
+          数値型のまま、それ以外はテキストとして送られます。
         </Alert>
 
         <Divider sx={{ my: 3 }} />
@@ -305,12 +450,37 @@ export default function EneCrmPushCard({
         {testResult && (
           <Alert severity={testResult.ok ? 'success' : 'error'} sx={{ mb: 2 }}>
             {testResult.message}
-            {testResult.ok && !!testResult.fieldNames?.length && (
+            {testResult.ok && !!testResult.fields?.length && (
               <Box sx={{ mt: 1 }}>
-                <Typography variant="body2" sx={{ mb: 1 }}>E-NE 側に存在するCRMフィールド名:</Typography>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-                  {testResult.fieldNames.map((n) => <Chip key={n} size="small" label={n} />)}
-                </Stack>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  E-NE 側のCRM項目一覧です。<strong>「CRMフィールド名」欄には “システム名” 列の値
+                  （<code>field_xxxx</code>）をそのまま入力してください</strong>。表示名を入れると
+                  E-NE 側で無視され、更新されません。
+                </Typography>
+                <TableContainer sx={{ maxHeight: 320, overflow: 'auto', bgcolor: 'background.paper', borderRadius: 1 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>表示名</TableCell>
+                        <TableCell>システム名（これを入力）</TableCell>
+                        <TableCell>型</TableCell>
+                        <TableCell>現在値</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {testResult.fields.map((f) => (
+                        <TableRow key={f.name} hover>
+                          <TableCell>{f.label}</TableCell>
+                          <TableCell sx={{ fontFamily: 'monospace' }}>{f.name}</TableCell>
+                          <TableCell>{f.type}</TableCell>
+                          <TableCell sx={{ maxWidth: 200, wordBreak: 'break-all' }}>
+                            <Typography variant="caption" color="text.secondary">{f.display_value || '-'}</Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Box>
             )}
           </Alert>

@@ -29,6 +29,7 @@ import {
   Switch,
   RadioGroup,
   Radio,
+  Tooltip,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -42,6 +43,7 @@ import {
   Email as EmailIcon,
   PhotoCamera as PhotoCameraIcon,
   SwapHoriz as SwapHorizIcon,
+  ConfirmationNumber as ConfirmationNumberIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 
@@ -162,7 +164,9 @@ export default function UserDetail() {
   const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<'buyer' | 'seller'>('buyer');
   const [switchSubmitting, setSwitchSubmitting] = useState(false);
-  
+  const [oneDayDialogOpen, setOneDayDialogOpen] = useState(false);
+  const [oneDaySubmitting, setOneDaySubmitting] = useState(false);
+
   // 編集フォーム
   const [editForm, setEditForm] = useState({
     name: '',
@@ -361,6 +365,42 @@ export default function UserDetail() {
     }
   };
 
+  // 1Day枠の付与／解除。付与すると本人の加入モーダルに1Day（500円）だけが提示される。
+  // マーカーは本人の決済で自動解除されるため、リピート購入のたびに付与し直す運用。
+  const handleGrantOneDay = async () => {
+    setOneDaySubmitting(true);
+    try {
+      const response = await axios.post(`/api/admin/users/${id}/grant-one-day`);
+
+      if (response.data.success) {
+        setSuccess(response.data.message || '1Day枠を付与しました');
+        setOneDayDialogOpen(false);
+        fetchUser();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || '1Day枠の付与に失敗しました');
+      setOneDayDialogOpen(false);
+    } finally {
+      setOneDaySubmitting(false);
+    }
+  };
+
+  const handleRevokeOneDay = async () => {
+    setOneDaySubmitting(true);
+    try {
+      const response = await axios.delete(`/api/admin/users/${id}/grant-one-day`);
+
+      if (response.data.success) {
+        setSuccess(response.data.message || '1Day枠を解除しました');
+        fetchUser();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || '1Day枠の解除に失敗しました');
+    } finally {
+      setOneDaySubmitting(false);
+    }
+  };
+
   const handleDelete = async () => {
     try {
       const response = await axios.delete(`/api/admin/users/${id}`);
@@ -413,6 +453,14 @@ export default function UserDetail() {
       </Box>
     );
   }
+
+  // 1Day枠の付与可否判定（サーバー側 grantOneDay のガードと対）
+  const isAdminUser = user.roles.some((r) => r.name === 'admin');
+  const isSellerUser = user.roles.some((r) => r.name === 'seller');
+  const hasActiveSubscription =
+    user.subscription?.status === 'active' &&
+    !!user.subscription.current_period_end &&
+    new Date(user.subscription.current_period_end) > new Date();
 
   return (
     <Box>
@@ -1187,6 +1235,43 @@ export default function UserDetail() {
                 </Button>
               )}
 
+              {/* 1Day枠の付与／解除。1Dayは allows_sell=false のため出品者ロールは対象外。
+                  有効なサブスク加入中は加入モーダル自体が出ないので付与しても効果がない。
+                  条件はサーバー側 grantOneDay のガードと一致させ、理由を tooltip で示す。 */}
+              {user.intended_plan_code === 'one_day' ? (
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={oneDaySubmitting ? <CircularProgress size={16} /> : <ConfirmationNumberIcon />}
+                  disabled={oneDaySubmitting}
+                  onClick={handleRevokeOneDay}
+                >
+                  1Day枠を解除
+                </Button>
+              ) : !isAdminUser && (
+                <Tooltip
+                  title={
+                    isSellerUser
+                      ? '出品者ロールのユーザーには付与できません（1Dayは落札のみのプランです）'
+                      : hasActiveSubscription
+                        ? '有効な会員プランに加入中のため付与できません（期間終了後に付与できます）'
+                        : '本人の加入モーダルに1Day会員（500円/14日）のみを表示します'
+                  }
+                >
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<ConfirmationNumberIcon />}
+                      disabled={isSellerUser || hasActiveSubscription}
+                      onClick={() => setOneDayDialogOpen(true)}
+                    >
+                      1Day枠を付与
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+
               <Button
                 variant="outlined"
                 color="error"
@@ -1390,6 +1475,33 @@ export default function UserDetail() {
             startIcon={switchSubmitting ? <CircularProgress size={16} /> : <SwapHorizIcon />}
           >
             切替を実行
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 1Day枠付与ダイアログ */}
+      <Dialog open={oneDayDialogOpen} onClose={() => !oneDaySubmitting && setOneDayDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>1Day枠の付与</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            このユーザーの加入モーダルに <b>1Day会員（500円 / 14日間）</b> のみを表示します。課金はここでは行われません。ご本人が次回ログイン時に決済（カードまたは銀行振込）します。
+          </Typography>
+          <Alert severity="info">
+            1Day枠は<b>本人の決済（振込の場合は申込）で自動的に外れます</b>。期間終了後にもう一度1Dayを使う場合は、都度この操作が必要です。
+          </Alert>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            付与中は年会費プラン（5,500円）を選べなくなります。年会員にする場合は先に「1Day枠を解除」してください。
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOneDayDialogOpen(false)} disabled={oneDaySubmitting}>キャンセル</Button>
+          <Button
+            onClick={handleGrantOneDay}
+            variant="contained"
+            disabled={oneDaySubmitting}
+            startIcon={oneDaySubmitting ? <CircularProgress size={16} /> : <ConfirmationNumberIcon />}
+          >
+            付与する
           </Button>
         </DialogActions>
       </Dialog>

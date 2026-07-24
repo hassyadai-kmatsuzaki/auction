@@ -667,6 +667,99 @@ class UserController extends Controller
     }
 
     /**
+     * 1Day枠の付与（intended_plan_code='one_day' を立てる）。
+     *
+     * 2026-07-24 以降、単発プラン（1Day）はマーカー保持者にしか加入モーダルに出ない
+     * （[User/SubscriptionController::show()]）。マーカーは初回決済で自動解除されるため、
+     * 失効した1Day会員に「もう一度500円で使わせる」にはここで立て直す必要がある。
+     * E-NE 経由の再契約は既存メール扱い（handleDuplicate）でマーカーが付き直さないため、
+     * 実質この画面が唯一の付与導線になる。
+     *
+     * 課金はしない。本人が次回ログイン時の加入モーダルで 1Day を決済する。
+     */
+    public function grantOneDay(Request $request, $id)
+    {
+        $user = User::with(['roles', 'subscription.plan'])->findOrFail($id);
+
+        if ($user->roles->contains('name', 'admin')) {
+            return response()->json([
+                'success' => false,
+                'message' => '管理者ユーザーには付与できません',
+            ], 422);
+        }
+
+        // 1Day は allows_sell=false。出品者ロールの加入モーダルは allows_sell=true の
+        // プランしか描画しないため、付与すると「加入可能なプランがありません」になる。
+        if ($user->roles->contains('name', 'seller')) {
+            return response()->json([
+                'success' => false,
+                'message' => '出品者ロールのユーザーには1Day枠を付与できません（1Dayは落札のみのプランです）',
+            ], 422);
+        }
+
+        if (!Plan::active()->where('code', 'one_day')->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => '1Dayプランが無効化されています。プラン管理から有効化してください',
+            ], 422);
+        }
+
+        // 有効なサブスクがある間は加入モーダル自体が出ないため、付与しても効果がない。
+        $subscription = $user->subscription;
+        if ($subscription && $subscription->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => '有効な会員プランに加入中のため付与できません。期間終了後に再度お試しください',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($user, $subscription) {
+            // 会員種別切替マーカー（canceled + switched_by_admin）が残っていると show() が
+            // 単発プランを弾き、1Day 1択のはずが0件になる。改めて1Day枠を与える＝切替手続きは
+            // 取り下げる意思のため、理由を差し替えてマーカーを解除する（履歴は残す）。
+            if ($subscription && $subscription->isSwitchedByAdmin()) {
+                $subscription->update(['suspended_reason' => 'one_day_granted_by_admin']);
+            }
+
+            $user->forceFill(['intended_plan_code' => 'one_day'])->save();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => '1Day枠を付与しました。ご本人が次回ログイン時に1Day会員（500円）を決済できます。',
+            'data' => [
+                'user' => $user->fresh(['roles', 'sellerProfile', 'subscription.plan']),
+            ],
+        ]);
+    }
+
+    /**
+     * 1Day枠の解除（誤付与の取り消し）。
+     * 会員種別切替で立てた bid_only/both マーカーを消さないよう one_day のときだけ許可する。
+     */
+    public function revokeOneDay(Request $request, $id)
+    {
+        $user = User::with(['roles', 'subscription.plan'])->findOrFail($id);
+
+        if ($user->intended_plan_code !== 'one_day') {
+            return response()->json([
+                'success' => false,
+                'message' => '1Day枠が付与されていません',
+            ], 422);
+        }
+
+        $user->forceFill(['intended_plan_code' => null])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => '1Day枠を解除しました。加入モーダルには年会費プランが表示されます。',
+            'data' => [
+                'user' => $user->fresh(['roles', 'sellerProfile', 'subscription.plan']),
+            ],
+        ]);
+    }
+
+    /**
      * ユーザーアイコン（users.profile_image_path）アップロード
      */
     public function uploadProfileImage(Request $request, $id)
