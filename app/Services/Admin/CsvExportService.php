@@ -76,6 +76,7 @@ class CsvExportService
                 '出品人数',
                 '落札数',
                 '落札人数',
+                '入札者数',
                 '参加数',
                 '落札金額(税抜)',
                 '買手手数料(税抜)',
@@ -114,7 +115,10 @@ class CsvExportService
                     $s['sellers_count'],
                     $s['won_count'],
                     $s['winners_count'],
+                    // 入札者数 = bid_participants の distinct user（従来の「参加数」。is_test 含む）
                     $s['participants_count'],
+                    // 参加数 = 会場ボタン(venue_enter)のユニークユーザー数（is_test 除外）
+                    $a['venue_enter'],
                     (int) $s['sales'],
                     (int) $s['commission'],
                     // 売手手数料 = 支払通知書で出品者から控除する額。現状は買手と同率(10%)・同額
@@ -757,6 +761,7 @@ class CsvExportService
      * オークション別の行動指標（activity_events）を1クエリで集計する。
      *
      * - 閲覧数/閲覧UU … item_view の件数と distinct ユーザー数
+     * - 参加数         … venue_enter（会場ボタン）のユニークユーザー数
      * - お気に入り数   … favorite_add の累計発生回数（解除しても減らない）
      * - 指値数         … bid_limit_set の累計発生回数（同上）
      * 分析ダッシュボードと数値を一致させるため is_test ユーザーは除外する（確定仕様）。
@@ -764,7 +769,7 @@ class CsvExportService
      * 終了オークションの閲覧数は「開始前の閲覧」を表す点に注意。
      *
      * @param int[] $auctionIds
-     * @return array<int, array{views:int,view_users:int,favorites:int,bid_limits:int}>  key=auction_id
+     * @return array<int, array{views:int,view_users:int,venue_enter:int,favorites:int,bid_limits:int}>  key=auction_id
      */
     private function aggregateAuctionActivityStats(array $auctionIds): array
     {
@@ -778,6 +783,7 @@ class CsvExportService
             ->whereIn('ae.auction_id', $auctionIds)
             ->whereIn('ae.event_type', [
                 ActivityEvent::ITEM_VIEW,
+                ActivityEvent::VENUE_ENTER,
                 ActivityEvent::FAVORITE_ADD,
                 ActivityEvent::BID_LIMIT_SET,
             ])
@@ -802,8 +808,9 @@ class CsvExportService
      * 出品明細CSVと同じ絞り込み（auction_id / event_date 期間 / is_test オークション）を
      * activity_events→auctions の JOIN で再現し、item_id ごとにまとめる。
      * 集計方針は aggregateAuctionActivityStats と同じ（is_test ユーザー除外）。
+     * venue_enter は item_id を持たないため item 単位では常に 0。
      *
-     * @return array<int, array{views:int,view_users:int,favorites:int,bid_limits:int}>  key=item_id
+     * @return array<int, array{views:int,view_users:int,venue_enter:int,favorites:int,bid_limits:int}>  key=item_id
      */
     private function aggregateItemActivityStats(?int $auctionId, ?Carbon $from, ?Carbon $to, bool $includeTest): array
     {
@@ -857,6 +864,10 @@ class CsvExportService
                 $stats['views'] = (int) $row->cnt;
                 $stats['view_users'] = (int) $row->uu;
                 break;
+            case ActivityEvent::VENUE_ENTER:
+                // 1ユーザー1オークション1行のため件数=者数。者数として uu を採用
+                $stats['venue_enter'] = (int) $row->uu;
+                break;
             case ActivityEvent::FAVORITE_ADD:
                 $stats['favorites'] = (int) $row->cnt;
                 break;
@@ -871,6 +882,7 @@ class CsvExportService
         return [
             'views' => 0,
             'view_users' => 0,
+            'venue_enter' => 0,
             'favorites' => 0,
             'bid_limits' => 0,
         ];

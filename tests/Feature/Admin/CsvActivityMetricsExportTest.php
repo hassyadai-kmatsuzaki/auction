@@ -7,6 +7,7 @@ use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -65,9 +66,22 @@ class CsvActivityMetricsExportTest extends TestCase
         $this->event(ActivityEvent::FAVORITE_ADD, $userA->id, $auction->id, $item->id);
         // 指値: userA が1件
         $this->event(ActivityEvent::BID_LIMIT_SET, $userA->id, $auction->id, $item->id);
+        // 会場ボタン(venue_enter, item_id なし): 実ユーザー2名 → 参加数=2
+        $this->event(ActivityEvent::VENUE_ENTER, $userA->id, $auction->id, null);
+        $this->event(ActivityEvent::VENUE_ENTER, $userB->id, $auction->id, null);
+
+        // 入札参加(bid_participants): userA のみ → 入札者数=1（参加数=2 と区別される）
+        DB::table('bid_participants')->insert([
+            'item_id' => $item->id,
+            'user_id' => $userA->id,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         // is_test ユーザーの行動は全て除外される
         $this->event(ActivityEvent::ITEM_VIEW, $testUser->id, $auction->id, $item->id);
+        $this->event(ActivityEvent::VENUE_ENTER, $testUser->id, $auction->id, null);
         $this->event(ActivityEvent::FAVORITE_ADD, $testUser->id, $auction->id, $item->id);
         $this->event(ActivityEvent::BID_LIMIT_SET, $testUser->id, $auction->id, $item->id);
 
@@ -77,6 +91,8 @@ class CsvActivityMetricsExportTest extends TestCase
         $summary->assertOk();
         $srow = $this->firstDataRow($summary->streamedContent());
 
+        $this->assertSame('1', $srow['入札者数']);          // bid_participants: userA のみ
+        $this->assertSame('2', $srow['参加数']);            // venue_enter UU: userA, userB
         $this->assertSame('2', $srow['閲覧数']);
         $this->assertSame('2', $srow['閲覧UU']);
         $this->assertSame('1', $srow['お気に入り数']);
