@@ -195,6 +195,7 @@ class CsvExportService
                 'オークション日',
                 'オークション名',
                 '出品番号',
+                '出品ID',
                 '品種名',
                 '匹数',
                 '出品者名',
@@ -275,6 +276,8 @@ class CsvExportService
                     optional($auction?->event_date)->format('Y-m-d') ?? '',
                     $auction?->title ?? '',
                     $item->item_number,
+                    // 出品ID = レーン割当時に発行される表示用ID（お気に入り/指値CSVと同じ表記）
+                    $item->exhibit_code ?: '未発行',
                     $item->species_name,
                     $item->quantity,
                     $sellerName,

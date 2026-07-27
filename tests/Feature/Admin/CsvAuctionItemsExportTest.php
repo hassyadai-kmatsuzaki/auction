@@ -48,12 +48,14 @@ class CsvAuctionItemsExportTest extends TestCase
             'seller_profile_id' => $registeredSeller->id,
             'status' => 'sold',
             'item_number' => 1,
+            'exhibit_code' => 'A001',
         ]);
         $itemB = Item::factory()->create([
             'auction_id' => $auction->id,
             'seller_profile_id' => $exemptSeller->id,
             'status' => 'sold',
             'item_number' => 2,
+            'exhibit_code' => null,
         ]);
         // 未落札の生体（金額列は全て空欄）
         Item::factory()->create([
@@ -97,6 +99,7 @@ class CsvAuctionItemsExportTest extends TestCase
         $rowC = array_combine($header, str_getcsv($lines[3]));
 
         // --- インボイス有出品者の行 ---
+        $this->assertSame('A001', $rowA['出品ID']);
         $this->assertSame('100000', $rowA['落札金額(税抜)']);
         $this->assertSame('10000', $rowA['落札者手数料(税抜)']);
         $this->assertSame('10000', $rowA['出品者手数料(税抜)']);
@@ -111,6 +114,7 @@ class CsvAuctionItemsExportTest extends TestCase
         $this->assertSame('99000', $rowA['出品者支払合計(税込)']);
 
         // --- インボイス無出品者の行 ---
+        $this->assertSame('未発行', $rowB['出品ID']);
         $this->assertSame('50000', $rowB['落札金額(税抜)']);
         // 落札者: (50,000+5,000+1,000)×10% = 5,600
         $this->assertSame('5600', $rowB['消費税(落札者)']);
