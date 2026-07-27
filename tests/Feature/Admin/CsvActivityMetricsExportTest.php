@@ -92,7 +92,7 @@ class CsvActivityMetricsExportTest extends TestCase
         $srow = $this->firstDataRow($summary->streamedContent());
 
         $this->assertSame('1', $srow['入札者数']);          // bid_participants: userA のみ
-        $this->assertSame('2', $srow['参加数']);            // venue_enter UU: userA, userB
+        $this->assertSame('2', $srow['会場参加者数']);      // venue_enter UU: userA, userB
         $this->assertSame('2', $srow['閲覧数']);
         $this->assertSame('2', $srow['閲覧UU']);
         $this->assertSame('1', $srow['お気に入り数']);

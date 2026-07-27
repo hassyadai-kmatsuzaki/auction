@@ -77,10 +77,10 @@ class CsvExportService
                 '落札数',
                 '落札人数',
                 '入札者数',
-                '参加数',
+                '会場参加者数',
                 '落札金額(税抜)',
-                '買手手数料(税抜)',
-                '売手手数料(税抜)',
+                '落札者手数料(税抜)',
+                '出品者手数料(税抜)',
                 '送料(税抜)',
                 '消費税(落札者)',
                 '消費税(インボイス有出品者)',
@@ -117,11 +117,11 @@ class CsvExportService
                     $s['winners_count'],
                     // 入札者数 = bid_participants の distinct user（従来の「参加数」。is_test 含む）
                     $s['participants_count'],
-                    // 参加数 = 会場ボタン(venue_enter)のユニークユーザー数（is_test 除外）
+                    // 会場参加者数 = 会場ボタン(venue_enter)のユニークユーザー数（is_test 除外）
                     $a['venue_enter'],
                     (int) $s['sales'],
                     (int) $s['commission'],
-                    // 売手手数料 = 支払通知書で出品者から控除する額。現状は買手と同率(10%)・同額
+                    // 出品者手数料 = 支払通知書で出品者から控除する額。現状は落札者と同率(10%)・同額
                     (int) $s['commission'],
                     (int) $s['shipping'],
                     $t['buyer_tax'],
@@ -151,7 +151,7 @@ class CsvExportService
         $query = Item::query()
             ->with([
                 'auction:id,title,event_date,is_test',
-                'sellerProfile:id,user_id',
+                'sellerProfile:id,user_id,business_registration_number',
                 'sellerProfile.user:id,name,trade_name',
                 'wonItem.winner:id,name,trade_name',
             ])
@@ -203,16 +203,24 @@ class CsvExportService
                 '落札者名',
                 '落札者ID',
                 '落札金額(税抜)',
+                '落札者手数料(税抜)',
+                '出品者手数料(税抜)',
                 '送料(税抜)',
-                '手数料(税抜)',
-                '税金',
-                '合計(税込)',
+                '消費税(落札者)',
+                '消費税(インボイス有出品者)',
+                '消費税(インボイス無出品者)',
+                '落札者請求合計(税込)',
+                '出品者支払合計(税込)',
                 // 行動分析（activity_events / is_test ユーザー除外）
                 '閲覧数',
                 '閲覧UU',
                 'お気に入り数',
                 '指値数',
             ]);
+
+            $resolver = app(InvoiceTaxResolver::class);
+            // resolve() は SystemSetting を読むため、オークション×登録番号単位でメモ化
+            $taxMetaCache = [];
 
             foreach ($query->lazy(200) as $item) {
                 $auction = $item->auction;
@@ -221,19 +229,45 @@ class CsvExportService
                 $won = $item->wonItem;
                 $act = $activity[$item->id] ?? $this->emptyActivityStats();
 
+                // 金額列は落札済みの行のみ。未落札は全て空欄
+                $sales = $commission = $shipping = $buyerTax = $buyerTotal = '';
+                $sellerTaxRegistered = $sellerTaxExempt = $sellerPayout = '';
+                $winnerName = '';
+                $winnerId = null;
+
                 if ($won) {
                     // 落札金額(税抜) = 落札価格 × 匹数。total_amount は手数料込みのため使わない。
-                    $sales = (float) $won->winning_price * (int) $won->quantity;
-                    $shipping = (float) $won->shipping_fee;
-                    $commission = (float) $won->commission_amount;
-                    $tax = floor(($sales + $commission + $shipping) * $taxRate / 100);
-                    $grand = $sales + $commission + $shipping + $tax;
+                    $sales = (int) ((float) $won->winning_price * (int) $won->quantity);
+                    $shipping = (int) (float) $won->shipping_fee;
+                    // 落札者手数料・出品者手数料はいずれも won_items.commission_amount
+                    // （サマリーCSVと同じ扱い。現状は同率10%・同額）
+                    $commission = (int) (float) $won->commission_amount;
+
+                    // 落札者側: 請求書と同式（落札+手数料+送料の税込）。生体単位で floor 丸めするため、
+                    // 帳票単位（落札者×オークション）で丸めるサマリーCSVとは合計が一致しない場合がある
+                    $buyerTax = (int) floor(($sales + $commission + $shipping) * $taxRate / 100);
+                    $buyerTotal = $sales + $commission + $shipping + $buyerTax;
+
+                    // 出品者側: 支払通知書と同じ税率解決（インボイス有無・経過措置は event_date 基準）。
+                    // 消費税はインボイス有/無の該当区分のみに出力する
+                    if ($auction && $item->sellerProfile) {
+                        $cacheKey = $auction->id . ':' . ($item->sellerProfile->business_registration_number ?? '');
+                        $taxMeta = $taxMetaCache[$cacheKey] ??= $resolver->resolve($auction, $item->sellerProfile);
+
+                        $taxWinning = (int) floor($sales * $taxMeta['winning_tax_rate'] / 100);
+                        $taxCommission = (int) floor($commission * $taxMeta['commission_tax_rate'] / 100);
+                        $sellerTax = $taxWinning - $taxCommission;
+
+                        if ($taxMeta['is_tax_exempt']) {
+                            $sellerTaxExempt = $sellerTax;
+                        } else {
+                            $sellerTaxRegistered = $sellerTax;
+                        }
+                        $sellerPayout = ($sales + $taxWinning) - ($commission + $taxCommission);
+                    }
+
                     $winnerName = $this->resolveWinnerName($won);
                     $winnerId = $won->winner_id;
-                } else {
-                    $sales = $shipping = $commission = $tax = $grand = null;
-                    $winnerName = '';
-                    $winnerId = null;
                 }
 
                 fputcsv($out, [
@@ -248,11 +282,15 @@ class CsvExportService
                     $item->status,
                     $winnerName,
                     $winnerId ?? '',
-                    $sales !== null ? (int) $sales : '',
-                    $shipping !== null ? (int) $shipping : '',
-                    $commission !== null ? (int) $commission : '',
-                    $tax !== null ? (int) $tax : '',
-                    $grand !== null ? (int) $grand : '',
+                    $sales,
+                    $commission,
+                    $commission,
+                    $shipping,
+                    $buyerTax,
+                    $sellerTaxRegistered,
+                    $sellerTaxExempt,
+                    $buyerTotal,
+                    $sellerPayout,
                     $act['views'],
                     $act['view_users'],
                     $act['favorites'],
@@ -711,7 +749,7 @@ class CsvExportService
             ->get()
             ->keyBy('auction_id');
 
-        // bid_participants ベースの参加数（入札参加した distinct user）
+        // bid_participants ベースの入札者数（入札参加した distinct user）
         $participantStats = DB::table('bid_participants')
             ->join('items', 'items.id', '=', 'bid_participants.item_id')
             ->whereIn('items.auction_id', $auctionIds)
@@ -761,7 +799,7 @@ class CsvExportService
      * オークション別の行動指標（activity_events）を1クエリで集計する。
      *
      * - 閲覧数/閲覧UU … item_view の件数と distinct ユーザー数
-     * - 参加数         … venue_enter（会場ボタン）のユニークユーザー数
+     * - 会場参加者数   … venue_enter（会場ボタン）のユニークユーザー数
      * - お気に入り数   … favorite_add の累計発生回数（解除しても減らない）
      * - 指値数         … bid_limit_set の累計発生回数（同上）
      * 分析ダッシュボードと数値を一致させるため is_test ユーザーは除外する（確定仕様）。
@@ -893,7 +931,7 @@ class CsvExportService
      *
      * 丸めは帳票と同じ単位で floor してから合算する（帳票合計との一致が目的）:
      * - 落札者分: 請求書と同じ「落札者×オークション」単位で
-     *   (落札金額 + 買手手数料 + 送料) × tax_rate
+     *   (落札金額 + 落札者手数料 + 送料) × tax_rate
      * - 出品者分: 支払通知書と同じ「出品者×オークション」単位で
      *   落札金額×税率 − 手数料×tax_rate のネット額。
      *   落札金額の税率は InvoiceTaxResolver（インボイス登録有=10% / 未登録=経過措置率、

@@ -92,7 +92,7 @@ export default function AnalyticsDashboard() {
                   <TableCell>オークション</TableCell>
                   <TableCell>状態</TableCell>
                   <TableCell align="right">閲覧UU</TableCell>
-                  <TableCell align="right">会場入場</TableCell>
+                  <TableCell align="right">会場参加者数</TableCell>
                   <TableCell align="right">お気に入り</TableCell>
                   <TableCell align="right">指値</TableCell>
                   <TableCell align="right">入札者</TableCell>

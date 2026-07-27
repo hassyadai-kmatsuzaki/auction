@@ -87,9 +87,9 @@ export default function AuctionAnalytics() {
 
       <Grid container spacing={2} sx={{ mb: 1 }}>
         <Grid item xs={6} md={3}>
-          <KpiCard icon={<VenueIcon fontSize="small" />} label="会場入場（人）" value={m.venue_enter.count}
+          <KpiCard icon={<VenueIcon fontSize="small" />} label="会場参加者数（人）" value={m.venue_enter.count}
             sub="「会場へ」を押した人数"
-            onClick={() => openDrill('venue_enter', '会場入場した人')} />
+            onClick={() => openDrill('venue_enter', '会場に参加した人')} />
         </Grid>
         <Grid item xs={6} md={3}>
           <KpiCard icon={<ViewIcon fontSize="small" />} label="生体閲覧（回）" value={m.item_view.count}

@@ -85,8 +85,8 @@ class CsvAuctionSummaryExportTest extends TestCase
         $row = array_combine($header, str_getcsv($lines[1]));
 
         $this->assertSame('150000', $row['落札金額(税抜)']);
-        $this->assertSame('15000', $row['買手手数料(税抜)']);
-        $this->assertSame('15000', $row['売手手数料(税抜)']);
+        $this->assertSame('15000', $row['落札者手数料(税抜)']);
+        $this->assertSame('15000', $row['出品者手数料(税抜)']);
         $this->assertSame('3000', $row['送料(税抜)']);
 
         // 落札者: (100,000+10,000+2,000)×10% + (50,000+5,000+1,000)×10% = 11,200 + 5,600
