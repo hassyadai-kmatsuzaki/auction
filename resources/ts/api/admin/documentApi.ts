@@ -26,6 +26,12 @@ export type PaymentNoticeRow = {
   status: 'sent' | 'draft';
   issued_at: string | null;
   transfer_scheduled: string | null;
+  notice_sent_at: string | null;
+};
+
+export type NotifyPaymentNoticesResult = {
+  message: string;
+  data: { line: number; mail: number; skipped: number };
 };
 
 export type DeliveryNoteRow = {
@@ -61,6 +67,12 @@ export const adminDocumentApi = {
   getPaymentNotices: async (): Promise<PaymentNoticeRow[]> => {
     const res = await axios.get('/api/admin/documents/payment-notices');
     return res.data.data;
+  },
+  notifyPaymentNotices: async (auctionId: number): Promise<NotifyPaymentNoticesResult> => {
+    const res = await axios.post('/api/admin/documents/payment-notices/notify', {
+      auction_id: auctionId,
+    });
+    return res.data;
   },
   getDeliveryNotes: async (): Promise<DeliveryNoteRow[]> => {
     const res = await axios.get('/api/admin/documents/delivery-notes');

@@ -27,6 +27,8 @@ import {
   DialogActions,
   Alert,
   CircularProgress,
+  Snackbar,
+  Tooltip as MuiTooltip,
 } from '@mui/material';
 import {
   AccountBalance as BankIcon,
@@ -151,6 +153,31 @@ export default function SalesSettlement() {
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [settlementDetail, setSettlementDetail] = useState<SettlementDetail | null>(null);
+  const [downloadingNoticeId, setDownloadingNoticeId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // 支払通知書PDFダウンロード（settlement.id = auction_id）
+  const handleDownloadNotice = async (auctionId: number) => {
+    setDownloadingNoticeId(auctionId);
+    try {
+      const res = await axios.get(`/api/seller/settlements/${auctionId}/payment-notice`, {
+        responseType: 'blob',
+      });
+      const blobUrl = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `payment_notice_auction_${auctionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('支払通知書ダウンロードエラー:', err);
+      setDownloadError('支払通知書のダウンロードに失敗しました。');
+    } finally {
+      setDownloadingNoticeId(null);
+    }
+  };
 
   // データ取得
   const fetchSettlements = useCallback(async () => {
@@ -493,13 +520,14 @@ export default function SalesSettlement() {
                       <TableCell align="right">受取金額（税込）</TableCell>
                       <TableCell align="center">ステータス</TableCell>
                       <TableCell>振込日</TableCell>
+                      <TableCell align="center">支払通知書</TableCell>
                       <TableCell align="center">詳細</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {settlements.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">精算履歴がありません</Typography>
                         </TableCell>
                       </TableRow>
@@ -545,6 +573,24 @@ export default function SalesSettlement() {
                             ) : (
                               '-'
                             )}
+                          </TableCell>
+                          <TableCell align="center">
+                            <MuiTooltip title="支払通知書（PDF）をダウンロード">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  disabled={downloadingNoticeId === settlement.id}
+                                  onClick={() => handleDownloadNotice(settlement.id)}
+                                >
+                                  {downloadingNoticeId === settlement.id ? (
+                                    <CircularProgress size={16} />
+                                  ) : (
+                                    <DownloadIcon sx={{ fontSize: 18 }} />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </MuiTooltip>
                           </TableCell>
                           <TableCell align="center">
                             <IconButton
@@ -758,9 +804,35 @@ export default function SalesSettlement() {
           )}
         </DialogContent>
         <DialogActions>
+          {selectedSettlement && (
+            <Button
+              startIcon={
+                downloadingNoticeId === selectedSettlement.id ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              disabled={downloadingNoticeId === selectedSettlement.id}
+              onClick={() => handleDownloadNotice(selectedSettlement.id)}
+            >
+              支払通知書をダウンロード
+            </Button>
+          )}
           <Button onClick={handleCloseDetail}>閉じる</Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={!!downloadError}
+        autoHideDuration={4000}
+        onClose={() => setDownloadError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setDownloadError(null)}>
+          {downloadError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

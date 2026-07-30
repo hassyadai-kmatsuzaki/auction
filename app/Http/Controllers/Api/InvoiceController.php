@@ -276,6 +276,34 @@ class InvoiceController extends Controller
     }
 
     /**
+     * LINE 通知からアクセスされる出品者支払通知書 PDF ダウンロード（signed URL で保護）
+     * GET /api/line/payment-notices/{auctionId}/{sellerProfileId}?expires=...&signature=...
+     */
+    public function lineDownloadPaymentNotice(int $auctionId, int $sellerProfileId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+        $seller = SellerProfile::findOrFail($sellerProfileId);
+
+        try {
+            $pdf = $this->invoiceService->generateSellerPaymentNotice($auction, $seller);
+            $content = $pdf->output();
+
+            return response($content, 200, [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => "inline; filename=\"payment_notice_auction_{$auctionId}.pdf\"",
+                'Content-Length'      => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('LINE 支払通知書PDF生成エラー', [
+                'auction_id' => $auctionId,
+                'seller_id'  => $sellerProfileId,
+                'error'      => $e->getMessage(),
+            ]);
+            return response()->json(['message' => '支払通知書の生成に失敗しました'], 500);
+        }
+    }
+
+    /**
      * 出品者支払通知書PDFダウンロード（出品者向け）
      * GET /api/seller/settlements/{auctionId}/payment-notice
      */

@@ -33,7 +33,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Tooltip,
   InputAdornment,
   Slider,
 } from '@mui/material';
@@ -163,22 +162,9 @@ export default function SubmitItem() {
   const [shipments, setShipments] = useState<ShipmentInput[]>([{ carrier: '', tracking_number: '' }]);
   // 当該オークションで既に登録済みの自分の伝票（追加登録時に重複チェック・上限管理に利用）
   const [existingShipments, setExistingShipments] = useState<{ id: number; carrier: Carrier; carrier_label: string; tracking_number: string }[]>([]);
-  const [completedItems, setCompletedItems] = useState<{ id: number; species_name: string; item_number?: string }[]>([]);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   // 品種名入力モーダルの開閉対象（どの生体行を編集中か）
   const [speciesPicker, setSpeciesPicker] = useState<{ open: boolean; index: number | null }>({ open: false, index: null });
-
-  const copyToClipboard = async (text: string, key: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
-    } catch (err) {
-      console.error('クリップボードへのコピーに失敗:', err);
-      setSnackbar({ open: true, message: 'コピーに失敗しました', severity: 'error' });
-    }
-  };
 
   const remainingShipmentSlots = Math.max(0, MAX_SHIPMENTS - existingShipments.length);
 
@@ -351,15 +337,7 @@ export default function SubmitItem() {
         });
       });
 
-      const responses = await Promise.all(promises);
-      const created = responses
-        .map((r) => r.data?.data?.item)
-        .filter((it) => it && typeof it.id === 'number')
-        .map((it) => ({
-          id: it.id as number,
-          species_name: it.species_name as string,
-          item_number: it.item_number as string | undefined,
-        }));
+      await Promise.all(promises);
 
       // 伝票番号の登録（出品作成成功後にまとめて送信）。既存伝票のみで新規ゼロなら送信スキップ。
       if (validShipments.length > 0) {
@@ -379,7 +357,6 @@ export default function SubmitItem() {
         }
       }
 
-      setCompletedItems(created);
       setResultDialogOpen(true);
       setSnackbar({
         open: true,
@@ -906,7 +883,7 @@ export default function SubmitItem() {
         </>
       )}
 
-      {/* 登録完了ダイアログ（出品ID提示・郵送照合用） */}
+      {/* 登録完了ダイアログ */}
       <Dialog
         open={resultDialogOpen}
         onClose={(_event, reason) => {
@@ -922,55 +899,9 @@ export default function SubmitItem() {
           出品申込を受け付けました
         </DialogTitle>
         <DialogContent dividers>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            郵送時に生体を識別できるよう、下記の出品IDを各生体（袋・ケース等）に貼付してご発送ください。
-          </Alert>
-          <Paper variant="outlined" sx={{ overflow: 'auto', mb: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell sx={{ fontWeight: 600, width: 100 }}>出品ID</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>品種名</TableCell>
-                  <TableCell sx={{ fontWeight: 600, width: 56 }} align="right">操作</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {completedItems.map((ci) => (
-                  <TableRow key={ci.id}>
-                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 600 }}>{ci.id}</TableCell>
-                    <TableCell>{ci.species_name}</TableCell>
-                    <TableCell align="right">
-                      <Tooltip title={copiedKey === `row-${ci.id}` ? 'コピーしました' : 'IDをコピー'}>
-                        <IconButton
-                          size="small"
-                          onClick={() => copyToClipboard(String(ci.id), `row-${ci.id}`)}
-                          aria-label="出品IDをコピー"
-                        >
-                          <CopyIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Paper>
-          {completedItems.length > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                size="small"
-                startIcon={<CopyIcon />}
-                onClick={() =>
-                  copyToClipboard(
-                    completedItems.map((ci) => ci.id).join(', '),
-                    'all-ids',
-                  )
-                }
-              >
-                {copiedKey === 'all-ids' ? 'コピーしました' : 'IDを全件コピー'}
-              </Button>
-            </Box>
-          )}
+          <Typography>
+            {items.length}件の出品申込を受け付けました。管理者の審査をお待ちください。
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button

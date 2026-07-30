@@ -44,6 +44,8 @@ class SellerSettlement extends BaseModel
         'payment_method',
         'transaction_reference',
         'note',
+        'payment_notice_sent_at',
+        'payment_notice_sent_by',
     ];
 
     protected $casts = [
@@ -54,6 +56,7 @@ class SellerSettlement extends BaseModel
         'items_count' => 'integer',
         'scheduled_payment_date' => 'datetime',
         'paid_at' => 'datetime',
+        'payment_notice_sent_at' => 'datetime',
     ];
 
     public function auction(): BelongsTo

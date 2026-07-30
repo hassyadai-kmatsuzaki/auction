@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Mail\SellerPaymentNoticeMail;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
+use App\Models\SellerSettlement;
 use App\Models\User;
 use App\Models\WonItem;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /**
@@ -190,5 +193,63 @@ class DocumentControllerTest extends TestCase
         $this->actingAs($participant, 'sanctum')
             ->getJson('/api/admin/documents/invoices')
             ->assertStatus(403);
+    }
+
+    public function test_notify_payment_notices_queues_mail_and_records_sent_at(): void
+    {
+        Mail::fake();
+        $this->makeWon();
+
+        $r = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/documents/payment-notices/notify', [
+                'auction_id' => $this->auction->id,
+            ]);
+
+        $r->assertOk();
+        // LINE 未連携の出品者はメールにフォールバックする
+        $this->assertSame(1, $r->json('data.mail'));
+        $this->assertSame(0, $r->json('data.line'));
+        Mail::assertQueued(SellerPaymentNoticeMail::class, 1);
+
+        $settlement = SellerSettlement::where('auction_id', $this->auction->id)
+            ->where('seller_profile_id', $this->sellerProfile->id)
+            ->first();
+        $this->assertNotNull($settlement?->payment_notice_sent_at);
+        $this->assertSame($this->admin->id, $settlement->payment_notice_sent_by);
+
+        // 一覧にも送信日時が反映される
+        $rows = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/documents/payment-notices')
+            ->json('data');
+        $this->assertNotNull($rows[0]['notice_sent_at']);
+    }
+
+    public function test_notify_payment_notices_rejects_unfinished_auction(): void
+    {
+        Mail::fake();
+        $this->makeWon();
+        $this->auction->update(['status' => 'live']);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/documents/payment-notices/notify', [
+                'auction_id' => $this->auction->id,
+            ])
+            ->assertStatus(400);
+
+        Mail::assertNotQueued(SellerPaymentNoticeMail::class);
+    }
+
+    public function test_notify_payment_notices_requires_won_items(): void
+    {
+        Mail::fake();
+        $emptyAuction = Auction::factory()->finished()->create(['created_by' => $this->admin->id]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/documents/payment-notices/notify', [
+                'auction_id' => $emptyAuction->id,
+            ])
+            ->assertStatus(404);
+
+        Mail::assertNotQueued(SellerPaymentNoticeMail::class);
     }
 }

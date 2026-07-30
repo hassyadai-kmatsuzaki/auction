@@ -289,6 +289,31 @@ class LineFlexBuilder
         );
     }
 
+    /**
+     * 出品者向け「支払通知書発行」通知。
+     *
+     * 金額は載せない（帳票PDFとの食い違い防止。金額はPDF側が正）。
+     */
+    public function paymentNotice(Auction $auction, string $pdfUrl): array
+    {
+        $isHttps = str_starts_with($pdfUrl, 'https://');
+
+        return $this->bubble(
+            heroImageUrl: null,
+            headerText: '📄 支払通知書が発行されました',
+            headerColor: self::BRAND_COLOR,
+            bodyRows: [
+                ['オークション', (string) $auction->title],
+                ['開催日',       $auction->event_date?->format('Y/m/d') ?? ''],
+            ],
+            bodyNote: "下のボタンから PDF をダウンロードできます。\nお支払金額の明細・精算状況はマイページの「売上・精算」からもご確認いただけます。",
+            footerButton: $isHttps ? [
+                'label' => '支払通知書をダウンロード',
+                'uri'   => $pdfUrl,
+            ] : null,
+        );
+    }
+
     // ─── 共通ビルダー ────────────────────────────────────────
 
     /**

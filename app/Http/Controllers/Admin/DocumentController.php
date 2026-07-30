@@ -3,11 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Auction;
 use App\Models\Item;
+use App\Models\SellerProfile;
+use App\Models\SellerSettlement;
 use App\Models\SystemSetting;
 use App\Models\WonItem;
 use App\Services\InvoiceTaxResolver;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class DocumentController extends Controller
 {
@@ -91,10 +97,16 @@ class DocumentController extends Controller
 
         $resolver = app(InvoiceTaxResolver::class);
 
+        // 一斉通知の送信記録（auctionId-sellerProfileId → sent_at）
+        $sentAtMap = SellerSettlement::query()
+            ->whereNotNull('payment_notice_sent_at')
+            ->get(['auction_id', 'seller_profile_id', 'payment_notice_sent_at'])
+            ->keyBy(fn ($s) => $s->auction_id.'-'.$s->seller_profile_id);
+
         $grouped = $wonItems
             ->filter(fn ($w) => $w->item && $w->item->auction && $w->item->sellerProfile)
             ->groupBy(fn ($w) => $w->item->auction_id.'-'.$w->item->seller_profile_id)
-            ->map(function ($group) use ($resolver) {
+            ->map(function ($group, $groupKey) use ($resolver, $sentAtMap) {
                 $first = $group->first();
                 $auction = $first->item->auction;
                 $seller = $first->item->sellerProfile;
@@ -137,11 +149,83 @@ class DocumentController extends Controller
                     'is_tax_exempt' => $taxMeta['is_tax_exempt'],
                     'winning_tax_rate' => $taxMeta['winning_tax_rate'],
                     'transition_rate' => $taxMeta['transition_rate'],
+                    'notice_sent_at' => $sentAtMap->get($groupKey)?->payment_notice_sent_at?->toIso8601String(),
                 ];
             })
             ->values();
 
         return response()->json(['success' => true, 'data' => $grouped]);
+    }
+
+    /**
+     * 支払通知書の一斉通知（オークション単位・管理画面ボタンから）
+     * POST /api/admin/documents/payment-notices/notify
+     *
+     * 対象オークションで売上のある出品者全員に、LINE連携済みならLINE、
+     * 未連携ならメール（PDF添付）で支払通知書を届ける。
+     */
+    public function notifyPaymentNotices(Request $request, NotificationService $notificationService)
+    {
+        $validated = $request->validate([
+            'auction_id' => 'required|integer|exists:auctions,id',
+        ]);
+
+        $auction = Auction::findOrFail($validated['auction_id']);
+
+        // 開催前/開催中は金額が確定していないため送信させない
+        if ($auction->status !== 'finished') {
+            return response()->json([
+                'success' => false,
+                'message' => '終了済みのオークションのみ送信できます。',
+            ], 400);
+        }
+
+        $sellerProfileIds = WonItem::query()
+            ->join('items', 'won_items.item_id', '=', 'items.id')
+            ->where('items.auction_id', $auction->id)
+            ->whereNotNull('items.seller_profile_id')
+            ->distinct()
+            ->pluck('items.seller_profile_id');
+
+        if ($sellerProfileIds->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => '対象の売上データがありません。',
+            ], 404);
+        }
+
+        $counts = ['line' => 0, 'mail' => 0, 'skipped' => 0];
+
+        foreach (SellerProfile::with('user')->whereIn('id', $sellerProfileIds)->get() as $sellerProfile) {
+            $channel = $notificationService->sendSellerPaymentNoticeNotification($auction, $sellerProfile);
+            $counts[$channel] = ($counts[$channel] ?? 0) + 1;
+
+            if ($channel !== 'skipped') {
+                $settlement = SellerSettlement::firstOrCreate(
+                    ['auction_id' => $auction->id, 'seller_profile_id' => $sellerProfile->id],
+                    ['status' => SellerSettlement::STATUS_PENDING],
+                );
+                $settlement->fill([
+                    'payment_notice_sent_at' => now(),
+                    'payment_notice_sent_by' => Auth::id(),
+                ])->save();
+            }
+        }
+
+        Log::info('支払通知書一斉通知', [
+            'auction_id' => $auction->id,
+            'admin_id' => Auth::id(),
+            'counts' => $counts,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => sprintf(
+                '送信しました（LINE: %d件 / メール: %d件 / スキップ: %d件）',
+                $counts['line'], $counts['mail'], $counts['skipped'],
+            ),
+            'data' => $counts,
+        ]);
     }
 
     /**

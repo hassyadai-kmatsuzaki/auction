@@ -27,6 +27,7 @@ import { AuctionHeader } from '../../features/auction-live/components/AuctionHea
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { CelebrationOverlay } from '../../features/auction-live/components/CelebrationOverlay';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 import { DemoLayout } from './DemoLayout';
 import { DemoHome } from './DemoHome';
 import { DemoItemList } from './DemoItemList';
@@ -722,9 +723,19 @@ export function FreeDemo({ onBackToTop }: FreeDemoProps) {
                           flexShrink: 0, width: 120, borderRadius: 1, border: '1px solid', borderColor: 'divider',
                           overflow: 'hidden', bgcolor: 'background.paper',
                         }}>
-                          <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <PetsIcon sx={{ color: 'grey.400', fontSize: 20 }} />
-                          </Box>
+                          {item.thumbnail_path ? (
+                            <Box
+                              component="img"
+                              src={optimizedImageUrl(item.thumbnail_path, 'thumb')}
+                              alt={item.species_name}
+                              loading="lazy"
+                              sx={{ width: '100%', aspectRatio: '3/2', objectFit: 'cover', display: 'block' }}
+                            />
+                          ) : (
+                            <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <PetsIcon sx={{ color: 'grey.400', fontSize: 20 }} />
+                            </Box>
+                          )}
                           <Box sx={{ p: 0.75 }}>
                             <Typography variant="caption" noWrap sx={{ display: 'block', fontWeight: 600, fontSize: '0.65rem' }}>{item.species_name}</Typography>
                             <Typography variant="caption" color="primary.main" fontWeight="bold" sx={{ fontSize: '0.65rem' }}>¥{item.start_price.toLocaleString()}〜</Typography>

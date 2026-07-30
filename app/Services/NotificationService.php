@@ -10,12 +10,15 @@ use App\Mail\NewAuctionNotificationMail;
 use App\Mail\PaymentConfirmedMail;
 use App\Mail\PaymentReminderMail;
 use App\Mail\SellerAuctionStartMail;
+use App\Mail\SellerPaymentNoticeMail;
 use App\Mail\ShippingFeeFinalizedMail;
 use App\Mail\ShippingNotificationMail;
 use App\Mail\WonItemNotificationMail;
 use App\Jobs\SendLineNotificationJob;
 use App\Services\LineFlexBuilder;
 use App\Models\Auction;
+use App\Models\LineAccount;
+use App\Models\LineNotificationSetting;
 use App\Models\SellerProfile;
 use App\Models\User;
 use App\Models\WonItem;
@@ -452,6 +455,62 @@ class NotificationService
         } catch (\Exception $e) {
             Log::error('出品者向け落札通知送信エラー', ['error' => $e->getMessage()]);
             return false;
+        }
+    }
+
+    /**
+     * ⑨' 支払通知書発行通知（出品者向け・管理画面の一斉通知ボタンから）
+     *
+     * LINE連携済み（かつ payment_notice 通知ON）なら LINE Flex に
+     * PDF ダウンロード用 signed URL（14日有効）を添付、未連携ならメール（PDF添付）。
+     * 金額は通知本文に載せない（帳票PDFとの食い違い防止）。
+     *
+     * @return string 実際に使った経路 'line' | 'mail' | 'skipped'
+     */
+    public function sendSellerPaymentNoticeNotification(Auction $auction, SellerProfile $sellerProfile): string
+    {
+        try {
+            $user = $sellerProfile->user;
+            if (!$user || !$user->is_active || $user->status !== 'approved') return 'skipped';
+            // テストオークションは is_test=true ユーザー以外には送らない（メール・LINE 共通）
+            if (!app(TestModeService::class)->shouldNotifyForAuction($user, $auction)) return 'skipped';
+
+            $canUseLine = LineAccount::where('user_id', $user->id)->where('is_active', true)->exists()
+                && LineNotificationSetting::isEnabled($user->id, 'payment_notice');
+
+            if ($canUseLine) {
+                $pdfUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                    'line.payment-notice.download',
+                    now()->addDays(14),
+                    ['auctionId' => $auction->id, 'sellerProfileId' => $sellerProfile->id],
+                );
+
+                $this->sendLine($user->id, 'payment_notice',
+                    "📄 支払通知書が発行されました\n"
+                    . ($auction->title ?? '') . "\n"
+                    . "下記リンクからPDFをダウンロードできます。\n"
+                    . $pdfUrl,
+                    $this->flex->paymentNotice($auction, $pdfUrl),
+                );
+
+                Log::info('出品者向け支払通知書通知送信(LINE)', ['auction_id' => $auction->id, 'seller_profile_id' => $sellerProfile->id]);
+                return 'line';
+            }
+
+            if ($user->email) {
+                Mail::to($user->email)->queue(new SellerPaymentNoticeMail($auction, $sellerProfile));
+                Log::info('出品者向け支払通知書通知送信(メール)', ['auction_id' => $auction->id, 'seller_profile_id' => $sellerProfile->id]);
+                return 'mail';
+            }
+
+            return 'skipped';
+        } catch (\Exception $e) {
+            Log::error('出品者向け支払通知書通知エラー', [
+                'auction_id' => $auction->id,
+                'seller_profile_id' => $sellerProfile->id,
+                'error' => $e->getMessage(),
+            ]);
+            return 'skipped';
         }
     }
 

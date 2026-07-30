@@ -104,6 +104,11 @@ Route::get('/line/invoices/{auctionId}/{winnerId}', [InvoiceController::class, '
     ->middleware('signed')
     ->name('line.invoice.download');
 
+// LINE 通知からアクセスされる出品者支払通知書PDF（signed URL で保護、有効期限付き）
+Route::get('/line/payment-notices/{auctionId}/{sellerProfileId}', [InvoiceController::class, 'lineDownloadPaymentNotice'])
+    ->middleware('signed')
+    ->name('line.payment-notice.download');
+
 // 認証API（認証必須）
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [LoginController::class, 'logout']);
@@ -299,6 +304,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     // 帳票管理（一覧）
     Route::get('documents/invoices', [\App\Http\Controllers\Admin\DocumentController::class, 'invoices']);
     Route::get('documents/payment-notices', [\App\Http\Controllers\Admin\DocumentController::class, 'paymentNotices']);
+    Route::post('documents/payment-notices/notify', [\App\Http\Controllers\Admin\DocumentController::class, 'notifyPaymentNotices']);
     Route::get('documents/delivery-notes', [\App\Http\Controllers\Admin\DocumentController::class, 'deliveryNotes']);
 
     // 配送マスタ管理

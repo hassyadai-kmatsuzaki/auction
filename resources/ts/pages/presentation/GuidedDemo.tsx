@@ -23,6 +23,7 @@ import { CelebrationOverlay } from '../../features/auction-live/components/Celeb
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { DemoTourPopover, type TourStep } from '../../components/DemoTourPopover';
+import { optimizedImageUrl } from '@/lib/optimizedMedia';
 import { DemoLayout } from './DemoLayout';
 import { DemoHome } from './DemoHome';
 import { DemoItemList } from './DemoItemList';
@@ -813,9 +814,19 @@ export function GuidedDemo({ onBackToTop }: GuidedDemoProps) {
                   flexShrink: 0, width: 150, borderRadius: 1.5,
                   border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'background.paper',
                 }}>
-                  <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
-                  </Box>
+                  {item.thumbnail_path ? (
+                    <Box
+                      component="img"
+                      src={optimizedImageUrl(item.thumbnail_path, 'thumb')}
+                      alt={item.species_name}
+                      loading="lazy"
+                      sx={{ width: '100%', aspectRatio: '3/2', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <Box sx={{ width: '100%', aspectRatio: '3/2', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <PetsIcon sx={{ color: 'grey.400', fontSize: 28 }} />
+                    </Box>
+                  )}
                   <Box sx={{ p: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
                       <Chip label={laneNameOf(item.laneNumber)} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, maxWidth: 100 }} color="primary" variant="outlined" />

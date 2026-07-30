@@ -22,6 +22,11 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Receipt as ReceiptIcon,
@@ -29,6 +34,7 @@ import {
   LocalShipping as DeliveryIcon,
   Search as SearchIcon,
   Download as DownloadIcon,
+  Send as SendIcon,
 } from '@mui/icons-material';
 import {
   adminDocumentApi,
@@ -47,6 +53,10 @@ export default function DocumentManagement() {
   const [loading, setLoading] = useState(false);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [notifyAuctionId, setNotifyAuctionId] = useState<number | ''>('');
+  const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -68,6 +78,44 @@ export default function DocumentManagement() {
     };
     load();
   }, []);
+
+  const notifyAuctionOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    paymentNotices.forEach((p) => {
+      if (!map.has(p.auction_id)) map.set(p.auction_id, p.auction);
+    });
+    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
+  }, [paymentNotices]);
+
+  const notifyTargetRows = useMemo(
+    () => (notifyAuctionId === '' ? [] : paymentNotices.filter((p) => p.auction_id === notifyAuctionId)),
+    [paymentNotices, notifyAuctionId],
+  );
+
+  const notifyDraftCount = notifyTargetRows.filter((p) => p.status === 'draft').length;
+
+  const notifyLastSentAt = useMemo(() => {
+    const dates = notifyTargetRows
+      .map((p) => p.notice_sent_at)
+      .filter((d): d is string => !!d)
+      .sort();
+    return dates.length > 0 ? dates[dates.length - 1] : null;
+  }, [notifyTargetRows]);
+
+  const handleNotify = async () => {
+    if (notifyAuctionId === '') return;
+    setNotifying(true);
+    try {
+      const result = await adminDocumentApi.notifyPaymentNotices(notifyAuctionId);
+      setSuccessMessage(result.message);
+      setNotifyDialogOpen(false);
+      setPaymentNotices(await adminDocumentApi.getPaymentNotices());
+    } catch (e: any) {
+      setErrorMessage(e?.response?.data?.message ?? '一斉通知の送信に失敗しました');
+    } finally {
+      setNotifying(false);
+    }
+  };
 
   const filteredInvoices = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -157,7 +205,7 @@ export default function DocumentManagement() {
       </Card>
 
       <Card sx={{ mb: 3 }}>
-        <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
             placeholder="番号、名前、オークション名で検索..."
@@ -172,6 +220,33 @@ export default function DocumentManagement() {
               ),
             }}
           />
+          {tabValue === 1 && (
+            <>
+              <TextField
+                select
+                size="small"
+                label="一斉通知の対象オークション"
+                value={notifyAuctionId}
+                onChange={(e) => setNotifyAuctionId(e.target.value === '' ? '' : Number(e.target.value))}
+                sx={{ width: 300 }}
+              >
+                <MenuItem value="">選択してください</MenuItem>
+                {notifyAuctionOptions.map((o) => (
+                  <MenuItem key={o.id} value={o.id}>
+                    {o.title}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="contained"
+                startIcon={<SendIcon />}
+                disabled={notifyAuctionId === ''}
+                onClick={() => setNotifyDialogOpen(true)}
+              >
+                出品者に一斉通知
+              </Button>
+            </>
+          )}
         </Box>
       </Card>
 
@@ -284,6 +359,7 @@ export default function DocumentManagement() {
                   <TableCell align="right">振込金額（税込）</TableCell>
                   <TableCell align="center">ステータス</TableCell>
                   <TableCell>振込予定日</TableCell>
+                  <TableCell>通知送信日</TableCell>
                   <TableCell align="center">操作</TableCell>
                 </TableRow>
               </TableHead>
@@ -326,6 +402,7 @@ export default function DocumentManagement() {
                       </TableCell>
                       <TableCell align="center">{getPaymentStatusChip(row.status)}</TableCell>
                       <TableCell>{row.transfer_scheduled ?? '-'}</TableCell>
+                      <TableCell>{formatDate(row.notice_sent_at)}</TableCell>
                       <TableCell align="center">
                         <Tooltip title="PDFダウンロード">
                           <span>
@@ -352,7 +429,7 @@ export default function DocumentManagement() {
                 })}
                 {filteredPaymentNotices.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    <TableCell colSpan={11} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                       データがありません
                     </TableCell>
                   </TableRow>
@@ -445,6 +522,42 @@ export default function DocumentManagement() {
         </Card>
       )}
 
+      <Dialog open={notifyDialogOpen} onClose={() => !notifying && setNotifyDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>支払通知書の一斉通知</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            「{notifyAuctionOptions.find((o) => o.id === notifyAuctionId)?.title ?? ''}」で売上のある出品者{' '}
+            <strong>{notifyTargetRows.length}名</strong> に支払通知書を送信します。
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            LINE連携済みの出品者にはLINE（PDFダウンロードリンク付き）、未連携の出品者にはメール（PDF添付）で届きます。
+          </Typography>
+          {notifyDraftCount > 0 && (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              落札者の入金が確認できていない出品者が {notifyDraftCount}名 います。金額が変わる可能性があるため、入金確認後の送信を推奨します。
+            </Alert>
+          )}
+          {notifyLastSentAt && (
+            <Alert severity="info">
+              このオークションは {new Date(notifyLastSentAt).toLocaleString('ja-JP')} に送信済みです。再送すると出品者に再度通知が届きます。
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNotifyDialogOpen(false)} disabled={notifying}>
+            キャンセル
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleNotify}
+            disabled={notifying}
+            startIcon={notifying ? <CircularProgress size={16} /> : <SendIcon />}
+          >
+            {notifyLastSentAt ? '再送する' : '送信する'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={!!errorMessage}
         autoHideDuration={4000}
@@ -453,6 +566,17 @@ export default function DocumentManagement() {
       >
         <Alert severity="error" onClose={() => setErrorMessage(null)}>
           {errorMessage}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={() => setSuccessMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
         </Alert>
       </Snackbar>
     </Box>
