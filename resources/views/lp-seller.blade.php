@@ -1110,24 +1110,33 @@
 </div>
 
 <script src="/js/lp.js?v=5"></script>
-{{-- Meta計測: _fbc/_fbp をLINEリンクへ引き渡し + LineButtonClick 計測（2026-08-11 仕様書 修正2） --}}
+{{-- Meta計測: _fbc/_fbp をLINEリンクへ引き渡し + LineButtonClick 計測（2026-08-12 仕様書 修正2 v2） --}}
 <script>
 (function () {
   function cookie(name) {
     var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
     return m ? m.pop() : '';
   }
-  var fbc = cookie('_fbc');
-  var fbp = cookie('_fbp');
-  var fired = false;
-
-  document.querySelectorAll('a[href*="liff.line.me"]').forEach(function (a) {
+  function getFbc() {
+    var v = cookie('_fbc');
+    if (v) return v;
+    // ピクセル未読込でも fbclid から fbc を直接組み立てる（Meta公式仕様の形式）
+    var fbclid = new URLSearchParams(location.search).get('fbclid');
+    return fbclid ? 'fb.1.' + Date.now() + '.' + fbclid : '';
+  }
+  function decorate(a) {
     var u = new URL(a.href);
+    var fbc = getFbc();
+    var fbp = cookie('_fbp');
     if (fbc) u.searchParams.set('fbc', fbc);
     if (fbp) u.searchParams.set('fbp', fbp);
     a.href = u.toString();
-
+  }
+  var fired = false;
+  document.querySelectorAll('a[href*="liff.line.me"]').forEach(function (a) {
+    decorate(a);  // 読み込み時点で反映できる分を反映
     a.addEventListener('click', function () {
+      decorate(a);  // クリック時点の最新クッキーで上書き（ピクセル非同期読込との競合対策）
       if (fired) return;          // 1セッション1回だけ
       fired = true;
       if (window.fbq) fbq('trackCustom', 'LineButtonClick');
