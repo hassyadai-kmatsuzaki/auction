@@ -18,7 +18,16 @@ class LpCvrSetting extends BaseModel
 
     public const LP_TYPES = ['buyer', 'seller'];
 
-    public const FAILSAFE_CTA_URL = 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD';
+    // Meta広告の流入元識別のため source は LP 種別ごとに固定（buyer=FWUbEVcD / seller=KEVHrCE4）
+    public const FAILSAFE_CTA_URLS = [
+        'buyer'  => 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=FWUbEVcD',
+        'seller' => 'https://liff.line.me/2009178950-3kyQfbZq?route=add&source=KEVHrCE4',
+    ];
+
+    public static function failsafeCtaUrl(string $lpType): string
+    {
+        return self::FAILSAFE_CTA_URLS[$lpType] ?? self::FAILSAFE_CTA_URLS['buyer'];
+    }
 
     /**
      * LP の CTA URL を解決する。
@@ -49,6 +58,6 @@ class LpCvrSetting extends BaseModel
             // テーブル未作成等の場合はフェイルセーフへ倒す
         }
 
-        return self::FAILSAFE_CTA_URL;
+        return self::failsafeCtaUrl($lpType);
     }
 }

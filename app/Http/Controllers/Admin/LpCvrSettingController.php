@@ -26,7 +26,7 @@ class LpCvrSettingController extends Controller
             'data' => [
                 'lp_type' => $lpType,
                 'default_cta_url' => $defaultCtaUrl,
-                'failsafe_cta_url' => LpCvrSetting::FAILSAFE_CTA_URL,
+                'failsafe_cta_url' => LpCvrSetting::failsafeCtaUrl($lpType),
                 'preview_base_url' => config('app.url') . '/' . $lpType,
                 'items' => $items,
             ],
