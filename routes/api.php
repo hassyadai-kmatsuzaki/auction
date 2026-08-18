@@ -164,6 +164,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::delete('users/{id}/profile-image', [UserController::class, 'deleteProfileImage']);
     Route::post('users/{id}/seller-profile-image', [UserController::class, 'uploadSellerProfileImage']);
     Route::delete('users/{id}/seller-profile-image', [UserController::class, 'deleteSellerProfileImage']);
+    Route::get('users/{id}/login-history', [UserController::class, 'loginHistory']);
     
     // お知らせ管理
     Route::apiResource('announcements', AdminAnnouncementController::class);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Container, Typography, Paper, Divider } from '@mui/material';
+import { LEGAL_CONTACT } from '@/lib/legalContact';
 
 export default function PrivacyPolicy() {
   return (
@@ -9,7 +10,7 @@ export default function PrivacyPolicy() {
           プライバシーポリシー
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          最終更新日: 2025年1月1日
+          最終更新日: 2026年4月1日
         </Typography>
         <Divider sx={{ mb: 4 }} />
 
@@ -108,9 +109,8 @@ export default function PrivacyPolicy() {
             </Typography>
             <Typography variant="body2" sx={{ lineHeight: 2 }}>
               日本メダカオンライン市場運営事務局<br />
-              〒104-0061<br />
-              東京都中央区銀座1-12-4 N&E BLD.7階<br />
-              TEL: 03-1234-5678
+              {LEGAL_CONTACT.postalCode}<br />
+              {LEGAL_CONTACT.street}
             </Typography>
           </section>
         </Box>

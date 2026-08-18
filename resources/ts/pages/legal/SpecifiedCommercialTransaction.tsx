@@ -1,13 +1,14 @@
 import React from 'react';
 import { Box, Container, Typography, Paper, Divider, Table, TableBody, TableCell, TableContainer, TableRow } from '@mui/material';
+import { LEGAL_CONTACT } from '@/lib/legalContact';
 
 export default function SpecifiedCommercialTransaction() {
   const tableData = [
     { label: '販売業者', value: '日本メダカオンライン市場運営事務局' },
-    { label: '運営統括責任者', value: '代表者名（例：山田太郎）' },
-    { label: '所在地', value: '〒104-0061\n東京都中央区銀座1-12-4 N&E BLD.7階' },
-    { label: '電話番号', value: '03-1234-5678\n（お問い合わせはメールにてお願いいたします）' },
-    { label: 'メールアドレス', value: 'info@medaka-auction.example.com' },
+    { label: '運営統括責任者', value: LEGAL_CONTACT.operator },
+    { label: '所在地', value: `${LEGAL_CONTACT.postalCode}\n${LEGAL_CONTACT.street}` },
+    { label: '電話番号', value: LEGAL_CONTACT.tel },
+    { label: 'メールアドレス', value: LEGAL_CONTACT.email },
     // { label: 'URL', value: 'https://medaka-auction.example.com' },
     { label: '販売価格', value: 'オークション形式のため、落札価格が販売価格となります。\n別途、システム利用手数料・配送料がかかります。' },
     { label: '商品代金以外の必要料金', value: '・システム利用手数料：落札価格の10%\n・配送料：実費（地域・サイズにより異なります）\n・振込手数料：お客様負担' },
@@ -26,7 +27,7 @@ export default function SpecifiedCommercialTransaction() {
           特定商取引法に基づく表記
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          最終更新日: 2025年1月1日
+          最終更新日: 2026年4月1日
         </Typography>
         <Divider sx={{ mb: 4 }} />
 
@@ -66,9 +67,8 @@ export default function SpecifiedCommercialTransaction() {
           </Typography>
           <Typography variant="body2" sx={{ lineHeight: 2 }}>
             日本メダカオンライン市場運営事務局<br />
-            〒104-0061<br />
-            東京都中央区銀座1-12-4 N&E BLD.7階<br />
-            TEL: 03-1234-5678
+            {LEGAL_CONTACT.postalCode}<br />
+            {LEGAL_CONTACT.street}
           </Typography>
         </Box>
       </Paper>

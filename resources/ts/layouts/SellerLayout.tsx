@@ -515,7 +515,7 @@ export default function SellerLayout() {
             </Typography>
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
-            © 2025 日本メダカオンライン市場運営事務局
+            © 2026 日本メダカオンライン市場運営事務局
           </Typography>
         </Box>
       </Box>

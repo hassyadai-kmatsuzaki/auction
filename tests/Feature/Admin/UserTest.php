@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\ActivityEvent;
 use App\Models\SellerProfile;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class UserTest extends TestCase
@@ -209,5 +211,71 @@ class UserTest extends TestCase
             ->getJson('/api/admin/users?search=検索対象');
 
         $response->assertStatus(200);
+    }
+
+    public function test_admin_can_view_login_history(): void
+    {
+        $participant = $this->createParticipant();
+        $other = $this->createParticipant();
+
+        $this->insertLoginEvent($participant->id, '2026-08-01 10:00:00', '203.0.113.10', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1');
+        $this->insertLoginEvent($participant->id, '2026-08-03 09:30:00', '203.0.113.11', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36');
+        // 別ユーザーのログインは混ざらない
+        $this->insertLoginEvent($other->id, '2026-08-02 12:00:00', '203.0.113.20', 'Mozilla/5.0');
+        // ログイン以外のイベントも混ざらない
+        DB::table('activity_events')->insert([
+            'user_id' => $participant->id,
+            'event_type' => ActivityEvent::ITEM_VIEW,
+            'created_at' => '2026-08-04 08:00:00',
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/admin/users/{$participant->id}/login-history");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.total', 2)
+            ->assertJsonCount(2, 'data.history')
+            // 新しい順
+            ->assertJsonPath('data.history.0.ip_address', '203.0.113.11')
+            ->assertJsonPath('data.history.0.device', 'Windows / Chrome')
+            ->assertJsonPath('data.history.1.ip_address', '203.0.113.10')
+            ->assertJsonPath('data.history.1.device', 'iPhone / Safari');
+    }
+
+    public function test_login_history_respects_limit(): void
+    {
+        $participant = $this->createParticipant();
+
+        foreach (range(1, 5) as $i) {
+            $this->insertLoginEvent($participant->id, sprintf('2026-08-%02d 10:00:00', $i), '203.0.113.1', 'Mozilla/5.0');
+        }
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/admin/users/{$participant->id}/login-history?limit=2");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.total', 5)
+            ->assertJsonCount(2, 'data.history');
+    }
+
+    public function test_participant_cannot_view_login_history(): void
+    {
+        $participant = $this->createParticipant();
+
+        $response = $this->actingAs($participant, 'sanctum')
+            ->getJson("/api/admin/users/{$participant->id}/login-history");
+
+        $response->assertStatus(403);
+    }
+
+    private function insertLoginEvent(int $userId, string $createdAt, string $ip, string $userAgent): void
+    {
+        DB::table('activity_events')->insert([
+            'user_id' => $userId,
+            'event_type' => ActivityEvent::LOGIN,
+            'ip_address' => $ip,
+            'user_agent' => $userAgent,
+            'created_at' => $createdAt,
+        ]);
     }
 }

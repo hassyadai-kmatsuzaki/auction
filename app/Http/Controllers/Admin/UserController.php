@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityEvent;
 use App\Models\User;
 use App\Models\Plan;
 use App\Models\Role;
@@ -113,6 +114,87 @@ class UserController extends Controller
             'success' => true,
             'data' => ['user' => $userData],
         ]);
+    }
+
+    /**
+     * ログイン履歴
+     *
+     * activity_events の login イベント（LoginController / TwoFactorController /
+     * GoogleAuthController が記録）を新しい順に返す。計測開始日より前のログインは行が無い。
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function loginHistory(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        $limit = (int) $request->input('limit', 50);
+        $limit = max(1, min($limit, 200));
+
+        $base = ActivityEvent::query()
+            ->where('user_id', $user->id)
+            ->where('event_type', ActivityEvent::LOGIN);
+
+        $events = (clone $base)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get(['id', 'created_at', 'ip_address', 'user_agent']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'history' => $events->map(fn (ActivityEvent $e) => [
+                    'id' => $e->id,
+                    'logged_in_at' => optional($e->created_at)->toIso8601String(),
+                    'ip_address' => $e->ip_address,
+                    'user_agent' => $e->user_agent,
+                    'device' => $this->summarizeUserAgent($e->user_agent),
+                ])->values(),
+                'total' => (clone $base)->count(),
+                'limit' => $limit,
+                'last_login_at' => optional($user->last_login_at)->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * User-Agent を「OS / ブラウザ」の短い表記にまとめる。
+     * 生の User-Agent も併せて返すので、判定は一覧をざっと読むための目安でよい。
+     *
+     * @param string|null $ua
+     * @return string|null
+     */
+    private function summarizeUserAgent(?string $ua)
+    {
+        if (!$ua) {
+            return null;
+        }
+
+        $os = match (true) {
+            str_contains($ua, 'iPhone') => 'iPhone',
+            str_contains($ua, 'iPad') => 'iPad',
+            str_contains($ua, 'Android') => 'Android',
+            str_contains($ua, 'Windows') => 'Windows',
+            str_contains($ua, 'Mac OS X') => 'Mac',
+            default => null,
+        };
+
+        // Chrome / Edge も UA に Safari を含むので、判定順を入れ替えないこと
+        $browser = match (true) {
+            str_contains($ua, 'Line/') => 'LINEアプリ',
+            str_contains($ua, 'Edg/') => 'Edge',
+            str_contains($ua, 'CriOS') || str_contains($ua, 'Chrome') => 'Chrome',
+            str_contains($ua, 'FxiOS') || str_contains($ua, 'Firefox') => 'Firefox',
+            str_contains($ua, 'Safari') => 'Safari',
+            default => null,
+        };
+
+        $parts = array_values(array_filter([$os, $browser]));
+
+        return $parts === [] ? null : implode(' / ', $parts);
     }
 
     /**

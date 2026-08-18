@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -133,6 +134,9 @@ class GoogleAuthController extends Controller
 
             // トークン発行
             $token = $user->createToken('auth-token')->plainTextToken;
+
+            // 計測: ログイン（管理画面のログイン履歴もこのイベントを見ている）
+            ActivityLogger::login($user->id);
 
             $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
             return redirect("{$frontendUrl}/auth/google-callback?token={$token}");

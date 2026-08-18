@@ -152,8 +152,8 @@ export interface MockAuction {
 }
 
 export const MOCK_AUCTIONS: MockAuction[] = [
-  { id: 1, title: 'デモフリーオークション', event_date: '2026-04-15', start_time: '13:00', status: 'scheduled', total_items: 120, entrance_allowed: true, description: '厳選された個体を多数出品！希少品種も見逃せない春の特別オークションです。', sellers: ['ブリーダーA', 'ブリーダーB', 'ブリーダーC', 'ブリーダーD', 'ブリーダーE', 'ブリーダーF'] },
-  { id: 2, title: '2026年GWスペシャルオークション', event_date: '2026-05-03', start_time: '10:00', status: 'scheduled', total_items: 200, entrance_allowed: false, description: 'ゴールデンウィーク限定の大型オークション。初心者の方も大歓迎！', sellers: ['ブリーダーA', 'ブリーダーB', 'ブリーダーG'] },
+  { id: 1, title: 'デモフリーオークション', event_date: '2026-05-06', start_time: '13:00', status: 'scheduled', total_items: 120, entrance_allowed: true, description: '厳選された個体を多数出品！希少品種も見逃せない春の特別オークションです。', sellers: ['ブリーダーA', 'ブリーダーB', 'ブリーダーC', 'ブリーダーD', 'ブリーダーE', 'ブリーダーF'] },
+  { id: 2, title: '2026年GWスペシャルオークション', event_date: '2026-05-03', start_time: '10:00', status: 'finished', total_items: 200, entrance_allowed: false, description: 'ゴールデンウィーク限定の大型オークション。初心者の方も大歓迎！', sellers: ['ブリーダーA', 'ブリーダーB', 'ブリーダーG'] },
   { id: 3, title: '2026年早春オークション', event_date: '2026-03-01', start_time: '13:00', status: 'finished', total_items: 80, description: '早春の人気品種を集めたオークションです。', sellers: ['ブリーダーC', 'ブリーダーD'] },
 ];
 
@@ -166,11 +166,11 @@ export interface MockAnnouncement {
 }
 
 export const MOCK_ANNOUNCEMENTS: MockAnnouncement[] = [
-  { id: 1, title: 'GWスペシャルオークション出品受付開始', content: 'ゴールデンウィーク限定の大型オークションの出品受付を開始しました。出品をご希望の方は、マイページの出品管理から申請をお願いいたします。', published_at: '2026-03-15T10:00:00', is_important: true },
-  { id: 2, title: 'システムメンテナンスのお知らせ', content: '2026年3月20日 02:00〜06:00にシステムメンテナンスを実施いたします。', published_at: '2026-03-10T00:02:00', is_important: true },
-  { id: 3, title: 'デモフリーオークション出品者募集中', content: 'デモフリーオークションの出品者を募集しています。', published_at: '2026-03-01T09:00:00', is_important: false },
-  { id: 4, title: '新機能「指値（上限価格）」のご案内', content: '入札時に上限価格を設定できる「指値」機能をリリースしました。', published_at: '2026-02-20T05:36:00', is_important: false },
-  { id: 5, title: '利用規約の一部改定について', content: '2026年3月1日より利用規約の一部を改定いたしました。', published_at: '2026-02-15T05:36:00', is_important: false },
+  { id: 2, title: 'システムメンテナンスのお知らせ', content: '2026年5月10日 02:00〜06:00にシステムメンテナンスを実施いたします。', published_at: '2026-05-05T10:00:00', is_important: true },
+  { id: 4, title: '新機能「指値（上限価格）」のご案内', content: '入札時に上限価格を設定できる「指値」機能をリリースしました。', published_at: '2026-05-01T10:00:00', is_important: false },
+  { id: 3, title: 'デモフリーオークション出品者募集中', content: 'デモフリーオークションの出品者を募集しています。', published_at: '2026-04-27T09:00:00', is_important: false },
+  { id: 1, title: 'GWスペシャルオークション出品受付開始', content: 'ゴールデンウィーク限定の大型オークションの出品受付を開始しました。出品をご希望の方は、マイページの出品管理から申請をお願いいたします。', published_at: '2026-04-23T10:00:00', is_important: true },
+  { id: 5, title: '利用規約の一部改定について', content: '2026年4月1日より利用規約の一部を改定いたしました。', published_at: '2026-04-20T09:00:00', is_important: false },
 ];
 
 export interface MockWonItem {

@@ -30,6 +30,12 @@ import {
   RadioGroup,
   Radio,
   Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -146,6 +152,14 @@ interface User {
   subscription: UserSubscription | null;
 }
 
+interface LoginHistoryEntry {
+  id: number;
+  logged_in_at: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  device: string | null;
+}
+
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -197,6 +211,12 @@ export default function UserDetail() {
   const sellerImageInputRef = useRef<HTMLInputElement | null>(null);
   const [imageUploading, setImageUploading] = useState<'user' | 'seller' | null>(null);
 
+  // ログイン履歴
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
+  const [loginHistoryTotal, setLoginHistoryTotal] = useState(0);
+  const [loginHistoryLimit, setLoginHistoryLimit] = useState(20);
+  const [loginHistoryLoading, setLoginHistoryLoading] = useState(true);
+
   const handleImageUpload = async (
     target: 'user' | 'seller',
     event: React.ChangeEvent<HTMLInputElement>,
@@ -245,6 +265,32 @@ export default function UserDetail() {
   useEffect(() => {
     fetchUser();
   }, [id]);
+
+  useEffect(() => {
+    fetchLoginHistory();
+  }, [id, loginHistoryLimit]);
+
+  const fetchLoginHistory = async () => {
+    setLoginHistoryLoading(true);
+
+    try {
+      const response = await axios.get(`/api/admin/users/${id}/login-history`, {
+        params: { limit: loginHistoryLimit },
+      });
+
+      if (response.data.success) {
+        setLoginHistory(response.data.data.history);
+        setLoginHistoryTotal(response.data.data.total);
+      }
+    } catch (err: any) {
+      // ログイン履歴はページの主役ではないので、失敗しても画面全体はエラーにしない
+      console.error('ログイン履歴取得エラー:', err);
+      setLoginHistory([]);
+      setLoginHistoryTotal(0);
+    } finally {
+      setLoginHistoryLoading(false);
+    }
+  };
 
   const fetchUser = async () => {
     setLoading(true);
@@ -803,6 +849,78 @@ export default function UserDetail() {
                   {new Date(user.email_verified_at).toLocaleString('ja-JP')}
                 </Typography>
               </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* ログイン履歴 */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="h6">
+                ログイン履歴
+              </Typography>
+              {loginHistoryTotal > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  全 {loginHistoryTotal.toLocaleString()} 件中 {loginHistory.length.toLocaleString()} 件を表示
+                </Typography>
+              )}
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+
+            {loginHistoryLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : loginHistory.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                ログイン履歴がありません（記録開始前のログインは残っていません）
+              </Typography>
+            ) : (
+              <>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>日時</TableCell>
+                        <TableCell>IPアドレス</TableCell>
+                        <TableCell>端末</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {loginHistory.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                            {entry.logged_in_at
+                              ? new Date(entry.logged_in_at).toLocaleString('ja-JP')
+                              : '-'}
+                          </TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                            {entry.ip_address || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Tooltip title={entry.user_agent || ''}>
+                              <span>{entry.device || entry.user_agent || '-'}</span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                {loginHistory.length < loginHistoryTotal && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Button
+                      size="small"
+                      onClick={() => setLoginHistoryLimit((prev) => Math.min(prev + 50, 200))}
+                      disabled={loginHistoryLimit >= 200}
+                    >
+                      {loginHistoryLimit >= 200 ? '直近200件まで表示できます' : 'さらに表示'}
+                    </Button>
+                  </Box>
+                )}
+              </>
             )}
           </Paper>
         </Grid>
