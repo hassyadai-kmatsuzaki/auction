@@ -169,8 +169,8 @@ export const MOCK_ANNOUNCEMENTS: MockAnnouncement[] = [
   { id: 2, title: 'システムメンテナンスのお知らせ', content: '2026年5月10日 02:00〜06:00にシステムメンテナンスを実施いたします。', published_at: '2026-05-05T10:00:00', is_important: true },
   { id: 4, title: '新機能「指値（上限価格）」のご案内', content: '入札時に上限価格を設定できる「指値」機能をリリースしました。', published_at: '2026-05-01T10:00:00', is_important: false },
   { id: 3, title: 'デモフリーオークション出品者募集中', content: 'デモフリーオークションの出品者を募集しています。', published_at: '2026-04-27T09:00:00', is_important: false },
-  { id: 1, title: 'GWスペシャルオークション出品受付開始', content: 'ゴールデンウィーク限定の大型オークションの出品受付を開始しました。出品をご希望の方は、マイページの出品管理から申請をお願いいたします。', published_at: '2026-04-23T10:00:00', is_important: true },
-  { id: 5, title: '利用規約の一部改定について', content: '2026年4月1日より利用規約の一部を改定いたしました。', published_at: '2026-04-20T09:00:00', is_important: false },
+  { id: 1, title: 'GWスペシャルオークション出品受付開始', content: 'ゴールデンウィーク限定の大型オークションの出品受付を開始しました。出品をご希望の方は、マイページの出品管理から申請をお願いいたします。', published_at: '2026-04-26T10:00:00', is_important: true },
+  { id: 5, title: '利用規約の一部改定について', content: '2026年5月1日より利用規約の一部を改定いたします。', published_at: '2026-04-25T09:00:00', is_important: false },
 ];
 
 export interface MockWonItem {

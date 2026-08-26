@@ -10,7 +10,7 @@ export default function TermsOfService() {
           利用規約
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          最終更新日: 2026年4月1日
+          最終更新日: 2026年5月19日
         </Typography>
         <Divider sx={{ mb: 4 }} />
 

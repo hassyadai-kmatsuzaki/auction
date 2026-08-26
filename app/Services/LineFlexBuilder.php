@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\WonItem;
+use Illuminate\Support\Collection;
 
 /**
  * LINE Flex Message のコンテンツ（bubble JSON）を生成するビルダー。
@@ -164,21 +165,55 @@ class LineFlexBuilder
         );
     }
 
-    /** ⑧ 入金催促通知 */
-    public function paymentReminder(WonItem $wonItem, string $urgency): array
+    /**
+     * ⑧ 入金催促通知（落札者単位で集約）
+     *
+     * 同一落札者・同一期限の未入金 WonItem をまとめて1バブルにする。
+     * 生体は最大10件まで列挙し、合計は請求書と同じ「落札金額(税込)+送料」で算出する。
+     *
+     * @param  Collection<int, WonItem>  $wonItems
+     */
+    public function paymentReminder(Collection $wonItems, string $urgency): array
     {
-        $item = $wonItem->item;
+        $wonItems = $wonItems->values();
+        $count    = $wonItems->count();
+        $first    = $wonItems->first();
+
+        $bodyRows = [
+            ['残り', $urgency],
+            ['期限', $first?->payment_deadline?->format('m/d H:i') ?? '未定'],
+        ];
+        if ($count > 1) {
+            $bodyRows[] = ['対象', "{$count} 件"];
+        }
+
+        // 最大10件まで本文に列挙（LINE の bubble size 制約への配慮）
+        // ラベル列は狭く wrap しないため、生体名は値列側に置く（長い品種名の「…」切れ防止）
+        $listed = $wonItems->slice(0, 10);
+        foreach ($listed as $i => $w) {
+            $bodyRows[] = [
+                $count > 1 ? '商品' . ($i + 1) : '商品',
+                ($w->item?->species_name ?? '商品') . '　¥' . number_format((int) $w->total_amount),
+            ];
+        }
+        if ($count > $listed->count()) {
+            $bodyRows[] = ['(以下省略)', '他 ' . ($count - $listed->count()) . ' 件'];
+        }
+
+        $shippingTotal = (int) $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+        if ($shippingTotal > 0) {
+            $bodyRows[] = ['送料', '¥' . number_format($shippingTotal)];
+        }
+
+        $total = (int) $wonItems->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0));
+        $bodyRows[] = ['合計', '¥' . number_format($total) . '（税込）'];
 
         return $this->bubble(
-            heroImageUrl: $this->itemHeroImage($item),
+            // 複数件のときは特定の生体画像を出すと誤解を招くので hero を省略
+            heroImageUrl: $count === 1 ? $this->itemHeroImage($first?->item) : null,
             headerText: '⚠️ 入金期限が近づいています',
             headerColor: self::ALERT_COLOR,
-            bodyRows: [
-                ['生体',   $item?->species_name ?? '商品'],
-                ['残り',   $urgency],
-                ['期限',   $wonItem->payment_deadline?->format('m/d H:i') ?? '未定'],
-                ['合計',   '¥' . number_format((int) $wonItem->total_amount)],
-            ],
+            bodyRows: $bodyRows,
             footerButton: ($url = $this->appUrl('/participant/won-items'))
                 ? ['label' => '入金内容を確認', 'uri' => $url]
                 : null,

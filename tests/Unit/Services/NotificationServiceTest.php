@@ -327,7 +327,7 @@ class NotificationServiceTest extends TestCase
 
         $this->participant->update(['notification_settings' => ['email_payment_reminder' => true]]);
 
-        $this->notificationService->sendPaymentReminderNotification($wonItem, '24時間前');
+        $this->notificationService->sendPaymentReminderNotification(collect([$wonItem]), '24時間前');
         $this->assertTrue(true);
     }
 }

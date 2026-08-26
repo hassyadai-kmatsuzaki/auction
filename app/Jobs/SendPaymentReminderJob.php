@@ -9,14 +9,17 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
  * 入金催促通知を送信するスケジュールジョブ
  *
- * payment_deadline が 24時間以内 / 1時間以内 の未入金 WonItem に対して通知を送信する。
- * Cache による送信済みフラグで、同じ urgency レベルの通知は WonItem 1件につき1回のみ送信する。
+ * payment_deadline が 24時間以内 / 1時間以内 の未入金 WonItem を対象にする。
+ * 送信は「落札者 × 期限」単位に集約して1通（メール+LINE Flex）にまとめる。
+ * Cache による送信済みフラグは従来どおり WonItem 単位なので、
+ * 後から窓に入った落札品があればその分だけ追送される（既送分は再送しない）。
  */
 class SendPaymentReminderJob implements ShouldQueue
 {
@@ -32,52 +35,61 @@ class SendPaymentReminderJob implements ShouldQueue
     public function handle(NotificationService $notificationService): void
     {
         $now = now();
-        $sentCount = ['1h' => 0, '24h' => 0];
 
         // ── 1時間以内に期限が来る落札品 ──
         $oneHourItems = WonItem::where('payment_status', 'pending')
             ->whereNotNull('payment_deadline')
             ->where('payment_deadline', '>', $now)
             ->where('payment_deadline', '<=', $now->copy()->addHour())
+            ->with(['item', 'winner'])
             ->get();
 
-        foreach ($oneHourItems as $wonItem) {
-            $cacheKey = "payment_reminder:1h:{$wonItem->id}";
-            if (Cache::has($cacheKey)) continue;
-
-            try {
-                $notificationService->sendPaymentReminderNotification($wonItem, '1時間以内');
-                // 期限まで有効なキャッシュ（期限後は不要なので自動消滅）
-                Cache::put($cacheKey, true, $wonItem->payment_deadline);
-                $sentCount['1h']++;
-            } catch (\Exception $e) {
-                Log::warning("Payment reminder (1h) failed: won_item={$wonItem->id} - " . $e->getMessage());
-            }
-        }
+        $sent1h = $this->sendGrouped($oneHourItems, '1h', '1時間以内', $notificationService);
 
         // ── 24時間以内に期限が来る落札品（1時間以内は除外） ──
         $twentyFourHourItems = WonItem::where('payment_status', 'pending')
             ->whereNotNull('payment_deadline')
             ->where('payment_deadline', '>', $now->copy()->addHour())
             ->where('payment_deadline', '<=', $now->copy()->addHours(24))
+            ->with(['item', 'winner'])
             ->get();
 
-        foreach ($twentyFourHourItems as $wonItem) {
-            $cacheKey = "payment_reminder:24h:{$wonItem->id}";
-            if (Cache::has($cacheKey)) continue;
+        $sent24h = $this->sendGrouped($twentyFourHourItems, '24h', '24時間以内', $notificationService);
 
+        if ($sent1h + $sent24h > 0) {
+            Log::info("Payment reminders sent: 1h={$sent1h}, 24h={$sent24h}");
+        }
+    }
+
+    /**
+     * 未送信の WonItem を「落札者 × 期限」で集約し、グループごとに1通送る。
+     *
+     * @param  Collection<int, WonItem>  $wonItems
+     * @return int  送信した通数（グループ数）
+     */
+    private function sendGrouped(Collection $wonItems, string $bucket, string $urgency, NotificationService $notificationService): int
+    {
+        $sent = 0;
+
+        $pending = $wonItems->reject(fn (WonItem $w) => Cache::has("payment_reminder:{$bucket}:{$w->id}"));
+
+        // 期限が異なる落札品を同じ「期限: mm/dd HH:ii」の1通にまとめないよう、期限も集約キーに含める
+        $groups = $pending->groupBy(fn (WonItem $w) => $w->winner_id . ':' . ($w->payment_deadline?->getTimestamp() ?? 0));
+
+        foreach ($groups as $group) {
+            $group = $group->values();
             try {
-                $notificationService->sendPaymentReminderNotification($wonItem, '24時間以内');
-                Cache::put($cacheKey, true, $wonItem->payment_deadline);
-                $sentCount['24h']++;
+                $notificationService->sendPaymentReminderNotification($group, $urgency);
+                foreach ($group as $w) {
+                    // 期限まで有効なキャッシュ（期限後は不要なので自動消滅）
+                    Cache::put("payment_reminder:{$bucket}:{$w->id}", true, $w->payment_deadline);
+                }
+                $sent++;
             } catch (\Exception $e) {
-                Log::warning("Payment reminder (24h) failed: won_item={$wonItem->id} - " . $e->getMessage());
+                Log::warning("Payment reminder ({$bucket}) failed: won_items=" . $group->pluck('id')->implode(',') . " - " . $e->getMessage());
             }
         }
 
-        $total = $sentCount['1h'] + $sentCount['24h'];
-        if ($total > 0) {
-            Log::info("Payment reminders sent: 1h={$sentCount['1h']}, 24h={$sentCount['24h']}");
-        }
+        return $sent;
     }
 }

@@ -1,0 +1,357 @@
+<title>レーン停止対策 仕様書</title>
+<style>
+  :root {
+    --bg: #f6f7f5; --surface: #ffffff; --ink: #1b1f1e; --muted: #5f6966; --line: #d9dfdc;
+    --accent: #0f766e; --accent-ink: #0b5d57; --accent-soft: #e3f1ee;
+    --danger: #b42318; --danger-soft: #fdf1f0; --warn: #b45309; --warn-soft: #fdf4e7;
+    --code-bg: #edf0ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101413; --surface: #181e1c; --ink: #e6eae8; --muted: #9aa3a0; --line: #2a3230;
+      --accent: #3db9ad; --accent-ink: #62d2c7; --accent-soft: #15302c;
+      --danger: #f97066; --danger-soft: #2b1a18; --warn: #f0b35b; --warn-soft: #2d2213;
+      --code-bg: #212826;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101413; --surface: #181e1c; --ink: #e6eae8; --muted: #9aa3a0; --line: #2a3230;
+    --accent: #3db9ad; --accent-ink: #62d2c7; --accent-soft: #15302c;
+    --danger: #f97066; --danger-soft: #2b1a18; --warn: #f0b35b; --warn-soft: #2d2213;
+    --code-bg: #212826;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.8;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 44px 22px 90px; }
+  header.doc { border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+  .eyebrow { font-size: 11px; letter-spacing: .14em; font-weight: 700; color: var(--accent-ink); margin: 0 0 6px; }
+  h1 { font-size: 27px; line-height: 1.35; margin: 0 0 8px; text-wrap: balance; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0; }
+  h2 { font-size: 18px; margin: 48px 0 12px; padding-top: 22px; border-top: 1px solid var(--line); }
+  h3 { font-size: 15.5px; margin: 26px 0 8px; }
+  p { margin: 10px 0; }
+  .verdict { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--accent);
+    border-radius: 6px; padding: 16px 20px; margin: 22px 0; }
+  .verdict p:first-child { margin-top: 0; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  @media (max-width: 640px) { .split { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  .card.yes { border-top: 4px solid var(--accent); }
+  .card.no { border-top: 4px solid var(--warn); }
+  .card h4 { margin: 4px 0 6px; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); font-size: 12.5px; letter-spacing: .04em; }
+  td { background: var(--surface); }
+  .scroll { overflow-x: auto; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px;
+    overflow-x: auto; margin: 10px 0; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.6; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .92em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  figure { margin: 22px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 8px; }
+  figure svg { display: block; max-width: 100%; height: auto; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; letter-spacing: .04em; }
+  .tag.ok { background: var(--accent-soft); color: var(--accent-ink); }
+  .tag.ng { background: var(--danger-soft); color: var(--danger); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  ul, ol { padding-left: 22px; } li { margin: 4px 0; }
+  .go { background: var(--accent-soft); border-radius: 8px; padding: 12px 18px; }
+  .nogo { background: var(--danger-soft); border-radius: 8px; padding: 12px 18px; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+</style>
+
+<main>
+<header class="doc">
+  <p class="eyebrow">DEV-2026-011 ・ 仕様書 / 実装方針 / 原因説明</p>
+  <h1>レーン単独停止（countdown cache 汚染）対策</h1>
+  <p class="meta">作成 2026-08-14（第7回開催中の事象を受けて） ／ 対象: 2026-08-21（金）第8回開催まで ／ 関連: OPS-2026-005 復旧手順書、DEV-2026-008 tickクロバー、CAS恒久解計画</p>
+</header>
+
+<h2>1. 結論 — 金曜日までに「完璧に安全な修正」は可能か</h2>
+
+<div class="verdict">
+  <p><strong>「今回の原因経路が原理的に再発しない修正」は、金曜日までに余裕をもって入れられます。</strong>変更は復旧分岐だけで、カウントダウン・入札・落札の通常経路は1行も変えません。ロールバックは2ファイルを戻して1分です。</p>
+  <p>一方で<strong>「レーンが止まる事象がゼロになる保証」は、この修正ではできません。</strong>tick 側は不一致を検知しても自己修復せず「スキップ」するだけなので、別の経路で汚染が起きれば止まります。そこは復旧手順書（60秒復旧）と監視で担保し、根治は計画済みのCAS化で行います。</p>
+</div>
+
+<div class="split">
+  <div class="card yes">
+    <h4><span class="tag ok">できる</span> 金曜までに保証できること</h4>
+    <ul>
+      <li>復旧パスが古い商品でキャッシュを上書きすることは<strong>構造的に不可能</strong>になる（atomic add）</li>
+      <li>通常経路は無変更（差分は追加のみ・挙動変更なし）</li>
+      <li>決定的に再現できるユニットテスト付き</li>
+      <li>ステージング E2E ①〜④ 合格を Go 条件にする</li>
+    </ul>
+  </div>
+  <div class="card no">
+    <h4><span class="tag warn">できない</span> この修正の範囲外</h4>
+    <ul>
+      <li>tick 側の自己修復（不一致を見つけたら自分で直す）— ホットパス改修になるためCAS化と一緒に</li>
+      <li>未知の別経路による汚染の根絶</li>
+      <li>「次の商品へ」「AdjustPrice」など既知の未保護操作</li>
+    </ul>
+  </div>
+</div>
+
+<h2>2. 今回の原因 — 何が起きたか</h2>
+
+<p>11:03:39、レーンC（lane 113）で商品 3140 が落札され、次商品 3196 へ切り替わる<strong>同じ秒</strong>に、参加者のブラウザからの状態取得（<code>getLiveState</code>）が割り込みました。復旧パスは「キャッシュが空なら再生成する」保護機能ですが、そのリクエストは<strong>切替前の古い lane 情報（current_item = 3140）</strong>を持ったまま <code>Cache::put</code>（無条件上書き）で書き戻したため、tick が書いた次商品の Pre-bid 状態を潰しました。</p>
+
+<figure>
+<svg viewBox="0 0 760 480" role="img" aria-label="11:03:39 のシーケンス。tickワーカーが商品3140落札後にPre-bid(3196)をキャッシュへ書いた直後、参加者ブラウザの復旧パスが古いlane情報でbidding(3140)を上書きし、次のtickがガードBで不一致を検知してレーンをスキップし続ける">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+    <marker id="ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--danger)"/>
+    </marker>
+  </defs>
+  <g fill="currentColor" font-size="13" font-weight="700" text-anchor="middle">
+    <text x="120" y="26">tick ワーカー</text>
+    <text x="380" y="26">Redis: countdown:lane:113</text>
+    <text x="640" y="26">参加者ブラウザ → getLiveState</text>
+  </g>
+  <g stroke="currentColor" stroke-opacity=".3" stroke-dasharray="4 4">
+    <line x1="120" y1="40" x2="120" y2="405"/>
+    <line x1="380" y1="40" x2="380" y2="405"/>
+    <line x1="640" y1="40" x2="640" y2="405"/>
+  </g>
+  <!-- ① -->
+  <line x1="130" y1="78" x2="628" y2="78" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="380" y="70" fill="currentColor" font-size="12" text-anchor="middle">① 3140 落札 → DB: current_item=3196 → LaneChanged 配信</text>
+  <!-- ② -->
+  <rect x="520" y="96" width="232" height="40" rx="5" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+  <text x="636" y="112" fill="currentColor" font-size="12" text-anchor="middle">② jitter≈0ms で GET /live</text>
+  <text x="636" y="128" fill="currentColor" font-size="12" text-anchor="middle">lane 読込: current_item=<tspan style="fill: var(--warn)" font-weight="700">3140（古い）</tspan></text>
+  <!-- ③ -->
+  <line x1="628" y1="165" x2="392" y2="165" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="510" y="157" fill="currentColor" font-size="12" text-anchor="middle">③ Cache::get → MISS（遷移中で空）</text>
+  <!-- ④ -->
+  <line x1="130" y1="215" x2="368" y2="215" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="250" y="207" fill="currentColor" font-size="12" text-anchor="middle">④ Cache::put  Pre-bid (3196)</text>
+  <rect x="392" y="222" width="110" height="22" rx="4" style="fill: var(--accent-soft); stroke: var(--accent)"/>
+  <text x="447" y="237" style="fill: var(--accent-ink)" font-size="12" text-anchor="middle" font-weight="700">Pre-bid 3196</text>
+  <!-- ⑤ -->
+  <line x1="628" y1="275" x2="392" y2="275" style="stroke: var(--danger)" stroke-width="2" marker-end="url(#ahd)"/>
+  <text x="510" y="267" style="fill: var(--danger)" font-size="12" text-anchor="middle" font-weight="700">⑤ startCountdown(古いlane) → Cache::put bidding (3140)</text>
+  <rect x="392" y="282" width="110" height="22" rx="4" style="fill: var(--danger-soft); stroke: var(--danger)"/>
+  <text x="447" y="297" style="fill: var(--danger)" font-size="12" text-anchor="middle" font-weight="700">bidding 3140</text>
+  <text x="512" y="297" style="fill: var(--danger)" font-size="11.5" text-anchor="start">← ④ を上書き</text>
+  <!-- ⑥ -->
+  <line x1="368" y1="340" x2="130" y2="340" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="250" y="332" fill="currentColor" font-size="12" text-anchor="middle">⑥ 次 tick: Cache::get → item 3140</text>
+  <rect x="14" y="352" width="212" height="40" rx="5" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+  <text x="120" y="368" fill="currentColor" font-size="12" text-anchor="middle">3140 ≠ current 3196</text>
+  <text x="120" y="384" fill="currentColor" font-size="12" text-anchor="middle">→ ガードB → このレーンをスキップ</text>
+  <!-- result -->
+  <rect x="230" y="420" width="300" height="40" rx="6" style="fill: var(--danger-soft); stroke: var(--danger)" stroke-width="1.5"/>
+  <text x="380" y="445" style="fill: var(--danger)" font-size="14" font-weight="700" text-anchor="middle">レーンC 停止（「残り10秒」のまま）</text>
+</svg>
+<figcaption>図1 — 11:03:39 の実際の順序。④と⑤は同じ秒に起きた。ガードB（tick は自分の知らない商品のキャッシュを書き換えない）が働いたため、データは壊れずレーンが止まるだけで済んだ。</figcaption>
+</figure>
+
+<h3>なぜ「遷移の一瞬」にリクエストが来るのか</h3>
+<p>常時ポーリングはしていません（WS接続中はOFF）。ただしフロントは <strong>LaneChanged イベントを受けると 0〜1.5 秒の jitter 後に必ず1回 getLiveState を取りに行く</strong>設計です（WSイベントに載らない自分の入札状態・指値・auto-bid 結果を取るため）。つまり「落札直後に120人が順番に取りに来る」のは仕様であり、jitter を小さく引いたクライアントは遷移窓（1秒未満）の中に着弾します。</p>
+
+<figure>
+<svg viewBox="0 0 760 180" role="img" aria-label="時間軸上で、遷移窓0〜0.8秒に現行のjitter 0〜1.5秒が重なっているが、修正後のjitter 1.5〜3.0秒は窓の外に完全に出る">
+  <defs>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" style="stroke: var(--danger)" stroke-width="1.5"/>
+    </pattern>
+  </defs>
+  <line x1="60" y1="150" x2="700" y2="150" stroke="currentColor" stroke-width="1.2"/>
+  <g fill="currentColor" font-size="11.5" text-anchor="middle">
+    <text x="60" y="170">0</text><text x="166.7" y="170">0.5s</text><text x="273.3" y="170">1.0s</text>
+    <text x="380" y="170">1.5s</text><text x="486.7" y="170">2.0s</text><text x="593.3" y="170">2.5s</text><text x="700" y="170">3.0s</text>
+  </g>
+  <g stroke="currentColor" stroke-opacity=".5">
+    <line x1="60" y1="146" x2="60" y2="154"/><line x1="166.7" y1="146" x2="166.7" y2="154"/><line x1="273.3" y1="146" x2="273.3" y2="154"/>
+    <line x1="380" y1="146" x2="380" y2="154"/><line x1="486.7" y1="146" x2="486.7" y2="154"/><line x1="593.3" y1="146" x2="593.3" y2="154"/><line x1="700" y1="146" x2="700" y2="154"/>
+  </g>
+  <rect x="60" y="30" width="170" height="112" fill="url(#hatch)" opacity=".55"/>
+  <text x="145" y="22" style="fill: var(--danger)" font-size="12" font-weight="700" text-anchor="middle">遷移窓（落札→Pre-bid 書込完了、1秒未満）</text>
+  <rect x="60" y="58" width="320" height="24" fill="currentColor" fill-opacity=".22"/>
+  <text x="392" y="75" fill="currentColor" font-size="12.5" text-anchor="start">現行 jitter 0〜1.5s — 窓と重なる</text>
+  <rect x="380" y="104" width="320" height="24" style="fill: var(--accent)" fill-opacity=".85"/>
+  <text x="372" y="121" style="fill: var(--accent-ink)" font-size="12.5" font-weight="700" text-anchor="end">修正後 1.5〜3.0s — 窓の外</text>
+</svg>
+<figcaption>図2 — LaneChanged 後の再取得タイミング。補助策として jitter に下限を設けると、着弾が遷移窓に入らなくなる。ただし WS 切断中の 5 秒ポーリングは制御できないので、本命はサーバー側（§4）。</figcaption>
+</figure>
+
+<h3>止まる時と流れる時の違い</h3>
+<p>汚染が起きても、その後に誰かが正しい状態を書けば流れます（入札＝freeze 書込、tick の Pre-bid 書込）。<strong>汚染書込が「最後の書込」のまま残り、かつ誰も入札しない</strong>時だけ停止が顕在化します。今日の3件（11:03 停止 / 11:17 流れた / 11:23 流れた）はこの差です。人気商品では自然回復し、閑散商品で止まる、という偏りが出ます。</p>
+
+<h2>3. 仕様 — 修正が満たすべき要件</h2>
+
+<div class="scroll"><table>
+  <tr><th style="width:64px">ID</th><th>要件</th><th>根拠</th></tr>
+  <tr><td><strong>R1</strong></td><td>復旧パスは、<strong>復旧を実行する時点のDB</strong>（<code>$lane->refresh()</code> 後）の current_item で再生成する</td><td>古い lane モデルを信じたのが直接原因</td></tr>
+  <tr><td><strong>R2</strong></td><td>current_item が <code>live</code> でなければ<strong>何も書かない</strong></td><td>落札済み商品での再生成を禁止</td></tr>
+  <tr><td><strong>R3</strong></td><td>キャッシュ書込は <strong><code>Cache::add</code>（存在すれば書かない・アトミック）</strong>で行う。<code>put</code> は禁止</td><td>「最後に書いた人が勝つ」を構造的に排除。R1/R2 をすり抜けても上書きは起きない</td></tr>
+  <tr><td><strong>R4</strong></td><td><code>startCountdown</code> / <code>startPreBidCountdown</code> / tick / 入札の通常経路は<strong>変更しない</strong>。差分は追加のみ</td><td>ホットパスの回帰リスク回避・レビュー容易性・1分ロールバック</td></tr>
+  <tr><td><strong>R5</strong></td><td>復旧ログに <code>recovered=true/false</code> と対象 item_id を出す</td><td>次回開催で「add が拒否した回数」＝防いだ回数が見える</td></tr>
+  <tr><td><strong>R6</strong></td><td>（フロント・補助）LaneChanged 後の再取得 jitter を <strong>1500〜3000ms</strong> にする</td><td>遷移窓への着弾を避ける。JSビルドが必要なので別便でも可</td></tr>
+  <tr><td>対象外</td><td>tick 側の自己修復、CAS化、「次の商品へ」等の既知未保護操作</td><td>別計画（CAS恒久解）で扱う</td></tr>
+</table></div>
+
+<h2>4. 実装方針</h2>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="現行のCache::putでは復旧パスの書込がPre-bid(3196)をbidding(3140)に上書きして停止するが、修正後のCache::addではキーが存在するため書込が拒否されPre-bid(3196)が残って流れる">
+  <defs>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <!-- left panel -->
+  <text x="190" y="24" fill="currentColor" font-size="13.5" font-weight="700" text-anchor="middle">現行: Cache::put（無条件上書き）</text>
+  <rect x="40" y="48" width="120" height="40" rx="5" style="fill: var(--accent-soft); stroke: var(--accent)"/>
+  <text x="100" y="73" style="fill: var(--accent-ink)" font-size="12.5" font-weight="700" text-anchor="middle">Pre-bid 3196</text>
+  <line x1="168" y1="68" x2="228" y2="68" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <text x="198" y="58" fill="currentColor" font-size="11" text-anchor="middle">put</text>
+  <rect x="236" y="48" width="120" height="40" rx="5" style="fill: var(--danger-soft); stroke: var(--danger)"/>
+  <text x="296" y="73" style="fill: var(--danger)" font-size="12.5" font-weight="700" text-anchor="middle">bidding 3140</text>
+  <line x1="198" y1="130" x2="198" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <rect x="118" y="132" width="160" height="34" rx="5" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+  <text x="198" y="153" fill="currentColor" font-size="12" text-anchor="middle">復旧パス: bidding(3140) を書く</text>
+  <text x="198" y="205" style="fill: var(--danger)" font-size="13.5" font-weight="700" text-anchor="middle">上書き → レーン停止</text>
+  <!-- divider -->
+  <line x1="380" y1="20" x2="380" y2="225" stroke="currentColor" stroke-opacity=".25"/>
+  <!-- right panel -->
+  <text x="570" y="24" fill="currentColor" font-size="13.5" font-weight="700" text-anchor="middle">修正後: Cache::add（空の時だけ書く）</text>
+  <rect x="420" y="48" width="120" height="40" rx="5" style="fill: var(--accent-soft); stroke: var(--accent)"/>
+  <text x="480" y="73" style="fill: var(--accent-ink)" font-size="12.5" font-weight="700" text-anchor="middle">Pre-bid 3196</text>
+  <line x1="548" y1="68" x2="608" y2="68" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <text x="578" y="58" fill="currentColor" font-size="11" text-anchor="middle">add</text>
+  <rect x="616" y="48" width="120" height="40" rx="5" style="fill: var(--accent-soft); stroke: var(--accent)"/>
+  <text x="676" y="73" style="fill: var(--accent-ink)" font-size="12.5" font-weight="700" text-anchor="middle">Pre-bid 3196</text>
+  <line x1="578" y1="130" x2="578" y2="80" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <line x1="566" y1="98" x2="590" y2="118" style="stroke: var(--danger)" stroke-width="2.5"/>
+  <line x1="590" y1="98" x2="566" y2="118" style="stroke: var(--danger)" stroke-width="2.5"/>
+  <rect x="498" y="132" width="160" height="34" rx="5" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+  <text x="578" y="153" fill="currentColor" font-size="12" text-anchor="middle">復旧パス: キー存在 → 拒否</text>
+  <text x="578" y="205" style="fill: var(--accent-ink)" font-size="13.5" font-weight="700" text-anchor="middle">Pre-bid が残る → 流れる</text>
+  <text x="578" y="225" fill="currentColor" font-size="11.5" text-anchor="middle" opacity=".8">キーが本当に空（Redis eviction）の時だけ add 成功 = 正当な復旧は従来どおり</text>
+</svg>
+<figcaption>図3 — R3 の本質。復旧パスに「上書き能力」を与えない。R1/R2 が万一すり抜けて古い商品を書いても、それは本当に空だった時だけで、直後の tick の Pre-bid put が上書きして流れる。</figcaption>
+</figure>
+
+<h3>4-1. バックエンド（2ファイル・追加のみ）</h3>
+
+<p><strong>CountdownService.php</strong> — 復旧専用メソッドを追加。<code>startCountdown</code> は触らない（通常経路の put は正しい）。</p>
+<pre><code>/**
+ * getLiveState の cache-miss 復旧専用。
+ * 通常経路(startCountdown)と違い、①今のDBで読み直し ②live のみ ③add(存在すれば書かない)。
+ * @return bool true=書いた / false=書かなかった(既に存在 or live でない)
+ */
+public function recoverCountdownIfMissing(Lane $lane): bool
+{
+    $lane->refresh();                               // R1: current_item_id を今のDBで取り直す
+    $lane->load(['currentItem', 'auction']);
+    $item    = $lane->currentItem;
+    $auction = $lane->auction;
+
+    if ($lane->status !== 'active' || !$item || $item->status !== 'live' || !$auction) {
+        return false;                               // R2: live でなければ何も書かない
+    }
+
+    $seconds = $auction->calculateCountdownSeconds($item->current_price);
+    $cacheData = [
+        'lane_id' => $lane->id,
+        'item_id' => $item->id,
+        'auction_id' => $auction->id,
+        'phase' => 'bidding',
+        'remaining_seconds' => $seconds['bid_countdown_seconds'],
+        'started_at' => now()->timestamp,
+        'bid_countdown_seconds' => $seconds['bid_countdown_seconds'],
+        'freeze_countdown_seconds' => $seconds['freeze_countdown_seconds'],
+        'is_running' => true,
+        'pre_bid_remaining_seconds' => 0,
+        'last_bidder_user_id' => null,
+    ];
+
+    // R3: Redis SET NX。既に誰かが書いていれば false で戻る（上書き能力を持たない）
+    return Cache::add($this->getCacheKey($lane->id), $cacheData, self::CACHE_TTL);
+}</code></pre>
+
+<p><strong>BidService.php:172-186</strong> — 呼び先とログを差し替え（R5）。</p>
+<pre><code>if (!$countdownState &amp;&amp; $lane->status === 'active' &amp;&amp; $lane->currentItem &amp;&amp; $lane->currentItem->status === 'live') {
+    try {
+        $recovered      = app(\App\Services\CountdownService::class)->recoverCountdownIfMissing($lane);
+        $countdownState = Cache::get("countdown:lane:{$lane->id}");
+        Log::warning('getLiveState: countdown cache miss recovered', [
+            'lane_id'    => $lane->id,
+            'item_id'    => $countdownState['item_id'] ?? null,   // 実際にキャッシュにある商品
+            'recovered'  => $recovered,                           // false = 誰かが先に書いていた(防いだ)
+            'auction_id' => $auction->id,
+        ]);
+    } catch (\Throwable $e) { /* 既存のまま */ }
+}</code></pre>
+
+<p>配列を <code>startCountdown</code> と重複させているのは意図的です。共通化すると通常経路にも差分が入り「追加のみ」（R4）が崩れるため、レビューとロールバックの単純さを優先します。CAS化の際に統合します。</p>
+
+<h3>4-2. フロント（1行・補助・別便可）</h3>
+<pre><code>// useAuctionLive.ts:246  LaneChanged 後の再取得
+- const jitter = Math.floor(Math.random() * 1500);          // 0〜1.5s
++ const jitter = 1500 + Math.floor(Math.random() * 1500);   // 1.5〜3.0s（遷移窓の外）R6</code></pre>
+<p>auto-bid 結果などの反映が最大1.5秒遅れますが、WSイベントで価格・カウントは即時反映されるため体感影響はありません。</p>
+
+<h3>4-3. テスト</h3>
+<div class="scroll"><table>
+  <tr><th>ID</th><th>ケース</th><th>期待</th></tr>
+  <tr><td>T1</td><td>キャッシュ空・現商品 live</td><td>true / キャッシュに現商品の bidding 状態</td></tr>
+  <tr><td><strong>T2</strong></td><td><strong>今回の再現</strong>: キャッシュに Pre-bid(商品B)、渡す lane モデルは古く current_item=A</td><td><strong>false / キャッシュは Pre-bid(B) のまま</strong></td></tr>
+  <tr><td>T3</td><td>キャッシュ空・refresh 後の現商品が sold</td><td>false / キャッシュ空のまま</td></tr>
+  <tr><td>T4</td><td>キャッシュ空・lane が paused</td><td>false</td></tr>
+  <tr><td>T5</td><td>書いた内容が startCountdown と同キー・同TTL・同構造</td><td>tick がそのまま消費できる</td></tr>
+  <tr><td>E2E</td><td>ステージングで修正報告§7 の ①〜④ 再走 ＋ 遷移中に <code>/live</code> を 50 req/s で叩き続けるソーク（30遷移分）</td><td>3レーンダンプで cache/DB 不一致ゼロ、<code>recovered=false</code> が観測される（防いだ証拠）</td></tr>
+</table></div>
+<p>T2 は <code>add</code> の性質上タイミングに依存せず<strong>決定的に</strong>再現できます。これが「完璧に安全」に最も近づける根拠です。</p>
+
+<h3>4-4. デプロイとロールバック</h3>
+<pre><code># 本番（live 0件の時間帯）
+cd /var/www/auction
+git pull（or 2ファイル配置）
+md5sum app/Services/CountdownService.php app/Services/BidService.php   # 期待値をデプロイ前に控える
+sudo systemctl reload php-fpm                 # opcache
+sudo -u ec2-user php artisan queue:restart    # worker のコード再読込
+sudo supervisorctl status                     # 全 RUNNING
+
+# ロールバック（1分）: 2ファイルを前版に戻して同じ reload / queue:restart</code></pre>
+<p>migration・config・route の変更はありません。フロント（R6）を同時に出す場合のみ JS ビルド＋配置が加わります。</p>
+
+<h2>5. スケジュール（8/21 開催まで）</h2>
+<div class="scroll"><table>
+  <tr><th>日</th><th>作業</th><th>担当</th></tr>
+  <tr><td>8/14 金（今日）</td><td>開催完走 → ログ回収（recovered 全件・停止回数）→ 最終報告</td><td>運用</td></tr>
+  <tr><td>8/17 月</td><td>実装（4-1, 4-2）＋ユニットテスト T1〜T5</td><td>開発</td></tr>
+  <tr><td>8/18 火</td><td>ステージング配備 → E2E ①〜④ → 遷移ソーク → md5 控え</td><td>開発＋運用</td></tr>
+  <tr><td>8/19 水</td><td>本番デプロイ（live 0件）→ md5 照合 → 30秒起動テスト → <code>re_dispatched</code> 0件確認</td><td>運用</td></tr>
+  <tr><td>8/20 木</td><td>予備日。<strong>木曜中に Go / No-Go を確定</strong>（No-Go なら現行コード＋手順書運用で開催）</td><td>両者</td></tr>
+  <tr><td>8/21 金</td><td>開催。<code>recovered=false</code> の件数を監視（＝防いだ回数）。停止時は OPS-2026-005</td><td>運用</td></tr>
+</table></div>
+
+<h2>6. Go / No-Go 基準</h2>
+<div class="split">
+  <div class="go"><strong>Go（修正版で開催）</strong><ul>
+    <li>T1〜T5 全合格</li><li>ステージング E2E ①〜④ 合格</li><li>遷移ソークで不一致ゼロ</li><li>本番 md5 が期待値と一致・worker 再起動済み</li><li>30秒起動テストで re_dispatched 0件</li></ul></div>
+  <div class="nogo"><strong>No-Go（現行コードで開催）</strong><ul>
+    <li>上のどれか1つでも未達</li><li>木曜 18:00 までに本番反映が終わっていない</li><li>→ 現行コード＋OPS-2026-005（60秒復旧）＋監視で開催。これも実績のある安全な選択</li></ul></div>
+</div>
+
+<h2>7. 残るリスク（正直に）</h2>
+<ul>
+  <li><strong>修正そのもの</strong>: <code>getLiveState</code> は全ポーリングが通るホットパス。コードミスは既存 try/catch で握られるが、ステージング実走なしでの本番投入はしない。</li>
+  <li><strong>別経路の汚染</strong>: tick は不一致を自己修復しない。止まったら手順書で60秒復旧。根治はCAS化。</li>
+  <li><strong>WS切断中の5秒ポーリング</strong>: R6 では制御できない着弾だが、R3 により無害化される。</li>
+  <li><strong>既知の未保護操作</strong>: 「次の商品へ」「AdjustPrice」「残り数秒の指値」は引き続き運用ルールで回避。</li>
+</ul>
+
+<footer>正本: 本書（DEV-2026-011）／ 復旧手順: OPS-2026-005 ／ 関連: DEV-2026-008 tickクロバー、CAS恒久解計画、2026-07-16 同額指値膠着バグ修正報告 §7（E2E ①〜④）</footer>
+</main>

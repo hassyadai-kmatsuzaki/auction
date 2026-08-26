@@ -22,6 +22,7 @@ use App\Models\LineNotificationSetting;
 use App\Models\SellerProfile;
 use App\Models\User;
 use App\Models\WonItem;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -345,30 +346,51 @@ class NotificationService
         );
     }
 
-    /** ⑧ 入金催促通知（参加者向け） — 呼び出し元で期限前に実行する */
-    public function sendPaymentReminderNotification(WonItem $wonItem, string $urgency = '24時間前'): void
+    /**
+     * ⑧ 入金催促通知（落札者単位で集約）
+     *
+     * 同一落札者・同一期限の未入金 WonItem をまとめて、メール1通 + LINE Flex 1通で送る。
+     * 落札品ごとの個別送信はしない（10生体落札で10通届く事故の防止）。
+     *
+     * @param  Collection<int, WonItem>  $wonItems  同一 winner_id の WonItem
+     */
+    public function sendPaymentReminderNotification(Collection $wonItems, string $urgency = '24時間前'): void
     {
         try {
-            $user = $wonItem->user;
+            $wonItems = $wonItems->values();
+            $first = $wonItems->first();
+            if (!$first) return;
+
+            $user = $first->user;
             if (!$user) return;
             // 入金催促メールも未承認/停止アカウントへは送らない（事後ステータス変更ケース対策）。
             if (!$user->is_active || $user->status !== 'approved') return;
 
             // メール
             if ($user->email) {
-                Mail::to($user->email)->queue(new PaymentReminderMail($wonItem, $urgency));
+                Mail::to($user->email)->queue(new PaymentReminderMail($wonItems, $urgency));
             }
 
             // LINE
+            $count     = $wonItems->count();
+            $firstName = $first->item?->species_name ?? '商品';
+            $target    = $count > 1 ? "{$firstName} ほか（計 {$count} 件）" : $firstName;
+            $total     = (int) $wonItems->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0));
+
             $this->sendLine($user->id, 'payment_reminder',
                 "⚠️ 入金期限が近づいています\n"
-                . ($wonItem->item ? $wonItem->item->species_name : '商品') . "\n"
+                . $target . "\n"
                 . "期限まで{$urgency}\n"
-                . "期限: " . ($wonItem->payment_deadline ? $wonItem->payment_deadline->format('m/d H:i') : '未定'),
-                $this->flex->paymentReminder($wonItem, $urgency),
+                . "期限: " . ($first->payment_deadline ? $first->payment_deadline->format('m/d H:i') : '未定') . "\n"
+                . "合計: ¥" . number_format($total),
+                $this->flex->paymentReminder($wonItems, $urgency),
             );
 
-            Log::info('入金催促通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
+            Log::info('入金催促通知送信', [
+                'won_item_ids' => $wonItems->pluck('id')->all(),
+                'user_id'      => $user->id,
+                'urgency'      => $urgency,
+            ]);
         } catch (\Exception $e) {
             Log::warning("入金催促通知エラー: " . $e->getMessage());
         }

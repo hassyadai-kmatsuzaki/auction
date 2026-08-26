@@ -170,6 +170,22 @@ class LineSettingsController extends Controller
         $wonItem->payment_deadline = now()->addHours(24);
         $wonItem->setRelation('item', $item);
 
+        // 入金催促は落札者単位で集約されるため、複数件の見た目を確認できるよう2件目を用意
+        $item2 = new Item();
+        $item2->id = 0;
+        $item2->species_name = '【テスト】紅白ラメ幹之';
+        $item2->thumbnail_path = null;
+
+        $wonItem2 = new WonItem();
+        $wonItem2->id = 0;
+        $wonItem2->winner_id = (int) Auth::id();
+        $wonItem2->winning_price = 8000;
+        $wonItem2->quantity = 2;
+        $wonItem2->total_amount = 17600;
+        $wonItem2->shipping_fee = 0;
+        $wonItem2->payment_deadline = $wonItem->payment_deadline;
+        $wonItem2->setRelation('item', $item2);
+
         $auction = new Auction();
         $auction->id = 0;
         $auction->title = '【テスト】第99回日本メダカオンライン市場';
@@ -177,7 +193,7 @@ class LineSettingsController extends Controller
 
         return match ($type) {
             'won_item'             => $this->flex->wonItem($wonItem),
-            'payment_reminder'     => $this->flex->paymentReminder($wonItem, '24時間'),
+            'payment_reminder'     => $this->flex->paymentReminder(collect([$wonItem, $wonItem2]), '24時間'),
             'shipping_completed'   => $this->flex->shippingCompleted($wonItem),
             'bid_limit_reached'    => $this->flex->bidLimitReached('【テスト】三色ラメ体外光', 10000, 10500),
             'auction_start'        => $this->flex->auctionStart($auction),

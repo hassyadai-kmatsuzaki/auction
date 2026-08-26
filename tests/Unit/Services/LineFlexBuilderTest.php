@@ -137,9 +137,61 @@ class LineFlexBuilderTest extends TestCase
 
     public function test_paymentReminder_は_緊急度文言を含む(): void
     {
-        $bubble = $this->builder->paymentReminder($this->makeWonItem(), '24時間前');
+        $bubble = $this->builder->paymentReminder(collect([$this->makeWonItem()]), '24時間前');
         $this->assertBubble($bubble);
-        $this->assertStringContainsString('24時間前', json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $contents = json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('24時間前', $contents);
+        $this->assertStringContainsString('幹之メダカ', $contents);
+        // 1件のときは「対象 n 件」行を出さない
+        $this->assertStringNotContainsString('"対象"', $contents);
+    }
+
+    public function test_paymentReminder_は_複数件を1バブルに集約し合計を出す(): void
+    {
+        $winner = $this->createParticipant();
+        $item2 = Item::factory()->sold()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+            'species_name' => '楊貴妃メダカ',
+        ]);
+        $w1 = $this->makeWonItem(['winner_id' => $winner->id, 'total_amount' => 16500, 'shipping_fee' => 1500]);
+        $w2 = $this->makeWonItem(['winner_id' => $winner->id, 'item_id' => $item2->id, 'total_amount' => 11000, 'shipping_fee' => 0]);
+
+        $bubble = $this->builder->paymentReminder(collect([$w1, $w2]), '1時間以内');
+        $this->assertBubble($bubble);
+        $contents = json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $this->assertStringContainsString('2 件', $contents);
+        $this->assertStringContainsString('幹之メダカ', $contents);
+        $this->assertStringContainsString('楊貴妃メダカ', $contents);
+        $this->assertStringContainsString('¥16,500', $contents);
+        $this->assertStringContainsString('¥11,000', $contents);
+        // 送料行 + 合計（16500 + 11000 + 1500）
+        $this->assertStringContainsString('¥1,500', $contents);
+        $this->assertStringContainsString('¥29,000（税込）', $contents);
+        // 複数件のときは特定生体の hero 画像を出さない
+        $this->assertArrayNotHasKey('hero', $bubble);
+    }
+
+    public function test_paymentReminder_は_11件以上を省略表記にする(): void
+    {
+        $winner = $this->createParticipant();
+        // won_items.item_id は UNIQUE なので落札品ごとに Item を用意する
+        $items = collect(range(1, 12))->map(function (int $i) use ($winner) {
+            $item = Item::factory()->sold()->create([
+                'auction_id' => $this->auction->id,
+                'seller_profile_id' => $this->sellerProfile->id,
+                'species_name' => "テスト生体{$i}",
+            ]);
+            return $this->makeWonItem(['winner_id' => $winner->id, 'item_id' => $item->id, 'total_amount' => 1000]);
+        });
+
+        $bubble = $this->builder->paymentReminder($items, '24時間以内');
+        $contents = json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $this->assertStringContainsString('12 件', $contents);
+        $this->assertStringContainsString('他 2 件', $contents);
+        $this->assertStringContainsString('¥12,000（税込）', $contents);
     }
 
     public function test_itemSold_は_出品者向けの落札通知(): void

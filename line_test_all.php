@@ -91,7 +91,7 @@ $push('⑦お気に入り接近', $flexBuilder->favoriteApproaching(999, '和墨
 $w = new \App\Models\WonItem();
 $w->setRelation('item', $mkItem('三色体外光亜種', $IMG['三色体外光亜種']));
 $w->payment_deadline = Carbon::parse('2026-07-08 23:59'); $w->total_amount = 39600;
-$push('⑧入金催促', $flexBuilder->paymentReminder($w, 'あと2日'));
+$push('⑧入金催促', $flexBuilder->paymentReminder(collect([$w]), 'あと2日'));
 
 // ══ 出品者向け ══════════════════════════════════════════════
 // ⑨ 出品落札（出品者）
