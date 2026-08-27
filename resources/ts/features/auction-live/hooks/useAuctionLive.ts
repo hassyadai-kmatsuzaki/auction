@@ -241,8 +241,14 @@ export function useAuctionLive(auctionId: number) {
 
     // lane changed 時には refetch も走らせて auto_bid 反映や server-only fields を取得
     // ただし jitter 付きで分散（120 名同時 refetch を回避）
+    //
+    // DEV-2026-011 (R6): jitter に下限 1.5s を設ける。
+    //   落札→次商品の遷移窓（サーバー側で countdown cache が空になる 1 秒未満の区間）に
+    //   refetch が着弾すると、cache-miss 復旧パスが走る。サーバー側は Cache::add で上書きを
+    //   防いでいるが、そもそも窓の外に着弾させる。価格・カウントは WS で即時反映済みなので
+    //   auto_bid 等の反映が最大 1.5s 遅れても体感影響はない。
     if (event.current_item) {
-      const jitter = Math.floor(Math.random() * 1500); // 0-1.5 秒
+      const jitter = 1500 + Math.floor(Math.random() * 1500); // 1.5-3.0 秒（遷移窓の外）
       setTimeout(() => {
         queryClient.invalidateQueries({
           queryKey: LIVE_STATE_QUERY_KEY(auctionId),

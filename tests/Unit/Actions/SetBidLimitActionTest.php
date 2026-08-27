@@ -177,4 +177,45 @@ class SetBidLimitActionTest extends TestCase
         $this->assertSame(1, $count, '既に active な1名は除外され、新規1名だけ activate');
         Event::assertDispatchedTimes(BidderUpdated::class, 1);
     }
+
+    /**
+     * 2026-08-26 変更（第7回 item 3079 不落札の再発防止）:
+     * ライブ中に唯一の落札権利者が指値を解除しても、入札状態（active）は維持される。
+     * 旧版は LeaveBidAction で離脱させていたため active 0 人 → 流札になっていた。
+     */
+    public function test_ライブ中に指値を解除しても入札状態は維持される(): void
+    {
+        Event::fake();
+
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create([
+            'auction_id'    => $auction->id,
+            'status'        => 'live',
+            'current_price' => 210,
+        ]);
+        Lane::factory()->create([
+            'auction_id'      => $auction->id,
+            'current_item_id' => $item->id,
+        ]);
+        $userId = $this->createParticipant()->id;
+
+        // 事前指値 → 自動入札で active になっている状態を再現
+        BidLimitPrice::create([
+            'item_id' => $item->id, 'user_id' => $userId, 'limit_price' => 8000, 'is_triggered' => false,
+        ]);
+        BidParticipant::participate($item->id, $userId, true, null, 'auto-bid-from-limit');
+        Favorite::create(['user_id' => $userId, 'item_id' => $item->id]);
+
+        $result = $this->action->remove($item, $userId);
+
+        $this->assertTrue($result->success);
+        $this->assertDatabaseHas('bid_participants', [
+            'item_id' => $item->id, 'user_id' => $userId, 'is_active' => true,
+        ]);
+        $this->assertDatabaseMissing('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userId]);
+        $this->assertDatabaseMissing('favorites', ['item_id' => $item->id, 'user_id' => $userId]);
+        $this->assertDatabaseMissing('bid_events', [
+            'item_id' => $item->id, 'user_id' => $userId, 'event_type' => 'leave',
+        ]);
+    }
 }

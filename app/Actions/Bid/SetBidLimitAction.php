@@ -356,16 +356,18 @@ class SetBidLimitAction
         return $activated;
     }
 
+    /**
+     * 指値（上限価格）を解除する
+     *
+     * ■ 入札状態は維持する（2026-08-26 変更 / 第7回 item 3079 不落札の再発防止）:
+     *   旧版はライブ中に active なら LeaveBidAction で入札からも離脱させていたため、
+     *   唯一の落札権利者が「設定を解除」を押すと active 0 人 → 流札になっていた。
+     *   解除後は「指値なしで active」= 手動入札者と同じ状態になり、
+     *   誰も入札しなければそのまま落札、他者が入札すれば通常の価格上昇経路で自動離脱する。
+     *   ユーザー自身が入札から抜ける動線は単方向入札仕様どおり存在しない。
+     */
     public function remove(Item $item, int $userId): BidResultDto
     {
-        // 入札中であれば自動で離脱（指値解除 = 自動入札も解除）
-        if ($item->status === 'live') {
-            $participant = BidParticipant::forItem($item->id)->forUser($userId)->first();
-            if ($participant && $participant->is_active) {
-                $this->leaveBidAction->execute($item, $userId);
-            }
-        }
-
         // 解除前に指値額を控えておく（物理削除で履歴が消えるため、meta 用に取得）
         $removedPrice = BidLimitPrice::forItem($item->id)->forUser($userId)->value('limit_price');
 
@@ -381,7 +383,7 @@ class SetBidLimitAction
             $userId
         );
 
-        return BidResultDto::success([], '上限価格を解除し、入札から離脱しました');
+        return BidResultDto::success([], '上限価格を解除しました（入札は継続中です）');
     }
 
     private function broadcastLimitReached(Item $item, int $userId, float $limitPrice): void

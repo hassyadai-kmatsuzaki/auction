@@ -115,6 +115,63 @@ class CountdownService
     }
 
     /**
+     * getLiveState の cache-miss 復旧専用（DEV-2026-011）。
+     *
+     * 通常経路 startCountdown() との違い:
+     *   R1: $lane->refresh() で「今のDB」の current_item_id を取り直す
+     *       （リクエスト冒頭にロードした古い lane モデルを信じない）
+     *   R2: current_item が live でなければ何も書かない
+     *   R3: Cache::add（Redis SET NX）で書く。既に誰かが書いていれば書かない
+     *       → 復旧パスは「上書き能力」を持たない。tick / 入札の書き込みに必ず負ける
+     *
+     * 2026-08-14 第7回: 落札→次商品の遷移中に古い lane で startCountdown() が走り、
+     * 売却済み商品の bidding 状態で Pre-bid キャッシュを上書き → tick がガードBで
+     * そのレーンをスキップし続け「残り10秒のまま」停止した事象への対策。
+     *
+     * @return bool true = 書いた（本当に空だった） / false = 書かなかった（既に存在 or live でない）
+     */
+    public function recoverCountdownIfMissing(Lane $lane): bool
+    {
+        $lane->refresh();
+        $lane->load(['currentItem', 'auction']);
+
+        $item    = $lane->currentItem;
+        $auction = $lane->auction;
+
+        if ($lane->status !== 'active' || !$item || $item->status !== 'live' || !$auction) {
+            return false;
+        }
+
+        $countdownSeconds = $auction->calculateCountdownSeconds($item->current_price);
+        $bidSeconds    = $countdownSeconds['bid_countdown_seconds'];
+        $freezeSeconds = $countdownSeconds['freeze_countdown_seconds'];
+
+        // startCountdown() と同じ構造・同じキー・同じTTL（tick がそのまま消費できること）。
+        // 意図的に共通化していない: 通常経路を無変更に保つ（R4）。CAS化の際に統合する。
+        $cacheData = [
+            'lane_id' => $lane->id,
+            'item_id' => $item->id,
+            'auction_id' => $auction->id,
+            'phase' => 'bidding',
+            'remaining_seconds' => $bidSeconds,
+            'started_at' => now()->timestamp,
+            'bid_countdown_seconds' => $bidSeconds,
+            'freeze_countdown_seconds' => $freezeSeconds,
+            'is_running' => true,
+            'pre_bid_remaining_seconds' => 0,
+            'last_bidder_user_id' => null,
+        ];
+
+        $written = Cache::add($this->getCacheKey($lane->id), $cacheData, self::CACHE_TTL);
+
+        if ($written) {
+            Log::info("Countdown recovered: lane {$lane->id}, item {$item->id}, bid={$bidSeconds}s, freeze={$freezeSeconds}s");
+        }
+
+        return $written;
+    }
+
+    /**
      * 入札開始待機フェーズを開始（生体切り替え後の待機）
      */
     public function startPreBidCountdown(Lane $lane): void

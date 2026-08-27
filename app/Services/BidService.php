@@ -166,17 +166,22 @@ class BidService
                 // Redis LRU eviction や瞬間的な network timeout でレーン単位に
                 // null が返ると、ユーザーごとに「3秒のまま」表示される事故になる。
                 // active レーン × 商品ライブ中 で cache が無い場合は、
-                // CountdownService::startCountdown を呼んで再構築 → 再取得する。
+                // CountdownService::recoverCountdownIfMissing を呼んで再構築 → 再取得する。
                 // 復旧自体が失敗しても、最後の保険として $defaultCountdown が走るが、
                 // その前に必ず1度復旧を試みる。
+                // DEV-2026-011: 復旧は recoverCountdownIfMissing() 経由に限定する。
+                //   startCountdown() は無条件 put のため、落札→次商品の遷移中にこのリクエストが
+                //   持つ古い lane（売却済み商品）で Pre-bid キャッシュを上書きし、レーンが停止した
+                //   （2026-08-14 第7回 lane 113）。recover 版は refresh + live 限定 + Cache::add。
                 if (!$countdownState && $lane->status === 'active' && $lane->currentItem && $lane->currentItem->status === 'live') {
                     try {
-                        app(\App\Services\CountdownService::class)->startCountdown($lane);
+                        $recovered      = app(\App\Services\CountdownService::class)->recoverCountdownIfMissing($lane);
                         $countdownState = Cache::get("countdown:lane:{$lane->id}");
                         Log::warning('getLiveState: countdown cache miss recovered', [
-                            'lane_id'   => $lane->id,
-                            'item_id'   => $lane->currentItem->id,
-                            'auction_id'=> $auction->id,
+                            'lane_id'    => $lane->id,
+                            'item_id'    => $countdownState['item_id'] ?? null, // 実際にキャッシュにある商品
+                            'recovered'  => $recovered,                         // false = 誰かが先に書いていた（上書きを防いだ）
+                            'auction_id' => $auction->id,
                         ]);
                     } catch (\Throwable $e) {
                         Log::error('getLiveState: countdown cache recovery failed', [
