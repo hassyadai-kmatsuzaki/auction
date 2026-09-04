@@ -105,6 +105,8 @@ interface WonItem {
   delivery_method?: string;
   shipping_address?: string;
   tracking_number?: string;
+  /** 伝票番号の配列（複数口）。tracking_number はカンマ区切りの同値 */
+  tracking_numbers?: string[];
   shipping_company?: string;
   shipped_at?: string;
   shipping_calculated_at?: string;
@@ -128,6 +130,51 @@ const getTrackingUrl = (trackingNumber: string, company: string) => {
       return '';
   }
 };
+
+// 1発送単位に登録できる伝票番号の上限（出品者側の伝票登録・API と同じ）
+const MAX_TRACKING_NUMBERS = 10;
+
+// 伝票番号はカンマ区切りで複数件を保持する。API は tracking_numbers 配列も返す
+const getTrackingNumbers = (item: { tracking_number?: string | null; tracking_numbers?: string[] | null }): string[] => {
+  if (item.tracking_numbers && item.tracking_numbers.length > 0) return item.tracking_numbers;
+  return (item.tracking_number ?? '')
+    .split(/[,\n、]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
+// 伝票番号の一覧（コピー・追跡リンク付き）。複数口は縦に並べる
+const TrackingNumberList = ({
+  numbers,
+  company,
+  onCopy,
+}: {
+  numbers: string[];
+  company?: string;
+  onCopy: (num: string) => void;
+}) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+    {numbers.map((num) => (
+      <Box key={num} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+          {num}
+        </Typography>
+        <Tooltip title="コピー">
+          <IconButton size="small" onClick={() => onCopy(num)}>
+            <CopyIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Tooltip>
+        {company && getTrackingUrl(num, company) && (
+          <Tooltip title="配送状況を確認">
+            <IconButton size="small" component={Link} href={getTrackingUrl(num, company)} target="_blank">
+              <OpenInNewIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+    ))}
+  </Box>
+);
 
 interface Statistics {
   total_items: number;
@@ -239,7 +286,11 @@ export default function WonItemManagement() {
   const [totalItems, setTotalItems] = useState(0);
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WonItem | null>(null);
-  const [trackingForm, setTrackingForm] = useState({ tracking_number: '', shipping_company: 'ヤマト運輸' });
+  // 伝票番号は複数口に対応（最大 MAX_TRACKING_NUMBERS 件）。空行は送信時に除外する
+  const [trackingForm, setTrackingForm] = useState<{ tracking_numbers: string[]; shipping_company: string }>({
+    tracking_numbers: [''],
+    shipping_company: 'ヤマト運輸',
+  });
   const [actionLoading, setActionLoading] = useState(false);
   const [shippingDetailOpen, setShippingDetailOpen] = useState(false);
   const [shippingDetail, setShippingDetail] = useState<ShippingDetail | null>(null);
@@ -249,10 +300,13 @@ export default function WonItemManagement() {
   const [approveShippingOverride, setApproveShippingOverride] = useState<string>('');
   const [approveShippingReason, setApproveShippingReason] = useState<string>('');
   // 送料修正時の箱・袋編集
+  // 数値欄は「入力中の文字列」で保持する。number state を type="number" に直結すると
+  // 空欄にした瞬間に 0 へ戻されて消せず、続けて打つと "0350" のように先頭の 0 が残る
+  // （React は数値が等しい間 DOM の value を上書きしない）。確定時に Number() で変換する。
   const [approveShippingBoxes, setApproveShippingBoxes] = useState<
-    Array<{ box_size: number; count: number; shipping_cost: number; packing_material_cost: number }>
+    Array<{ box_size: number; count: string; shipping_cost: string; packing_material_cost: string }>
   >([]);
-  const [approveShippingBags, setApproveShippingBags] = useState<Array<{ size: string; quantity: number }>>([]);
+  const [approveShippingBags, setApproveShippingBags] = useState<Array<{ size: string; quantity: string }>>([]);
   const [approveShippingIsFree, setApproveShippingIsFree] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [exporting, setExporting] = useState(false);
@@ -335,7 +389,7 @@ export default function WonItemManagement() {
     try {
       const response = await axios.post(`/api/admin/won-items/${selectedItem.id}/ship`, {
         shipping_company: trackingForm.shipping_company,
-        tracking_number: trackingForm.tracking_number,
+        tracking_numbers: trackingForm.tracking_numbers.map((n) => n.trim()).filter(Boolean),
       });
       if (response.data.success) {
         setSnackbar({ open: true, message: '発送を登録しました', severity: 'success' });
@@ -351,9 +405,26 @@ export default function WonItemManagement() {
 
   const handleOpenTrackingDialog = (item: WonItem) => {
     setSelectedItem(item);
-    setTrackingForm({ tracking_number: item.tracking_number || '', shipping_company: 'ヤマト運輸' });
+    const existing = getTrackingNumbers(item);
+    setTrackingForm({ tracking_numbers: existing.length > 0 ? existing : [''], shipping_company: 'ヤマト運輸' });
     setTrackingDialogOpen(true);
   };
+  const updateTrackingNumber = (idx: number, value: string) =>
+    setTrackingForm((prev) => ({
+      ...prev,
+      tracking_numbers: prev.tracking_numbers.map((n, i) => (i === idx ? value : n)),
+    }));
+  const addTrackingNumber = () =>
+    setTrackingForm((prev) =>
+      prev.tracking_numbers.length >= MAX_TRACKING_NUMBERS
+        ? prev
+        : { ...prev, tracking_numbers: [...prev.tracking_numbers, ''] },
+    );
+  const removeTrackingNumber = (idx: number) =>
+    setTrackingForm((prev) => {
+      const next = prev.tracking_numbers.filter((_, i) => i !== idx);
+      return { ...prev, tracking_numbers: next.length > 0 ? next : [''] };
+    });
 
   const handleCopyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -443,11 +514,18 @@ export default function WonItemManagement() {
               packing_material_cost: Number(b.packing_material_cost) || 0,
             });
           }
-          setApproveShippingBoxes(Array.from(grouped.values()));
+          setApproveShippingBoxes(
+            Array.from(grouped.values()).map((g) => ({
+              box_size: g.box_size,
+              count: String(g.count),
+              shipping_cost: String(g.shipping_cost),
+              packing_material_cost: String(g.packing_material_cost),
+            })),
+          );
         }
         if (bd && Array.isArray(bd.bags)) {
           setApproveShippingBags(
-            bd.bags.map((b: any) => ({ size: String(b.size || ''), quantity: Number(b.quantity) || 0 })),
+            bd.bags.map((b: any) => ({ size: String(b.size || ''), quantity: String(Number(b.quantity) || 0) })),
           );
         }
       }
@@ -470,26 +548,34 @@ export default function WonItemManagement() {
     setApproveShippingIsFree(false);
     setApproveShippingBoxes((prev) => [
       ...prev,
-      { box_size: 100, count: 1, shipping_cost: 0, packing_material_cost: 0 },
+      // 金額欄は空で開始し placeholder に 0 を見せる（先頭 0 残り防止）
+      { box_size: 100, count: '1', shipping_cost: '', packing_material_cost: '' },
     ]);
   };
   const removeBoxRow = (idx: number) => {
     setApproveShippingBoxes((prev) => prev.filter((_, i) => i !== idx));
   };
-  const updateBoxRow = (idx: number, patch: Partial<{ box_size: number; count: number; shipping_cost: number; packing_material_cost: number }>) => {
+  const updateBoxRow = (idx: number, patch: Partial<{ box_size: number; count: string; shipping_cost: string; packing_material_cost: string }>) => {
     setApproveShippingIsFree(false);
     setApproveShippingBoxes((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   };
   const addBagRow = () => {
     setApproveShippingIsFree(false);
-    setApproveShippingBags((prev) => [...prev, { size: 'S', quantity: 1 }]);
+    setApproveShippingBags((prev) => [...prev, { size: 'S', quantity: '1' }]);
   };
   const removeBagRow = (idx: number) => {
     setApproveShippingBags((prev) => prev.filter((_, i) => i !== idx));
   };
-  const updateBagRow = (idx: number, patch: Partial<{ size: string; quantity: number }>) => {
+  const updateBagRow = (idx: number, patch: Partial<{ size: string; quantity: string }>) => {
     setApproveShippingIsFree(false);
     setApproveShippingBags((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  };
+  // フォーカスが外れたら "0350" → "350" のように正規化する（空欄はそのまま）
+  const normalizeIntInput = (value: string, min: number): string => {
+    if (value.trim() === '') return '';
+    const n = Number(value);
+    if (Number.isNaN(n)) return '';
+    return String(Math.max(min, Math.floor(n)));
   };
 
   // 箱の合計から送料を自動算出してフィールドに反映
@@ -779,29 +865,12 @@ export default function WonItemManagement() {
         )}
       </TableCell>
       <TableCell>
-        {item.tracking_number ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-              {item.tracking_number}
-            </Typography>
-            <Tooltip title="コピー">
-              <IconButton size="small" onClick={() => handleCopyTrackingNumber(item.tracking_number!)}>
-                <CopyIcon sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Tooltip>
-            {item.shipping_company && getTrackingUrl(item.tracking_number, item.shipping_company) && (
-              <Tooltip title="配送状況を確認">
-                <IconButton
-                  size="small"
-                  component={Link}
-                  href={getTrackingUrl(item.tracking_number, item.shipping_company)}
-                  target="_blank"
-                >
-                  <OpenInNewIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
+        {getTrackingNumbers(item).length > 0 ? (
+          <TrackingNumberList
+            numbers={getTrackingNumbers(item)}
+            company={item.shipping_company}
+            onCopy={handleCopyTrackingNumber}
+          />
         ) : (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
         )}
@@ -879,7 +948,7 @@ export default function WonItemManagement() {
     const representative = items[0];
     const paymentStatus = representative.payment_status;
     const deliveryStatus = representative.delivery_status;
-    const trackingNumber = representative.tracking_number;
+    const trackingNumbers = getTrackingNumbers(representative);
     const shippingCompany = representative.shipping_company;
     const shippedAt = representative.shipped_at;
     const winner = representative.winner;
@@ -912,31 +981,12 @@ export default function WonItemManagement() {
             </Typography>
           )}
         </Box>
-        {trackingNumber && (
+        {trackingNumbers.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>伝票番号</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                {trackingNumber}
-              </Typography>
-              <Tooltip title="コピー">
-                <IconButton size="small" onClick={() => handleCopyTrackingNumber(trackingNumber)}>
-                  <CopyIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-              </Tooltip>
-              {shippingCompany && getTrackingUrl(trackingNumber, shippingCompany) && (
-                <Tooltip title="配送状況を確認">
-                  <IconButton
-                    size="small"
-                    component={Link}
-                    href={getTrackingUrl(trackingNumber, shippingCompany)}
-                    target="_blank"
-                  >
-                    <OpenInNewIcon sx={{ fontSize: 14 }} />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              伝票番号{trackingNumbers.length > 1 ? `（${trackingNumbers.length}件）` : ''}
+            </Typography>
+            <TrackingNumberList numbers={trackingNumbers} company={shippingCompany} onCopy={handleCopyTrackingNumber} />
           </Box>
         )}
         <Box sx={{ display: 'flex', gap: 1, ml: 'auto', flexWrap: 'wrap' }}>
@@ -1393,14 +1443,36 @@ export default function WonItemManagement() {
             </Grid>
             {trackingForm.shipping_company !== '引き取り' && (
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="伝票番号"
-                  value={trackingForm.tracking_number}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, tracking_number: e.target.value })}
-                  placeholder="1234-5678-9012"
-                  required
-                />
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+                  複数口に分かれた場合は「伝票を追加」で最大{MAX_TRACKING_NUMBERS}件まで登録できます。
+                  発送通知は LINE・メールとも 1 通にまとめて送られます。
+                </Typography>
+                {trackingForm.tracking_numbers.map((num, idx) => (
+                  <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                    <TextField
+                      fullWidth
+                      label={trackingForm.tracking_numbers.length > 1 ? `伝票番号 ${idx + 1}` : '伝票番号'}
+                      value={num}
+                      onChange={(e) => updateTrackingNumber(idx, e.target.value)}
+                      placeholder="1234-5678-9012"
+                      required={idx === 0}
+                      inputProps={{ maxLength: 40 }}
+                    />
+                    {trackingForm.tracking_numbers.length > 1 && (
+                      <IconButton size="small" onClick={() => removeTrackingNumber(idx)} aria-label="伝票を削除">
+                        <RemoveIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </Box>
+                ))}
+                <Button
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={addTrackingNumber}
+                  disabled={trackingForm.tracking_numbers.length >= MAX_TRACKING_NUMBERS}
+                >
+                  伝票を追加（{trackingForm.tracking_numbers.length}/{MAX_TRACKING_NUMBERS}）
+                </Button>
               </Grid>
             )}
             {trackingForm.shipping_company === '引き取り' && (
@@ -1422,7 +1494,8 @@ export default function WonItemManagement() {
             startIcon={actionLoading ? <CircularProgress size={20} /> : <LocalShippingIcon />}
             disabled={
               actionLoading ||
-              (trackingForm.shipping_company !== '引き取り' && !trackingForm.tracking_number)
+              (trackingForm.shipping_company !== '引き取り' &&
+                !trackingForm.tracking_numbers.some((n) => n.trim() !== ''))
             }
           >
             {trackingForm.shipping_company === '引き取り' ? '引き取り完了登録' : '発送登録'}
@@ -1475,7 +1548,7 @@ export default function WonItemManagement() {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ minWidth: 100 }}>箱サイズ</TableCell>
-                    <TableCell sx={{ width: 80 }}>箱数</TableCell>
+                    <TableCell sx={{ width: 110 }}>箱数</TableCell>
                     <TableCell sx={{ minWidth: 120 }}>配送料/箱(円)</TableCell>
                     <TableCell sx={{ minWidth: 120 }}>梱包資材費/箱(円)</TableCell>
                     <TableCell align="right" sx={{ minWidth: 100 }}>小計</TableCell>
@@ -1510,8 +1583,10 @@ export default function WonItemManagement() {
                             type="number"
                             size="small"
                             value={row.count}
-                            onChange={(e) => updateBoxRow(idx, { count: Math.max(1, Number(e.target.value) || 1) })}
-                            inputProps={{ min: 1, max: 50 }}
+                            onChange={(e) => updateBoxRow(idx, { count: e.target.value })}
+                            onBlur={() => updateBoxRow(idx, { count: normalizeIntInput(row.count, 1) || '1' })}
+                            // 幅 80 のセルでは padding に食われて数字が欠けるため、内側の余白を詰めて中央寄せ
+                            inputProps={{ min: 1, max: 50, style: { textAlign: 'center', paddingLeft: 8, paddingRight: 8 } }}
                             fullWidth
                           />
                         </TableCell>
@@ -1520,7 +1595,9 @@ export default function WonItemManagement() {
                             type="number"
                             size="small"
                             value={row.shipping_cost}
-                            onChange={(e) => updateBoxRow(idx, { shipping_cost: Math.max(0, Number(e.target.value) || 0) })}
+                            onChange={(e) => updateBoxRow(idx, { shipping_cost: e.target.value })}
+                            onBlur={() => updateBoxRow(idx, { shipping_cost: normalizeIntInput(row.shipping_cost, 0) })}
+                            placeholder="0"
                             inputProps={{ min: 0 }}
                             fullWidth
                           />
@@ -1530,7 +1607,9 @@ export default function WonItemManagement() {
                             type="number"
                             size="small"
                             value={row.packing_material_cost}
-                            onChange={(e) => updateBoxRow(idx, { packing_material_cost: Math.max(0, Number(e.target.value) || 0) })}
+                            onChange={(e) => updateBoxRow(idx, { packing_material_cost: e.target.value })}
+                            onBlur={() => updateBoxRow(idx, { packing_material_cost: normalizeIntInput(row.packing_material_cost, 0) })}
+                            placeholder="0"
                             inputProps={{ min: 0 }}
                             fullWidth
                           />
@@ -1569,7 +1648,7 @@ export default function WonItemManagement() {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ minWidth: 100 }}>袋サイズ</TableCell>
-                    <TableCell sx={{ width: 100 }}>個数</TableCell>
+                    <TableCell sx={{ width: 120 }}>個数</TableCell>
                     <TableCell sx={{ width: 48 }} />
                   </TableRow>
                 </TableHead>
@@ -1601,8 +1680,10 @@ export default function WonItemManagement() {
                             type="number"
                             size="small"
                             value={row.quantity}
-                            onChange={(e) => updateBagRow(idx, { quantity: Math.max(0, Number(e.target.value) || 0) })}
-                            inputProps={{ min: 0, max: 1000 }}
+                            onChange={(e) => updateBagRow(idx, { quantity: e.target.value })}
+                            onBlur={() => updateBagRow(idx, { quantity: normalizeIntInput(row.quantity, 0) })}
+                            placeholder="0"
+                            inputProps={{ min: 0, max: 1000, style: { textAlign: 'center', paddingLeft: 8, paddingRight: 8 } }}
                             fullWidth
                           />
                         </TableCell>

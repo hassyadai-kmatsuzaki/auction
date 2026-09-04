@@ -125,6 +125,8 @@ class WonItemTest extends TestCase
     public function test_admin_can_ship_item(): void
     {
         $wonItem = $this->createNewItemWithWonItem('confirmed');
+        // 送料未承認の発送は 409 で拒否される仕様のため、承認済みにしてから発送する
+        $wonItem->update(['shipping_approved_at' => now()]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/won-items/{$wonItem->id}/ship", [
@@ -140,6 +142,61 @@ class WonItemTest extends TestCase
             'delivery_status' => 'shipped',
             'tracking_number' => '1234-5678-9012',
         ]);
+    }
+
+    /**
+     * 複数口の発送: 伝票番号を配列で受け取り、trim・空・重複を除いてカンマ区切りで保持する。
+     */
+    public function test_admin_can_ship_with_multiple_tracking_numbers(): void
+    {
+        $wonItem = $this->createNewItemWithWonItem('confirmed');
+        $wonItem->update(['shipping_approved_at' => now()]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/won-items/{$wonItem->id}/ship", [
+                'shipping_company' => 'ヤマト運輸',
+                'tracking_numbers' => [' 1111-2222-3333 ', '4444-5555-6666', '', '4444-5555-6666'],
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('data.tracking_numbers', ['1111-2222-3333', '4444-5555-6666']);
+
+        $this->assertDatabaseHas('won_items', [
+            'id' => $wonItem->id,
+            'delivery_status' => 'shipped',
+            'tracking_number' => '1111-2222-3333,4444-5555-6666',
+        ]);
+        $this->assertSame(['1111-2222-3333', '4444-5555-6666'], $wonItem->fresh()->tracking_numbers);
+    }
+
+    public function test_shipping_rejects_more_than_ten_tracking_numbers(): void
+    {
+        $wonItem = $this->createNewItemWithWonItem('confirmed');
+        $wonItem->update(['shipping_approved_at' => now()]);
+        $numbers = array_map(fn ($i) => sprintf('%012d', $i), range(1, 11));
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/won-items/{$wonItem->id}/ship", [
+                'shipping_company' => 'ヤマト運輸',
+                'tracking_numbers' => $numbers,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['tracking_numbers']);
+    }
+
+    public function test_won_item_list_returns_tracking_numbers_array(): void
+    {
+        $wonItem = $this->createNewItemWithWonItem('shipped');
+        $wonItem->update(['tracking_number' => '1111-2222-3333,4444-5555-6666']);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/admin/auctions/{$this->auction->id}/won-items?delivery_status=shipped");
+
+        $response->assertStatus(200);
+        $row = collect($response->json('data.won_items'))->firstWhere('id', $wonItem->id);
+        $this->assertSame(['1111-2222-3333', '4444-5555-6666'], $row['tracking_numbers']);
     }
 
     public function test_admin_cannot_ship_without_payment_confirmation(): void

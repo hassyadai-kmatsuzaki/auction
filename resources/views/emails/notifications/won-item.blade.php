@@ -16,19 +16,13 @@
 
 **数量**: {{ $wonItem->quantity }}匹
 
-**落札価格**: ¥{{ number_format($wonItem->winning_price) }}
+**落札価格**: ¥{{ number_format($wonItem->winning_price) }} / 匹
 
-**手数料**: ¥{{ number_format($wonItem->commission_amount ?? 0) }}
+**落札手数料**: ¥{{ number_format($wonItem->commission_amount ?? 0) }}
 
-@if(($wonItem->shipping_fee ?? 0) > 0)
-**配送料金**: ¥{{ number_format($wonItem->shipping_fee) }}
+**小計（税抜・落札手数料込）**: ¥{{ number_format(\App\Services\InvoiceService::buyerLineAmount($wonItem)) }}
 
-**合計金額**: ¥{{ number_format($wonItem->total_amount + $wonItem->shipping_fee) }}
-@else
-**合計金額**: ¥{{ number_format($wonItem->total_amount) }}
-
-※ 配送料金は配送先地域により異なります。配送先住所をご登録いただくと自動計算されます。
-@endif
+※ 落札時点では送料が未確定のため税抜の小計です。配送料金と消費税は別途加算されます。確定金額は請求書でご確認ください。
 
 ---
 

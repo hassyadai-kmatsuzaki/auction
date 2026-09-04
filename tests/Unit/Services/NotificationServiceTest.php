@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services;
 
+use App\Jobs\SendLineNotificationJob;
 use App\Models\Auction;
 use App\Models\Item;
 use App\Models\SellerProfile;
@@ -9,6 +10,7 @@ use App\Models\User;
 use App\Models\WonItem;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class NotificationServiceTest extends TestCase
@@ -329,5 +331,68 @@ class NotificationServiceTest extends TestCase
 
         $this->notificationService->sendPaymentReminderNotification(collect([$wonItem]), '24時間前');
         $this->assertTrue(true);
+    }
+
+    /**
+     * 単価 10000 × 2 + 手数料 500 + 送料 1000 = 21500（税抜）→ 税 2150 → 税込 23650
+     */
+    private function createTaxSampleWonItem(): WonItem
+    {
+        return WonItem::factory()->create([
+            'item_id' => $this->item->id,
+            'winner_id' => $this->participant->id,
+            'winning_price' => 10000,
+            'quantity' => 2,
+            'commission_amount' => 500,
+            'shipping_fee' => 1000,
+            'total_amount' => 22000,
+            'payment_status' => 'pending',
+            'payment_deadline' => now()->addHours(20),
+            'shipping_approved_at' => now(),
+        ])->fresh(['item', 'winner']);
+    }
+
+    public function test_payment_reminder_line_text_uses_tax_included_total(): void
+    {
+        Queue::fake();
+        $wonItem = $this->createTaxSampleWonItem();
+
+        $this->notificationService->sendPaymentReminderNotification(collect([$wonItem]), '24時間以内');
+
+        Queue::assertPushed(SendLineNotificationJob::class, function (SendLineNotificationJob $job) {
+            return $job->notificationType === 'payment_reminder'
+                && str_contains($job->text, '合計: ¥23,650（税込）')
+                && str_contains(json_encode($job->flexContent, JSON_UNESCAPED_UNICODE), '¥23,650（税込）');
+        });
+    }
+
+    public function test_invoice_ready_line_total_matches_invoice_grand_total(): void
+    {
+        Queue::fake();
+        $this->createTaxSampleWonItem();
+
+        $count = $this->notificationService->sendInvoiceReadyNotification($this->auction);
+
+        $this->assertSame(1, $count);
+        Queue::assertPushed(SendLineNotificationJob::class, function (SendLineNotificationJob $job) {
+            return $job->notificationType === 'invoice_ready'
+                && str_contains($job->text, '請求金額: ¥23,650（税込）')
+                && str_contains(json_encode($job->flexContent, JSON_UNESCAPED_UNICODE), '¥23,650（税込）');
+        });
+    }
+
+    public function test_won_item_line_text_labels_total_as_tax_excluded(): void
+    {
+        Queue::fake();
+        $wonItem = $this->createTaxSampleWonItem();
+        $this->participant->update(['notification_settings' => ['email_won_item' => true]]);
+
+        $this->notificationService->sendWonItemNotification($wonItem);
+
+        Queue::assertPushed(SendLineNotificationJob::class, function (SendLineNotificationJob $job) {
+            return $job->notificationType === 'won_item'
+                && str_contains($job->text, '合計: ¥20,500（税抜・手数料込）')
+                && !str_contains($job->text, '（税込）');
+        });
     }
 }

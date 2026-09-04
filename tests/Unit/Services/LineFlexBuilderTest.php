@@ -47,6 +47,8 @@ class LineFlexBuilderTest extends TestCase
             'winner_id' => $this->createParticipant()->id,
             'winning_price' => 5000,
             'quantity' => 3,
+            // 通知の金額は winning_price × quantity + commission_amount（請求書と同じ基準）
+            'commission_amount' => 1500,
             'total_amount' => 16500,
         ], $override))->fresh('item');
     }
@@ -66,7 +68,9 @@ class LineFlexBuilderTest extends TestCase
         $this->assertStringContainsString('落札おめでとう', $contents);
         $this->assertStringContainsString('幹之メダカ', $contents);
         $this->assertStringContainsString('¥5,000', $contents);
-        $this->assertStringContainsString('¥16,500', $contents);
+        // 落札時点の合計は税抜（手数料込）。「税込」と誤表示しない
+        $this->assertStringContainsString('¥16,500（税抜・手数料込）', $contents);
+        $this->assertStringNotContainsString('（税込）', $contents);
     }
 
     public function test_paymentConfirmed_は_入金確認通知_bubbleを生成(): void
@@ -96,6 +100,32 @@ class LineFlexBuilderTest extends TestCase
     {
         $bubble = $this->builder->shippingCompleted($this->makeWonItem());
         $this->assertBubble($bubble);
+    }
+
+    /**
+     * 複数口の発送は 1 バブルにまとめ、伝票番号を全件列挙する（2026-09-02 中北さん依頼）。
+     */
+    public function test_shippingCompleted_は_複数伝票番号と複数生体を1バブルに集約する(): void
+    {
+        $attrs = ['shipping_company' => 'ヤマト運輸', 'tracking_number' => '1111-2222-3333,4444-5555-6666'];
+        $w1 = $this->makeWonItem($attrs);
+        // won_items.item_id は一意なので 2 件目は別の生体を用意する
+        $item2 = Item::factory()->sold()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+            'species_name' => '楊貴妃メダカ',
+        ]);
+        $w2 = $this->makeWonItem(array_merge($attrs, ['item_id' => $item2->id, 'winner_id' => $w1->winner_id]));
+
+        $bubble = $this->builder->shippingCompleted($w1, collect([$w1, $w2]));
+        $this->assertBubble($bubble);
+        $contents = json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('生体（2点）', $contents);
+        $this->assertStringContainsString('伝票番号（2件）', $contents);
+        $this->assertStringContainsString('1111-2222-3333', $contents);
+        $this->assertStringContainsString('4444-5555-6666', $contents);
+        // 複数件のときは特定生体の hero 画像を出さない
+        $this->assertArrayNotHasKey('hero', $bubble);
     }
 
     public function test_bidLimitReached_は_上限価格と現在価格を含む(): void
@@ -154,8 +184,17 @@ class LineFlexBuilderTest extends TestCase
             'seller_profile_id' => $this->sellerProfile->id,
             'species_name' => '楊貴妃メダカ',
         ]);
+        // 5000×3 + 手数料1500 = 16500（税抜）、送料 1500
         $w1 = $this->makeWonItem(['winner_id' => $winner->id, 'total_amount' => 16500, 'shipping_fee' => 1500]);
-        $w2 = $this->makeWonItem(['winner_id' => $winner->id, 'item_id' => $item2->id, 'total_amount' => 11000, 'shipping_fee' => 0]);
+        // 5000×2 + 手数料1000 = 11000（税抜）、送料なし
+        $w2 = $this->makeWonItem([
+            'winner_id' => $winner->id,
+            'item_id' => $item2->id,
+            'quantity' => 2,
+            'commission_amount' => 1000,
+            'total_amount' => 11000,
+            'shipping_fee' => 0,
+        ]);
 
         $bubble = $this->builder->paymentReminder(collect([$w1, $w2]), '1時間以内');
         $this->assertBubble($bubble);
@@ -166,11 +205,37 @@ class LineFlexBuilderTest extends TestCase
         $this->assertStringContainsString('楊貴妃メダカ', $contents);
         $this->assertStringContainsString('¥16,500', $contents);
         $this->assertStringContainsString('¥11,000', $contents);
-        // 送料行 + 合計（16500 + 11000 + 1500）
+        // 送料行 + 消費税行 + 税込合計: (16500 + 11000 + 1500) = 29000 → 税 2900 → 31900
         $this->assertStringContainsString('¥1,500', $contents);
-        $this->assertStringContainsString('¥29,000（税込）', $contents);
+        $this->assertStringContainsString('"消費税"', $contents);
+        $this->assertStringContainsString('¥2,900', $contents);
+        $this->assertStringContainsString('¥31,900（税込）', $contents);
+        // 税抜合計を「税込」と表示しない（2026-09-02 報告の不具合）
+        $this->assertStringNotContainsString('¥29,000', $contents);
+        $this->assertStringContainsString('税抜金額', $contents);
         // 複数件のときは特定生体の hero 画像を出さない
         $this->assertArrayNotHasKey('hero', $bubble);
+    }
+
+    public function test_paymentReminder_の合計は請求書PDFの税込合計と一致する(): void
+    {
+        $winner = $this->createParticipant();
+        $w = $this->makeWonItem([
+            'winner_id' => $winner->id,
+            'winning_price' => 7200,
+            'quantity' => 1,
+            'commission_amount' => 720,
+            'total_amount' => 7920,
+            'shipping_fee' => 350,
+        ]);
+
+        $expected = \App\Services\InvoiceService::buyerTotals(collect([$w]))['grand_total'];
+        // (7200 + 720 + 350) = 8270 → 税 827 → 9097
+        $this->assertSame(9097, $expected);
+
+        $contents = json_encode($this->builder->paymentReminder(collect([$w]), '24時間以内'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('¥9,097（税込）', $contents);
+        $this->assertStringNotContainsString('¥8,270', $contents);
     }
 
     public function test_paymentReminder_は_11件以上を省略表記にする(): void
@@ -183,7 +248,15 @@ class LineFlexBuilderTest extends TestCase
                 'seller_profile_id' => $this->sellerProfile->id,
                 'species_name' => "テスト生体{$i}",
             ]);
-            return $this->makeWonItem(['winner_id' => $winner->id, 'item_id' => $item->id, 'total_amount' => 1000]);
+            // 1000×1 + 手数料0 = 1000（税抜）
+            return $this->makeWonItem([
+                'winner_id' => $winner->id,
+                'item_id' => $item->id,
+                'winning_price' => 1000,
+                'quantity' => 1,
+                'commission_amount' => 0,
+                'total_amount' => 1000,
+            ]);
         });
 
         $bubble = $this->builder->paymentReminder($items, '24時間以内');
@@ -191,7 +264,8 @@ class LineFlexBuilderTest extends TestCase
 
         $this->assertStringContainsString('12 件', $contents);
         $this->assertStringContainsString('他 2 件', $contents);
-        $this->assertStringContainsString('¥12,000（税込）', $contents);
+        // 12000（税抜）→ 税 1200 → 13200
+        $this->assertStringContainsString('¥13,200（税込）', $contents);
     }
 
     public function test_itemSold_は_出品者向けの落札通知(): void

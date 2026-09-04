@@ -68,6 +68,8 @@ interface WonItemData {
   delivery_method: 'shipping' | 'pickup';
   shipping_address?: string;
   tracking_number?: string;
+  /** 伝票番号の配列（複数口）。tracking_number はカンマ区切りの同値 */
+  tracking_numbers?: string[];
   shipping_company?: string;
   shipped_at?: string;
   created_at: string;
@@ -123,6 +125,15 @@ const computeTaxBreakdown = (subtotal: number, commission: number, shipping: num
     taxAmount,
     grandTotalInclTax: taxBase + taxAmount,
   };
+};
+
+// 伝票番号はカンマ区切りで複数件を保持する。API は tracking_numbers 配列も返す
+const getTrackingNumbers = (item: { tracking_number?: string | null; tracking_numbers?: string[] | null }): string[] => {
+  if (item.tracking_numbers && item.tracking_numbers.length > 0) return item.tracking_numbers;
+  return (item.tracking_number ?? '')
+    .split(/[,\n、]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 };
 
 // 配送業者の追跡URLを生成
@@ -628,33 +639,40 @@ export default function WonItems() {
                           </Box>
 
                           {/* 配送情報 */}
-                          {wonItem.tracking_number && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                              <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 16 }} />
-                              <Typography variant="body2">
+                          {getTrackingNumbers(wonItem).length > 0 && (
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                              <LocalShippingIcon sx={{ color: 'text.secondary', fontSize: 16, mt: 0.5 }} />
+                              <Typography variant="body2" sx={{ mt: 0.25 }}>
                                 {wonItem.shipping_company}:
                               </Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                                {wonItem.tracking_number}
-                              </Typography>
-                              <Tooltip title="コピー">
-                                <IconButton size="small" onClick={() => handleCopyTrackingNumber(wonItem.tracking_number!)}>
-                                  <CopyIcon sx={{ fontSize: 14 }} />
-                                </IconButton>
-                              </Tooltip>
-                              {wonItem.shipping_company && (
-                                <Button
-                                  size="small"
-                                  variant="text"
-                                  endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-                                  component={Link}
-                                  href={getTrackingUrl(wonItem.tracking_number, wonItem.shipping_company)}
-                                  target="_blank"
-                                  sx={{ fontSize: '0.75rem' }}
-                                >
-                                  追跡
-                                </Button>
-                              )}
+                              {/* 複数口は伝票番号を縦に並べ、番号ごとに追跡リンクを出す */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                                {getTrackingNumbers(wonItem).map((num) => (
+                                  <Box key={num} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                                      {num}
+                                    </Typography>
+                                    <Tooltip title="コピー">
+                                      <IconButton size="small" onClick={() => handleCopyTrackingNumber(num)}>
+                                        <CopyIcon sx={{ fontSize: 14 }} />
+                                      </IconButton>
+                                    </Tooltip>
+                                    {wonItem.shipping_company && (
+                                      <Button
+                                        size="small"
+                                        variant="text"
+                                        endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                                        component={Link}
+                                        href={getTrackingUrl(num, wonItem.shipping_company)}
+                                        target="_blank"
+                                        sx={{ fontSize: '0.75rem' }}
+                                      >
+                                        追跡
+                                      </Button>
+                                    )}
+                                  </Box>
+                                ))}
+                              </Box>
                             </Box>
                           )}
 
@@ -739,35 +757,44 @@ export default function WonItems() {
                 <Step><StepLabel>配達完了</StepLabel></Step>
               </Stepper>
 
-              {selectedItem.tracking_number && (
+              {getTrackingNumbers(selectedItem).length > 0 && (
                 <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2, mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>伝票番号</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="h6" sx={{ fontFamily: 'monospace' }}>
-                      {selectedItem.tracking_number}
-                    </Typography>
-                    <IconButton size="small" onClick={() => handleCopyTrackingNumber(selectedItem.tracking_number!)}>
-                      <CopyIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    伝票番号
+                    {getTrackingNumbers(selectedItem).length > 1 ? `（${getTrackingNumbers(selectedItem).length}件）` : ''}
+                  </Typography>
+                  {getTrackingNumbers(selectedItem).map((num) => (
+                    <Box key={num} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="h6" sx={{ fontFamily: 'monospace' }}>
+                        {num}
+                      </Typography>
+                      <IconButton size="small" onClick={() => handleCopyTrackingNumber(num)}>
+                        <CopyIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
                   <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
                     {selectedItem.shipping_company}
                   </Typography>
                 </Box>
               )}
 
-              {selectedItem.tracking_number && selectedItem.shipping_company && (
-                <Button
-                  fullWidth
-                  variant="contained"
-                  endIcon={<OpenInNewIcon />}
-                  component={Link}
-                  href={getTrackingUrl(selectedItem.tracking_number, selectedItem.shipping_company)}
-                  target="_blank"
-                >
-                  {selectedItem.shipping_company}の配送状況ページを開く
-                </Button>
-              )}
+              {selectedItem.shipping_company &&
+                getTrackingNumbers(selectedItem).map((num) => (
+                  <Button
+                    key={num}
+                    fullWidth
+                    variant="contained"
+                    endIcon={<OpenInNewIcon />}
+                    component={Link}
+                    href={getTrackingUrl(num, selectedItem.shipping_company!)}
+                    target="_blank"
+                    sx={{ mb: 1 }}
+                  >
+                    {selectedItem.shipping_company}の配送状況ページを開く
+                    {getTrackingNumbers(selectedItem).length > 1 ? `（${num}）` : ''}
+                  </Button>
+                ))}
             </>
           )}
         </DialogContent>

@@ -20,29 +20,26 @@
 
 **配送業者**: {{ $wonItem->shipping_company ?? 'ヤマト運輸' }}
 
-**伝票番号**: {{ $wonItem->tracking_number ?? '-' }}
+@if(count($trackingLinks) === 0)
+**伝票番号**: -
+@elseif(count($trackingLinks) === 1)
+**伝票番号**: {{ $trackingLinks[0]['number'] }}
+@else
+**伝票番号（{{ count($trackingLinks) }}件）**:
+@foreach($trackingLinks as $link)
+- {{ $link['number'] }}
+@endforeach
 
-@if($wonItem->tracking_number)
-@php
-    $trackingUrl = '';
-    $company = $wonItem->shipping_company ?? '';
-    $trackingNumber = str_replace('-', '', $wonItem->tracking_number);
+※ 複数口に分かれて発送しています。お荷物は別々に届く場合があります。
+@endif
 
-    if (str_contains($company, 'ヤマト') || str_contains($company, 'クロネコ')) {
-        $trackingUrl = 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno=' . $trackingNumber;
-    } elseif (str_contains($company, '佐川')) {
-        $trackingUrl = 'https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=' . $trackingNumber;
-    } elseif (str_contains($company, '郵便') || str_contains($company, 'ゆうパック')) {
-        $trackingUrl = 'https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=' . $trackingNumber;
-    }
-@endphp
-
-@if($trackingUrl)
-<x-mail::button :url="$trackingUrl">
-配送状況を確認する
+@foreach($trackingLinks as $link)
+@if($link['url'])
+<x-mail::button :url="$link['url']">
+配送状況を確認する{{ count($trackingLinks) > 1 ? '（' . $link['number'] . '）' : '' }}
 </x-mail::button>
 @endif
-@endif
+@endforeach
 
 ---
 

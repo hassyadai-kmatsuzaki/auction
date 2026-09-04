@@ -11,14 +11,20 @@
 ## 入金確認内容
 
 @foreach($wonItems as $wi)
-- **{{ $wi->item->species_name ?? '商品' }}**（No.{{ $wi->item->item_number ?? '-' }}）{{ $wi->quantity }}匹 — 落札 ¥{{ number_format((int) ($wi->total_amount ?? 0)) }}
+- **{{ $wi->item->species_name ?? '商品' }}**（No.{{ $wi->item->item_number ?? '-' }}）{{ $wi->quantity }}匹 — ¥{{ number_format(\App\Services\InvoiceService::buyerLineAmount($wi)) }}（税抜・落札手数料込）
 @endforeach
 
-**お支払い金額合計**: ¥{{ number_format($totalAmount + $totalShippingFee) }}
+**商品代金（税抜・落札手数料込）**: ¥{{ number_format(($totals['subtotal'] ?? 0) + ($totals['commission_total'] ?? 0)) }}
 
-@if($totalShippingFee > 0)
-（内訳: 商品代金 ¥{{ number_format($totalAmount) }} ＋ 配送料金 ¥{{ number_format($totalShippingFee) }}）
+@if(($totals['total_shipping_fee'] ?? 0) > 0)
+**配送料金**: ¥{{ number_format($totals['total_shipping_fee']) }}
+
 @endif
+**消費税（{{ rtrim(rtrim(number_format($totals['tax_rate'] ?? 10, 1), '0'), '.') }}%）**: ¥{{ number_format($totals['tax_amount'] ?? 0) }}
+
+**お支払い金額合計（税込）**: ¥{{ number_format($totals['grand_total'] ?? 0) }}
+
+※ 請求書と同じ計算で表示しています。
 
 ---
 

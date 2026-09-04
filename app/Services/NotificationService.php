@@ -86,7 +86,7 @@ class NotificationService
                 "🎉 落札おめでとうございます！\n"
                 . ($item ? $item->species_name : '商品') . "\n"
                 . "¥" . number_format($wonItem->winning_price) . "/匹\n"
-                . "合計: ¥" . number_format($wonItem->total_amount) . "（税込）",
+                . "合計: ¥" . number_format(InvoiceService::buyerLineAmount($wonItem)) . "（税抜・手数料込）",
                 $this->flex->wonItem($wonItem),
             );
 
@@ -125,24 +125,32 @@ class NotificationService
     }
 
     /** ③ 発送完了通知（参加者向け） */
-    public function sendShippingNotification(WonItem $wonItem): bool
+    public function sendShippingNotification(WonItem|\Illuminate\Support\Collection $wonItems): bool
     {
         try {
+            // 発送単位（オークション×落札者）でまとめて 1 通。伝票番号が複数（最大10件）でも
+            // LINE は Flex 1 通・メールは 1 通に集約する。単体 WonItem 渡しも従来どおり受け付ける。
+            $group = $wonItems instanceof WonItem ? collect([$wonItems]) : $wonItems->values();
+            $wonItem = $group->first();
+            if (!$wonItem) return false;
+
             $user = $wonItem->user;
             if (!$user || !$user->email) return false;
             if (!$this->shouldSendParticipantNotification($user, 'email_shipping')) return false;
 
             Mail::to($user->email)->queue(new ShippingNotificationMail($wonItem));
 
-            $trackingInfo = $wonItem->tracking_number ? "\n追跡番号: {$wonItem->tracking_number}" : '';
+            $count = $group->count();
+            $firstName = $wonItem->item ? $wonItem->item->species_name : '商品';
+            $target = $count > 1 ? "{$firstName} ほか（計 {$count} 点）" : $firstName;
+            $numbers = $wonItem->tracking_numbers;
+            $trackingInfo = $numbers === [] ? '' : "\n伝票番号: " . implode("\n伝票番号: ", $numbers);
             $this->sendLine($user->id, 'shipping_completed',
-                "📦 発送が完了しました\n"
-                . ($wonItem->item ? $wonItem->item->species_name : '商品')
-                . $trackingInfo,
-                $this->flex->shippingCompleted($wonItem),
+                "📦 発送が完了しました\n" . $target . $trackingInfo,
+                $this->flex->shippingCompleted($wonItem, $group),
             );
 
-            Log::info('発送通知送信', ['won_item_id' => $wonItem->id, 'user_id' => $user->id]);
+            Log::info('発送通知送信', ['won_item_ids' => $group->pluck('id')->all(), 'user_id' => $user->id]);
             return true;
         } catch (\Exception $e) {
             Log::error('発送通知送信エラー', ['error' => $e->getMessage()]);
@@ -375,14 +383,15 @@ class NotificationService
             $count     = $wonItems->count();
             $firstName = $first->item?->species_name ?? '商品';
             $target    = $count > 1 ? "{$firstName} ほか（計 {$count} 件）" : $firstName;
-            $total     = (int) $wonItems->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0));
+            // 請求書と同じ税込合計（total_amount は税抜なので直接使わない）
+            $total     = InvoiceService::buyerTotals($wonItems)['grand_total'];
 
             $this->sendLine($user->id, 'payment_reminder',
                 "⚠️ 入金期限が近づいています\n"
                 . $target . "\n"
                 . "期限まで{$urgency}\n"
                 . "期限: " . ($first->payment_deadline ? $first->payment_deadline->format('m/d H:i') : '未定') . "\n"
-                . "合計: ¥" . number_format($total),
+                . "合計: ¥" . number_format($total) . "（税込）",
                 $this->flex->paymentReminder($wonItems, $urgency),
             );
 
@@ -417,7 +426,8 @@ class NotificationService
                 $winner = $items->first()->winner;
                 if (!$winner) continue;
 
-                $totalAmount = (int) $items->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0));
+                // リンク先の請求書PDFと同じ税込額にする（total_amount は税抜）
+                $totalAmount = InvoiceService::buyerTotals($items)['grand_total'];
 
                 $pdfUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
                     'line.invoice.download',

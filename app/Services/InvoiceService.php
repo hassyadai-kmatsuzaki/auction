@@ -79,6 +79,59 @@ class InvoiceService
         return $wonItems;
     }
 
+    /**
+     * 落札者向け請求の1明細額（税抜）＝ 落札価格 × 数量 ＋ 落札手数料。
+     *
+     * won_items.total_amount と同値のはずだが、請求書PDFは total_amount を使わず
+     * この式で再計算している。通知側もここに揃えて帳票との食い違いを防ぐ。
+     */
+    public static function buyerLineAmount(WonItem $wonItem): int
+    {
+        return (int) $wonItem->winning_price * (int) $wonItem->quantity
+            + (int) ($wonItem->commission_amount ?? 0);
+    }
+
+    /**
+     * 落札者向け請求額の内訳（請求書PDF と同式・同丸め）。
+     *
+     * 税抜の「落札金額 + 落札手数料 + 送料」に消費税（SystemSetting::tax_rate）を
+     * floor 丸めで上乗せする。丸めは請求書1枚＝「オークション × 落札者」単位なので、
+     * 複数オークションの落札品が混在する場合もオークションごとに丸めてから合算し、
+     * 発行される請求書の合計と常に一致させる。
+     *
+     * @param  Collection<int, WonItem>  $wonItems  item リレーションをロード済みであること
+     * @return array{subtotal:int, commission_total:int, total_shipping_fee:int, tax_rate:float, tax_amount:int, grand_total:int}
+     */
+    public static function buyerTotals(Collection $wonItems): array
+    {
+        $taxRate = (float) SystemSetting::get('tax_rate', 10);
+
+        $subtotal = 0;
+        $commissionTotal = 0;
+        $totalShippingFee = 0;
+        $taxAmount = 0;
+
+        foreach ($wonItems->groupBy(fn ($w) => $w->item?->auction_id ?? 0) as $group) {
+            $groupSubtotal = (int) $group->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
+            $groupCommission = (int) $group->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
+            $groupShipping = (int) $group->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+
+            $subtotal += $groupSubtotal;
+            $commissionTotal += $groupCommission;
+            $totalShippingFee += $groupShipping;
+            $taxAmount += (int) floor(($groupSubtotal + $groupCommission + $groupShipping) * $taxRate / 100);
+        }
+
+        return [
+            'subtotal' => $subtotal,
+            'commission_total' => $commissionTotal,
+            'total_shipping_fee' => $totalShippingFee,
+            'tax_rate' => $taxRate,
+            'tax_amount' => $taxAmount,
+            'grand_total' => $subtotal + $commissionTotal + $totalShippingFee + $taxAmount,
+        ];
+    }
+
     private function buildInvoiceData(Auction $auction, User $winner, Collection $wonItems, string $type): array
     {
         $prefix = $type === 'invoice' ? 'INV' : 'RCP';
@@ -130,13 +183,14 @@ class InvoiceService
             ];
         })->values()->toArray();
 
-        // 合計計算（winning_price は税抜）
-        $subtotal = $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
-        $commissionTotal = $wonItems->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
-        $totalShippingFee = $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
-        $taxRate = (float) SystemSetting::get('tax_rate', 10);
-        $taxAmount = (int) floor(($subtotal + $commissionTotal + $totalShippingFee) * $taxRate / 100);
-        $grandTotal = $subtotal + $commissionTotal + $totalShippingFee + $taxAmount;
+        // 合計計算（winning_price は税抜）。通知側と共通の buyerTotals を正とする
+        $totals = self::buyerTotals($wonItems);
+        $subtotal = $totals['subtotal'];
+        $commissionTotal = $totals['commission_total'];
+        $totalShippingFee = $totals['total_shipping_fee'];
+        $taxRate = $totals['tax_rate'];
+        $taxAmount = $totals['tax_amount'];
+        $grandTotal = $totals['grand_total'];
 
         // 支払い期限（最も早いもの）
         $paymentDeadline = $wonItems
@@ -230,16 +284,18 @@ class InvoiceService
         })->values()->toArray();
 
         // 合計計算（請求書と同じロジック）
-        $subtotal = $wonItems->sum(fn ($w) => (int) $w->winning_price * (int) $w->quantity);
-        $commissionTotal = $wonItems->sum(fn ($w) => (int) ($w->commission_amount ?? 0));
-        $totalShippingFee = $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
-        $taxRate = (float) SystemSetting::get('tax_rate', 10);
-        $taxAmount = (int) floor(($subtotal + $commissionTotal + $totalShippingFee) * $taxRate / 100);
-        $grandTotal = $subtotal + $commissionTotal + $totalShippingFee + $taxAmount;
+        $totals = self::buyerTotals($wonItems);
+        $subtotal = $totals['subtotal'];
+        $commissionTotal = $totals['commission_total'];
+        $totalShippingFee = $totals['total_shipping_fee'];
+        $taxRate = $totals['tax_rate'];
+        $taxAmount = $totals['tax_amount'];
+        $grandTotal = $totals['grand_total'];
 
         // 配送業者・追跡番号は納品書単位で共通の想定。異なる値があれば連結表示
         $shippingCompany = $wonItems->pluck('shipping_company')->filter()->unique()->values()->implode('、');
-        $trackingNumber = $wonItems->pluck('tracking_number')->filter()->unique()->values()->implode('、');
+        // tracking_number はカンマ区切りで複数件を保持するため、分割してから重複を除いて連結する
+        $trackingNumber = $wonItems->flatMap(fn ($w) => $w->tracking_numbers)->unique()->values()->implode('、');
         $deliveryStatuses = $wonItems->pluck('delivery_status')->unique()->values();
         $deliveryStatus = $deliveryStatuses->count() === 1
             ? $this->formatDeliveryStatus($deliveryStatuses->first())

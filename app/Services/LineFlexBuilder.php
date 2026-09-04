@@ -40,7 +40,8 @@ class LineFlexBuilder
                 ['生体', $speciesName],
                 ['落札価格', '¥' . number_format((int) $wonItem->winning_price) . ' / 匹'],
                 ['数量',    (string) $wonItem->quantity . ' 匹'],
-                ['合計',    '¥' . number_format((int) $wonItem->total_amount) . '（税込）'],
+                // 落札時点では送料未確定・消費税未加算。税抜（手数料込）であることを明示する
+                ['合計',    '¥' . number_format(InvoiceService::buyerLineAmount($wonItem)) . '（税抜・手数料込）'],
             ],
             footerButton: $detailUrl ? [
                 'label' => '落札商品を確認',
@@ -69,17 +70,36 @@ class LineFlexBuilder
     }
 
     /** ③ 発送完了通知 */
-    public function shippingCompleted(WonItem $wonItem): array
+    public function shippingCompleted(WonItem $wonItem, ?Collection $group = null): array
     {
+        // 発送単位（オークション×落札者）でまとめて 1 バブル。$group 省略時は単体扱い。
+        $group = ($group && $group->isNotEmpty()) ? $group->values() : collect([$wonItem]);
+        $count = $group->count();
         $item = $wonItem->item;
+
+        // 生体は最大10件まで列挙（LINE の bubble size 制約への配慮）
+        $listed = $group->slice(0, 10);
+        $names = $listed->map(fn ($w) => $w->item?->species_name ?? '商品')->all();
+        if ($count > $listed->count()) {
+            $names[] = '他 ' . ($count - $listed->count()) . ' 件';
+        }
         $rows = [
-            ['生体', $item?->species_name ?? '商品'],
+            [$count > 1 ? "生体（{$count}点）" : '生体', implode("\n", $names)],
         ];
         if ($wonItem->shipping_company) $rows[] = ['運送会社', (string) $wonItem->shipping_company];
-        if ($wonItem->tracking_number)  $rows[] = ['追跡番号', (string) $wonItem->tracking_number];
+
+        // 伝票番号は複数口（最大10件）を改行で列挙（wrap:true なので改行が効く）
+        $numbers = $wonItem->tracking_numbers;
+        if ($numbers !== []) {
+            $rows[] = [
+                count($numbers) > 1 ? '伝票番号（' . count($numbers) . '件）' : '伝票番号',
+                implode("\n", $numbers),
+            ];
+        }
 
         return $this->bubble(
-            heroImageUrl: $this->itemHeroImage($item),
+            // 複数件のときは特定の生体画像を出すと誤解を招くので hero を省略
+            heroImageUrl: $count === 1 ? $this->itemHeroImage($item) : null,
             headerText: '📦 発送が完了しました',
             headerColor: self::BRAND_COLOR,
             bodyRows: $rows,
@@ -169,7 +189,10 @@ class LineFlexBuilder
      * ⑧ 入金催促通知（落札者単位で集約）
      *
      * 同一落札者・同一期限の未入金 WonItem をまとめて1バブルにする。
-     * 生体は最大10件まで列挙し、合計は請求書と同じ「落札金額(税込)+送料」で算出する。
+     * 生体は最大10件まで列挙（各金額は落札手数料込みの税抜額＝請求書明細と同じ基準）。
+     * 合計は請求書と同じ「落札金額 + 落札手数料 + 送料 に消費税を上乗せ」した税込額
+     * （InvoiceService::buyerTotals）で算出する。won_items.total_amount は税抜なので
+     * そのまま「税込」と表示してはいけない。
      *
      * @param  Collection<int, WonItem>  $wonItems
      */
@@ -193,20 +216,19 @@ class LineFlexBuilder
         foreach ($listed as $i => $w) {
             $bodyRows[] = [
                 $count > 1 ? '商品' . ($i + 1) : '商品',
-                ($w->item?->species_name ?? '商品') . '　¥' . number_format((int) $w->total_amount),
+                ($w->item?->species_name ?? '商品') . '　¥' . number_format(InvoiceService::buyerLineAmount($w)),
             ];
         }
         if ($count > $listed->count()) {
             $bodyRows[] = ['(以下省略)', '他 ' . ($count - $listed->count()) . ' 件'];
         }
 
-        $shippingTotal = (int) $wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
-        if ($shippingTotal > 0) {
-            $bodyRows[] = ['送料', '¥' . number_format($shippingTotal)];
+        $totals = InvoiceService::buyerTotals($wonItems);
+        if ($totals['total_shipping_fee'] > 0) {
+            $bodyRows[] = ['送料', '¥' . number_format($totals['total_shipping_fee'])];
         }
-
-        $total = (int) $wonItems->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0));
-        $bodyRows[] = ['合計', '¥' . number_format($total) . '（税込）'];
+        $bodyRows[] = ['消費税', '¥' . number_format($totals['tax_amount'])];
+        $bodyRows[] = ['合計', '¥' . number_format($totals['grand_total']) . '（税込）'];
 
         return $this->bubble(
             // 複数件のときは特定の生体画像を出すと誤解を招くので hero を省略
@@ -214,6 +236,7 @@ class LineFlexBuilder
             headerText: '⚠️ 入金期限が近づいています',
             headerColor: self::ALERT_COLOR,
             bodyRows: $bodyRows,
+            bodyNote: '※商品の金額は落札手数料を含む税抜金額です。',
             footerButton: ($url = $this->appUrl('/participant/won-items'))
                 ? ['label' => '入金内容を確認', 'uri' => $url]
                 : null,

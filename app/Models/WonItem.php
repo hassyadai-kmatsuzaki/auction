@@ -161,6 +161,68 @@ class WonItem extends BaseModel
         return true;
     }
 
+    /** 伝票番号の区切り文字（複数登録時は tracking_number にカンマ区切りで保持） */
+    public const TRACKING_NUMBER_SEPARATOR = ',';
+
+    /** 1発送単位に登録できる伝票番号の上限（出品者側の伝票登録と同じ） */
+    public const MAX_TRACKING_NUMBERS = 10;
+
+    /**
+     * 伝票番号を配列で返す（$wonItem->tracking_numbers）。
+     */
+    public function getTrackingNumbersAttribute(): array
+    {
+        return self::splitTrackingNumbers($this->tracking_number);
+    }
+
+    /**
+     * カンマ・改行・読点区切りの伝票番号文字列を trim / 空除去 / 重複除去した配列にする。
+     */
+    public static function splitTrackingNumbers(?string $raw): array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return [];
+        }
+        $parts = preg_split('/[,\r\n、]+/u', $raw) ?: [];
+        $parts = array_map(fn ($s) => trim((string) $s), $parts);
+        $parts = array_filter($parts, fn ($s) => $s !== '');
+
+        return array_values(array_unique($parts));
+    }
+
+    /**
+     * 伝票番号配列を保存用の文字列にする。空なら null。
+     */
+    public static function joinTrackingNumbers(array $numbers): ?string
+    {
+        $normalized = self::splitTrackingNumbers(
+            implode(self::TRACKING_NUMBER_SEPARATOR, array_map('strval', array_filter($numbers, 'is_scalar')))
+        );
+
+        return $normalized === [] ? null : implode(self::TRACKING_NUMBER_SEPARATOR, $normalized);
+    }
+
+    /**
+     * 配送業者に応じた追跡 URL。未対応の業者は null。
+     */
+    public function trackingUrlFor(string $number): ?string
+    {
+        $company = (string) ($this->shipping_company ?? '');
+        $clean = str_replace('-', '', $number);
+
+        if (str_contains($company, 'ヤマト') || str_contains($company, 'クロネコ')) {
+            return 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno=' . $clean;
+        }
+        if (str_contains($company, '佐川')) {
+            return 'https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=' . $clean;
+        }
+        if (str_contains($company, '郵便') || str_contains($company, 'ゆうパック')) {
+            return 'https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=' . $clean;
+        }
+
+        return null;
+    }
+
     /**
      * 発送処理
      */

@@ -123,6 +123,7 @@ class WonItemController extends Controller
                         'shipping_address' => $this->formatShippingAddress($wonItem),
                         'shipping_company' => $wonItem->shipping_company,
                         'tracking_number' => $wonItem->tracking_number,
+                        'tracking_numbers' => $wonItem->tracking_numbers,
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                         'created_at' => $wonItem->created_at->toIso8601String(),
                     ];
@@ -214,6 +215,7 @@ class WonItemController extends Controller
                     'shipping_phone' => $wonItem->shipping_phone,
                     'shipping_company' => $wonItem->shipping_company,
                     'tracking_number' => $wonItem->tracking_number,
+                    'tracking_numbers' => $wonItem->tracking_numbers,
                     'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                     'delivered_at' => $wonItem->delivered_at ? $wonItem->delivered_at->toIso8601String() : null,
                     'can_update_address' => $wonItem->canUpdateShippingAddress(),

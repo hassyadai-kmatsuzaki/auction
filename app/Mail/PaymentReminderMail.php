@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Mail\Concerns\RoutesToNotifyQueue;
 use App\Models\WonItem;
+use App\Services\InvoiceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -15,7 +16,8 @@ use Illuminate\Support\Collection;
  * 入金催促メール（落札者単位で集約）
  *
  * 同一落札者・同一期限の未入金 WonItem をまとめて1通にする。
- * 合計は請求書と同じ「落札金額(税込)+送料」。
+ * 明細は落札手数料込みの税抜額、合計は請求書と同じ
+ * 「落札金額 + 落札手数料 + 送料 に消費税を上乗せ」した税込額（InvoiceService::buyerTotals）。
  */
 class PaymentReminderMail extends Mailable
 {
@@ -61,16 +63,19 @@ class PaymentReminderMail extends Mailable
         $rows = '';
         foreach ($this->wonItems as $w) {
             $name   = $w->item?->species_name ?? '商品';
-            $amount = number_format((int) $w->total_amount);
+            $amount = number_format(InvoiceService::buyerLineAmount($w));
             $rows .= "<tr><td style=\"{$td}\">{$name}</td><td style=\"{$tdAmount}\">¥{$amount}</td></tr>\n";
         }
 
-        $shippingTotal = (int) $this->wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
-        if ($shippingTotal > 0) {
-            $rows .= "<tr><td style=\"{$td}\">送料</td><td style=\"{$tdAmount}\">¥" . number_format($shippingTotal) . "</td></tr>\n";
+        // 請求書PDFと同じ式・同じ丸めで税込合計を出す
+        $totals = InvoiceService::buyerTotals($this->wonItems);
+        if ($totals['total_shipping_fee'] > 0) {
+            $rows .= "<tr><td style=\"{$td}\">送料</td><td style=\"{$tdAmount}\">¥" . number_format($totals['total_shipping_fee']) . "</td></tr>\n";
         }
+        $taxRateLabel = rtrim(rtrim(number_format($totals['tax_rate'], 1), '0'), '.');
+        $rows .= "<tr><td style=\"{$td}\">消費税（{$taxRateLabel}%）</td><td style=\"{$tdAmount}\">¥" . number_format($totals['tax_amount']) . "</td></tr>\n";
 
-        $total = number_format((int) $this->wonItems->sum(fn ($w) => (int) $w->total_amount + (int) ($w->shipping_fee ?? 0)));
+        $total = number_format($totals['grand_total']);
 
         $lead = $count > 1
             ? "落札された <strong>{$count} 点</strong> の入金期限が <strong>{$this->urgency}</strong> に迫っています。"
@@ -81,11 +86,12 @@ class PaymentReminderMail extends Mailable
         <p>{$user?->name} 様</p>
         <p>{$lead}</p>
         <table style="border-collapse:collapse;margin:16px 0">
-            <tr><th style="{$td};background:#f3f4f6;text-align:left">商品</th><th style="{$td};background:#f3f4f6;text-align:right">金額（税込）</th></tr>
+            <tr><th style="{$td};background:#f3f4f6;text-align:left">商品</th><th style="{$td};background:#f3f4f6;text-align:right">金額（税抜）</th></tr>
             {$rows}
-            <tr><td style="{$td}"><strong>合計金額</strong></td><td style="{$tdAmount}"><strong>¥{$total}</strong></td></tr>
+            <tr><td style="{$td}"><strong>合計金額（税込）</strong></td><td style="{$tdAmount}"><strong>¥{$total}</strong></td></tr>
             <tr><td style="{$td}">入金期限</td><td style="{$td};color:#DC2626"><strong>{$deadline}</strong></td></tr>
         </table>
+        <p style="font-size:12px;color:#6b7280">※商品の金額は落札手数料を含む税抜金額です。</p>
         <p>期限内にお振込みをお願いいたします。</p>
         HTML;
     }

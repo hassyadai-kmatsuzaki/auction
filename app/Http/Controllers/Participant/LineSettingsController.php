@@ -40,7 +40,7 @@ class LineSettingsController extends Controller
     /** タイプ別のテストメッセージ */
     private const TEST_MESSAGES = [
         'auction_start' => "🔔 [テスト] オークションが開始されました！\n【テスト】第99回日本メダカオンライン市場\n今すぐ参加しましょう！",
-        'won_item' => "🎉 [テスト] 落札おめでとうございます！\n【テスト】三色ラメ体外光\n¥15,000/匹\n合計: ¥16,500（税込）",
+        'won_item' => "🎉 [テスト] 落札おめでとうございます！\n【テスト】三色ラメ体外光\n¥15,000/匹\n合計: ¥16,500（税抜・手数料込）",
         'payment_reminder' => "⚠️ [テスト] 入金期限が近づいています\n【テスト】三色ラメ体外光\n期限まで24時間前",
         'shipping_completed' => "📦 [テスト] 発送が完了しました\n【テスト】三色ラメ体外光\n追跡番号: 1234-5678-9012",
         'auction_preview' => "📅 [テスト] 明日オークション開催\n【テスト】第99回日本メダカオンライン市場",
@@ -159,6 +159,8 @@ class LineSettingsController extends Controller
         $wonItem->winner_id = (int) Auth::id();
         $wonItem->winning_price = 15000;
         $wonItem->quantity = 1;
+        // 通知の金額は winning_price × quantity + commission_amount で組み立てる（請求書と同じ基準）
+        $wonItem->commission_amount = 1500;
         $wonItem->total_amount = 16500;
         $wonItem->seller_amount = 12000;
         $wonItem->shipping_fee = 1500;
@@ -181,6 +183,7 @@ class LineSettingsController extends Controller
         $wonItem2->winner_id = (int) Auth::id();
         $wonItem2->winning_price = 8000;
         $wonItem2->quantity = 2;
+        $wonItem2->commission_amount = 1600;
         $wonItem2->total_amount = 17600;
         $wonItem2->shipping_fee = 0;
         $wonItem2->payment_deadline = $wonItem->payment_deadline;

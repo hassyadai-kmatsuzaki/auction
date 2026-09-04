@@ -20,6 +20,8 @@ class PaymentConfirmedMail extends Mailable
     public Collection $wonItems;
     public int $totalAmount;
     public int $totalShippingFee;
+    /** @var array{subtotal:int, commission_total:int, total_shipping_fee:int, tax_rate:float, tax_amount:int, grand_total:int} 請求書と同式の税込内訳 */
+    public array $totals = [];
 
     public function __construct(WonItem $wonItem)
     {
@@ -37,6 +39,9 @@ class PaymentConfirmedMail extends Mailable
         $this->wonItems = $items->isEmpty() ? collect([$wonItem]) : $items;
         $this->totalAmount = (int) $this->wonItems->sum(fn ($w) => (int) ($w->total_amount ?? 0));
         $this->totalShippingFee = (int) $this->wonItems->sum(fn ($w) => (int) ($w->shipping_fee ?? 0));
+        // 入金済みの案内なので、実際に支払われた税込額を請求書PDFと同じ式・同じ丸めで出す
+        // （total_amount は税抜・手数料込。そのまま「お支払い金額」と書くと請求書と食い違う）
+        $this->totals = \App\Services\InvoiceService::buyerTotals($this->wonItems);
         $this->routeViaNotify();
     }
 

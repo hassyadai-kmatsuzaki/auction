@@ -162,6 +162,7 @@ class WonItemController extends Controller
                         'delivery_method' => $wonItem->delivery_method,
                         'shipping_address' => $this->formatShippingAddress($wonItem),
                         'tracking_number' => $wonItem->tracking_number,
+                        'tracking_numbers' => $wonItem->tracking_numbers,
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                         'shipping_calculated_at' => $wonItem->shipping_calculated_at ? $wonItem->shipping_calculated_at->toIso8601String() : null,
                         'shipping_approved_at' => $wonItem->shipping_approved_at ? $wonItem->shipping_approved_at->toIso8601String() : null,
@@ -244,6 +245,7 @@ class WonItemController extends Controller
                     'shipping_phone' => $wonItem->shipping_phone,
                     'shipping_company' => $wonItem->shipping_company,
                     'tracking_number' => $wonItem->tracking_number,
+                    'tracking_numbers' => $wonItem->tracking_numbers,
                     'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
                     'delivered_at' => $wonItem->delivered_at ? $wonItem->delivered_at->toIso8601String() : null,
                     'notes' => $wonItem->notes,
@@ -313,11 +315,30 @@ class WonItemController extends Controller
 
         $validator = Validator::make($request->all(), [
             'shipping_company' => 'required|string|max:100',
-            'tracking_number' => $isPickup ? 'nullable|string|max:100' : 'required|string|max:100',
+            // 旧UI互換の単一文字列（カンマ/改行区切り可）と配列の両方を受け付ける
+            'tracking_number' => 'nullable|string|max:500',
+            'tracking_numbers' => 'nullable|array|max:' . WonItem::MAX_TRACKING_NUMBERS,
+            'tracking_numbers.*' => 'nullable|string|max:40',
         ], [
             'shipping_company.required' => '配送業者は必須です。',
-            'tracking_number.required' => '伝票番号は必須です。',
+            'tracking_numbers.max' => '伝票番号は最大' . WonItem::MAX_TRACKING_NUMBERS . '件までです。',
         ]);
+
+        // 複数口の伝票番号を正規化（trim・空除去・重複除去）。複数件はカンマ区切りで保持する
+        $rawNumbers = array_merge(
+            [(string) $request->input('tracking_number', '')],
+            array_map('strval', array_filter((array) $request->input('tracking_numbers', []), 'is_scalar')),
+        );
+        $trackingNumbers = WonItem::splitTrackingNumbers(implode(WonItem::TRACKING_NUMBER_SEPARATOR, $rawNumbers));
+
+        $validator->after(function ($v) use ($isPickup, $trackingNumbers) {
+            if (!$isPickup && $trackingNumbers === []) {
+                $v->errors()->add('tracking_number', '伝票番号は必須です。');
+            }
+            if (count($trackingNumbers) > WonItem::MAX_TRACKING_NUMBERS) {
+                $v->errors()->add('tracking_numbers', '伝票番号は最大' . WonItem::MAX_TRACKING_NUMBERS . '件までです。');
+            }
+        });
 
         if ($validator->fails()) {
             return response()->json([
@@ -325,6 +346,8 @@ class WonItemController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
+
+        $trackingNumber = $isPickup ? null : WonItem::joinTrackingNumbers($trackingNumbers);
 
         $wonItem = WonItem::with('item')->findOrFail($id);
         $group = $this->findGroupItems($wonItem);
@@ -353,7 +376,7 @@ class WonItemController extends Controller
             WonItem::whereIn('id', $groupIds)->update([
                 'delivery_status' => 'shipped',
                 'shipping_company' => $request->shipping_company,
-                'tracking_number' => $request->tracking_number,
+                'tracking_number' => $trackingNumber,
                 'shipped_at' => $now,
             ]);
         }
@@ -364,8 +387,10 @@ class WonItemController extends Controller
             ->update(['shipping_locked_at' => $now]);
 
         if (!$isPickup) {
-            $representative = WonItem::with('user')->find($wonItem->id);
-            $this->notificationService->sendShippingNotification($representative);
+            // 発送単位（オークション×落札者）の全落札品をまとめて 1 通で通知する
+            // （伝票番号が複数でも LINE は Flex 1通、メールは 1 通）
+            $groupItems = WonItem::with(['item', 'user'])->whereIn('id', $groupIds)->orderBy('id')->get();
+            $this->notificationService->sendShippingNotification($groupItems);
         }
 
         return response()->json([
@@ -374,7 +399,8 @@ class WonItemController extends Controller
             'data' => [
                 'affected_count' => $group->count(),
                 'delivery_status' => $isPickup ? 'completed' : 'shipped',
-                'tracking_number' => $isPickup ? null : $request->tracking_number,
+                'tracking_number' => $trackingNumber,
+                'tracking_numbers' => $isPickup ? [] : $trackingNumbers,
                 'shipped_at' => $now->toIso8601String(),
                 'delivered_at' => $isPickup ? $now->toIso8601String() : null,
                 'is_pickup' => $isPickup,

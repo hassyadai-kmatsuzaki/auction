@@ -195,6 +195,63 @@ class InvoiceServiceTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $pdf->output());
     }
 
+    public function test_buyerLineAmount_is_price_times_quantity_plus_commission(): void
+    {
+        $w = $this->createWonItem(['winning_price' => 7200, 'quantity' => 1, 'commission_amount' => 720, 'total_amount' => 7920]);
+
+        $this->assertSame(7920, InvoiceService::buyerLineAmount($w));
+    }
+
+    public function test_buyerTotals_matches_invoice_formula(): void
+    {
+        // 単価 10000 × 数量 2 = 小計 20000、手数料 500、送料 1000、税 10%
+        $w = $this->createWonItem([
+            'winning_price' => 10000,
+            'quantity' => 2,
+            'commission_amount' => 500,
+            'shipping_fee' => 1000,
+            'total_amount' => 22000,
+        ]);
+
+        $totals = InvoiceService::buyerTotals(collect([$w->load('item')]));
+
+        $this->assertSame(20000, $totals['subtotal']);
+        $this->assertSame(500, $totals['commission_total']);
+        $this->assertSame(1000, $totals['total_shipping_fee']);
+        $this->assertSame(10.0, $totals['tax_rate']);
+        // tax = floor(21500 * 10 / 100) = 2150
+        $this->assertSame(2150, $totals['tax_amount']);
+        $this->assertSame(23650, $totals['grand_total']);
+    }
+
+    public function test_buyerTotals_rounds_tax_per_auction(): void
+    {
+        // 請求書はオークション単位で floor 丸めするので、複数オークション混在時も
+        // 一括 floor（201）ではなく請求書ごとの税額の合計（100 + 100 = 200）になること
+        $auction2 = Auction::factory()->finished()->create(['created_by' => $this->admin->id]);
+        $item2 = Item::factory()->sold()->create([
+            'auction_id' => $auction2->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+
+        $w1 = $this->createWonItem(['winning_price' => 1005, 'quantity' => 1, 'commission_amount' => 0, 'shipping_fee' => 0, 'total_amount' => 1005]);
+        $w2 = WonItem::factory()->create([
+            'item_id' => $item2->id,
+            'winner_id' => $this->winner->id,
+            'winning_price' => 1005,
+            'quantity' => 1,
+            'commission_amount' => 0,
+            'shipping_fee' => 0,
+            'total_amount' => 1005,
+        ]);
+
+        $totals = InvoiceService::buyerTotals(collect([$w1->load('item'), $w2->load('item')]));
+
+        $this->assertSame(2010, $totals['subtotal']);
+        $this->assertSame(200, $totals['tax_amount']);
+        $this->assertSame(2210, $totals['grand_total']);
+    }
+
     public function test_seller_payment_notice_calculates_net_amount(): void
     {
         WonItem::factory()->create([
