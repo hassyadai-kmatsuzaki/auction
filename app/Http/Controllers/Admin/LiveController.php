@@ -9,32 +9,20 @@ use App\Actions\Auction\ResumeAuctionAction;
 use App\Actions\Auction\StartAuctionAction;
 use App\Actions\Auction\ToggleEntranceAction;
 use App\Actions\Item\AdjustPriceAction;
+use App\Services\AuctionService;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
-use App\Models\BidParticipant;
-use App\Models\Item;
 use App\Models\Lane;
-use App\Services\AuctionService;
+use App\Models\Item;
+use App\Models\BidParticipant;
 use App\Services\BidService;
 use App\Services\CountdownService;
-use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
-/**
- * 管理画面・ライブ進行コントローラ
- *
- * 2026-09-08 (A-7): 開始処理を StartAuctionAction に一本化する過程で本ファイルの大半を
- * 誤って削除したため、ルート定義・LiveControllerTest・管理画面フロント
- * （pages/admin/LiveAuctions.tsx / LiveControl.tsx / features/live-control）が要求する
- * レスポンス契約から再構成した。本番に配置されている原本（md5 ec98cc97…、7/16 セットB）と
- * 突合し、差異があれば原本の挙動に合わせること。
- */
 class LiveController extends Controller
 {
-    use MediaUrlTrait;
-
     public function __construct(
         protected BidService                   $bidService,
         protected CountdownService             $countdownService,
@@ -48,160 +36,191 @@ class LiveController extends Controller
         private readonly AuctionService        $auctionService,
     ) {}
 
+
     /**
-     * ライブ管理対象のオークション一覧（準備中・予定・開催中）と進捗統計
+     * ライブ管理用オークション一覧
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function auctionList()
+    public function auctionList(Request $request)
     {
-        $auctions = Auction::whereIn('status', ['preparing', 'scheduled', 'live'])
-            ->withCount([
-                'lanes',
-                'lanes as active_lanes_count' => fn ($q) => $q->where('status', 'active'),
-                'items',
-                'items as registered_items_count' => fn ($q) => $q->where('status', 'registered'),
-                'items as sold_items_count'       => fn ($q) => $q->where('status', 'sold'),
-                'items as unsold_items_count'     => fn ($q) => $q->where('status', 'unsold'),
-                'items as live_items_count'       => fn ($q) => $q->where('status', 'live'),
-            ])
-            ->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END")
-            ->orderBy('event_date')
-            ->orderBy('start_time')
-            ->get();
+        // SQLite互換のorderBy
+        $driver = config('database.default');
+        $query = Auction::whereIn('status', ['preparing', 'scheduled', 'live']);
+        
+        if ($driver === 'sqlite') {
+            $query->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'preparing' THEN 2 ELSE 3 END");
+        } else {
+            $query->orderByRaw("FIELD(status, 'live', 'scheduled', 'preparing')");
+        }
+        
+        $auctions = $query->orderBy('event_date', 'asc')
+            ->get()
+            ->map(function ($auction) {
+                // レーン情報
+                $lanes = Lane::where('auction_id', $auction->id)->get();
+                $activeLanes = $lanes->where('status', 'active')->count();
+                
+                // アイテム統計
+                $items = Item::where('auction_id', $auction->id);
+                $totalItems = (clone $items)->count();
+                $registeredItems = (clone $items)->where('status', 'registered')->count();
+                $liveItems = (clone $items)->where('status', 'live')->count();
+                $soldItems = (clone $items)->where('status', 'sold')->count();
+                $unsoldItems = (clone $items)->where('status', 'unsold')->count();
 
-        // レーン割当済み件数（lane_items）はオークション単位で一括取得
-        $assignedByAuction = DB::table('lane_items')
-            ->join('lanes', 'lane_items.lane_id', '=', 'lanes.id')
-            ->whereIn('lanes.auction_id', $auctions->pluck('id'))
-            ->selectRaw('lanes.auction_id, COUNT(*) as cnt')
-            ->groupBy('lanes.auction_id')
-            ->pluck('cnt', 'auction_id');
+                // レーンに割り当て済みのアイテム数
+                $assignedItems = DB::table('lane_items')
+                    ->join('lanes', 'lane_items.lane_id', '=', 'lanes.id')
+                    ->where('lanes.auction_id', $auction->id)
+                    ->count();
 
-        $data = $auctions->map(function (Auction $a) use ($assignedByAuction) {
-            return [
-                'id'         => $a->id,
-                'title'      => $a->title,
-                'status'     => $a->status,
-                'event_date' => $a->event_date,
-                'start_time' => $a->start_time,
-                'lane_count' => $a->lane_count,
-                'is_published' => (bool) $a->is_published,
-                'statistics' => [
-                    'lane_count'       => (int) $a->lanes_count,
-                    'active_lanes'     => (int) $a->active_lanes_count,
-                    'total_items'      => (int) $a->items_count,
-                    'registered_items' => (int) $a->registered_items_count,
-                    'assigned_items'   => (int) ($assignedByAuction[$a->id] ?? 0),
-                    'sold_items'       => (int) $a->sold_items_count,
-                    'unsold_items'     => (int) $a->unsold_items_count,
-                    'live_items'       => (int) $a->live_items_count,
-                ],
-            ];
-        })->values();
+                return [
+                    'id' => $auction->id,
+                    'title' => $auction->title,
+                    'event_date' => $auction->event_date->format('Y-m-d'),
+                    'start_time' => $auction->start_time,
+                    'status' => $auction->status,
+                    'statistics' => [
+                        'lane_count' => $lanes->count(),
+                        'active_lanes' => $activeLanes,
+                        'total_items' => $totalItems,
+                        'registered_items' => $registeredItems,
+                        'assigned_items' => $assignedItems,
+                        'live_items' => $liveItems,
+                        'sold_items' => $soldItems,
+                        'unsold_items' => $unsoldItems,
+                    ],
+                ];
+            });
 
         return response()->json([
             'success' => true,
-            'data'    => ['auctions' => $data],
+            'data' => [
+                'auctions' => $auctions,
+            ],
         ]);
     }
 
     /**
-     * ライブ管理画面の状態（オークション・レーン・全商品・統計）
+     * ライブオークション状態取得（管理者用）
      *
-     * レーンの進行状態は参加者向けと同じ BidService::getLiveState を土台にし、
-     * 管理者向けに「現在の入札者一覧」「レーン内の全商品」「商品統計」を足す。
+     * @param int $auctionId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show($auctionId)
     {
-        $auction = Auction::findOrFail($auctionId);
+        $auction = Auction::with(['lanes.currentItem.media'])->findOrFail($auctionId);
 
-        $liveState = $this->bidService->getLiveState($auction);
-        $lanes     = $auction->lanes()->orderBy('lane_number')->get()->keyBy('id');
+        $lanesData = [];
+        foreach ($auction->lanes()->orderBy('lane_number')->get() as $lane) {
+            $currentItemData = null;
+            
+            if ($lane->currentItem) {
+                $item = $lane->currentItem;
+                $activeBidderCount = BidParticipant::forItem($item->id)->active()->count();
+                
+                // アクティブな入札者一覧を取得
+                $activeBidders = BidParticipant::forItem($item->id)
+                    ->active()
+                    ->with('user:id,name')
+                    ->get()
+                    ->map(function ($p) {
+                        return [
+                            'user_id' => $p->user_id,
+                            'user_name' => $p->user->name ?? '不明',
+                            'activated_at' => $p->activated_at->toIso8601String(),
+                        ];
+                    });
 
-        // 現在商品の入札者一覧（アクティブのみ・氏名付き）を一括取得
-        $currentItemIds = collect($liveState['lanes'] ?? [])
-            ->pluck('current_item.id')->filter()->values()->all();
-        $biddersByItem = collect();
-        if (!empty($currentItemIds)) {
-            $biddersByItem = BidParticipant::whereIn('item_id', $currentItemIds)
-                ->where('is_active', true)
-                ->with('user:id,name,trade_name')
-                ->orderBy('activated_at')
-                ->get()
-                ->groupBy('item_id');
-        }
-
-        $laneData = collect($liveState['lanes'] ?? [])->map(function (array $lane) use ($lanes, $biddersByItem) {
-            $laneModel   = $lanes->get($lane['lane_id']);
-            $currentItem = $lane['current_item'];
-
-            if ($currentItem) {
-                $currentItem['active_bidders'] = ($biddersByItem->get($currentItem['id']) ?? collect())
-                    ->map(fn (BidParticipant $p) => [
-                        'user_id'      => $p->user_id,
-                        'user_name'    => $p->user?->trade_name ?: ($p->user?->name ?? "user#{$p->user_id}"),
-                        'activated_at' => optional($p->activated_at)->toIso8601String(),
-                    ])->values()->all();
+                $currentItemData = [
+                    'id' => $item->id,
+                    'item_number' => $item->item_number,
+                    'exhibit_code' => $item->exhibit_code,
+                    'species_name' => $item->species_name,
+                    'quantity' => $item->quantity,
+                    'start_price' => $item->start_price,
+                    'current_price' => $item->current_price,
+                    'estimated_price' => $item->estimated_price,
+                    'status' => $item->status,
+                    'is_premium' => $item->is_premium,
+                    'thumbnail_path' => $item->thumbnail_path,
+                    'active_bidders_count' => $activeBidderCount,
+                    'active_bidders' => $activeBidders,
+                ];
             }
 
-            // レーン内の全商品（並び順つき）
-            $allItems = $laneModel
-                ? $laneModel->items()->orderBy('lane_items.sequence_order')->get()
-                : collect();
-            $activeCounts = $allItems->isEmpty() ? collect() : BidParticipant::whereIn('item_id', $allItems->pluck('id'))
-                ->where('is_active', true)
-                ->selectRaw('item_id, COUNT(*) as cnt')
-                ->groupBy('item_id')
-                ->pluck('cnt', 'item_id');
+            // レーンに割り当てられた商品を取得
+            $queuedItems = $lane->items()
+                ->whereIn('status', ['registered', 'live'])
+                ->orderBy('lane_items.sequence_order')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
+                        'species_name' => $item->species_name,
+                        'status' => $item->status,
+                        'sequence' => $item->pivot->sequence_order,
+                    ];
+                });
 
-            return [
-                'lane_id'      => $lane['lane_id'],
-                'lane_number'  => $lane['lane_number'],
-                'lane_name'    => $lane['lane_name'] ?? null,
-                'status'       => $lane['status'],
-                'current_item' => $currentItem,
-                // 管理画面のカードはレーン直下の countdown_seconds / phase を見る
-                'countdown_seconds' => $currentItem['countdown_seconds'] ?? null,
-                'phase'             => $currentItem['phase'] ?? null,
-                'all_items'    => $allItems->map(fn (Item $i) => [
-                    'id'                   => $i->id,
-                    'item_number'          => $i->item_number,
-                    'exhibit_code'         => $i->exhibit_code,
-                    'species_name'         => $i->species_name,
-                    'quantity'             => $i->quantity,
-                    'start_price'          => $i->start_price,
-                    'current_price'        => $i->current_price,
-                    'status'               => $i->status,
-                    'is_premium'           => (bool) $i->is_premium,
-                    'thumbnail_path'       => $this->resolveMediaUrl($i->thumbnail_path),
-                    'sequence'             => $i->pivot->sequence_order ?? null,
-                    'active_bidders_count' => (int) ($activeCounts[$i->id] ?? 0),
-                ])->values()->all(),
+            // 全商品（sold/unsold含む）
+            $allItems = $lane->items()
+                ->orderBy('lane_items.sequence_order')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'item_number' => $item->item_number,
+                        'exhibit_code' => $item->exhibit_code,
+                        'species_name' => $item->species_name,
+                        'quantity' => $item->quantity,
+                        'start_price' => $item->start_price,
+                        'current_price' => $item->current_price,
+                        'status' => $item->status,
+                        'is_premium' => $item->is_premium,
+                        'thumbnail_path' => $item->thumbnail_path,
+                        'sequence' => $item->pivot->sequence_order,
+                    ];
+                });
+
+            $lanesData[] = [
+                'lane_id' => $lane->id,
+                'lane_number' => $lane->lane_number,
+                'status' => $lane->status,
+                'current_item' => $currentItemData,
+                'queued_items' => $queuedItems,
+                'queued_count' => $queuedItems->count(),
+                'all_items' => $allItems,
                 'all_items_count' => $allItems->count(),
             ];
-        })->values();
+        }
 
+        // 今日の商品統計
         $itemStats = [
-            'total'      => (int) $auction->items()->count(),
-            'registered' => (int) $auction->items()->where('status', 'registered')->count(),
-            'live'       => (int) $auction->items()->where('status', 'live')->count(),
-            'sold'       => (int) $auction->items()->where('status', 'sold')->count(),
-            'unsold'     => (int) $auction->items()->where('status', 'unsold')->count(),
+            'total' => $auction->items()->count(),
+            'registered' => $auction->items()->where('status', 'registered')->count(),
+            'live' => $auction->items()->where('status', 'live')->count(),
+            'sold' => $auction->items()->where('status', 'sold')->count(),
+            'unsold' => $auction->items()->where('status', 'unsold')->count(),
         ];
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'auction'    => [
-                    'id'          => $auction->id,
-                    'title'       => $auction->title,
-                    'status'      => $auction->status,
-                    'event_date'  => $auction->event_date,
-                    'start_time'  => $auction->start_time,
-                    'lane_count'  => $auction->lane_count,
-                    'is_published' => (bool) $auction->is_published,
-                    'is_test'     => (bool) $auction->is_test,
+            'data' => [
+                'auction' => [
+                    'id' => $auction->id,
+                    'title' => $auction->title,
+                    'status' => $auction->status,
+                    'event_date' => $auction->event_date->format('Y-m-d'),
+                    'start_time' => $auction->start_time,
+                    'countdown_seconds' => $auction->countdown_seconds,
+                    'default_bid_increment' => $auction->default_bid_increment,
                 ],
-                'lanes'      => $laneData,
+                'lanes' => $lanesData,
                 'item_stats' => $itemStats,
             ],
         ]);
@@ -210,10 +229,14 @@ class LiveController extends Controller
     /**
      * オークション開始
      *
-     * A-7 (2026-09-08): 開始処理は StartAuctionAction に一本化。
-     *   旧実装はここに同じ内容の別実装（レーン作成・割当・1商品目 live 化・Cache::put・dispatch）
-     *   があり、自動開始と同じ秒に押されると1商品目が孤立していた。
-     *   manual: true により、進行ジョブが死んでいる場合に限り押し直しで復旧できる挙動は温存している。
+     * A-7 (2026-09-08): 開始処理を StartAuctionAction に一本化。
+     *   旧実装はここに自動開始と同内容の別実装（レーン作成・割当・1商品目 live 化・Cache::put・dispatch）を
+     *   持っており、自動開始と同じ秒に押されると1商品目が孤立していた。
+     *   manual: true は「進行ジョブの heartbeat が 30 秒以上止まっている場合に限り、
+     *   押し直しで start_at を上書きして復旧できる」挙動（旧 Cache::put の意図）を温存するためのもの。
+     *
+     * @param int $auctionId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function start($auctionId)
     {
@@ -226,6 +249,7 @@ class LiveController extends Controller
             ], 400);
         }
 
+        // 商品があるか確認
         if ($auction->items()->count() === 0) {
             return response()->json([
                 'success' => false,
@@ -235,7 +259,15 @@ class LiveController extends Controller
 
         try {
             $this->startAction->start($auction, ['preparing', 'scheduled'], true);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // QueryException は RuntimeException の子なので先に捕まえる。SQL 文言を画面に出さない。
+            \Log::error('LiveController@start: DB error', ['auction_id' => $auction->id, 'error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'オークション開始中にエラーが発生しました。ログを確認してください。',
+            ], 500);
         } catch (\RuntimeException $e) {
+            // 状態不一致（同時押し・自動開始との競合）や商品ゼロなど、StartAuctionAction の事前検証
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -262,52 +294,32 @@ class LiveController extends Controller
         return $this->resumeAction->execute($auction)->toResponse();
     }
 
-    /** オークション終了（残りの商品は不成立） */
+    /** オークション終了 */
     public function finish($auctionId)
     {
         $auction = Auction::findOrFail($auctionId);
         return $this->finishAction->execute($auction)->toResponse();
     }
 
-    /**
-     * 次の商品へ
-     *
-     * A-6 (2026-09-08): 入札者が2名以上のときは MoveToNextItemAction が失敗を返す
-     * （旧実装は握りつぶして商品を宙に浮かせていた）。失敗理由はそのまま画面に出る。
-     */
-    public function nextItem($laneId)
+    /** 次の商品へ進む（手動） */
+    public function nextItem(Request $request, $laneId)
     {
         $lane = Lane::with(['auction', 'currentItem'])->findOrFail($laneId);
         return $this->nextItemAction->execute($lane)->toResponse();
     }
 
-    /**
-     * 価格調整
-     *
-     * ⚠ live 中の使用は運用ルールで禁止（AdjustPriceAction はロック・カウントダウン連動なしの素 update）。
-     */
+    /** 価格手動調整 */
     public function adjustPrice(Request $request, $itemId)
     {
-        $validator = Validator::make($request->all(), [
-            'new_price' => ['required', 'numeric', 'min:0'],
-            'reason'    => ['nullable', 'string', 'max:255'],
-        ]);
+        $validator = Validator::make($request->all(), ['new_price' => 'required|numeric|min:0']);
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => '入力内容に誤りがあります。',
-                'errors'  => $validator->errors(),
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $item = Item::findOrFail($itemId);
-
-        return $this->adjustPriceAction->execute(
-            $item,
-            (float) $request->input('new_price'),
-            $request->input('reason'),
-            $request->user()?->id
-        )->toResponse();
+        $item = Item::with('auction')->findOrFail($itemId);
+        return $this->adjustPriceAction
+            ->execute($item, (float) $request->new_price, $request->input('reason'), auth()->id())
+            ->toResponse();
     }
 
     /**

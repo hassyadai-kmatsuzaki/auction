@@ -74,7 +74,8 @@ Route::post('/webhooks/ene', [\App\Http\Controllers\Webhook\EneWebhookController
     ->name('webhooks.ene');
 
 // 認証API（ゲスト・レート制限付き）
-Route::middleware('rate.limit:10,1')->prefix('auth')->group(function () {
+// B-3 (2026-09-08): 上限は system_settings の auth_rate_limit_per_minute（既定 10）。開催当日だけ 60 に上げる
+Route::middleware('rate.limit:auth_rate_limit_per_minute,1')->prefix('auth')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
     Route::post('/register', [RegisterController::class, 'register']);
     Route::post('/forgot-password', [PasswordResetController::class, 'forgot']);

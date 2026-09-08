@@ -94,6 +94,9 @@ class UpdateAuctionStatusAction
         //   進行ジョブ死亡時の押し直し復旧は StartAuctionAction 側で扱う。
         try {
             $this->startAction->start($auction, ['preparing', 'scheduled'], true);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error("Failed to start auction via status change (DB)", ['auction_id' => $auction->id, 'error' => $e->getMessage()]);
+            return ['error' => 'オークション開始中にエラーが発生しました。ログを確認してください。'];
         } catch (\RuntimeException $e) {
             return ['error' => $e->getMessage()];
         } catch (\Exception $e) {

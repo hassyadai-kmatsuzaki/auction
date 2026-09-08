@@ -144,11 +144,17 @@ class StartAuctionAction
 
     private function ensureLanes(Auction $auction): void
     {
-        $laneCount = $auction->lane_count ?: 1;
+        $laneCount = (int) ($auction->lane_count ?: 1);
 
-        $existing = $auction->lanes()->count();
-        for ($i = $existing + 1; $i <= $laneCount; $i++) {
-            Lane::create(['auction_id' => $auction->id, 'lane_number' => $i, 'status' => 'waiting']);
+        // A-7 (2026-09-08): 「既存件数+1 から採番」だと、既存レーンの番号が連番でない場合
+        //   （管理画面で作り直した・テストの factory が乱数を振った等）に (auction_id, lane_number) の
+        //   UNIQUE と衝突して開始が失敗する。旧 LiveController は「1本も無いときだけ作る」だった。
+        //   ここでは 1..lane_count のうち欠けている番号だけを作る（両方の挙動を包含する）。
+        $existingNumbers = $auction->lanes()->pluck('lane_number')->map(fn ($n) => (int) $n)->all();
+        for ($i = 1; $i <= $laneCount; $i++) {
+            if (!in_array($i, $existingNumbers, true)) {
+                Lane::create(['auction_id' => $auction->id, 'lane_number' => $i, 'status' => 'waiting']);
+            }
         }
     }
 
@@ -189,7 +195,13 @@ class StartAuctionAction
     private function startNextItem(Lane $lane, bool $startCountdown = true): ?Item
     {
         $nextItem = $lane->items()->where('status', 'registered')->orderBy('lane_items.sequence_order')->first();
-        if (!$nextItem) return null;
+        if (!$nextItem) {
+            // 旧 LiveController::startNextItem と同じく、商品のないレーンは finished にする。
+            // CountdownService::checkAutoFinishAuction は「全レーン finished」を自動終了条件にしているため、
+            // waiting のまま残すと空レーン1本で自動終了が永久に走らない。
+            $lane->update(['current_item_id' => null, 'status' => 'finished']);
+            return null;
+        }
 
         $nextItem->update(['status' => 'live', 'current_price' => $nextItem->start_price]);
         $lane->update(['current_item_id' => $nextItem->id, 'status' => 'active']);

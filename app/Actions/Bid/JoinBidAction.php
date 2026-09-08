@@ -205,8 +205,13 @@ class JoinBidAction
                 }
 
                 try {
-                    broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'joined'))
-                        ->toOthers();
+                    // B-2 (2026-09-08): 商品単位で間引く。既定 250ms。窓内の再送は次の CountdownTick が正す。
+                    //   間隔は system_settings（live_bidder_updated_throttle_ms）で当日に調整できる。
+                    $throttleMs = (int) \App\Models\SystemSetting::get('live_bidder_updated_throttle_ms', 250);
+                    if (\App\Support\BroadcastThrottle::allow("bidder_updated:item:{$item->id}", $throttleMs)) {
+                        broadcast(new BidderUpdated($auction->id, $lane->id, $item->id, $activeBidderCount, 'joined'))
+                            ->toOthers();
+                    }
                 } catch (\Exception $e) {
                     BroadcastFailureLogger::warn('BidderUpdated', $e->getMessage(), [
                         'item_id' => $item->id, 'lane_id' => $lane->id, 'event_type' => 'joined',

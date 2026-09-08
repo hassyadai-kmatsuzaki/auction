@@ -664,6 +664,7 @@ class CountdownService
                 ->where('limit_price', '>=', $newPrice)
                 ->orderBy('limit_price', 'desc')
                 ->orderBy('created_at', 'asc')
+                ->orderBy('id', 'asc') // A-8: 同秒タイの決着（adjustPriceByBidLimits と同じ理由）
                 ->get();
 
             $protectedUserIds = $validLimits->pluck('user_id')->toArray();
