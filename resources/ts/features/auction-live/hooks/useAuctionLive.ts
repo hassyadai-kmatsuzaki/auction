@@ -53,6 +53,15 @@ export function useAuctionLive(auctionId: number) {
   const pendingLaneChangesRef = useRef<Map<number, LaneChangedEvent>>(new Map());
   const rafIdRef = useRef<number | null>(null);
 
+  // ─── B-1: 再取得タイマーを1本に集約する ───────────────────────────────
+  //   旧実装は LaneChanged を受けるたびに setTimeout を張っていた（dedupe なし）。
+  //   開始直後は 4 レーン分の LaneChanged と AuctionStatusChanged('live') が
+  //   ほぼ同時に届くため、1 人あたり最大 5 本のタイマーが独立に発火し、
+  //   500 名 × 最大 5 本 = 最大 2,000 件の GET /live が 3 秒間に集中していた。
+  //   予約済みなら新たに張らないことで、どれだけイベントが重なっても 1 回に収束させる。
+  // ────────────────────────────────────────────────────────────────────────
+  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const flushPending = () => {
     rafIdRef.current = null;
     const ticks = pendingTicksRef.current;
@@ -118,6 +127,12 @@ export function useAuctionLive(auctionId: number) {
       ticks.forEach((event, laneId) => {
         const idx = newLanes.findIndex((l) => l.lane_id === laneId);
         if (idx === -1 || !newLanes[idx].current_item) return;
+        // A-2: 商品切替直後に届いた「前 item の遅延 tick」を新 item に誤適用しない。
+        //   PriceUpdated 側（下の 3.）には元から同じガードがあるが tick 側に無く、
+        //   切替直後に旧 item の tick が遅れて届くと新 item の価格・phase・人数を
+        //   旧値で上書きしていた。pre_bid 中に入札ボタンが一瞬活性化する経路でもある。
+        //   通常は次 tick で自己修復するが、レーンの進行状態が汚染されている間は持続する。
+        if (event.item_id !== newLanes[idx].current_item!.id) return;
         const phase = event.phase ?? 'bidding';
         newLanes[idx] = {
           ...newLanes[idx],
@@ -197,12 +212,18 @@ export function useAuctionLive(auctionId: number) {
     rafIdRef.current = requestAnimationFrame(flushPending);
   };
 
-  // unmount 時に rAF をキャンセル（メモリリーク防止）
+  // unmount 時に rAF と再取得タイマーをキャンセル（メモリリーク防止）
   useEffect(() => {
     return () => {
       if (rafIdRef.current !== null && typeof cancelAnimationFrame !== 'undefined') {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
+      }
+      // B-1: 予約済みの再取得タイマーを破棄する。
+      //   残したままだと、離脱後に invalidateQueries が走って無駄なリクエストになる。
+      if (refetchTimerRef.current !== null) {
+        clearTimeout(refetchTimerRef.current);
+        refetchTimerRef.current = null;
       }
       pendingTicksRef.current.clear();
       pendingPricesRef.current.clear();
@@ -210,6 +231,42 @@ export function useAuctionLive(auctionId: number) {
       pendingLaneChangesRef.current.clear();
     };
   }, []);
+
+  /**
+   * B-1: 分散付きの再取得を「1本だけ」予約する。
+   *
+   *   - 既に予約済みなら何もしない。4 レーン同時切替でも実際の再取得は 1 回。
+   *   - 既定（商品切替）は 1.5〜6.0 秒。
+   *     下限 1.5 秒は落札→次商品の遷移窓（サーバー側で進行状態が
+   *     一瞬空になる 1 秒未満の区間）を避けるため。ここに着弾すると
+   *     cache-miss 復旧パスが旧商品でレーンを再生成しうる（2026-08-14 第7回）。
+   *     上限 6.0 秒は 500 名を分散させるため。旧値 3.0 秒では
+   *     500 名 ÷ 1.5 秒 = 330 件/秒 が着弾していた。
+   *     切替時は LaneChanged 自体が current_item をキャッシュへ直接反映するので、
+   *     この再取得は my_bid_status / 指値 / auto-bid 結果などの補完にすぎない。
+   *
+   *   - 開始時は呼び出し側が 0〜2.5 秒を渡す（下の注意を参照）。
+   *
+   *   ⚠ 開始時だけは事情が違う。ProcessAuctionCountdownJob は
+   *     各レーンの startCountdown を済ませてから AuctionStatusChanged('live') を
+   *     broadcast するが、このとき LaneItemChanged は飛ばない。
+   *     つまり「最初の商品を画面に出す」唯一の経路がこの再取得になる。
+   *     待たせすぎると商品が出ないまま参加者が待つことになるため、
+   *     開始時は下限 0・上限 2.5 秒（500 名で約 200 件/秒）に狭める。
+   *     lane は broadcast より前に live になっているので下限 0 でも古いデータは掴まない。
+   */
+  const scheduleRefetch = (minMs = 1500, maxMs = 6000) => {
+    if (refetchTimerRef.current !== null) return;
+    const span = Math.max(1, maxMs - minMs);
+    const delay = minMs + Math.floor(Math.random() * span);
+    refetchTimerRef.current = setTimeout(() => {
+      refetchTimerRef.current = null;
+      queryClient.invalidateQueries({
+        queryKey: LIVE_STATE_QUERY_KEY(auctionId),
+        refetchType: 'active', // 表示中のクエリのみ refetch
+      });
+    }, delay);
+  };
 
   /**
    * WebSocket受信時にキャッシュを直接更新（再フェッチなし）
@@ -239,26 +296,24 @@ export function useAuctionLive(auctionId: number) {
     pendingLaneChangesRef.current.set(event.lane_id, event);
     scheduleFlush();
 
-    // lane changed 時には refetch も走らせて auto_bid 反映や server-only fields を取得
-    // ただし jitter 付きで分散（120 名同時 refetch を回避）
+    // lane changed 時には refetch も走らせて auto_bid 反映や server-only fields を取得。
     //
-    // DEV-2026-011 (R6): jitter に下限 1.5s を設ける。
-    //   落札→次商品の遷移窓（サーバー側で countdown cache が空になる 1 秒未満の区間）に
-    //   refetch が着弾すると、cache-miss 復旧パスが走る。サーバー側は Cache::add で上書きを
-    //   防いでいるが、そもそも窓の外に着弾させる。価格・カウントは WS で即時反映済みなので
-    //   auto_bid 等の反映が最大 1.5s 遅れても体感影響はない。
+    // DEV-2026-011 (R6) の下限 1.5s は scheduleRefetch 側が引き継いでいる。
+    // B-1: ここで直接 setTimeout を張るのをやめ、集約版に委譲する。
+    //   旧実装はレーンごとに独立したタイマーを張っていたため、
+    //   4 レーンが近接して切り替わると 1 人で 4 回 refetch していた。
     if (event.current_item) {
-      const jitter = 1500 + Math.floor(Math.random() * 1500); // 1.5-3.0 秒（遷移窓の外）
-      setTimeout(() => {
-        queryClient.invalidateQueries({
-          queryKey: LIVE_STATE_QUERY_KEY(auctionId),
-          refetchType: 'active', // 表示中のクエリのみ refetch
-        });
-      }, jitter);
+      scheduleRefetch();
     }
   };
 
-  /** サーバーから強制再取得（エラー時・再接続時に使用） */
+  /**
+   * サーバーから強制再取得（即時・分散なし）。
+   *
+   * ⚠ 全参加者が同時に踏む経路では使わないこと。500 名が同一秒に着弾する。
+   *   一斉に発火しうる経路（AuctionStatusChanged / LaneChanged）は scheduleRefetch を使う。
+   *   これを使ってよいのは、個別ユーザーの操作起因（入室・お気に入り操作など）に限る。
+   */
   const refetch = () =>
     queryClient.invalidateQueries({ queryKey: LIVE_STATE_QUERY_KEY(auctionId) });
 
@@ -267,6 +322,7 @@ export function useAuctionLive(auctionId: number) {
     isLoading: query.isLoading,
     error: query.error,
     refetch,
+    scheduleRefetch,
     // WebSocketハンドラ（useAuctionSocketに渡す）
     applyCountdownTick,
     applyPriceUpdated,

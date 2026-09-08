@@ -20,6 +20,8 @@ import {
   DialogActions,
   Tooltip,
   TextField,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -32,13 +34,17 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Close as CloseIcon,
-  Reorder as ReorderIcon,
   Store as StoreIcon,
   ConfirmationNumber as ConfirmationNumberIcon,
   ForwardToInbox as ForwardToInboxIcon,
+  Lock as LockIcon,
+  LockOpen as LockOpenIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
+import LaneGroupBoard, { LaneStats } from '../../features/admin/lane-group-mode/LaneGroupBoard';
+import { GroupDropTarget, LaneGroup } from '../../features/admin/lane-group-mode/types';
+import { deriveLaneGroups, sumQuantity } from '../../features/admin/lane-group-mode/groupUtils';
 
 interface LaneItem {
   id: number;
@@ -55,6 +61,7 @@ interface LaneItem {
   sequence_order?: number;
   seller_profile_id?: number;
   seller_name?: string;
+  seller_code?: string | null;
 }
 
 interface Lane {
@@ -70,6 +77,9 @@ interface AuctionData {
   title: string;
   status: string;
   lane_count: number;
+  /** 出品者順序の確定日時。null の間は出品者グループ配置モード */
+  lane_order_confirmed_at: string | null;
+  lane_order_confirmed_by_name?: string | null;
 }
 
 interface Statistics {
@@ -140,6 +150,27 @@ export default function LaneAssignment() {
   // 出品者グループのドラッグ
   const [draggedSellerGroup, setDraggedSellerGroup] = useState<SellerGroup | null>(null);
   const [dragOverSellerIdx, setDragOverSellerIdx] = useState<number | null>(null);
+
+  // 出品者順序の確定 / 解除（null=出品者グループ配置モード、値あり=生体単位モード）
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [unconfirmDialogOpen, setUnconfirmDialogOpen] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  // グループ配置モードの「常時展開」。端末ごとに記憶する
+  const [expandAll, setExpandAll] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('laneAssignment.expandAll') !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('laneAssignment.expandAll', expandAll ? 'on' : 'off');
+    } catch {
+      /* 記憶できなくても動作に影響しない */
+    }
+  }, [expandAll]);
 
   // 未割当アイテムから出品者グループを構築（既存のsellerGroupsの順序を維持）
   const buildSellerGroups = (items: LaneItem[], existingGroups: SellerGroup[]): SellerGroup[] => {
@@ -463,6 +494,87 @@ export default function LaneAssignment() {
     }
   };
 
+  // 出品者順序を確定（グループ配置モード → 生体単位モード）
+  const handleConfirmOrder = async () => {
+    try {
+      setConfirmLoading(true);
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/confirm-order`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setConfirmDialogOpen(false);
+      await fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '確定に失敗しました', severity: 'error' });
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  // 確定を解除（生体単位モード → グループ配置モード）
+  const handleUnconfirmOrder = async () => {
+    try {
+      setConfirmLoading(true);
+      const response = await axios.post(`/api/admin/auctions/${auctionId}/lanes/unconfirm-order`);
+      setSnackbar({ open: true, message: response.data.message, severity: 'success' });
+      setUnconfirmDialogOpen(false);
+      await fetchData();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || '解除に失敗しました', severity: 'error' });
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  // 出品者グループをまとめて移動（レーン間 / レーン内 / 未割当との間）
+  const handleMoveGroup = async (group: LaneGroup, sourceLaneId: number | null, target: GroupDropTarget) => {
+    if (operating) return;
+    const ids = new Set(group.items.map((i) => i.id));
+    const pool = sourceLaneId === null ? unassignedItems : (lanes.find((l) => l.id === sourceLaneId)?.items ?? []);
+    const movedItems = group.items
+      .map((gi) => pool.find((i) => i.id === gi.id))
+      .filter((i): i is LaneItem => !!i);
+    if (movedItems.length === 0) return;
+
+    // 楽観的更新（失敗時は fetchData で巻き戻す）
+    setLanes((prev) => {
+      let next = prev.map((lane) => ({ ...lane, items: lane.items.filter((i) => !ids.has(i.id)) }));
+      if (target.laneId !== null) {
+        next = next.map((lane) => {
+          if (lane.id !== target.laneId) return lane;
+          const items = [...lane.items];
+          const at = target.beforeItemId === null ? -1 : items.findIndex((i) => i.id === target.beforeItemId);
+          items.splice(at === -1 ? items.length : at, 0, ...movedItems);
+          return { ...lane, items };
+        });
+      }
+      return next;
+    });
+    if (sourceLaneId === null) {
+      setUnassignedItems((prev) => prev.filter((i) => !ids.has(i.id)));
+    }
+    if (target.laneId === null) {
+      setUnassignedItems((prev) => [...prev, ...movedItems].sort((a, b) => a.item_number - b.item_number));
+    }
+    const delta = (sourceLaneId === null ? 1 : 0) - (target.laneId === null ? 1 : 0);
+    if (delta !== 0) {
+      setStatistics((prev) => prev ? {
+        ...prev,
+        assigned_items: prev.assigned_items + delta * movedItems.length,
+        unassigned_items: prev.unassigned_items - delta * movedItems.length,
+      } : prev);
+    }
+
+    try {
+      await axios.post(`/api/admin/auctions/${auctionId}/lanes/move-group`, {
+        item_ids: movedItems.map((i) => i.id),
+        target_lane_id: target.laneId,
+        before_item_id: target.beforeItemId,
+      });
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'グループの移動に失敗しました', severity: 'error' });
+      fetchData();
+    }
+  };
+
   // レーン追加
   const handleAddLane = async () => {
     try {
@@ -629,6 +741,61 @@ export default function LaneAssignment() {
     );
   }
 
+  const isConfirmed = !!auction?.lane_order_confirmed_at;
+  const confirmedAtLabel = auction?.lane_order_confirmed_at
+    ? new Date(auction.lane_order_confirmed_at).toLocaleString('ja-JP', {
+        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+      })
+    : '';
+  const laneStats = (lane: Lane): LaneStats => ({
+    groups: deriveLaneGroups(lane.items).length,
+    items: lane.items.length,
+    quantity: sumQuantity(lane.items),
+  });
+
+  // レーンの見出し（両モード共通）。右上に グループ数 / 生体数 / 合計匹数 を出す
+  const renderLaneHeader = (lane: Lane, stats: LaneStats) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, flexShrink: 0 }}>
+          レーン {lane.lane_name || lane.lane_number}
+        </Typography>
+        {auction?.status !== 'live' && (
+          <Tooltip title="レーン名を編集">
+            <IconButton
+              size="small"
+              onClick={() => setEditingLaneName({ id: lane.id, name: lane.lane_name || '' })}
+            >
+              <EditIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+        {!isConfirmed && <Chip label={`${stats.groups}グループ`} size="small" />}
+        <Chip
+          label={`生体 ${stats.items}点`}
+          size="small"
+          color={stats.items > 0 ? 'success' : 'default'}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+          {stats.quantity}匹
+        </Typography>
+        {auction?.status !== 'live' && lanes.length > 1 && (
+          <Tooltip title="このレーンを削除">
+            <IconButton
+              size="small"
+              color="error"
+              onClick={() => handleDeleteLane(lane.id, lane.lane_number, lane.items.length)}
+            >
+              <CloseIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+    </Box>
+  );
+
   return (
     <Box>
       {/* アクション */}
@@ -674,6 +841,28 @@ export default function LaneAssignment() {
           >
             自動割当
           </Button>
+          {isConfirmed ? (
+            <Button
+              startIcon={<LockOpenIcon />}
+              onClick={() => setUnconfirmDialogOpen(true)}
+              variant="outlined"
+              size="small"
+              disabled={auction?.status === 'live' || confirmLoading}
+            >
+              確定を解除
+            </Button>
+          ) : (
+            <Button
+              startIcon={<LockIcon />}
+              onClick={() => setConfirmDialogOpen(true)}
+              variant="contained"
+              color="success"
+              size="small"
+              disabled={auction?.status === 'live' || confirmLoading}
+            >
+              出品者順序を確定
+            </Button>
+          )}
           {(() => {
             const unissuedCount = lanes.reduce(
               (acc, l) => acc + l.items.filter((it) => !it.exhibit_code).length,
@@ -720,6 +909,32 @@ export default function LaneAssignment() {
         </Box>
       </Box>
 
+      {/* 配置モードの案内（出品者順序の確定前 / 後） */}
+      {isConfirmed ? (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <strong>ステップ 2／2：生体単位の並び替え</strong>{' '}
+          出品者順序は確定済みです（{confirmedAtLabel}
+          {auction?.lane_order_confirmed_by_name ? `・${auction.lane_order_confirmed_by_name}` : ''}）。
+          生体単位でレーン間・レーン内の並び替えができます。出品者グループ単位の操作に戻すには「確定を解除」を押してください。
+        </Alert>
+      ) : (
+        <Alert
+          severity="info"
+          sx={{ mb: 3, '& .MuiAlert-action': { alignItems: 'center', pt: 0 } }}
+          action={
+            <FormControlLabel
+              control={<Checkbox size="small" checked={expandAll} onChange={(e) => setExpandAll(e.target.checked)} />}
+              label="常時展開"
+              sx={{ mr: 0.5, whiteSpace: 'nowrap' }}
+            />
+          }
+        >
+          <strong>ステップ 1／2：出品者グループの配置</strong>{' '}
+          出品者グループ（通常と匿名は別グループ）単位で、レーン間・レーン内の並び替えができます。
+          生体単位の並び替えは「出品者順序を確定」後に行えます。
+        </Alert>
+      )}
+
       {/* 統計情報 */}
       {statistics && (
         <Paper sx={{ p: 2, mb: 3 }}>
@@ -752,6 +967,17 @@ export default function LaneAssignment() {
         </Paper>
       )}
 
+      {!isConfirmed ? (
+        <LaneGroupBoard
+          lanes={lanes}
+          unassignedItems={unassignedItems}
+          sellerOrder={sellerGroups.map((g) => g.seller_profile_id)}
+          expandAll={expandAll}
+          disabled={operating || auction?.status === 'live'}
+          onMoveGroup={handleMoveGroup}
+          renderLaneHeader={renderLaneHeader}
+        />
+      ) : (
       <Grid container spacing={2}>
         {/* 未割り当て生体 */}
         <Grid item xs={12} md={3}>
@@ -972,41 +1198,7 @@ export default function LaneAssignment() {
                   onDragOver={(e) => handleDragOverLane(e, lane.id, lane.items.length)}
                   onDrop={() => handleDropOnLane(lane.id)}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: 1 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, flexShrink: 0 }}>
-                        レーン {lane.lane_name || lane.lane_number}
-                      </Typography>
-                      {auction?.status !== 'live' && (
-                        <Tooltip title="レーン名を編集">
-                          <IconButton
-                            size="small"
-                            onClick={() => setEditingLaneName({ id: lane.id, name: lane.lane_name || '' })}
-                          >
-                            <EditIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Chip
-                        label={`${lane.items.length}件`}
-                        size="small"
-                        color={lane.items.length > 0 ? 'success' : 'default'}
-                      />
-                      {auction?.status !== 'live' && lanes.length > 1 && (
-                        <Tooltip title="このレーンを削除">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteLane(lane.id, lane.lane_number, lane.items.length)}
-                          >
-                            <CloseIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </Box>
+                  {renderLaneHeader(lane, laneStats(lane))}
 
                   {lane.items.length === 0 ? (
                     <Box
@@ -1127,6 +1319,7 @@ export default function LaneAssignment() {
           </Grid>
         </Grid>
       </Grid>
+      )}
 
       {/* 自動割り当てダイアログ */}
       <Dialog open={autoAssignDialogOpen} onClose={() => setAutoAssignDialogOpen(false)} maxWidth="sm" fullWidth>
@@ -1136,8 +1329,9 @@ export default function LaneAssignment() {
             未割当の生体を、出品者グループ単位でレーンに自動割り当てします。
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            出品者ごとに生体をグループ化し、各レーンの生体数が均等になるよう分配します。
-            レーン内の出品者グループ順はランダムになります。
+            出品者ごと（通常出品と匿名出品は別グループ）に生体をまとめ、各レーンの生体数が均等になるよう分配します。
+            レーン内は「出品者順序」の並び順で、匿名グループは各レーンの末尾にまとまります。
+            出品者順序が未設定の場合はランダム順になります。
           </Alert>
           <Alert severity="success">
             既に割り当て済みの生体はそのまま維持され、未割当の生体のみが各レーン末尾に追加されます。
@@ -1155,6 +1349,70 @@ export default function LaneAssignment() {
             color="primary"
           >
             {autoAssignLoading ? <CircularProgress size={20} /> : '自動割当を実行'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 出品者順序 確定ダイアログ */}
+      <Dialog open={confirmDialogOpen} onClose={() => !confirmLoading && setConfirmDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>出品者順序を確定</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            レーン内の出品者順序を確定し、生体単位の並び替えに切り替えます。
+            確定後は出品者グループ単位の移動はできなくなります（「確定を解除」で戻せます）。
+          </Typography>
+          <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'grey.50' }}>
+            {lanes.map((lane) => {
+              const stats = laneStats(lane);
+              return (
+                <Typography key={lane.id} variant="body2">
+                  レーン {lane.lane_name || lane.lane_number}：{stats.groups}グループ / 生体 {stats.items}点 / {stats.quantity}匹
+                </Typography>
+              );
+            })}
+            <Typography variant="body2">
+              未割当：{unassignedItems.length}点{unassignedItems.length > 0 ? '（未割当のまま残ります）' : ''}
+            </Typography>
+          </Paper>
+          <Typography variant="body2">よろしいですか?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)} disabled={confirmLoading}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleConfirmOrder}
+            disabled={confirmLoading}
+            variant="contained"
+            color="success"
+            startIcon={confirmLoading ? <CircularProgress size={18} /> : <LockIcon />}
+          >
+            確定する
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 出品者順序 確定解除ダイアログ */}
+      <Dialog open={unconfirmDialogOpen} onClose={() => !confirmLoading && setUnconfirmDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>確定を解除</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            出品者グループ単位の配置に戻します。現在のレーン内の並びはそのまま保持され、
+            同じ出品者が離れて並んでいる場合は連続する区間ごとに別のグループとして表示されます。
+          </Typography>
+          <Alert severity="warning">解除中は生体単位の並び替えができません。</Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUnconfirmDialogOpen(false)} disabled={confirmLoading}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleUnconfirmOrder}
+            disabled={confirmLoading}
+            variant="contained"
+            startIcon={confirmLoading ? <CircularProgress size={18} /> : <LockOpenIcon />}
+          >
+            解除する
           </Button>
         </DialogActions>
       </Dialog>

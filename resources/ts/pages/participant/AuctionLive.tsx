@@ -114,11 +114,38 @@ export default function AuctionLive() {
     isLoading,
     error,
     refetch,
+    scheduleRefetch,
     applyCountdownTick,
     applyPriceUpdated,
     applyBidderUpdated,
     applyLaneChanged,
   } = useAuctionLive(auctionId);
+
+  // A-3 / B-1: 全参加者が同時に踏む経路の再取得を分散させるための遅延タイマー。
+  //   落札一覧（useWonItems）は live 状態とは別クエリなので、
+  //   scheduleRefetch とは独立にここで分散させる。
+  //   終了時は 500 名が同時に「自分の落札結果」を取りに来るため、無分散だと
+  //   一番見られている瞬間に取得失敗が起きる。
+  //   refetchWon は下の useWonItems で宣言されるため、ref 経由で参照する。
+  const wonRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refetchWonRef = useRef<(() => void) | null>(null);
+  const scheduleWonRefetch = useCallback((minMs = 500, maxMs = 5000) => {
+    if (wonRefetchTimerRef.current !== null) return;
+    const delay = minMs + Math.floor(Math.random() * Math.max(1, maxMs - minMs));
+    wonRefetchTimerRef.current = setTimeout(() => {
+      wonRefetchTimerRef.current = null;
+      refetchWonRef.current?.();
+    }, delay);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (wonRefetchTimerRef.current !== null) {
+        clearTimeout(wonRefetchTimerRef.current);
+        wonRefetchTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // 実装書 H2: liveState を ref で保持し、useCallback ハンドラから常に最新値を参照
   //   useCallback の依存配列に liveState を入れると毎レンダーで関数 ref が変わってしまうため、
@@ -164,11 +191,15 @@ export default function AuctionLive() {
 
   // 落札一覧
   const { items: wonItems, totalAmount: wonTotalAmount, refetch: refetchWon } = useWonItems(auctionId);
+  // A-3: scheduleWonRefetch から最新の refetchWon を呼べるようにする
+  refetchWonRef.current = refetchWon;
 
   // 入室カウントダウン
   const { entranceCountdown } = useEntranceControl(entranceAllowed, entranceAt, () => {
     setEntranceAllowed(true);
-    refetch();
+    // A-3 / B-1: 入室解禁時刻は全員共通なので、この 0 到達も全画面で同時に起きる。
+    //   旧実装は即時 refetch で待機室が開く瞬間に 500 名が同一秒に着弾していた。
+    scheduleRefetch(0, 2500);
   });
 
   // 指値モーダル用フック（選択中のアイテムの指値）
@@ -278,14 +309,21 @@ export default function AuctionLive() {
         setStartingCountdown(null);
         // countdownFinishedRef のリセットは liveState が 'live' に確定してから行う
         // （ここで即リセットすると、refetch完了前に古い 'starting' 状態で再表示されるリスクがある）
-        refetch();
+        //
+        // A-3 / B-1: 旧実装は即時 refetch だったため 500 名が同一秒に着弾していた。
+        //   開始時はこの再取得が「最初の商品を画面に出す」唯一の経路なので
+        //   待たせすぎない。0〜2.5 秒で 500 名を分散させる（約 200 件/秒）。
+        scheduleRefetch(0, 2500);
       } else if (e.status === 'finished') {
-        refetch();
-        refetchWon();
+        // A-3: 終了時は 500 名が同時に「自分の落札結果」を取りに来る。
+        //   一番見られている瞬間なので、両クエリとも分散させる。
+        scheduleRefetch(0, 4000);
+        scheduleWonRefetch();
         showSnackbar(e.message || 'オークションが終了しました', 'success');
       } else {
         // 上記以外（管理者による待機室公開・閉鎖 等）は最新状態を再取得
-        refetch();
+        // A-3: これも全参加者が同時に踏むため分散させる
+        scheduleRefetch(0, 4000);
         if (e.message) showSnackbar(e.message, 'info');
       }
     },
@@ -518,7 +556,11 @@ export default function AuctionLive() {
         }
         // 完了後は startingEndsAt もクリアして再トリガーを防止
         setStartingEndsAt(null);
-        refetch();
+        // A-3 / B-1: 開始カウントダウンの 0 到達は全参加者でほぼ同時に起きる。
+        //   旧実装は即時 refetch で 500 名が同一秒に着弾していた。
+        //   AuctionStatusChanged('live') 経由の再取得と 1 本に集約される
+        //   （scheduleRefetch は予約済みなら何もしないため、開始時の 2 経路が 1 回に収束する）。
+        scheduleRefetch(0, 2500);
         return;
       }
       setStartingCountdown(remaining);
@@ -544,7 +586,17 @@ export default function AuctionLive() {
     );
   }
 
-  if (error) {
+  // A-1: 初回取得に失敗したときだけ全画面をエラーに置換する。
+  //
+  //   旧実装は error だけで分岐していたため、liveState を保持していても
+  //   レーン表示ごと「データの取得に失敗しました／ホームに戻る」に置き換わっていた。
+  //   再取得は 3 回（1s/2s/4s）リトライしてから error になり、WS 接続中は
+  //   refetchInterval が false なので、次の LaneChanged / status イベントまで
+  //   自動復帰しない。開始直後に php-fpm が飽和すると全員が同時にこれを踏む。
+  //
+  //   データを持っている状態での失敗は表示を維持し、警告帯だけで知らせる。
+  //   価格・カウントダウン・入札者数は WebSocket が運び続けるため入札は継続できる。
+  if (error && !liveState) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Alert severity="error" sx={{ mb: 2 }}>データの取得に失敗しました。</Alert>
@@ -720,6 +772,15 @@ export default function AuctionLive() {
       />
 
       <Container maxWidth="xl" sx={{ py: isCompactLive ? 0.5 : 2, px: isCompactLive ? 1 : undefined }}>
+        {/* A-1: データを持ったまま再取得に失敗した場合。
+             レーン表示は維持し、帯だけで知らせる。カウントダウンと価格は
+             WebSocket が運び続けるため入札は継続できる。回復すると帯は消える。 */}
+        {error && (
+          <Alert severity="warning" sx={{ mb: isCompactLive ? 1 : 2 }}>
+            最新情報の取得に失敗しました。表示が遅れている可能性があります。
+          </Alert>
+        )}
+
         {/* レーングリッド（横持ちスマホは 2x2 固定） */}
         <Grid container spacing={isCompactLive ? 1 : 2}>
           {liveState.lanes.map((lane) => (

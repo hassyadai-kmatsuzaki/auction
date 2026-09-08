@@ -31,7 +31,11 @@ class ItemReviewWorkflowTest extends TestCase
         $this->seedRoles();
         $this->admin = $this->createAdmin();
         $this->participant = $this->createParticipant();
-        $this->auction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
+        $this->auction = Auction::factory()->scheduled()->create([
+            'created_by' => $this->admin->id,
+            // 生体単位の割当 API は出品者順序の確定後にのみ使える（LaneGroupModeTest で未確定時を検証）
+            'lane_order_confirmed_at' => now(),
+        ]);
         $this->lane = Lane::factory()->create(['auction_id' => $this->auction->id, 'lane_number' => 1]);
 
         $seller = $this->createSeller();

@@ -27,6 +27,8 @@ class Auction extends BaseModel
         'start_notice_sent_at',
         'description',
         'lane_count',
+        'lane_order_confirmed_at',
+        'lane_order_confirmed_by',
         'default_bid_increment',  // @deprecated フロントエンドで未使用。DB互換のため残存。
         'countdown_seconds',      // @deprecated フロントエンドで未使用。bid_countdown_seconds に置き換え済み。
         'deposit_required',
@@ -56,6 +58,7 @@ class Auction extends BaseModel
         'published_at' => 'datetime',
         'start_notice_sent_at' => 'datetime',
         'lane_count' => 'integer',
+        'lane_order_confirmed_at' => 'datetime',
         'countdown_seconds' => 'integer',
         'payment_deadline_hours' => 'integer',
         'shipping_deadline_hours' => 'integer',
@@ -88,6 +91,23 @@ class Auction extends BaseModel
     public function lanes()
     {
         return $this->hasMany(Lane::class);
+    }
+
+    /**
+     * レーン割当の出品者順序を確定した管理者
+     */
+    public function laneOrderConfirmer()
+    {
+        return $this->belongsTo(User::class, 'lane_order_confirmed_by');
+    }
+
+    /**
+     * レーン割当の出品者順序が確定済みか。
+     * false の間はレーン画面が出品者グループ配置モードになり、生体単位の割当 API は拒否される。
+     */
+    public function isLaneOrderConfirmed(): bool
+    {
+        return $this->lane_order_confirmed_at !== null;
     }
 
     /**

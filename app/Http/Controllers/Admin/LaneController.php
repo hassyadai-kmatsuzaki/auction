@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Exhibit\IssueExhibitCodeAction;
 use App\Http\Controllers\Controller;
 use App\Models\Auction;
+use App\Models\AuctionSellerOrder;
 use App\Models\Item;
 use App\Models\Lane;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -53,6 +55,9 @@ class LaneController extends Controller
                     'title' => $auction->title,
                     'status' => $auction->status,
                     'lane_count' => $auction->lane_count,
+                    // 出品者順序の確定状態。null の間はレーン画面が出品者グループ配置モードになる
+                    'lane_order_confirmed_at' => $auction->lane_order_confirmed_at?->toIso8601String(),
+                    'lane_order_confirmed_by_name' => $auction->laneOrderConfirmer?->name,
                 ],
                 'lanes' => $lanes->map(function ($lane) {
                     return [
@@ -82,6 +87,7 @@ class LaneController extends Controller
                                 'sequence_order' => $item->pivot->sequence_order,
                                 'seller_profile_id' => $item->seller_profile_id,
                                 'seller_name' => $sellerName,
+                                'seller_code' => $item->sellerProfile?->seller_code,
                             ];
                         }),
                     ];
@@ -106,6 +112,7 @@ class LaneController extends Controller
                         'thumbnail_path' => $item->thumbnail_path,
                         'seller_profile_id' => $item->seller_profile_id,
                         'seller_name' => $sellerName,
+                        'seller_code' => $item->sellerProfile?->seller_code,
                     ];
                 }),
                 'statistics' => [
@@ -274,6 +281,11 @@ class LaneController extends Controller
             ], 400);
         }
 
+        // 生体単位の操作は出品者順序の確定後に限る（未確定の間はグループ単位 moveGroup のみ）
+        if ($rejected = $this->rejectUnlessLaneOrderConfirmed($auction)) {
+            return $rejected;
+        }
+
         $validator = Validator::make($request->all(), [
             'item_id' => 'required|exists:items,id',
             'position' => 'nullable|integer|min:1',
@@ -362,6 +374,11 @@ class LaneController extends Controller
             ], 400);
         }
 
+        // 生体単位の操作は出品者順序の確定後に限る（未確定の間はグループ単位 moveGroup のみ）
+        if ($rejected = $this->rejectUnlessLaneOrderConfirmed($auction)) {
+            return $rejected;
+        }
+
         $lane = Lane::where('auction_id', $auctionId)->where('id', $laneId)->firstOrFail();
         
         $deleted = DB::table('lane_items')
@@ -399,6 +416,11 @@ class LaneController extends Controller
             ], 400);
         }
 
+        // 生体単位の操作は出品者順序の確定後に限る（未確定の間はグループ単位 moveGroup のみ）
+        if ($rejected = $this->rejectUnlessLaneOrderConfirmed($auction)) {
+            return $rejected;
+        }
+
         $validator = Validator::make($request->all(), [
             'item_ids' => 'required|array',
             'item_ids.*' => 'exists:items,id',
@@ -431,11 +453,14 @@ class LaneController extends Controller
     /**
      * 自動割り当て（Greedy Bin Packing 方式）
      *
-     * 未割当の生体を出品者グループ単位で均等にレーンに分配する。
-     * - 出品者ごとにグループ化 → グループサイズ降順でソート
-     * - 各グループを「現在最も生体が少ないレーン」に割り当て（Greedy）
-     * - 各レーン内の出品者グループ順序をランダムにシャッフル
+     * 未割当の生体を「出品者 × 通常/匿名」のグループ単位で均等にレーンに分配する。
+     * - 同じ出品者でも通常出品と匿名出品は別グループ
+     * - 通常グループ → 匿名グループの順に、サイズ降順で「現在最も生体が少ないレーン」へ（Greedy）
+     * - レーン内は 通常グループ（出品者順序 display_order 順）→ 匿名グループ（同）の順。
+     *   つまり匿名グループは各レーンの末尾にまとまる。出品者順序が未設定ならランダム順
+     * - グループ内の生体順は seller_display_order → item_number（出品者順序ページの並び）
      * - 既存割り当ての末尾に追加（既存は一切変更しない）
+     * - 確定状態（lane_order_confirmed_at）は変更しない。確定前後どちらでも実行できる
      */
     public function autoAssign($auctionId)
     {
@@ -468,7 +493,8 @@ class LaneController extends Controller
             // 審査中(draft)・承認済み(registered) の両方を自動割り当て対象にする。
             ->whereIn('status', ['draft', 'registered'])
             ->whereNotIn('id', $assignedItemIds)
-            ->orderBy('item_number')
+            // 出品者順序ページで並べた生体順（seller_display_order）を尊重し、未設定は商品番号順
+            ->orderByRaw('seller_display_order IS NULL, seller_display_order, item_number')
             ->get();
 
         if ($unassignedItems->isEmpty()) {
@@ -478,30 +504,40 @@ class LaneController extends Controller
             ], 422);
         }
 
-        // 匿名出品は通常生体と分離し、レーン末尾にランダム配置する
-        $anonymousItems = $unassignedItems->where('is_anonymous', true)->values();
-        $normalItems = $unassignedItems->where('is_anonymous', false)->values();
+        // Step 2: 「出品者 × 通常/匿名」でグループ化（seller_profile_id = NULL は 0 として扱う）
+        //   同じ出品者でも通常出品と匿名出品は別グループ。匿名グループは各レーン末尾にまとめる。
+        $bySeller = fn($item) => $item->seller_profile_id ?? 0;
+        $normalGroups = $unassignedItems->where('is_anonymous', false)->groupBy($bySeller);
+        $anonGroups = $unassignedItems->where('is_anonymous', true)->groupBy($bySeller);
 
-        // Step 2: 通常生体を出品者ごとにグループ化（seller_profile_id = NULL は 0 として扱う）
-        $groups = $normalItems->groupBy(fn($item) => $item->seller_profile_id ?? 0);
-
-        // Step 3: グループサイズ降順ソート（大きいグループから処理）
-        $sortedGroups = $groups->sortByDesc(fn($group) => $group->count())->values();
+        // Step 3: レーン内の並び順を決める出品者ランク。
+        //   出品者順序（auction_seller_orders.display_order）があればそれに従い、
+        //   未設定ならランダム（従来のシャッフルと同じ挙動）。同一出品者の通常/匿名は同じランク。
+        $displayOrders = AuctionSellerOrder::where('auction_id', $auctionId)
+            ->pluck('display_order', 'seller_profile_id');
+        $sellerIds = $unassignedItems->map($bySeller)->unique()->values();
+        $rank = [];
+        if ($displayOrders->isEmpty()) {
+            foreach ($sellerIds->shuffle()->values() as $i => $sid) {
+                $rank[$sid] = $i;
+            }
+        } else {
+            foreach ($sellerIds as $sid) {
+                // 出品者順序に載っていない出品者は末尾
+                $rank[$sid] = $displayOrders->has($sid) ? (int) $displayOrders[$sid] : PHP_INT_MAX;
+            }
+        }
 
         // Step 4: 各レーンの現在の生体数を初期値に設定
         $laneCounts = [];
+        $laneGroups = [];
         foreach ($lanes as $lane) {
             $laneCounts[$lane->id] = DB::table('lane_items')->where('lane_id', $lane->id)->count();
+            $laneGroups[$lane->id] = ['normal' => [], 'anon' => []];
         }
 
-        // Greedy Bin Packing: 各グループを「最も空いているレーン」に割り当て
-        $laneAssignments = [];
-        foreach ($lanes as $lane) {
-            $laneAssignments[$lane->id] = collect();
-        }
-
-        foreach ($sortedGroups as $group) {
-            // 現在最も生体数が少ないレーンを選択（同数の場合はレーン番号が小さい方）
+        // 現在最も生体数が少ないレーンを選ぶ（同数の場合はレーン番号が小さい方）
+        $pickEmptiestLane = function () use (&$laneCounts) {
             $targetLaneId = null;
             $minCount = PHP_INT_MAX;
             foreach ($laneCounts as $laneId => $count) {
@@ -510,40 +546,32 @@ class LaneController extends Controller
                     $targetLaneId = $laneId;
                 }
             }
+            return $targetLaneId;
+        };
 
-            $laneAssignments[$targetLaneId] = $laneAssignments[$targetLaneId]->merge($group);
-            $laneCounts[$targetLaneId] += $group->count();
-        }
-
-        // Step 5: 各レーン内の出品者グループをシャッフル（グループ単位でランダム化）
-        foreach ($laneAssignments as $laneId => $items) {
-            if ($items->isEmpty()) {
-                continue;
+        // Greedy Bin Packing: 通常グループ → 匿名グループの順に、サイズ降順で「最も空いているレーン」へ
+        foreach (['normal' => $normalGroups, 'anon' => $anonGroups] as $kind => $groups) {
+            foreach ($groups->sortByDesc(fn($group) => $group->count()) as $sid => $group) {
+                $targetLaneId = $pickEmptiestLane();
+                $laneGroups[$targetLaneId][$kind][] = ['sid' => $sid, 'items' => $group];
+                $laneCounts[$targetLaneId] += $group->count();
             }
-            // 出品者グループに再分割してシャッフル後にフラット化
-            $shuffledGroups = $items
-                ->groupBy(fn($item) => $item->seller_profile_id ?? 0)
-                ->values()
-                ->shuffle();
-            $laneAssignments[$laneId] = $shuffledGroups->flatten(1);
         }
 
-        // Step 5.5: 匿名出品をレーン末尾にランダム配置
-        // 通常生体を全て配置し終えた後、匿名生体を「個体単位で」シャッフルし、
-        // 最も空いているレーンへ1個ずつ均等に追加する（出品者グループ化はしない）
-        if ($anonymousItems->isNotEmpty()) {
-            foreach ($anonymousItems->shuffle() as $anonItem) {
-                $targetLaneId = null;
-                $minCount = PHP_INT_MAX;
-                foreach ($laneCounts as $laneId => $count) {
-                    if ($count < $minCount) {
-                        $minCount = $count;
-                        $targetLaneId = $laneId;
-                    }
+        // Step 5: レーン内の順序を決める。
+        //   通常グループを出品者ランク順 → 匿名グループを出品者ランク順（匿名は末尾にまとまる）。
+        //   グループ内の生体順は Step 1 の取得順（seller_display_order → item_number）をそのまま使う。
+        $laneAssignments = [];
+        foreach ($laneGroups as $laneId => $kinds) {
+            $ordered = collect();
+            foreach (['normal', 'anon'] as $kind) {
+                $groups = $kinds[$kind];
+                usort($groups, fn($a, $b) => [$rank[$a['sid']], $a['sid']] <=> [$rank[$b['sid']], $b['sid']]);
+                foreach ($groups as $group) {
+                    $ordered = $ordered->concat($group['items']->values()->all());
                 }
-                $laneAssignments[$targetLaneId] = $laneAssignments[$targetLaneId]->push($anonItem);
-                $laneCounts[$targetLaneId]++;
             }
+            $laneAssignments[$laneId] = $ordered;
         }
 
         // Step 6: lane_items に挿入（既存アイテムの後ろに追加）
@@ -628,6 +656,249 @@ class LaneController extends Controller
                 'assigned_count' => $totalAssigned,
                 'lane_summary' => $laneStats,
             ],
+        ]);
+    }
+
+    /**
+     * 出品者順序を確定する（出品者グループ配置モード → 生体単位モード）。
+     *
+     * 確定後は assignItem / removeItem / reorderItems（生体単位）が使えるようになり、
+     * moveGroup（グループ単位）は拒否される。冪等（既に確定済みなら何もしない）。
+     */
+    public function confirmLaneOrder($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは操作できません。',
+            ], 400);
+        }
+
+        if ($auction->lane_order_confirmed_at === null) {
+            $auction->update([
+                'lane_order_confirmed_at' => now(),
+                'lane_order_confirmed_by' => Auth::id(),
+            ]);
+        }
+        $auction->refresh()->load('laneOrderConfirmer');
+
+        return response()->json([
+            'success' => true,
+            'message' => '出品者順序を確定しました。生体単位で並び替えができます。',
+            'data' => [
+                'lane_order_confirmed_at' => $auction->lane_order_confirmed_at?->toIso8601String(),
+                'lane_order_confirmed_by_name' => $auction->laneOrderConfirmer?->name,
+            ],
+        ]);
+    }
+
+    /**
+     * 出品者順序の確定を解除する（生体単位モード → 出品者グループ配置モード）。
+     *
+     * 解除後、レーン内で同じ出品者が離れて並んでいる場合は連続区間ごとに別グループとして扱われる
+     * （フロント側で lane_items の並びから導出する。データは変更しない）。
+     */
+    public function unconfirmLaneOrder($auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは操作できません。',
+            ], 400);
+        }
+
+        $auction->update([
+            'lane_order_confirmed_at' => null,
+            'lane_order_confirmed_by' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => '出品者順序の確定を解除しました。出品者グループ単位で配置できます。',
+        ]);
+    }
+
+    /**
+     * 出品者グループ（同一出品者 × 通常/匿名）をまとめて移動する（確定前のみ）。
+     *
+     * body:
+     *  - item_ids[]     : グループを構成する生体ID。全て同じ出品者・同じ匿名区分で、
+     *                     現在位置も揃っていること（全て未割当 or 全て同じレーン）
+     *  - target_lane_id : 移動先レーン。null なら未割当に戻す
+     *  - before_item_id : 移動先レーン内でこの生体の直前に挿入する。null なら末尾
+     *
+     * グループ内の生体順は、レーンから動かす場合は現在の並び、未割当から入れる場合は
+     * seller_display_order → item_number（出品者順序ページの並び）を使う。
+     */
+    public function moveGroup(Request $request, $auctionId)
+    {
+        $auction = Auction::findOrFail($auctionId);
+
+        if (!in_array($auction->status, ['preparing', 'scheduled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '開始済みのオークションでは操作できません。',
+            ], 400);
+        }
+
+        if ($auction->lane_order_confirmed_at !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => '出品者順序は確定済みです。グループ単位の移動は「確定を解除」後に行ってください。',
+                'code' => 'LANE_ORDER_CONFIRMED',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'integer',
+            'target_lane_id' => 'nullable|integer',
+            'before_item_id' => 'nullable|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $itemIds = array_values(array_unique(array_map('intval', $request->item_ids)));
+        $beforeItemId = $request->input('before_item_id');
+        $targetLaneId = $request->input('target_lane_id');
+
+        $items = Item::where('auction_id', $auctionId)
+            ->whereIn('id', $itemIds)
+            ->orderByRaw('seller_display_order IS NULL, seller_display_order, item_number')
+            ->get();
+
+        if ($items->count() !== count($itemIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => '指定された生体が見つかりません。',
+            ], 422);
+        }
+
+        $groupKeys = $items->map(fn($item) => ($item->seller_profile_id ?? 0) . ':' . ($item->is_anonymous ? 1 : 0))->unique();
+        if ($groupKeys->count() !== 1) {
+            return response()->json([
+                'success' => false,
+                'message' => '同じ出品者・同じ匿名区分の生体だけをまとめて移動できます。',
+            ], 422);
+        }
+
+        if ($beforeItemId !== null && in_array((int) $beforeItemId, $itemIds, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => '移動するグループ自身の生体は挿入位置に指定できません。',
+            ], 422);
+        }
+
+        $targetLane = null;
+        if ($targetLaneId !== null) {
+            $targetLane = Lane::where('auction_id', $auctionId)->where('id', $targetLaneId)->first();
+            if (!$targetLane) {
+                return response()->json([
+                    'success' => false,
+                    'message' => '移動先のレーンが見つかりません。',
+                ], 404);
+            }
+        }
+
+        $current = DB::table('lane_items')->whereIn('item_id', $itemIds)->get();
+        $sourceLaneIds = $current->pluck('lane_id')->unique();
+        if ($sourceLaneIds->count() > 1 || ($current->isNotEmpty() && $current->count() !== count($itemIds))) {
+            return response()->json([
+                'success' => false,
+                'message' => '複数のレーンにまたがる生体はまとめて移動できません。',
+            ], 422);
+        }
+        $sourceLaneId = $sourceLaneIds->first();
+
+        if ($targetLane !== null && $beforeItemId !== null) {
+            $beforeInTarget = DB::table('lane_items')
+                ->where('lane_id', $targetLane->id)
+                ->where('item_id', $beforeItemId)
+                ->exists();
+            if (!$beforeInTarget) {
+                return response()->json([
+                    'success' => false,
+                    'message' => '挿入位置に指定した生体が移動先レーンにありません。',
+                ], 422);
+            }
+        }
+
+        if ($targetLane === null && $sourceLaneId === null) {
+            return response()->json([
+                'success' => true,
+                'message' => 'すでに未割当です。',
+            ]);
+        }
+
+        // グループ内の順序: レーンから動かすときは現在の並び、未割当からは seller_display_order → item_number
+        if ($sourceLaneId !== null) {
+            $seq = $current->pluck('sequence_order', 'item_id');
+            $orderedIds = $items->sortBy(fn($item) => $seq[$item->id])->pluck('id')->values()->all();
+        } else {
+            $orderedIds = $items->pluck('id')->values()->all();
+        }
+
+        DB::transaction(function () use ($itemIds, $orderedIds, $sourceLaneId, $targetLane, $beforeItemId) {
+            // 1) 元の位置から外す
+            if ($sourceLaneId !== null) {
+                DB::table('lane_items')->where('lane_id', $sourceLaneId)->lockForUpdate()->get();
+                DB::table('lane_items')->whereIn('item_id', $itemIds)->delete();
+                $this->resequenceLane($sourceLaneId);
+            }
+
+            if ($targetLane === null) {
+                return; // 未割当へ戻すだけ
+            }
+
+            // 2) 挿入位置を決める
+            $maxSequence = DB::table('lane_items')
+                ->where('lane_id', $targetLane->id)
+                ->max('sequence_order') ?? 0;
+
+            if ($beforeItemId !== null) {
+                $before = DB::table('lane_items')
+                    ->where('lane_id', $targetLane->id)
+                    ->where('item_id', $beforeItemId)
+                    ->first();
+                $position = $before ? (int) $before->sequence_order : $maxSequence + 1;
+                if ($position <= $maxSequence) {
+                    DB::table('lane_items')
+                        ->where('lane_id', $targetLane->id)
+                        ->where('sequence_order', '>=', $position)
+                        ->increment('sequence_order', count($orderedIds));
+                }
+            } else {
+                $position = $maxSequence + 1;
+            }
+
+            // 3) グループを連続して挿入
+            $rows = [];
+            foreach ($orderedIds as $offset => $itemId) {
+                $rows[] = [
+                    'lane_id' => $targetLane->id,
+                    'item_id' => $itemId,
+                    'sequence_order' => $position + $offset,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+            DB::table('lane_items')->insert($rows);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => $targetLane === null
+                ? '出品者グループを未割当に戻しました。'
+                : '出品者グループを移動しました。',
         ]);
     }
 
@@ -781,6 +1052,24 @@ class LaneController extends Controller
                 'unassigned_count' => $deletedCount,
             ],
         ]);
+    }
+
+    /**
+     * 生体単位の操作（割当・解除・並び替え）は出品者順序の確定後に限る。
+     * 未確定の間は出品者グループ単位（moveGroup）でのみ配置を変えられる。
+     * 未確定なら 422 レスポンスを返し、確定済みなら null を返す。
+     */
+    private function rejectUnlessLaneOrderConfirmed(Auction $auction)
+    {
+        if ($auction->lane_order_confirmed_at !== null) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => '出品者順序が未確定のため、生体単位の操作はできません。先に「出品者順序を確定」を押してください。',
+            'code' => 'LANE_ORDER_NOT_CONFIRMED',
+        ], 422);
     }
 
     /**

@@ -253,6 +253,10 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::delete('auctions/{auctionId}/lanes/{laneId}', [AdminLaneController::class, 'deleteLane']);
     Route::put('auctions/{auctionId}/lanes/{laneId}', [AdminLaneController::class, 'updateLane']);
     Route::post('auctions/{auctionId}/lanes/auto-assign', [AdminLaneController::class, 'autoAssign']);
+    // 出品者グループ配置モード（出品者順序の確定前）
+    Route::post('auctions/{auctionId}/lanes/move-group', [AdminLaneController::class, 'moveGroup']);
+    Route::post('auctions/{auctionId}/lanes/confirm-order', [AdminLaneController::class, 'confirmLaneOrder']);
+    Route::post('auctions/{auctionId}/lanes/unconfirm-order', [AdminLaneController::class, 'unconfirmLaneOrder']);
     Route::post('auctions/{auctionId}/lanes/bulk-unassign', [AdminLaneController::class, 'bulkUnassign']);
     Route::post('auctions/{auctionId}/lanes/issue-exhibit-codes', [AdminLaneController::class, 'issueExhibitCodes']);
     Route::post('auctions/{auctionId}/lanes/resend-exhibit-codes', [AdminLaneController::class, 'resendExhibitCodeNotifications']);
