@@ -105,6 +105,65 @@ class OptimizedMediaTest extends TestCase
             ->assertStatus(404);
     }
 
+    // ---- 2026-09-08: B-6 縮退スイッチ（元画像固定）/ B-8 排他 / 相対パス ----
+
+    private function setLiveSetting(string $key, string $value, string $type): void
+    {
+        \App\Models\SystemSetting::updateOrCreate(['setting_key' => $key], [
+            'setting_value' => $value, 'value_type' => $type,
+            'category' => 'live_operation', 'display_name' => $key, 'description' => '', 'is_public' => false,
+        ]);
+        \App\Models\SystemSetting::clearCache();
+    }
+
+    public function test_showByPath_は_元画像固定スイッチONで元画像へ302(): void
+    {
+        $this->setLiveSetting('live_image_optimization_bypass', '1', 'boolean');
+        Storage::disk('public')->put('items/1/1/orig.png', $this->makePngBytes(50, 50));
+
+        $r = $this->get('/api/media/optimized-by-path?path=' . urlencode('http://localhost/storage/items/1/1/orig.png') . '&preset=small');
+        $r->assertStatus(302);
+        $this->assertSame(config('app.url') . '/storage/items/1/1/orig.png', $r->headers->get('Location'));
+        $this->assertStringContainsString('max-age=300', $r->headers->get('Cache-Control') ?? '');
+        $this->assertEmpty(Storage::disk('public')->files('cache/media'), '迂回中は変換もキャッシュもしない');
+    }
+
+    public function test_show_は_元画像固定スイッチONで元画像へ302(): void
+    {
+        $this->setLiveSetting('live_image_optimization_bypass', '1', 'boolean');
+        Storage::disk('public')->put('items/1/1/orig.png', $this->makePngBytes(50, 50));
+        $media = $this->makeMedia('image/png', 'items/1/1/orig.png');
+
+        $r = $this->get("/api/media/{$media->id}/optimized?preset=thumb");
+        $r->assertStatus(302);
+        $this->assertSame(config('app.url') . '/storage/items/1/1/orig.png', $r->headers->get('Location'));
+    }
+
+    public function test_showByPath_は_変換ロック待ちに失敗したら元画像を200で返す(): void
+    {
+        config(['media.convert_wait_seconds' => 0]);
+        $png = $this->makePngBytes(90, 60);
+        Storage::disk('public')->put('items/1/1/busy.png', $png);
+
+        $opt = app(\App\Services\MediaOptimizer::class);
+        $p = $opt->resolveParams('thumb');
+        $held = \Illuminate\Support\Facades\Cache::lock('media:convert:' . md5($opt->cachePath('items/1/1/busy.png', $p)), 20);
+        $this->assertTrue($held->get());
+
+        $r = $this->get('/api/media/optimized-by-path?path=' . urlencode('http://localhost/storage/items/1/1/busy.png') . '&preset=thumb');
+        $r->assertStatus(200);
+        $this->assertSame($png, $r->getContent());
+        $this->assertEmpty(Storage::disk('public')->files('cache/media'));
+        $held->release();
+    }
+
+    public function test_showByPath_は_相対パスも受け付ける(): void
+    {
+        Storage::disk('public')->put('items/1/1/rel.png', $this->makePngBytes(90, 60));
+        $this->get('/api/media/optimized-by-path?path=items/1/1/rel.png&preset=thumb')->assertStatus(200);
+        $this->assertCount(1, Storage::disk('public')->files('cache/media'));
+    }
+
     /**
      * 単純な PNG バイト列を生成（GD で画像最適化処理が通る最小限）。
      */

@@ -4,38 +4,26 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ItemMedia;
+use App\Models\SystemSetting;
+use App\Services\MediaOptimizer;
 use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 
 /**
  * 画像の最適化配信（オンデマンドリサイズ + ディスクキャッシュ）
  *
- * フロントエンドから /api/media/{mediaId}/optimized?w=800&q=80 で呼ぶと
- * リサイズ済みWebP画像をキャッシュ付きで返す。
- * 2回目以降はキャッシュファイルを直接返すので高速。
+ * フロントエンドから /api/media/{mediaId}/optimized?preset=small で呼ぶと
+ * リサイズ済み WebP 画像をキャッシュ付きで返す。2回目以降はキャッシュファイルを返す。
+ *
+ * 変換・キャッシュ・例外処理の実体は MediaOptimizer（media:warm と共通）。
+ * 2026-09-08: A-12（exists 例外）/ B-8（変換の排他）/ B-6（元画像固定スイッチ）
  */
 class OptimizedMediaController extends Controller
 {
-    /** サイズプリセット（安全制限） */
-    private const SIZE_PRESETS = [
-        'thumb'  => ['width' => 200,  'quality' => 70],
-        'small'  => ['width' => 400,  'quality' => 75],
-        'medium' => ['width' => 800,  'quality' => 80],
-        'large'  => ['width' => 1200, 'quality' => 85],
-    ];
-
-    /** 許可する最大幅 */
-    private const MAX_WIDTH = 1600;
-
-    /** キャッシュ保存先（storage/app/public/cache/media/） */
-    private const CACHE_DIR = 'cache/media';
-
     public function __construct(
         private readonly StorageService $storage,
+        private readonly MediaOptimizer $optimizer,
     ) {}
 
     /**
@@ -56,74 +44,23 @@ class OptimizedMediaController extends Controller
 
         // 動画はリサイズ不可 → リダイレクト
         if ($media->mime_type && str_starts_with($media->mime_type, 'video/')) {
-            return response('', 302, [
-                'Location' => $this->storage->url($media->file_path),
-            ]);
+            return $this->redirectTo($this->storage->url($media->file_path), 0);
         }
 
-        // パラメータ解決
-        $preset = $request->query('preset');
-        if ($preset && isset(self::SIZE_PRESETS[$preset])) {
-            $width   = self::SIZE_PRESETS[$preset]['width'];
-            $quality = self::SIZE_PRESETS[$preset]['quality'];
-        } else {
-            $width   = min((int) ($request->query('w', 800)), self::MAX_WIDTH);
-            $quality = max(1, min(100, (int) ($request->query('q', 80))));
+        if ($this->bypassEnabled()) {
+            return $this->redirectTo($this->storage->url($media->file_path), 300);
         }
 
-        $format = $request->query('f', 'webp');
-        if (!in_array($format, ['webp', 'jpg'], true)) {
-            $format = 'webp';
-        }
+        $p = $this->optimizer->resolveParams(
+            $request->query('preset'), $request->query('w'), $request->query('q'), $request->query('f')
+        );
 
-        $ext = $format === 'webp' ? 'webp' : 'jpg';
-        $mime = $format === 'webp' ? 'image/webp' : 'image/jpeg';
-
-        // キャッシュキー
-        $cacheKey = md5($media->file_path . "_{$width}_{$quality}_{$format}");
-        $cachePath = self::CACHE_DIR . "/{$cacheKey}.{$ext}";
-
-        $disk = $this->storage->disk();
-
-        // キャッシュヒット
-        if (Storage::disk($disk)->exists($cachePath)) {
-            $content = Storage::disk($disk)->get($cachePath);
-            return $this->respondWithCache($content, $mime);
-        }
-
-        // 元画像の読み込み
-        $originalContent = Storage::disk($disk)->get($media->file_path);
-        if (!$originalContent) {
+        $variant = $this->optimizer->variant($media->file_path, $p, $media->mime_type);
+        if ($variant === null) {
             abort(404);
         }
 
-        // リサイズ & フォーマット変換
-        try {
-            $manager = new ImageManager(new GdDriver());
-            $image = $manager->read($originalContent);
-
-            // 元画像が指定幅より小さければリサイズしない
-            if ($image->width() > $width) {
-                $image = $image->scaleDown(width: $width);
-            }
-
-            if ($format === 'webp') {
-                $encoded = $image->toWebp($quality);
-            } else {
-                $encoded = $image->toJpeg($quality);
-            }
-
-            $optimized = (string) $encoded;
-        } catch (\Exception $e) {
-            \Log::warning('画像最適化失敗 (media_id=' . $mediaId . '): ' . $e->getMessage());
-            // 失敗時は元画像をそのまま返す
-            return $this->respondWithCache($originalContent, $media->mime_type ?? 'image/jpeg');
-        }
-
-        // キャッシュに保存
-        Storage::disk($disk)->put($cachePath, $optimized);
-
-        return $this->respondWithCache($optimized, $mime);
+        return $this->respondWithCache($variant['content'], $variant['mime']);
     }
 
     /**
@@ -139,68 +76,51 @@ class OptimizedMediaController extends Controller
             abort(400);
         }
 
-        // フルURLからストレージパスを抽出
-        $storagePath = $this->extractStoragePath($path);
+        $storagePath = $this->optimizer->extractStoragePath($path);
         if (!$storagePath) {
             abort(404);
         }
 
-        $disk = $this->storage->disk();
-        if (!Storage::disk($disk)->exists($storagePath)) {
+        if ($this->bypassEnabled()) {
+            // 生の path パラメータではなく、ストレージ相対パスから組み立て直す（オープンリダイレクト防止）
+            return $this->redirectTo($this->storage->url($storagePath), 300);
+        }
+
+        $p = $this->optimizer->resolveParams(
+            $request->query('preset'), $request->query('w'), $request->query('q'), $request->query('f')
+        );
+
+        // 旧実装は先に元画像の exists() を見て 404 にしていた。variant() はキャッシュ命中なら元画像を
+        // 読まず、未命中で元画像が読めなければ null を返すので、結果は同じで S3 往復が 1 回減る。
+        $variant = $this->optimizer->variant($storagePath, $p);
+        if ($variant === null) {
             abort(404);
         }
 
-        // パラメータ解決
-        $preset = $request->query('preset');
-        if ($preset && isset(self::SIZE_PRESETS[$preset])) {
-            $width   = self::SIZE_PRESETS[$preset]['width'];
-            $quality = self::SIZE_PRESETS[$preset]['quality'];
-        } else {
-            $width   = min((int) ($request->query('w', 800)), self::MAX_WIDTH);
-            $quality = max(1, min(100, (int) ($request->query('q', 80))));
-        }
+        return $this->respondWithCache($variant['content'], $variant['mime']);
+    }
 
-        $format = $request->query('f', 'webp');
-        if (!in_array($format, ['webp', 'jpg'], true)) {
-            $format = 'webp';
-        }
+    /**
+     * B-6 縮退スイッチ: 画像最適化を迂回し、元画像（S3 直）へ 302 する。
+     * php-fpm の負担は「DB/S3 に触らない 302 を返すだけ」になる。転送量は増えるので平時は OFF。
+     */
+    private function bypassEnabled(): bool
+    {
+        return (bool) SystemSetting::get('live_image_optimization_bypass', false);
+    }
 
-        $ext = $format === 'webp' ? 'webp' : 'jpg';
-        $mime = $format === 'webp' ? 'image/webp' : 'image/jpeg';
-
-        $cacheKey = md5($storagePath . "_{$width}_{$quality}_{$format}");
-        $cachePath = self::CACHE_DIR . "/{$cacheKey}.{$ext}";
-
-        if (Storage::disk($disk)->exists($cachePath)) {
-            $content = Storage::disk($disk)->get($cachePath);
-            return $this->respondWithCache($content, $mime);
-        }
-
-        $originalContent = Storage::disk($disk)->get($storagePath);
-        if (!$originalContent) {
+    private function redirectTo(?string $url, int $maxAge): Response
+    {
+        if (!$url) {
             abort(404);
         }
 
-        try {
-            $manager = new ImageManager(new GdDriver());
-            $image = $manager->read($originalContent);
-
-            if ($image->width() > $width) {
-                $image = $image->scaleDown(width: $width);
-            }
-
-            $encoded = $format === 'webp'
-                ? $image->toWebp($quality)
-                : $image->toJpeg($quality);
-
-            $optimized = (string) $encoded;
-        } catch (\Exception $e) {
-            \Log::warning('画像最適化失敗 (path): ' . $e->getMessage());
-            return $this->respondWithCache($originalContent, 'image/jpeg');
+        $headers = ['Location' => $url];
+        if ($maxAge > 0) {
+            $headers['Cache-Control'] = "public, max-age={$maxAge}";
         }
 
-        Storage::disk($disk)->put($cachePath, $optimized);
-        return $this->respondWithCache($optimized, $mime);
+        return response('', 302, $headers);
     }
 
     /**
@@ -213,23 +133,5 @@ class OptimizedMediaController extends Controller
             'Cache-Control' => 'public, max-age=86400, s-maxage=604800, immutable',
             'ETag'          => '"' . md5($content) . '"',
         ]);
-    }
-
-    /**
-     * フルURLからストレージ相対パスを抽出
-     */
-    private function extractStoragePath(string $url): ?string
-    {
-        // S3 URL: https://bucket.s3.region.amazonaws.com/items/...
-        if (preg_match('#/(items/.+)$#', $url, $matches)) {
-            return $matches[1];
-        }
-
-        // ローカル URL: http://localhost/storage/items/...
-        if (preg_match('#/storage/(items/.+)$#', $url, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
     }
 }

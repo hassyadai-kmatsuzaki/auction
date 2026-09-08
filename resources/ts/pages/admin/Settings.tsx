@@ -9,7 +9,7 @@ import {
 import {
   Save as SaveIcon, Settings as SettingsIcon, AttachMoney as MoneyIcon,
   LocalShipping as ShippingIcon, Receipt as ReceiptIcon, Gavel as GavelIcon,
-  Edit as EditIcon, Link as LinkIcon,
+  Edit as EditIcon, Link as LinkIcon, Tune as TuneIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
@@ -68,6 +68,10 @@ interface SettingsState {
   // 外部連携（E-NE へのCRM更新 = 送信側）
   ene_crm_push_enabled: boolean; ene_crm_base_url: string;
   ene_crm_tenant_id: string; ene_crm_api_key: string;
+  // ライブ運用（開催当日の調整・縮退スイッチ）
+  auth_rate_limit_per_minute: string; live_bidder_updated_throttle_ms: string;
+  live_notify_favorite_approaching: boolean; live_tick_broadcast_interval: string;
+  live_image_optimization_bypass: boolean;
 }
 
 const DEFAULT_PRICE_INCREMENT_TIERS: PriceIncrementTier[] = [
@@ -105,6 +109,9 @@ const DEFAULT_SETTINGS: SettingsState = {
   ene_name_field_name: '名前', ene_company_field_name: '会社名 / 屋号', ene_invoice_field_name: 'インボイス登録番号',
   ene_default_member_type: 'buyer', ene_duplicate_behavior: 'skip',
   ene_crm_push_enabled: false, ene_crm_base_url: '', ene_crm_tenant_id: '', ene_crm_api_key: '',
+  auth_rate_limit_per_minute: '10', live_bidder_updated_throttle_ms: '250',
+  live_notify_favorite_approaching: true, live_tick_broadcast_interval: '1',
+  live_image_optimization_bypass: false,
 };
 
 export default function AdminSettings() {
@@ -177,6 +184,11 @@ export default function AdminSettings() {
       ene_crm_tenant_id:              String(d.external_integration?.ene_crm_tenant_id?.value ?? ''),
       // APIキーはサーバー側でマスク済み（cc_live_xxxx…）。触らず保存しても上書きされない。
       ene_crm_api_key:                d.external_integration?.ene_crm_api_key?.value ?? '',
+      auth_rate_limit_per_minute:     String(d.live_operation?.auth_rate_limit_per_minute?.value ?? '10'),
+      live_bidder_updated_throttle_ms: String(d.live_operation?.live_bidder_updated_throttle_ms?.value ?? '250'),
+      live_notify_favorite_approaching: d.live_operation?.live_notify_favorite_approaching?.value ?? true,
+      live_tick_broadcast_interval:   String(d.live_operation?.live_tick_broadcast_interval?.value ?? '1'),
+      live_image_optimization_bypass: d.live_operation?.live_image_optimization_bypass?.value ?? false,
     });
     if (d.external_integration?.ene_crm_event_map?.value) {
       setEneCrmEventMap({ ...DEFAULT_ENE_CRM_EVENT_MAP, ...d.external_integration.ene_crm_event_map.value });
@@ -267,6 +279,7 @@ export default function AdminSettings() {
           <Tab icon={<ShippingIcon />} iconPosition="start" label="配送・梱包" />
           <Tab icon={<ReceiptIcon />}  iconPosition="start" label="帳票" />
           <Tab icon={<LinkIcon />}     iconPosition="start" label="外部連携" />
+          <Tab icon={<TuneIcon />}     iconPosition="start" label="ライブ運用" />
         </Tabs>
       </Paper>
 
@@ -749,6 +762,51 @@ export default function AdminSettings() {
           onChangeText={(key, value) => setS((p) => ({ ...p, [key]: value }))}
           onChangeEventMap={setEneCrmEventMap}
         />
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={6}>
+        <Card>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>ライブ運用（開催当日の調整・縮退スイッチ）</Typography>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              保存するとおおむね<strong>5秒以内</strong>に進行中のオークションへ反映されます。平時は既定値のままにし、開催当日にサーバー負荷が高いときだけ変更してください。
+              変更した値は終了後に必ず既定値へ戻します（既定値: 認証上限 10 / 間引き 250 / 通知 ON / 配信間隔 1 / 画像迂回 OFF）。
+            </Alert>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <NumberField fullWidth label="認証APIのIP別上限（回/分）" value={s.auth_rate_limit_per_minute}
+                  onValueChange={strVal('auth_rate_limit_per_minute')}
+                  helperText="同一IPからのログイン等を1分間に受け付ける回数。会場や社内など共有回線で弾かれるのを防ぐため、開催当日のみ 60 程度に上げる" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <NumberField fullWidth label="入札者数配信の間引き（ミリ秒）" value={s.live_bidder_updated_throttle_ms}
+                  onValueChange={strVal('live_bidder_updated_throttle_ms')}
+                  helperText="入札成功ごとの全員配信を商品単位でこの時間内は抑止する。負荷が高いときは 500〜1000 に。0 で間引きなし" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <NumberField fullWidth label="カウントダウン配信の間隔（秒）" value={s.live_tick_broadcast_interval}
+                  onValueChange={strVal('live_tick_broadcast_interval')}
+                  helperText="平時は 1（毎秒）。WebSocket サーバーの CPU が高いときは 2〜3 に。残り3秒以下は設定に関係なく毎秒配信する" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={<Switch checked={s.live_notify_favorite_approaching} onChange={bool('live_notify_favorite_approaching')} />}
+                  label="お気に入り接近通知を送る" />
+                <Typography variant="body2" color="text.secondary">
+                  商品切替のたびに「あと3番目」の登録者へ LINE/メールを送ります。通知キューが詰まったら OFF に。進行には影響しません。
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={<Switch checked={s.live_image_optimization_bypass} onChange={bool('live_image_optimization_bypass')} />}
+                  label="画像を元画像のまま配信する（最適化を迂回）" />
+                <Typography variant="body2" color="text.secondary">
+                  ON にすると画像APIは変換せずに元画像へ転送します。サーバーCPUが張り付いたときの逃げ道です。転送量が増えるので平時は OFF。
+                </Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
       </TabPanel>
 
       {/* スナックバー */}

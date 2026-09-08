@@ -13,6 +13,7 @@ use App\Models\BidLimitPrice;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\BidParticipant;
+use App\Models\SystemSetting;
 use App\Services\Monitoring\MetricRecorder;
 use App\Events\BidderUpdated;
 use App\Events\BidLimitReached;
@@ -70,7 +71,54 @@ class CountdownService
             return true;
         }
         // 0.5 ステップで減算する前提で、整数秒（n.0）のときのみ true
-        return abs(fmod($remainingSeconds, 1.0)) < 0.05;
+        if (abs(fmod($remainingSeconds, 1.0)) >= 0.05) {
+            return false;
+        }
+
+        // B-6 (2026-09-08) 縮退スイッチ: 配信間隔を N 秒に広げる。
+        //   残り TICK_ALWAYS_EVERY_SECOND_UNDER 秒以下は入札判断に直結するので設定に関係なく毎秒。
+        $interval = $this->tickBroadcastInterval();
+        if ($interval <= 1 || $remainingSeconds <= self::TICK_ALWAYS_EVERY_SECOND_UNDER) {
+            return true;
+        }
+
+        return ((int) round($remainingSeconds)) % $interval === 0;
+    }
+
+    /** 残りこの秒数以下は縮退設定に関係なく毎秒配信する */
+    public const TICK_ALWAYS_EVERY_SECOND_UNDER = 3.0;
+
+    /** 縮退設定の読み出し間隔（秒）。tick は 0.5 秒ごと × レーン数なので毎回 cache を引かない */
+    private const LIVE_SETTING_MEMO_SECONDS = 5;
+
+    /** @var array<string, array{value:mixed, at:int}> */
+    private array $liveSettingMemo = [];
+
+    /**
+     * 縮退スイッチ用の設定値（system_settings）を短時間メモ化して返す。
+     * 管理画面で変えた値は最大 LIVE_SETTING_MEMO_SECONDS 秒後に効く。
+     */
+    protected function liveSetting(string $key, $default)
+    {
+        $now = time();
+        $memo = $this->liveSettingMemo[$key] ?? null;
+        if ($memo !== null && ($now - $memo['at']) < self::LIVE_SETTING_MEMO_SECONDS) {
+            return $memo['value'];
+        }
+
+        try {
+            $value = SystemSetting::get($key, $default);
+        } catch (\Throwable $e) {
+            $value = $default;
+        }
+        $this->liveSettingMemo[$key] = ['value' => $value, 'at' => $now];
+
+        return $value;
+    }
+
+    protected function tickBroadcastInterval(): int
+    {
+        return max(1, (int) $this->liveSetting('live_tick_broadcast_interval', 1));
     }
 
     /**
@@ -1145,10 +1193,13 @@ class CountdownService
                 ? $countdownState['remaining_seconds'] : 0;
 
             // お気に入り順番接近通知（notify queue で非同期実行 — countdown worker をブロックしない）
-            try {
-                NotifyFavoriteApproachingJob::dispatch($lane, $nextItem);
-            } catch (\Exception $e) {
-                Log::warning("Favorite notify dispatch error: " . $e->getMessage());
+            // B-6: 縮退スイッチが OFF のときはキューにも積まない
+            if ($this->liveSetting('live_notify_favorite_approaching', true)) {
+                try {
+                    NotifyFavoriteApproachingJob::dispatch($lane, $nextItem);
+                } catch (\Exception $e) {
+                    Log::warning("Favorite notify dispatch error: " . $e->getMessage());
+                }
             }
 
             // ★ 自動入札・指値調整後の最新状態を取得

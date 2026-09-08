@@ -7,6 +7,7 @@ use App\Models\BidParticipant;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Models\SellerProfile;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\CountdownService;
 use Illuminate\Support\Facades\Cache;
@@ -643,5 +644,52 @@ class CountdownServiceTest extends TestCase
         // 5) キャッシュ未存在 → 従来挙動を維持して書き戻す(false)。
         Cache::forget($key);
         $this->assertFalse($method->invoke($svc, $lane->id, $item->id), 'キャッシュ未存在は従来挙動を維持');
+    }
+
+    // ---- B-6 (2026-09-08): カウントダウン配信間隔の縮退スイッチ ----
+
+    private function setTickInterval(string $value): void
+    {
+        SystemSetting::updateOrCreate(['setting_key' => 'live_tick_broadcast_interval'], [
+            'setting_value' => $value, 'value_type' => 'integer',
+            'category' => 'live_operation', 'display_name' => 'x', 'description' => '', 'is_public' => false,
+        ]);
+        SystemSetting::clearCache();
+    }
+
+    private function shouldBroadcast(float $remaining): bool
+    {
+        $svc = app(CountdownService::class);
+        $m = new \ReflectionMethod($svc, 'shouldBroadcastLowFrequency');
+        return $m->invoke($svc, $remaining);
+    }
+
+    public function test_shouldBroadcastLowFrequency_は_設定なしなら整数秒ごとに配信する(): void
+    {
+        $this->assertTrue($this->shouldBroadcast(10.0));
+        $this->assertTrue($this->shouldBroadcast(9.0));
+        $this->assertFalse($this->shouldBroadcast(9.5), '半秒は間引く');
+        $this->assertTrue($this->shouldBroadcast(0.0));
+    }
+
+    public function test_shouldBroadcastLowFrequency_は_配信間隔3なら3秒ごと_残り3秒以下は毎秒(): void
+    {
+        $this->setTickInterval('3');
+        $this->assertTrue($this->shouldBroadcast(9.0));
+        $this->assertFalse($this->shouldBroadcast(8.0));
+        $this->assertFalse($this->shouldBroadcast(7.0));
+        $this->assertTrue($this->shouldBroadcast(6.0));
+        $this->assertFalse($this->shouldBroadcast(6.5), '半秒は設定に関係なく間引く');
+        $this->assertTrue($this->shouldBroadcast(3.0));
+        $this->assertTrue($this->shouldBroadcast(2.0), '残り3秒以下は毎秒');
+        $this->assertTrue($this->shouldBroadcast(1.0));
+        $this->assertTrue($this->shouldBroadcast(0.0));
+    }
+
+    public function test_shouldBroadcastLowFrequency_は_不正な設定値は毎秒扱い(): void
+    {
+        $this->setTickInterval('0');
+        $this->assertTrue($this->shouldBroadcast(8.0));
+        $this->assertTrue($this->shouldBroadcast(7.0));
     }
 }

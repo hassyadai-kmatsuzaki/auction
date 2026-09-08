@@ -22,6 +22,7 @@ use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use App\Support\Aws\LaravelCacheAdapter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -59,6 +60,43 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureRateLimiting();
         $this->configureOutgoingMailHeaders();
+        $this->configureAwsCredentialCache();
+    }
+
+    /**
+     * A-13 (2026-09-08): IAM Role 運用時の AWS 認証情報をホスト内で共有キャッシュする。
+     *
+     * アクセスキーが .env に無い（= IAM Role で解決する）場合だけ、S3 ディスクの credentials に
+     * 「Laravel cache に載せたプロバイダ」を差し込む。php-fpm のプロセスごとに IMDS へ取りに行かず、
+     * 一斉アクセス時の 401 → 画像 API 500 を無くす。
+     *
+     * config:cache の実行中は差し込まない（クロージャは設定キャッシュに書き出せない）。
+     * 無効化したいときは .env に AWS_CREDENTIAL_CACHE=false（config/filesystems.php 経由なので config:cache 後も効く）。
+     */
+    protected function configureAwsCredentialCache(): void
+    {
+        if (!config('filesystems.aws_credential_cache', true)) {
+            return;
+        }
+        if ($this->app->runningInConsole() && $this->app->runningConsoleCommand('config:cache', 'config:clear')) {
+            return;
+        }
+
+        $s3 = config('filesystems.disks.s3', []);
+        if (empty($s3['bucket']) || !empty($s3['key']) || !empty($s3['credentials'])) {
+            return;
+        }
+        if (!class_exists(\Aws\Credentials\CredentialProvider::class)) {
+            return;
+        }
+
+        $provider = \Aws\Credentials\CredentialProvider::cache(
+            \Aws\Credentials\CredentialProvider::defaultProvider(),
+            new LaravelCacheAdapter(),
+            'credentials:' . (string) config('app.env', 'production')
+        );
+
+        config(['filesystems.disks.s3.credentials' => $provider]);
     }
 
     /**
