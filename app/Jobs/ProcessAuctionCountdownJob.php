@@ -108,16 +108,57 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             return;
         }
 
-        Log::info('countdown.job.started', [
-            'auction_id' => $this->auctionId,
-            'pid' => getmypid(),
-            'generation' => $this->generation,
-        ]);
-        
-        // ジョブ実行中フラグをセット（フェイルセーフ用・TTLはジョブtimeout+余裕）
+        // A-5 (2026-09-08): ロック取得後は何が起きても finally で自分のロックだけ解放する。
+        //   旧実装はロック直後の Log::info が例外を投げると（storage/logs が root 所有など）
+        //   ロックが timeout+60 秒残ったままジョブが死に、Monitor が再投入した新ジョブが
+        //   skipped_lock_held で即終了する「復旧不能の輪」になっていた（OPS-2026-004）。
+        try {
+            $this->run($countdownService, $lockKey);
+        } finally {
+            $this->releaseLockIfOwner($lockKey);
+        }
+    }
+
+    /**
+     * ロックは「自分の PID が入っているときだけ」解放する。
+     * 世代交代で新ジョブが同じキーを取り直した後に、古いジョブが forget して
+     * 新ジョブのロックを消してしまう事故（8/28 §7-2 の 4）を防ぐ。
+     */
+    private function releaseLockIfOwner(string $lockKey): void
+    {
+        try {
+            if ((int) Cache::get($lockKey) === getmypid()) {
+                Cache::forget($lockKey);
+            }
+        } catch (\Throwable $e) {
+            // 解放失敗はログにも書けない状況がありうるので握りつぶす（TTL で自然消滅する）
+        }
+    }
+
+    /**
+     * ジョブ本体。handle() がロックを確保した後に呼ばれる。
+     */
+    private function run(CountdownService $countdownService, string $lockKey): void
+    {
+        // A-5: 生存確認（heartbeat / running）を最優先で書く。ログより先。
+        //   Monitor はこの heartbeat の鮮度でジョブの生死を判断するため、
+        //   ここが書けていれば以降のログ失敗はジョブの死につながらない。
         $jobKey = "countdown_job_running:auction:{$this->auctionId}";
         Cache::put($jobKey, true, $this->timeout + 600);
         Cache::put("countdown_job_heartbeat:auction:{$this->auctionId}", now()->timestamp, self::HEARTBEAT_TTL);
+
+        // A-5: ログはあくまで観測。書けなくても進行を止めない。
+        //   storage/logs が root 所有になった場合、ここで UnexpectedValueException /
+        //   ErrorException が飛ぶ。旧実装はこれで全レーン停止していた。
+        try {
+            Log::info('countdown.job.started', [
+                'auction_id' => $this->auctionId,
+                'pid' => getmypid(),
+                'generation' => $this->generation,
+            ]);
+        } catch (\Throwable $e) {
+            // 意図的に握りつぶす
+        }
 
         // === 10秒プレスタートカウントダウン ===
         $startAtKey = "auction:{$this->auctionId}:start_at";
@@ -131,7 +172,7 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                     Log::info("Auction {$this->auctionId}: generation superseded during pre-start (job={$this->generation}), stopping");
                     Cache::forget($jobKey);
                     Cache::forget("countdown_job_heartbeat:auction:{$this->auctionId}");
-                    Cache::forget($lockKey);
+                    $this->releaseLockIfOwner($lockKey);
                     return;
                 }
                 $remaining = max(0, $startAt - now()->timestamp);
@@ -404,10 +445,10 @@ class ProcessAuctionCountdownJob implements ShouldQueue
             Cache::put("countdown_job_finished:auction:{$this->auctionId}", true, 120);
         }
 
-        // ジョブ実行中フラグ・ハートビート・ロックをクリア
+        // ジョブ実行中フラグ・ハートビートをクリア。ロックは自分のものだけ解放（finally でも再確認）
         Cache::forget($jobKey);
         Cache::forget($heartbeatKey);
-        Cache::forget($lockKey);
+        $this->releaseLockIfOwner($lockKey);
 
         Log::info('countdown.job.completed', [
             'auction_id' => $this->auctionId,

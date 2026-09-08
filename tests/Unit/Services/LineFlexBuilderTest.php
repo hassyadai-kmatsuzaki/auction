@@ -79,7 +79,9 @@ class LineFlexBuilderTest extends TestCase
         $this->assertBubble($bubble);
         $contents = json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $this->assertStringContainsString('入金が確認', $contents);
-        $this->assertStringContainsString('発送準備中', $contents);
+        // A-10 (2026-09-08): 弊社預かり・弊社発送モデルへの移行で「発送準備中」の文言は廃止済み。
+        // 現行の本文（ご入金ありがとうございました）で検証する。
+        $this->assertStringContainsString('ご入金ありがとうございました', $contents);
     }
 
     public function test_shippingCompleted_は_運送会社と追跡番号を含む(): void
@@ -273,12 +275,6 @@ class LineFlexBuilderTest extends TestCase
         $bubble = $this->builder->itemSold($this->makeWonItem());
         $this->assertBubble($bubble);
         $this->assertStringContainsString('幹之メダカ', json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    }
-
-    public function test_sellerPaymentReceived_は_出品者向け入金通知(): void
-    {
-        $bubble = $this->builder->sellerPaymentReceived($this->makeWonItem());
-        $this->assertBubble($bubble);
     }
 
     public function test_sellerAuctionStart_は_出品者向けオークション開始(): void

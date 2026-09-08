@@ -290,20 +290,6 @@ class NotificationServiceTest extends TestCase
         $this->assertTrue($result || $result === false);
     }
 
-    public function test_send_seller_payment_received_notification(): void
-    {
-        $wonItem = WonItem::factory()->confirmed()->create([
-            'item_id' => $this->item->id,
-            'winner_id' => $this->participant->id,
-        ]);
-        $wonItem->load(['item.sellerProfile.user']);
-
-        $this->seller->update(['notification_settings' => ['email_payment_received' => true]]);
-
-        $result = $this->notificationService->sendSellerPaymentReceivedNotification($wonItem);
-        $this->assertTrue($result || $result === false);
-    }
-
     public function test_send_invoice_ready_notification(): void
     {
         // 落札者が居ないと送信件数 0

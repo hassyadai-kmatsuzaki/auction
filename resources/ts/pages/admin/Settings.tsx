@@ -19,6 +19,7 @@ import TestModeCard from '../../features/settings/components/TestModeCard';
 import EneCrmPushCard, {
   DEFAULT_ENE_CRM_EVENT_MAP, type EneCrmEventMap,
 } from '../../features/settings/components/EneCrmPushCard';
+import NumberField from '../../components/NumberField';
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) => (
@@ -237,6 +238,9 @@ export default function AdminSettings() {
 
   const str = (k: keyof SettingsState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setS((p) => ({ ...p, [k]: e.target.value }));
+  // NumberField 用（入力中の生文字列をそのまま state に入れる。SettingsState は全て string）
+  const strVal = (k: keyof SettingsState) => (raw: string) =>
+    setS((p) => ({ ...p, [k]: raw }));
   const bool = (k: keyof SettingsState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setS((p) => ({ ...p, [k]: e.target.checked }));
 
@@ -296,7 +300,7 @@ export default function AdminSettings() {
                 { label: 'デフォルトレーン数', k: 'default_lane_count' as const, helper: '同時進行できるレーン数' },
               ].map(({ label, k, unit, prefix, step, helper }) => (
                 <Grid item xs={12} sm={6} md={4} key={k}>
-                  <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                  <NumberField fullWidth label={label} value={s[k]} onValueChange={strVal(k)} helperText={helper}
                     InputProps={prefix ? { startAdornment: <InputAdornment position="start">¥</InputAdornment> }
                       : unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> } : {}}
                     inputProps={step ? { step } : {}} />
@@ -321,31 +325,31 @@ export default function AdminSettings() {
                   {incrementTiers.map((tier, idx) => (
                     <TableRow key={idx}>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.from_price}
+                        <NumberField size="small" value={tier.from_price}
                           InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...incrementTiers];
-                            next[idx] = { ...next[idx], from_price: parseInt(e.target.value) || 0 };
+                            next[idx] = { ...next[idx], from_price: parseInt(v) || 0 };
                             setIncrementTiers(next);
                           }} />
                       </TableCell>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.to_price ?? ''}
+                        <NumberField size="small" value={tier.to_price ?? ''}
                           placeholder="上限なし"
                           InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...incrementTiers];
-                            const val = e.target.value === '' ? null : parseInt(e.target.value);
+                            const val = v === '' ? null : parseInt(v);
                             next[idx] = { ...next[idx], to_price: val };
                             setIncrementTiers(next);
                           }} />
                       </TableCell>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.increment_amount}
+                        <NumberField size="small" value={tier.increment_amount}
                           InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...incrementTiers];
-                            next[idx] = { ...next[idx], increment_amount: parseInt(e.target.value) || 0 };
+                            next[idx] = { ...next[idx], increment_amount: parseInt(v) || 0 };
                             setIncrementTiers(next);
                           }} />
                       </TableCell>
@@ -378,7 +382,7 @@ export default function AdminSettings() {
                 { label: '商品開始毎カウント', k: 'item_switch_delay_seconds' as const, unit: '秒', step: 0.5, helper: '次の商品表示後の待機（0.5〜10秒）' },
               ].map(({ label, k, unit, step, helper }) => (
                 <Grid item xs={12} sm={6} md={4} key={k}>
-                  <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                  <NumberField fullWidth label={label} value={s[k]} onValueChange={strVal(k)} helperText={helper}
                     InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                     inputProps={{ step, min: 0 }} />
                 </Grid>
@@ -403,41 +407,41 @@ export default function AdminSettings() {
                   {countdownTiers.map((tier, idx) => (
                     <TableRow key={idx}>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.from_price}
+                        <NumberField size="small" value={tier.from_price}
                           InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...countdownTiers];
-                            next[idx] = { ...next[idx], from_price: parseInt(e.target.value) || 0 };
+                            next[idx] = { ...next[idx], from_price: parseInt(v) || 0 };
                             setCountdownTiers(next);
                           }} />
                       </TableCell>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.to_price ?? ''} placeholder="上限なし"
+                        <NumberField size="small" value={tier.to_price ?? ''} placeholder="上限なし"
                           InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...countdownTiers];
-                            const val = e.target.value === '' ? null : parseInt(e.target.value);
+                            const val = v === '' ? null : parseInt(v);
                             next[idx] = { ...next[idx], to_price: val };
                             setCountdownTiers(next);
                           }} />
                       </TableCell>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.bid_countdown_seconds}
+                        <NumberField size="small" value={tier.bid_countdown_seconds}
                           InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
                           inputProps={{ step: 0.5, min: 0.5 }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...countdownTiers];
-                            next[idx] = { ...next[idx], bid_countdown_seconds: parseFloat(e.target.value) || 5 };
+                            next[idx] = { ...next[idx], bid_countdown_seconds: parseFloat(v) || 5 };
                             setCountdownTiers(next);
                           }} />
                       </TableCell>
                       <TableCell>
-                        <TextField size="small" type="number" value={tier.freeze_countdown_seconds}
+                        <NumberField size="small" value={tier.freeze_countdown_seconds}
                           InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
                           inputProps={{ step: 0.1, min: 0.1 }}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             const next = [...countdownTiers];
-                            next[idx] = { ...next[idx], freeze_countdown_seconds: parseFloat(e.target.value) || 1 };
+                            next[idx] = { ...next[idx], freeze_countdown_seconds: parseFloat(v) || 1 };
                             setCountdownTiers(next);
                           }} />
                       </TableCell>
@@ -465,7 +469,7 @@ export default function AdminSettings() {
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>会場・レーン設定</Typography>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6} md={4}>
-                <TextField fullWidth type="number" label="会場入室可能開始" value={s.venue_open_minutes_before_start} onChange={str('venue_open_minutes_before_start')}
+                <NumberField fullWidth label="会場入室可能開始" value={s.venue_open_minutes_before_start} onValueChange={strVal('venue_open_minutes_before_start')}
                   InputProps={{ endAdornment: <InputAdornment position="end">分前</InputAdornment> }}
                   helperText="オークション開始の何分前から入室可能か" />
               </Grid>
@@ -499,7 +503,7 @@ export default function AdminSettings() {
                   </Grid>
                   */}
                   <Grid item xs={12} sm={6}>
-                    <TextField fullWidth type="number" label="販売手数料率" value={s.default_commission_rate} onChange={str('default_commission_rate')}
+                    <NumberField fullWidth label="販売手数料率" value={s.default_commission_rate} onValueChange={strVal('default_commission_rate')}
                       helperText="落札金額に対する手数料"
                       InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
                   </Grid>
@@ -513,7 +517,7 @@ export default function AdminSettings() {
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#3B82F6' }}>買受者向け料金</Typography>
                 <Grid container spacing={3}>
                   <Grid item xs={12} sm={6}>
-                    <TextField fullWidth type="number" label="落札手数料率" value={s.buyer_commission_rate} onChange={str('buyer_commission_rate')}
+                    <NumberField fullWidth label="落札手数料率" value={s.buyer_commission_rate} onValueChange={strVal('buyer_commission_rate')}
                       helperText="落札金額に対する手数料"
                       InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
                   </Grid>
@@ -541,7 +545,7 @@ export default function AdminSettings() {
                     { label: '冬季保温料金', k: 'heating_fee_winter' as const, helper: '12-2月の追加料金' },
                   ].map(({ label, k, unit, helper }) => (
                     <Grid item xs={12} sm={6} key={k}>
-                      <TextField fullWidth type="number" label={label} value={s[k]} onChange={str(k)} helperText={helper}
+                      <NumberField fullWidth label={label} value={s[k]} onValueChange={strVal(k)} helperText={helper}
                         InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
                           : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }} />
                     </Grid>
@@ -651,7 +655,7 @@ export default function AdminSettings() {
                   <Grid item xs={12} sm={6}><TextField fullWidth label="請求書プレフィックス" value={s.invoice_prefix} onChange={str('invoice_prefix')} helperText="例: INV-2025-0001" /></Grid>
                   <Grid item xs={12} sm={6}><TextField fullWidth label="支払通知書プレフィックス" value={s.payment_notice_prefix} onChange={str('payment_notice_prefix')} helperText="例: PAY-2025-0001" /></Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField fullWidth type="number" label="保証書有効日数" value={s.warranty_validity_days} onChange={str('warranty_validity_days')}
+                    <NumberField fullWidth label="保証書有効日数" value={s.warranty_validity_days} onValueChange={strVal('warranty_validity_days')}
                       InputProps={{ endAdornment: <InputAdornment position="end">日</InputAdornment> }} helperText="到着後の保証期間" />
                   </Grid>
                 </Grid>
@@ -774,14 +778,13 @@ export default function AdminSettings() {
                     <TableCell sx={{ fontWeight: 600 }}>{region}</TableCell>
                     {[80, 100, 120, 140].map((sz) => (
                       <TableCell key={sz}>
-                        <TextField
+                        <NumberField
                           size="small"
-                          type="number"
                           value={sizes[sz] ?? 0}
-                          onChange={(e) => {
+                          onValueChange={(v) => {
                             setEditingRates((prev) => ({
                               ...prev,
-                              [region]: { ...prev[region], [sz]: Number(e.target.value) },
+                              [region]: { ...prev[region], [sz]: Number(v) },
                             }));
                           }}
                           InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}

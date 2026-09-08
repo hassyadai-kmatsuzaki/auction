@@ -1368,6 +1368,11 @@ class CountdownService
             ->where('limit_price', '>=', $currentPrice)
             ->orderBy('limit_price', 'desc')
             ->orderBy('created_at', 'asc')
+            // A-8 (2026-09-08): created_at が同秒の同額指値は id（登録順）で決着させる。
+            //   複合インデックス (item_id, is_triggered, limit_price) が入ると DB は limit_price を
+            //   逆順走査で返すため、同秒タイの並びが「後発者が先頭」に反転し、先設定者保護が崩れる。
+            //   本番には 5/21 から同じインデックスがあるので、これは本番でも起きうる順序依存だった。
+            ->orderBy('id', 'asc')
             ->get();
 
         if ($limits->count() < 2) {
@@ -1662,6 +1667,11 @@ class CountdownService
             ->where('limit_price', '>=', $freshItem->current_price)
             ->orderBy('limit_price', 'desc')
             ->orderBy('created_at', 'asc')
+            // A-8 (2026-09-08): created_at が同秒の同額指値は id（登録順）で決着させる。
+            //   複合インデックス (item_id, is_triggered, limit_price) が入ると DB は limit_price を
+            //   逆順走査で返すため、同秒タイの並びが「後発者が先頭」に反転し、先設定者保護が崩れる。
+            //   本番には 5/21 から同じインデックスがあるので、これは本番でも起きうる順序依存だった。
+            ->orderBy('id', 'asc')
             ->first();
 
         if ($highestLimitUser) {

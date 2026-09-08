@@ -158,7 +158,9 @@ class JoinBidActionTest extends TestCase
         $result = $this->action->execute($item, $userId);
 
         $this->assertTrue($result->success);
-        $this->assertSame(1, BidEvent::where('item_id', $item->id)->where('user_id', $userId)->where('event_type', BidEvent::TYPE_JOIN)->count(),
+        // A-10 (2026-09-08): このテストは BidParticipant を直接 INSERT しており join イベントは
+        // 最初から 0 件。冪等成功で recordJoin が走らないなら 0 のままが正しい（旧アサートは 1 で矛盾）。
+        $this->assertSame(0, BidEvent::where('item_id', $item->id)->where('user_id', $userId)->where('event_type', BidEvent::TYPE_JOIN)->count(),
             '冪等成功時は recordJoin が新たに発行されないこと（既存ゼロのまま）'
         );
         $this->assertDatabaseHas('bid_participants', [
@@ -184,7 +186,9 @@ class JoinBidActionTest extends TestCase
         $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
 
         // 指値（is_triggered=false）が A 名義で登録されている前提
-        $userA = 10;
+        // A-10 (2026-09-08): bid_limit_prices.user_id は users への FK なので実ユーザーを用意する
+        $userA = \App\Models\User::factory()->create(['id' => 10])->id;
+        $userBModel = \App\Models\User::factory()->create(['id' => 20]);
         BidLimitPrice::create([
             'item_id'      => $item->id,
             'user_id'      => $userA,
@@ -201,7 +205,7 @@ class JoinBidActionTest extends TestCase
         ]);
 
         // 後続の B が入札ボタンを押す
-        $userB = 20;
+        $userB = $userBModel->id;
         $result = $this->action->execute($item, $userB);
 
         $this->assertTrue($result->success);

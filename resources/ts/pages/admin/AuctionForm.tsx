@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 import { useAuctionForm } from '../../features/auction-form/hooks/useAuctionForm';
+import NumberField from '../../components/NumberField';
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) => (
@@ -403,9 +404,9 @@ export default function AuctionForm() {
                   { label: '会場入室可能開始', key: 'venue_open_minutes_before_start', unit: '分前', systemKey: 'venue_open_minutes_before_start', step: 1 },
                 ].map(({ label, key, unit, systemKey, step, helper }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
-                    <TextField fullWidth type="number" label={label}
+                    <NumberField fullWidth label={label}
                       value={(formData.custom_auction_settings as any)[key]}
-                      onChange={(e) => setCustomAuction({ [key]: parseFloat(e.target.value) || 0 })}
+                      onValueChange={(v) => setCustomAuction({ [key]: parseFloat(v) || 0 })}
                       InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                       inputProps={{ step, min: 0 }}
                       helperText={defaults ? `システム: ${(defaults.auction_settings as any)[systemKey] ?? '-'}${unit}${helper ? `（${helper}）` : ''}` : helper} />
@@ -430,30 +431,30 @@ export default function AuctionForm() {
                     {(formData.custom_auction_settings.price_increment_tiers ?? []).map((tier: any, idx: number) => (
                       <TableRow key={idx}>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.from_price}
+                          <NumberField size="small" value={tier.from_price}
                             InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
-                              tiers[idx] = { ...tiers[idx], from_price: parseInt(e.target.value) || 0 };
+                              tiers[idx] = { ...tiers[idx], from_price: parseInt(v) || 0 };
                               setCustomAuction({ price_increment_tiers: tiers } as any);
                             }} />
                         </TableCell>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.to_price ?? ''} placeholder="上限なし"
+                          <NumberField size="small" value={tier.to_price ?? ''} placeholder="上限なし"
                             InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
-                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              const val = v === '' ? null : parseInt(v);
                               tiers[idx] = { ...tiers[idx], to_price: val };
                               setCustomAuction({ price_increment_tiers: tiers } as any);
                             }} />
                         </TableCell>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.increment_amount}
+                          <NumberField size="small" value={tier.increment_amount}
                             InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.price_increment_tiers ?? [])];
-                              tiers[idx] = { ...tiers[idx], increment_amount: parseInt(e.target.value) || 0 };
+                              tiers[idx] = { ...tiers[idx], increment_amount: parseInt(v) || 0 };
                               setCustomAuction({ price_increment_tiers: tiers } as any);
                             }} />
                         </TableCell>
@@ -497,41 +498,41 @@ export default function AuctionForm() {
                     {(formData.custom_auction_settings.countdown_tiers ?? []).map((tier: any, idx: number) => (
                       <TableRow key={idx}>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.from_price}
+                          <NumberField size="small" value={tier.from_price}
                             InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
-                              tiers[idx] = { ...tiers[idx], from_price: parseInt(e.target.value) || 0 };
+                              tiers[idx] = { ...tiers[idx], from_price: parseInt(v) || 0 };
                               setCustomAuction({ countdown_tiers: tiers } as any);
                             }} />
                         </TableCell>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.to_price ?? ''} placeholder="上限なし"
+                          <NumberField size="small" value={tier.to_price ?? ''} placeholder="上限なし"
                             InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
-                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              const val = v === '' ? null : parseInt(v);
                               tiers[idx] = { ...tiers[idx], to_price: val };
                               setCustomAuction({ countdown_tiers: tiers } as any);
                             }} />
                         </TableCell>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.bid_countdown_seconds}
+                          <NumberField size="small" value={tier.bid_countdown_seconds}
                             InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
                             inputProps={{ step: 0.5, min: 0.5 }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
-                              tiers[idx] = { ...tiers[idx], bid_countdown_seconds: parseFloat(e.target.value) || 5 };
+                              tiers[idx] = { ...tiers[idx], bid_countdown_seconds: parseFloat(v) || 5 };
                               setCustomAuction({ countdown_tiers: tiers } as any);
                             }} />
                         </TableCell>
                         <TableCell>
-                          <TextField size="small" type="number" value={tier.freeze_countdown_seconds}
+                          <NumberField size="small" value={tier.freeze_countdown_seconds}
                             InputProps={{ endAdornment: <InputAdornment position="end">秒</InputAdornment> }}
                             inputProps={{ step: 0.1, min: 0.1 }}
-                            onChange={(e) => {
+                            onValueChange={(v) => {
                               const tiers = [...(formData.custom_auction_settings.countdown_tiers ?? [])];
-                              tiers[idx] = { ...tiers[idx], freeze_countdown_seconds: parseFloat(e.target.value) || 1 };
+                              tiers[idx] = { ...tiers[idx], freeze_countdown_seconds: parseFloat(v) || 1 };
                               setCustomAuction({ countdown_tiers: tiers } as any);
                             }} />
                         </TableCell>
@@ -586,9 +587,9 @@ export default function AuctionForm() {
                   { label: '販売手数料率', key: 'seller_commission_rate', unit: '%' },
                 ].map(({ label, key, unit }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
-                    <TextField fullWidth type="number" label={label}
+                    <NumberField fullWidth label={label}
                       value={(formData.custom_fee_settings as any)[key]}
-                      onChange={(e) => setCustomFee({ [key]: parseFloat(e.target.value) || 0 })}
+                      onValueChange={(v) => setCustomFee({ [key]: parseFloat(v) || 0 })}
                       InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                       helperText={defaults ? `システム: ${(defaults.fee_settings as any)[key]}` : ''} />
                   </Grid>
@@ -599,9 +600,9 @@ export default function AuctionForm() {
                   { label: '落札手数料率', key: 'buyer_commission_rate', unit: '%' },
                 ].map(({ label, key, unit }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
-                    <TextField fullWidth type="number" label={label}
+                    <NumberField fullWidth label={label}
                       value={(formData.custom_fee_settings as any)[key]}
-                      onChange={(e) => setCustomFee({ [key]: parseFloat(e.target.value) || 0 })}
+                      onValueChange={(v) => setCustomFee({ [key]: parseFloat(v) || 0 })}
                       InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
                       helperText={defaults ? `システム: ${(defaults.fee_settings as any)[key]}` : ''} />
                   </Grid>
@@ -628,9 +629,9 @@ export default function AuctionForm() {
                   { label: '配送料割引率', key: 'shipping_discount_rate', unit: '%OFF' },
                 ].map(({ label, key, unit }) => (
                   <Grid item xs={12} sm={6} md={3} key={key}>
-                    <TextField fullWidth type="number" label={label}
+                    <NumberField fullWidth label={label}
                       value={(formData.custom_shipping_settings as any)[key]}
-                      onChange={(e) => setCustomShipping({ [key]: parseFloat(e.target.value) || 0 })}
+                      onValueChange={(v) => setCustomShipping({ [key]: parseFloat(v) || 0 })}
                       InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }
                         : { startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
                       helperText={defaults && !unit ? `システム: ¥${(defaults.shipping_settings as any)[key] ?? '-'}` : ''} />

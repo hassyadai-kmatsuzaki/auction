@@ -86,7 +86,8 @@ export const BidLimitModal = React.memo(({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9]/g, '');
+    // 先頭の 0 を落とす（"0" の後ろに打ち足して "0350" になるのを防ぐ）
+    const val = e.target.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
     setInputValue(val);
     setSelectedQuick(null);
   };
@@ -138,6 +139,7 @@ export const BidLimitModal = React.memo(({
           placeholder="例: 8000"
           value={inputValue}
           onChange={handleInputChange}
+          onFocus={(e) => e.target.select()}
           disabled={!!allowedPrice}
           error={isOverCap}
           helperText={isOverCap ? `上限価格は ¥${formatYen(MAX_BID_LIMIT_PRICE)} 以下を入力してください` : undefined}

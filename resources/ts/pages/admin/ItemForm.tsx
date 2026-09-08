@@ -42,6 +42,7 @@ import {
   ErrorOutline as ErrorOutlineIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import NumberField from '../../components/NumberField';
 
 interface SellerProfile {
   id: number;
@@ -524,13 +525,12 @@ export default function ItemForm() {
                   </Grid>
 
                   <Grid item xs={6} md={2}>
-                    <TextField
+                    <NumberField
                       fullWidth
                       required
-                      type="number"
                       label="数量"
                       value={formData.quantity}
-                      onChange={handleChange('quantity')}
+                      onValueChange={(v) => setFormData({ ...formData, quantity: v })}
                       inputProps={{ min: 1 }}
                     />
                   </Grid>
@@ -566,13 +566,12 @@ export default function ItemForm() {
                   </Grid>
 
                   <Grid item xs={12} md={4}>
-                    <TextField
+                    <NumberField
                       fullWidth
                       required
-                      type="number"
                       label="開始価格"
                       value={formData.start_price}
-                      onChange={handleChange('start_price')}
+                      onValueChange={(v) => setFormData({ ...formData, start_price: v })}
                       InputProps={{
                         startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>¥</Typography>,
                       }}

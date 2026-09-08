@@ -59,6 +59,7 @@ import {
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 import { adminCsvExportApi } from '../../api/admin/csvExportApi';
+import NumberField from '../../components/NumberField';
 
 // 消費税率（請求書/納品書PDFと同一値）
 const TAX_RATE = 10;
@@ -300,9 +301,8 @@ export default function WonItemManagement() {
   const [approveShippingOverride, setApproveShippingOverride] = useState<string>('');
   const [approveShippingReason, setApproveShippingReason] = useState<string>('');
   // 送料修正時の箱・袋編集
-  // 数値欄は「入力中の文字列」で保持する。number state を type="number" に直結すると
-  // 空欄にした瞬間に 0 へ戻されて消せず、続けて打つと "0350" のように先頭の 0 が残る
-  // （React は数値が等しい間 DOM の value を上書きしない）。確定時に Number() で変換する。
+  // 数値欄は「入力中の文字列」で保持し、確定時に Number() で変換する。
+  // 表示側の先頭 0 残り・空欄にできない問題は共通の <NumberField> が吸収する。
   const [approveShippingBoxes, setApproveShippingBoxes] = useState<
     Array<{ box_size: number; count: string; shipping_cost: string; packing_material_cost: string }>
   >([]);
@@ -518,8 +518,9 @@ export default function WonItemManagement() {
             Array.from(grouped.values()).map((g) => ({
               box_size: g.box_size,
               count: String(g.count),
-              shipping_cost: String(g.shipping_cost),
-              packing_material_cost: String(g.packing_material_cost),
+              // 0 は空欄で開始し placeholder に 0 を見せる（先頭 0 残り防止）
+              shipping_cost: g.shipping_cost ? String(g.shipping_cost) : '',
+              packing_material_cost: g.packing_material_cost ? String(g.packing_material_cost) : '',
             })),
           );
         }
@@ -1513,13 +1514,12 @@ export default function WonItemManagement() {
               引き取り（送料0円）の場合は「送料無料」ボタンを押すと内訳もクリアされます。
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 2 }}>
-              <TextField
+              <NumberField
                 fullWidth
                 label="送料（円）"
-                type="number"
                 value={approveShippingOverride}
-                onChange={(e) => {
-                  setApproveShippingOverride(e.target.value);
+                onValueChange={(v) => {
+                  setApproveShippingOverride(v);
                   setApproveShippingIsFree(false);
                   if (approveShippingReason === '送料無料') setApproveShippingReason('');
                 }}
@@ -1579,11 +1579,10 @@ export default function WonItemManagement() {
                           </TextField>
                         </TableCell>
                         <TableCell>
-                          <TextField
-                            type="number"
+                          <NumberField
                             size="small"
                             value={row.count}
-                            onChange={(e) => updateBoxRow(idx, { count: e.target.value })}
+                            onValueChange={(v) => updateBoxRow(idx, { count: v })}
                             onBlur={() => updateBoxRow(idx, { count: normalizeIntInput(row.count, 1) || '1' })}
                             // 幅 80 のセルでは padding に食われて数字が欠けるため、内側の余白を詰めて中央寄せ
                             inputProps={{ min: 1, max: 50, style: { textAlign: 'center', paddingLeft: 8, paddingRight: 8 } }}
@@ -1591,11 +1590,10 @@ export default function WonItemManagement() {
                           />
                         </TableCell>
                         <TableCell>
-                          <TextField
-                            type="number"
+                          <NumberField
                             size="small"
                             value={row.shipping_cost}
-                            onChange={(e) => updateBoxRow(idx, { shipping_cost: e.target.value })}
+                            onValueChange={(v) => updateBoxRow(idx, { shipping_cost: v })}
                             onBlur={() => updateBoxRow(idx, { shipping_cost: normalizeIntInput(row.shipping_cost, 0) })}
                             placeholder="0"
                             inputProps={{ min: 0 }}
@@ -1603,11 +1601,10 @@ export default function WonItemManagement() {
                           />
                         </TableCell>
                         <TableCell>
-                          <TextField
-                            type="number"
+                          <NumberField
                             size="small"
                             value={row.packing_material_cost}
-                            onChange={(e) => updateBoxRow(idx, { packing_material_cost: e.target.value })}
+                            onValueChange={(v) => updateBoxRow(idx, { packing_material_cost: v })}
                             onBlur={() => updateBoxRow(idx, { packing_material_cost: normalizeIntInput(row.packing_material_cost, 0) })}
                             placeholder="0"
                             inputProps={{ min: 0 }}
@@ -1676,11 +1673,10 @@ export default function WonItemManagement() {
                           </TextField>
                         </TableCell>
                         <TableCell>
-                          <TextField
-                            type="number"
+                          <NumberField
                             size="small"
                             value={row.quantity}
-                            onChange={(e) => updateBagRow(idx, { quantity: e.target.value })}
+                            onValueChange={(v) => updateBagRow(idx, { quantity: v })}
                             onBlur={() => updateBagRow(idx, { quantity: normalizeIntInput(row.quantity, 0) })}
                             placeholder="0"
                             inputProps={{ min: 0, max: 1000, style: { textAlign: 'center', paddingLeft: 8, paddingRight: 8 } }}

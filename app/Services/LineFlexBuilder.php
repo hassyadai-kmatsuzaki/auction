@@ -551,9 +551,13 @@ class LineFlexBuilder
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-        $key    = config('filesystems.disks.s3.key');
+        // A-9 (2026-09-08): 認証情報は IAM Role / env どちらでも AWS SDK 側が解決するので、
+        //   bucket と SDK の存在だけで S3 を選ぶ（MediaUrlTrait::resolveMediaUrl と同じ判定）。
+        //   旧実装は access key の存在を条件にしていたため、IAM Role 運用の本番では key が空 →
+        //   local パスに組み立てられ、LINE Flex の hero 画像が 404（灰色）になっていた。
+        //   画像表示側は 2026-05-21 に同じ修正済み。通知側だけ取り残されていた。
         $bucket = config('filesystems.disks.s3.bucket');
-        if (!empty($key) && !empty($bucket) && class_exists(\Aws\S3\S3Client::class)) {
+        if (!empty($bucket) && class_exists(\Aws\S3\S3Client::class)) {
             return \Illuminate\Support\Facades\Storage::disk('s3')->url($path);
         }
         return rtrim((string) config('app.url'), '/') . '/storage/' . ltrim($path, '/');

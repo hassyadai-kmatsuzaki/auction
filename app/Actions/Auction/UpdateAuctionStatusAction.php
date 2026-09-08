@@ -3,14 +3,8 @@
 namespace App\Actions\Auction;
 
 use App\DTOs\AuctionResultDto;
-use App\Events\AuctionStatusChanged;
-use App\Jobs\ProcessAuctionCountdownJob;
 use App\Models\Auction;
-use App\Models\Item;
-use App\Models\Lane;
 use App\Services\NotificationService;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,6 +22,7 @@ class UpdateAuctionStatusAction
 
     public function __construct(
         private readonly NotificationService $notificationService,
+        private readonly StartAuctionAction  $startAction,
     ) {}
 
     public function execute(Auction $auction, string $newStatus): AuctionResultDto
@@ -94,120 +89,19 @@ class UpdateAuctionStatusAction
             return ['error' => 'オークションを開始できません。承認済みの生体を1件以上登録してください。'];
         }
 
-        DB::beginTransaction();
+        // A-7 (2026-09-08): 開始処理は StartAuctionAction に一本化（LiveController::start と同じ入口）。
+        //   旧実装はここにも同じ内容の別実装があった。行ロックによる二重起動防止と、
+        //   進行ジョブ死亡時の押し直し復旧は StartAuctionAction 側で扱う。
         try {
-            // レーンを作成（まだない場合）
-            if ($auction->lanes()->count() === 0) {
-                $laneCount = $auction->lane_count ?: 1;
-                for ($i = 1; $i <= $laneCount; $i++) {
-                    Lane::create([
-                        'auction_id' => $auction->id,
-                        'lane_number' => $i,
-                        'status' => 'waiting',
-                    ]);
-                }
-            }
-
-            // 商品をレーンに割り当て
-            $lanes = $auction->lanes()->orderBy('lane_number')->get();
-            $laneCount = $lanes->count();
-
-            if ($laneCount > 0) {
-                $unassigned = $auction->items()
-                    ->where('status', 'registered')
-                    ->whereNotIn('id', function ($q) use ($auction) {
-                        $q->select('item_id')->from('lane_items')
-                          ->join('lanes', 'lane_items.lane_id', '=', 'lanes.id')
-                          ->where('lanes.auction_id', $auction->id);
-                    })
-                    ->orderByDesc('is_premium')
-                    ->orderBy('item_number')
-                    ->get();
-
-                foreach ($unassigned as $index => $item) {
-                    $lane = $lanes[$index % $laneCount];
-                    $maxOrder = DB::table('lane_items')->where('lane_id', $lane->id)->max('sequence_order') ?? 0;
-                    DB::table('lane_items')->insert([
-                        'lane_id'        => $lane->id,
-                        'item_id'        => $item->id,
-                        'sequence_order' => $maxOrder + 1,
-                        'created_at'     => now(),
-                        'updated_at'     => now(),
-                    ]);
-                }
-            }
-
-            // オークションを開始
-            $auction->update(['status' => 'live']);
-
-            // 各レーンの最初の商品をライブに
-            $lanesToStart = [];
-            foreach ($auction->lanes()->get() as $lane) {
-                $nextItem = $lane->items()
-                    ->where('status', 'registered')
-                    ->orderBy('lane_items.sequence_order')
-                    ->first();
-
-                if ($nextItem) {
-                    $nextItem->update([
-                        'status' => 'live',
-                        'current_price' => $nextItem->start_price,
-                    ]);
-                    $lane->update([
-                        'current_item_id' => $nextItem->id,
-                        'status' => 'active',
-                    ]);
-                    $lanesToStart[] = $lane->id;
-                }
-            }
-
-            DB::commit();
-
-            // 開始カウントダウン
-            $countdownSeconds = $auction->getStartCountdownSeconds();
-
-            // 古いロック・フラグが残っている場合はクリア（前回のオークションの残骸対策）
-            // ※ StartAuctionAction と同等のクリーンアップ。start_at は Cache::add のガード対象なので forget しない
-            Cache::forget("countdown_job_lock:auction:{$auction->id}");
-            Cache::forget("countdown_job_running:auction:{$auction->id}");
-            Cache::forget("countdown_job_heartbeat:auction:{$auction->id}");
-            Cache::forget("countdown_job_finished:auction:{$auction->id}");
-
-            // 世代番号を 0 にリセット（StartAuctionAction と揃える）
-            Cache::put(ProcessAuctionCountdownJob::generationKey($auction->id), 0, ProcessAuctionCountdownJob::HEARTBEAT_TTL);
-
-            // TTL はカウントダウンより必ず長く（StartAuctionAction と揃える）
-            $cacheTtl = max(120, $countdownSeconds + 60);
-
-            // 二重dispatch ガード: start_at を Cache::add で確保
-            $added = Cache::add(
-                "auction:{$auction->id}:start_at",
-                now()->addSeconds($countdownSeconds)->timestamp,
-                $cacheTtl
-            );
-            if (!$added) {
-                Log::info("UpdateAuctionStatusAction.toLiveState: pre-start already in flight, skipping duplicate broadcast/dispatch", ['auction_id' => $auction->id]);
-                return 'オークションを開始しました。';
-            }
-
-            Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, $cacheTtl);
-
-            broadcast(new AuctionStatusChanged(
-                $auction->id,
-                'starting',
-                'オークションが間もなく開始されます',
-                $countdownSeconds
-            ));
-
-            ProcessAuctionCountdownJob::dispatch($auction->id);
-
-            Log::info("Auction started via status change", ['auction_id' => $auction->id, 'lanes' => count($lanesToStart)]);
+            $this->startAction->start($auction, ['preparing', 'scheduled'], true);
+        } catch (\RuntimeException $e) {
+            return ['error' => $e->getMessage()];
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error("Failed to start auction via status change", ['auction_id' => $auction->id, 'error' => $e->getMessage()]);
             return ['error' => 'オークション開始中にエラーが発生しました: ' . $e->getMessage()];
         }
 
+        Log::info("Auction started via status change", ['auction_id' => $auction->id]);
         return 'オークションを開始しました。';
     }
 

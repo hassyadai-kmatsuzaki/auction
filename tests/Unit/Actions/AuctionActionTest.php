@@ -56,7 +56,11 @@ class AuctionActionTest extends TestCase
     public function test_UpdateLaneCountAction_レーン数を増やせる(): void
     {
         $auction = Auction::factory()->create(['status' => 'preparing', 'lane_count' => 3]);
-        Lane::factory(3)->create(['auction_id' => $auction->id]);
+        // LaneFactory の lane_number は乱数なので (auction_id, lane_number) の UNIQUE に当たる。
+        // 明示的に 1..3 を振る（A-10 / 2026-09-08）。
+        Lane::factory()->count(3)
+            ->sequence(fn ($seq) => ['lane_number' => $seq->index + 1])
+            ->create(['auction_id' => $auction->id]);
 
         $result = app(UpdateLaneCountAction::class)->execute($auction, 5);
 

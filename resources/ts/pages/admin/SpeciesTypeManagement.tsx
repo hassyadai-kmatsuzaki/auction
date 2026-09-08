@@ -10,6 +10,7 @@ import {
   adminSpeciesTypeApi,
   type SpeciesType, type BagSpec, type BoxCapacity, type BagMixRestriction, type QuantityUnit,
 } from '@/api/admin/speciesTypeApi';
+import NumberField from '../../components/NumberField';
 
 const UNIT_OPTIONS: { value: QuantityUnit; label: string }[] = [
   { value: 'fish', label: '匹' },
@@ -250,11 +251,10 @@ function SpeciesTypeEditDialog({ target, onClose, onSaved, onError }: EditDialog
               ))}
             </FormGroup>
           </Box>
-          <TextField
+          <NumberField
             label="並び順"
-            type="number"
             value={form.sort_order ?? 0}
-            onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value, 10) })}
+            onValueChange={(v) => setForm({ ...form, sort_order: parseInt(v, 10) || 0 })}
           />
           <FormControlLabel
             control={<Switch checked={!!form.is_default} onChange={(e) => setForm({ ...form, is_default: e.target.checked })} />}
@@ -366,9 +366,9 @@ function BagSpecsTab({ speciesId, onSaved }: { speciesId: number; onSaved: () =>
             <TableRow>
               <TableCell><TextField size="small" value={draft.bag_size} onChange={(e) => setDraft({ ...draft, bag_size: e.target.value })} /></TableCell>
               <TableCell><TextField size="small" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} /></TableCell>
-              <TableCell><TextField size="small" type="number" value={draft.min_qty} onChange={(e) => setDraft({ ...draft, min_qty: e.target.value })} /></TableCell>
-              <TableCell><TextField size="small" type="number" value={draft.max_qty} onChange={(e) => setDraft({ ...draft, max_qty: e.target.value })} /></TableCell>
-              <TableCell><TextField size="small" type="number" inputProps={{ step: 0.1 }} value={draft.weight_kg} onChange={(e) => setDraft({ ...draft, weight_kg: e.target.value })} /></TableCell>
+              <TableCell><NumberField size="small" value={draft.min_qty} onValueChange={(v) => setDraft({ ...draft, min_qty: v })} /></TableCell>
+              <TableCell><NumberField size="small" value={draft.max_qty} onValueChange={(v) => setDraft({ ...draft, max_qty: v })} /></TableCell>
+              <TableCell><NumberField size="small" inputProps={{ step: 0.1 }} value={draft.weight_kg} onValueChange={(v) => setDraft({ ...draft, weight_kg: v })} /></TableCell>
               <TableCell align="right"><Button size="small" onClick={handleAdd}>追加</Button></TableCell>
             </TableRow>
           </TableBody>
@@ -435,6 +435,8 @@ function BoxCapacitiesTab({ speciesId, onSaved }: { speciesId: number; onSaved: 
                         size="small"
                         type="number"
                         defaultValue={current}
+                        // 非制御のため NumberField 化できない。既存値への打ち足しだけ防ぐ
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
                         sx={{ width: 80 }}
                       />
@@ -501,7 +503,7 @@ function MixRestrictionsTab({ speciesId, onSaved }: { speciesId: number; onSaved
               </TableRow>
             ))}
             <TableRow>
-              <TableCell><TextField size="small" type="number" placeholder="全箱" value={draft.box_size} onChange={(e) => setDraft({ ...draft, box_size: e.target.value })} /></TableCell>
+              <TableCell><NumberField size="small" placeholder="全箱" value={draft.box_size} onValueChange={(v) => setDraft({ ...draft, box_size: v })} /></TableCell>
               <TableCell><TextField size="small" value={draft.bag_size_a} onChange={(e) => setDraft({ ...draft, bag_size_a: e.target.value })} /></TableCell>
               <TableCell><TextField size="small" value={draft.bag_size_b} onChange={(e) => setDraft({ ...draft, bag_size_b: e.target.value })} /></TableCell>
               <TableCell align="right"><Button size="small" onClick={handleAdd}>追加</Button></TableCell>
