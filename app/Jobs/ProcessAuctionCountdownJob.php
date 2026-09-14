@@ -348,12 +348,25 @@ class ProcessAuctionCountdownJob implements ShouldQueue
                     // ★ 復旧ロジック: active レーンにカウントダウンキャッシュがない場合は再作成
                     // 一時停止→再開後やキャッシュ消滅時に発生する
                     if (!$state) {
-                        Log::warning("Lane {$lane->id} is active but has no countdown state - recovering");
                         try {
                             $lane->load(['auction', 'currentItem']);
-                            if ($lane->currentItem && $lane->currentItem->status === 'live') {
+                            $current = $lane->currentItem;
+                            if ($current && $current->status === 'live') {
+                                Log::warning("Lane {$lane->id} is active but has no countdown state - recovering");
                                 $countdownService->startCountdown($lane);
                                 $activeCount++;
+                            } elseif ($current && in_array($current->status, ['sold', 'unsold', 'cancelled'], true)) {
+                                // R3 (2026-09-14): 確定は済んだのに次の商品へ進めなかったレーン（経路 B）。
+                                //   旧版は live 以外を無視したため、毎秒「no countdown state」を吐きながら永久停止した
+                                //   （復旧は管理画面の「次の商品へ」だけ）。3 秒に 1 回だけ次の商品へ進め直す。
+                                //   他レーンの tick はこの間も止めない。
+                                if (Cache::add("lane_stall_retry:{$lane->id}", 1, 3)) {
+                                    Log::warning("Lane {$lane->id} is active but current item {$current->id} is {$current->status} - moving to next item");
+                                    $result = $countdownService->recoverStalledLane($lane);
+                                    if ($result['recovered']) {
+                                        $activeCount++;
+                                    }
+                                }
                             }
                         } catch (\Exception $e) {
                             Log::error("Lane {$lane->id} recovery failed: " . $e->getMessage());

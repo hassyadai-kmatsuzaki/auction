@@ -54,5 +54,8 @@ class LaneRepository implements LaneRepositoryInterface
         Lane::where('auction_id', $auctionId)
             ->where('status', $fromStatus)
             ->update(['status' => $toStatus]);
+
+        // B-4: 一括更新はモデルイベントが出ないので、共有キャッシュをここで捨てる（一時停止・再開）
+        \App\Services\BidService::forgetSharedState($auctionId);
     }
 }

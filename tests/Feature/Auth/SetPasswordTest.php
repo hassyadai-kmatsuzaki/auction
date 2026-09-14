@@ -167,4 +167,28 @@ class SetPasswordTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['password']);
     }
+
+    public function test_set_password_keeps_suspended_status(): void
+    {
+        // 管理画面で停止した人が、未使用のパスワード設定リンクで自分を承認済みに戻せないこと
+        $user = User::factory()->create([
+            'password' => bcrypt('temporary'),
+            'status' => 'suspended',
+        ]);
+
+        $token = EmailVerificationToken::create([
+            'user_id' => $user->id,
+            'token' => Str::random(64),
+            'expires_at' => now()->addHours(24),
+        ]);
+
+        $response = $this->postJson('/api/auth/set-password', [
+            'token' => $token->token,
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('suspended', $user->fresh()->status);
+    }
 }

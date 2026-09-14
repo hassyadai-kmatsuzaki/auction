@@ -54,7 +54,10 @@ class ActivityLogger
             ]);
         } catch (\Throwable $e) {
             // dedup_key の unique 違反（レース）や一時障害はここで吸収する。
-            Log::warning('ActivityLogger failed', [
+            // 2026-09-14: 前日に入場した人の再入場は Redis の当日フラグが無いので DB の unique に当たる（9/11 は 27 件）。
+            //   設計どおりの重複排除なので警告ではなく情報として残す。500 名だと警告が 100 件単位になりログが読みにくい。
+            $isDuplicate = str_contains($e->getMessage(), 'Duplicate entry') || str_contains($e->getMessage(), 'UNIQUE constraint');
+            Log::log($isDuplicate ? 'info' : 'warning', $isDuplicate ? 'ActivityLogger duplicate ignored' : 'ActivityLogger failed', [
                 'event_type' => $eventType,
                 'error'      => $e->getMessage(),
             ]);

@@ -78,11 +78,12 @@ class SetPasswordController extends Controller
         try {
             $user = $verificationToken->user;
 
-            // パスワードを設定し、ステータスを承認済みに変更
+            // パスワードを設定し、ステータスを承認済みに変更。
+            // ただし管理画面で停止・拒否した人は戻さない（未使用のパスワード設定リンクで自分を承認済みに戻せてしまうため）。
             $user->update([
                 'password' => Hash::make($request->password),
                 'email_verified_at' => now(),
-                'status' => 'approved',
+                'status' => in_array($user->status, ['suspended', 'rejected'], true) ? $user->status : 'approved',
             ]);
 
             // トークンを検証済みにする

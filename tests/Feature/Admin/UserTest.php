@@ -139,6 +139,49 @@ class UserTest extends TestCase
         ]);
     }
 
+    public function test_suspending_user_revokes_tokens(): void
+    {
+        // ステータスはログイン時にしか見ないので、停止と同時にトークンを消してログイン中の端末を追い出す
+        $buyer = $this->createParticipant();
+        $plainToken = $buyer->createToken('auth-token')->plainTextToken;
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/users/{$buyer->id}", ['status' => 'suspended'])
+            ->assertStatus(200);
+
+        $this->assertSame(0, $buyer->tokens()->count());
+
+        // 停止前のトークンでは API を使えない
+        $this->app['auth']->forgetGuards();
+        $this->withHeader('Authorization', "Bearer {$plainToken}")
+            ->getJson('/api/auth/me')
+            ->assertStatus(401);
+    }
+
+    public function test_updating_user_without_losing_access_keeps_tokens(): void
+    {
+        $buyer = $this->createParticipant();
+        $buyer->createToken('auth-token');
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/users/{$buyer->id}", ['name' => '更新された名前', 'status' => 'approved'])
+            ->assertStatus(200);
+
+        $this->assertSame(1, $buyer->tokens()->count());
+    }
+
+    public function test_deleting_user_revokes_tokens(): void
+    {
+        $buyer = $this->createParticipant();
+        $buyer->createToken('auth-token');
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/admin/users/{$buyer->id}")
+            ->assertStatus(200);
+
+        $this->assertSame(0, $buyer->tokens()->count());
+    }
+
     public function test_user_creation_requires_email(): void
     {
         $response = $this->actingAs($this->admin, 'sanctum')

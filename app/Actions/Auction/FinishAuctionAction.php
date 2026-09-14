@@ -29,6 +29,9 @@ class FinishAuctionAction
             throw $e;
         }
 
+        // B-4: レーンの一括更新はモデルイベントが出ないので、参加者向けライブ状態の共有キャッシュを捨てる
+        \App\Services\BidService::forgetSharedState($auction->id);
+
         // 送料を自動計算（管理者承認前なので shipping_approved_at は未セット）
         $this->calculateShippingForAuction($auction);
 

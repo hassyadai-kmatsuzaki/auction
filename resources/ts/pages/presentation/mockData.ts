@@ -154,7 +154,7 @@ export interface MockAuction {
 export const MOCK_AUCTIONS: MockAuction[] = [
   { id: 1, title: 'デモフリーオークション', event_date: '2026-05-06', start_time: '13:00', status: 'scheduled', total_items: 120, entrance_allowed: true, description: '厳選された個体を多数出品！希少品種も見逃せない春の特別オークションです。', sellers: ['ブリーダーA', 'ブリーダーB', 'ブリーダーC', 'ブリーダーD', 'ブリーダーE', 'ブリーダーF'] },
   { id: 2, title: '2026年GWスペシャルオークション', event_date: '2026-05-03', start_time: '10:00', status: 'finished', total_items: 200, entrance_allowed: false, description: 'ゴールデンウィーク限定の大型オークション。初心者の方も大歓迎！', sellers: ['ブリーダーA', 'ブリーダーB', 'ブリーダーG'] },
-  { id: 3, title: '2026年早春オークション', event_date: '2026-03-01', start_time: '13:00', status: 'finished', total_items: 80, description: '早春の人気品種を集めたオークションです。', sellers: ['ブリーダーC', 'ブリーダーD'] },
+  { id: 3, title: '2026年春オークション', event_date: '2026-04-26', start_time: '13:00', status: 'finished', total_items: 80, description: '春の人気品種を集めたオークションです。', sellers: ['ブリーダーC', 'ブリーダーD'] },
 ];
 
 export interface MockAnnouncement {
@@ -199,28 +199,28 @@ export interface MockWonItem {
 export const MOCK_WON_ITEMS: MockWonItem[] = [
   {
     id: 1,
-    item: { id: 1, item_number: 1, species_name: 'エメキン 20匹(10ペア)', quantity: 20, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    item: { id: 1, item_number: 1, species_name: 'エメキン 20匹(10ペア)', quantity: 20, thumbnail_path: `${DEMO_IMG}/エメキン_サムネ.jpg`, auction: { id: 3, title: '2026年春オークション', event_date: '2026-04-26' } },
     winning_price: 850, quantity: 20, total_amount: 18700, commission_amount: 1700,
     payment_status: 'confirmed', delivery_status: 'shipped',
-    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', tracking_number: '1234-5678-9012', shipping_company: 'ヤマト運輸', shipped_at: '2026-03-10',
+    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', tracking_number: '1234-5678-9012', shipping_company: 'ヤマト運輸', shipped_at: '2026-05-01',
   },
   {
     id: 2,
-    item: { id: 2, item_number: 2, species_name: '紅帝リアルロングフィン 35匹', quantity: 35, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    item: { id: 2, item_number: 2, species_name: '紅帝リアルロングフィン 35匹', quantity: 35, thumbnail_path: `${DEMO_IMG}/紅帝リアルロングフィン_サムネ.jpg`, auction: { id: 3, title: '2026年春オークション', event_date: '2026-04-26' } },
     winning_price: 1200, quantity: 35, total_amount: 46200, commission_amount: 4200,
     payment_status: 'confirmed', delivery_status: 'completed',
-    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', shipped_at: '2026-03-08',
+    shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101', shipped_at: '2026-04-30',
   },
   {
     id: 3,
-    item: { id: 3, item_number: 3, species_name: '三色体外光亜種 40匹', quantity: 40, thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    item: { id: 3, item_number: 3, species_name: '三色体外光亜種 40匹', quantity: 40, thumbnail_path: `${DEMO_IMG}/三色体外光亜種_サムネ.jpg`, auction: { id: 3, title: '2026年春オークション', event_date: '2026-04-26' } },
     winning_price: 420, quantity: 40, total_amount: 18480, commission_amount: 1680,
-    payment_status: 'pending', payment_deadline: '2026-03-19', delivery_status: 'pending',
+    payment_status: 'pending', payment_deadline: '2026-04-29', delivery_status: 'pending',
     shipping_address: '未設定',
   },
   {
     id: 4,
-    item: { id: 4, item_number: 4, species_name: '和墨ミッドナイトフリル 40匹', quantity: 40, thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`, auction: { id: 3, title: '2026年早春オークション', event_date: '2026-03-01' } },
+    item: { id: 4, item_number: 4, species_name: '和墨ミッドナイトフリル 40匹', quantity: 40, thumbnail_path: `${DEMO_IMG}/和墨ミッドナイトフリル_サムネ.jpg`, auction: { id: 3, title: '2026年春オークション', event_date: '2026-04-26' } },
     winning_price: 1500, quantity: 40, total_amount: 66000, commission_amount: 6000,
     payment_status: 'paid', delivery_status: 'preparing',
     shipping_address: '〒150-0001 東京都渋谷区神宮前1-2-3 メダカハイツ101',

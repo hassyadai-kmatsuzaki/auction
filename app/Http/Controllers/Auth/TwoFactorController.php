@@ -164,6 +164,26 @@ class TwoFactorController extends Controller
             ], 422);
         }
 
+        // アカウント状態チェック（LoginController と同じ）。パスワード入力の後に停止された人へトークンを出さない。
+        if ($user->status !== 'approved') {
+            $messages = [
+                'pending'   => '現在、アカウントの承認待ちです。運営による承認が完了次第、ログインいただけます。承認には数営業日かかる場合があります。お急ぎの場合は info@nep-corp.com までご連絡ください。',
+                'rejected'  => '申し訳ございません。アカウントの承認が見送られました。詳しくは info@nep-corp.com までお問い合わせください。',
+                'suspended' => 'このアカウントは現在ご利用を停止しています。詳しくは info@nep-corp.com までお問い合わせください。',
+            ];
+            return response()->json([
+                'success' => false,
+                'message' => $messages[$user->status] ?? 'このアカウントは現在ログインできません。詳しくは info@nep-corp.com までお問い合わせください。',
+            ], 403);
+        }
+
+        if (!$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'このアカウントは現在無効化されています。詳しくは info@nep-corp.com までお問い合わせください。',
+            ], 403);
+        }
+
         // 多重ログイン抑止（LoginController と同じロジック）
         $forceLogoutOthers = $request->boolean('force_logout_others');
         if (! $forceLogoutOthers && $this->hasActiveAuthToken($user)) {

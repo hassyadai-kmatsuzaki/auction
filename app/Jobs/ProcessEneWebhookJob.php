@@ -269,7 +269,8 @@ class ProcessEneWebhookJob implements ShouldQueue
 
         // promote: 有効(is_active=true)な既存ユーザーが未承認なら承認済みに昇格。
         // 無効化(is_active=false)ユーザーは意図的な停止の可能性があるため webhook では復活させない。
-        if ($behavior === 'promote' && $existing->is_active && $existing->status !== 'approved') {
+        // 管理画面の「停止」は is_active を変えず status=suspended にするだけなので、これも除外する。
+        if ($behavior === 'promote' && $existing->is_active && ! in_array($existing->status, ['approved', 'suspended'], true)) {
             $existing->update([
                 'status'      => 'approved',
                 'approved_at' => $existing->approved_at ?: now(),

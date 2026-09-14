@@ -40,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'ensure.auction.editable' => \App\Http\Middleware\EnsureAuctionEditable::class,
         ]);
 
+        // 2026-09-14: ログイン前のブラウザが API 以外の保護ページを開いたときの転送先。
+        //   未定義だと「Route [login] not defined」でエラー画面になる（9/11 のログに 1 件）。SPA の /login へ送る。
+        $middleware->redirectGuestsTo('/login');
+
         // ALB（HTTPS終端）配下での X-Forwarded-* を信頼
         $middleware->trustProxies(at: '*', headers:
             Request::HEADER_X_FORWARDED_FOR |

@@ -29,6 +29,8 @@ class MonitorAuctionJobsTest extends TestCase
     public function test_command_redispatches_when_heartbeat_is_stale(): void
     {
         $auction = Auction::factory()->live()->create();
+        // R3: 開始直後 60 秒は猶予があるので、開始から時間が経った状態にする
+        Auction::where('id', $auction->id)->update(['updated_at' => now()->subMinutes(5)]);
         Lane::factory()->active()->create([
             'auction_id' => $auction->id,
             'lane_number' => 1,

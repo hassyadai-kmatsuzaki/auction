@@ -376,6 +376,13 @@ class UserController extends Controller
                 'city', 'address_line1', 'address_line2', 'status', 'is_active', 'is_test'
             ]));
 
+            // 停止・拒否・無効化でログインできない状態にしたら、発行済みトークンを全削除して即時ログアウトさせる。
+            // ステータスを見ているのはログイン時だけでトークンは無期限なので、消さないとログイン中の端末で使い続けられる。
+            if (($user->wasChanged('status') || $user->wasChanged('is_active'))
+                && ($user->status !== 'approved' || ! $user->is_active)) {
+                $user->tokens()->delete();
+            }
+
             // ステータス変更時の処理
             if ($request->has('status')) {
                 if ($request->status === 'approved' && $user->wasChanged('status')) {
@@ -508,6 +515,9 @@ class UserController extends Controller
 
         // ソフトデリート（is_activeをfalseに）
         $user->update(['is_active' => false]);
+
+        // ログイン中の端末もその場で追い出す（トークンは無期限で、is_active を見るのはログイン時だけのため）
+        $user->tokens()->delete();
 
         return response()->json([
             'success' => true,

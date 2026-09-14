@@ -141,6 +141,35 @@ class MetricRecorder
     }
 
     /**
+     * R3 (2026-09-14): 確定後に次の商品へ進めず止まったレーン（経路 B）の検知と復旧結果。
+     * アラーム auction-lane-stalled は EventType=lane_stalled の LaneStalled 合計 >= 1 で鳴らす（欠測は正常扱い）。
+     */
+    public function laneStalled(int $laneId, ?int $itemId, bool $recovered, ?int $nextItemId): void
+    {
+        $this->emit('lane_stalled', [
+            ['LaneStalled' => ['Count', 1]],
+            ['LaneStallRecovered' => ['Count', $recovered ? 1 : 0]],
+        ], [
+            'lane_id'      => (string) $laneId,
+            'item_id'      => (string) ($itemId ?? ''),
+            'next_item_id' => (string) ($nextItemId ?? ''),
+            'recovered'    => $recovered ? 'true' : 'false',
+        ], level: 'warning');
+    }
+
+    /**
+     * R3 (2026-09-14): 監視コマンド（毎分）の心拍。ライブ中のオークション数と、その回に見つけた停止レーン数。
+     * CountdownTick のアラームは「ライブが無い＝欠測」を区別できないので、LiveAuctions と組み合わせて読む。
+     */
+    public function monitorRun(int $liveAuctions, int $stalledLanes): void
+    {
+        $this->emit('monitor', [
+            ['LiveAuctions' => ['Count', $liveAuctions]],
+            ['StalledLanes' => ['Count', $stalledLanes]],
+        ], []);
+    }
+
+    /**
      * EMFフォーマットでログ出力する
      *
      * @param  string $eventType  イベント識別子

@@ -31,6 +31,24 @@ class Lane extends BaseModel
     ];
 
     /**
+     * B-4 (2026-09-14): レーンが変わったら参加者向けライブ状態の共有キャッシュを捨てる。
+     * 現在商品の切替（moveToNextItem / MoveToNextItemAction / StartAuctionAction）と状態変更を拾う。
+     * トランザクション内の更新は commit 後に捨てる（commit 前に捨てると、他の要求が旧状態で作り直してしまう）。
+     * 一括更新（Lane::where()->update()）はモデルイベントが出ないので、呼び元で forgetSharedState を呼ぶ。
+     */
+    protected static function booted(): void
+    {
+        $forget = function (Lane $lane): void {
+            $auctionId = (int) $lane->auction_id;
+            \Illuminate\Support\Facades\DB::afterCommit(function () use ($auctionId) {
+                \App\Services\BidService::forgetSharedState($auctionId);
+            });
+        };
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
+    /**
      * オークションとのリレーション
      */
     public function auction()

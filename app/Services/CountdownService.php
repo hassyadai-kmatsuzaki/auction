@@ -220,6 +220,77 @@ class CountdownService
     }
 
     /**
+     * R3 (2026-09-14): 確定後にレーンが止まった経路（経路 B）の復旧。
+     *
+     * handleCountdownEnd の Step 1（落札/流札の commit）は済んだのに Step 2（moveToNextItem）が失敗すると、
+     * レーンは active のまま売れた商品を指し続け、カウントダウン状態も無い。旧版はここから自力で戻れず、
+     * 復旧は管理画面の「次の商品へ」だけだった。この経路をカウントダウンジョブ（3 秒に 1 回）と
+     * 監視コマンド（毎分）から呼び、次の商品へ進め直す。
+     *   - 現在商品が live なら対象外（それは recoverCountdownIfMissing / startCountdown の仕事）
+     *   - 前回の失敗で「live なのにどのレーンも指していない商品」が残っていれば registered に戻して拾い直す
+     *     （moveToNextItem は registered しか拾わないので、戻さないと商品を飛ばす）
+     *   - 同じレーンを同時に直さないようロックを取る
+     *
+     * @return array{recovered: bool, reason: string, next_item_id: ?int}
+     */
+    public function recoverStalledLane(Lane $lane): array
+    {
+        $lane->refresh();
+        $lane->load(['auction', 'currentItem']);
+        $auction = $lane->auction;
+        $item    = $lane->currentItem;
+
+        if (!$auction || $auction->status !== 'live') {
+            return ['recovered' => false, 'reason' => 'auction_not_live', 'next_item_id' => null];
+        }
+        if ($lane->status !== 'active') {
+            return ['recovered' => false, 'reason' => 'lane_not_active', 'next_item_id' => null];
+        }
+        if ($item && $item->status === 'live') {
+            return ['recovered' => false, 'reason' => 'item_still_live', 'next_item_id' => null];
+        }
+
+        $lock = Cache::lock("lane_stall_recover:{$lane->id}", 30);
+        if (!$lock->get()) {
+            return ['recovered' => false, 'reason' => 'locked', 'next_item_id' => null];
+        }
+
+        try {
+            $orphans = $lane->items()
+                ->where('items.status', 'live')
+                ->when($lane->current_item_id, fn ($q) => $q->where('items.id', '!=', $lane->current_item_id))
+                ->get();
+            foreach ($orphans as $orphan) {
+                $orphan->update(['status' => 'registered']);
+                Log::warning("recoverStalledLane: orphan live item {$orphan->id} in lane {$lane->id} reset to registered");
+            }
+
+            $next = $this->moveToNextItem($lane, $auction);
+
+            $this->metrics->laneStalled($lane->id, $item?->id, true, $next?->id);
+            Log::warning('lane.stall.recovered', [
+                'lane_id'          => $lane->id,
+                'auction_id'       => $auction->id,
+                'previous_item_id' => $item?->id,
+                'next_item_id'     => $next?->id,
+            ]);
+
+            return ['recovered' => true, 'reason' => $next ? 'moved' : 'lane_finished', 'next_item_id' => $next?->id];
+        } catch (\Throwable $e) {
+            $this->metrics->laneStalled($lane->id, $item?->id, false, null);
+            Log::error('lane.stall.recovery_failed', [
+                'lane_id'    => $lane->id,
+                'auction_id' => $auction->id,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return ['recovered' => false, 'reason' => 'error: ' . $e->getMessage(), 'next_item_id' => null];
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
      * 入札開始待機フェーズを開始（生体切り替え後の待機）
      */
     public function startPreBidCountdown(Lane $lane): void

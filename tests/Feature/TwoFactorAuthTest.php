@@ -180,6 +180,25 @@ class TwoFactorAuthTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_2fa_verify_rejects_suspended_user(): void
+    {
+        // パスワード入力（1段目）の後に管理画面で停止されたケース。正しいコードでもトークンを出さない
+        $service = new TwoFactorService();
+        $service->generateSecret($this->user);
+        $this->user->update(['two_factor_confirmed_at' => now(), 'status' => 'suspended']);
+        $secret = decrypt($this->user->fresh()->two_factor_secret);
+        $code = $this->generateTotpCode($secret);
+
+        $response = $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id,
+            'code' => $code,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonMissingPath('data.token');
+        $this->assertSame(0, $this->user->tokens()->count());
+    }
+
     private function generateTotpCode(string $secret): string
     {
         $timeStep = (int) floor(time() / 30);

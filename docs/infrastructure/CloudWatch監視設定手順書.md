@@ -633,3 +633,16 @@ aws cloudwatch set-alarm-state \
 |---|---|---|---|
 | 1.0 | 2026-04-22 | 初版作成 | 株式会社BeerO'Clock 松崎 航平 |
 | 1.1 | 2026-06-10 | システム名称統一 | 株式会社BeerO'Clock 松崎 航平 |
+
+---
+
+## 追記（2026-09-14）: 監視ファイル名の不一致でメトリクスが 5 か月間届いていなかった
+
+- 本書の 2-3 の設定は `storage/logs/alerts.log` と `storage/logs/laravel.log` を固定名で監視しているが、アプリの `alerts` / 既定のログチャンネルは `daily` ドライバで **日付付きファイル**（`alerts-YYYY-MM-DD.log`、`laravel-YYYY-MM-DD.log`）に書く。このため `/auction/app/alerts` は 2026-04-15、`/auction/app/laravel` は 2026-04-28 で転送が止まり、`Auction/App` のメトリクスは 1 件も届いていなかった（`auction-countdown-stalled` が 4/15 から ALARM 固定だった原因）。
+- 正しい設定は `file_path` をワイルドカードにする（エージェントは一致する最新ファイルだけを監視する）:
+  - `/var/www/auction/storage/logs/alerts-*.log`
+  - `/var/www/auction/storage/logs/laravel-*.log`
+- 本番は 2026-09-14 13:59 JST に修正済み（`amazon-cloudwatch-agent.d/file_amazon-cloudwatch-agent.json` を編集し、同じファイル名で `fetch-config … -s`）。変更前の設定は `/opt/aws/amazon-cloudwatch-agent/etc/backup-cwagent-20260914.json`。
+- 反映の注意: `fetch-config -c file:<path>` は `<path>` のファイル名の頭に `file_` を付けて `.d/` に置く。**既存と違う名前で渡すと `.d/` に設定が 2 本並び、同じログを二重に送る。** 既存の `.d/file_amazon-cloudwatch-agent.json` を `/tmp/amazon-cloudwatch-agent.json` にコピーして編集し、その名前で渡す。
+- 疎通確認は、アプリと同じ持ち主（nginx / ec2-user、664）で当日の `alerts-YYYY-MM-DD.log` に EMF を 1 行追記し（`EventType=agent_test`、メトリクス名 `AgentTest`）、3 分後に `aws cloudwatch list-metrics --namespace Auction/App --metric-name AgentTest` で確認する。`describe-log-streams` の lastEventTimestamp と `storedBytes` は反映が遅れるので、実イベントは `get-log-events` で見る。
+- `auction-countdown-stalled` は欠測を異常扱い（TreatMissingData=breaching）にしているため、**ライブ開催が無い時間帯は ALARM のままが正常**。開催日は開始から 2 分以内に OK へ変わることを確認項目にする。1 レーンだけの停止（確定後の次商品移行の失敗）は CountdownTick では検知できない。
