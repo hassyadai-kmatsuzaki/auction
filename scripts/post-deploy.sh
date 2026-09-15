@@ -84,7 +84,8 @@ sudo supervisorctl status | grep -E 'auction-queue' | while read -r name state p
   [ "$state" = "RUNNING" ] || { ng "$name は $state"; continue; }
   pid="${pid%,}"
   started="$(date -d "$(ps -o lstart= -p "$pid")" +%s 2>/dev/null || echo 0)"
-  if [ "$started" -gt "$LATEST_MTIME" ]; then
+  # 2026-09-14: 秒単位の比較なので、キャッシュ再生成と同じ秒に起動した worker は同値になる（ステージングで偽 NG）。同じ秒は新コード扱い
+  if [ "$started" -ge "$LATEST_MTIME" ]; then
     ok "$name pid=$pid 起動 $(date -d "@$started" '+%T')"
   else
     ng "$name pid=$pid 起動 $(date -d "@$started" '+%T') が最新ファイルより古い（旧コードで稼働中）"

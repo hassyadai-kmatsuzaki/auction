@@ -66,9 +66,13 @@ class RateLimitByIp
             }
         }
 
-        $expiresAt = now()->addMinutes($decayMinutes);
+        // 2026-09-15: 固定窓にする。旧版は put のたびに有効期限を延ばしていたので、要求が途切れない限り
+        //   窓が閉じず「1 分あたり」ではなく「途切れるまでの合計」で数えていた（1000 名試験で判明）。
+        //   add で窓の開始時に 1 回だけ期限を付け、以後は increment で数える。
         foreach ($limits as $key => $max) {
-            Cache::put($key, $attempts[$key] + 1, $expiresAt);
+            if (!Cache::add($key, 1, $decayMinutes * 60)) {
+                Cache::increment($key);
+            }
         }
 
         $response = $next($request);
