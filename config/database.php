@@ -160,6 +160,11 @@ return [
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_DB', '0'),
             'scheme' => env('REDIS_SCHEME', 'tcp'),
+            // 2026-09-17: REDIS_PERSISTENT=true のとき、default（DB 0）と cache（DB 1）が同じソケットを共有しないように分ける。
+            //   phpredis の常時接続は「ホスト・ポート・タイムアウト・persistent_id」で同じ接続を再利用するため、
+            //   persistent_id が無いと片方の select(DB) がもう片方に効き、キューやカウントダウンの状態が別の DB に書かれる。
+            //   REDIS_PERSISTENT=false（既定）のときは使われない。
+            'persistent_id' => 'default',
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
@@ -174,6 +179,7 @@ return [
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_CACHE_DB', '1'),
             'scheme' => env('REDIS_SCHEME', 'tcp'),
+            'persistent_id' => 'cache', // default と別の接続にする（上の注記を参照）
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
