@@ -45,6 +45,7 @@ import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 import ReviewDialog from '../../features/reviews/ReviewDialog';
 import { optimizedImageUrl } from '../../lib/optimizedMedia';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface WonItemData {
   id: number;
@@ -179,6 +180,10 @@ const downloadPdf = async (url: string, filename: string): Promise<string | null
 };
 
 export default function WonItems() {
+  const { user } = useAuth();
+  // 当日会員（会場登録）は手数料体系が異なり、画面の金額と実際の請求が一致しない。
+  // 金額サマリー・請求書/領収書は出さず、現地案内が正である旨を表示する。
+  const isOnsite = !!user?.is_onsite;
   const [auctionGroups, setAuctionGroups] = useState<AuctionGroup[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -391,8 +396,15 @@ export default function WonItems() {
         落札した商品の支払い状況と配送状況を確認できます
       </Typography>
 
-      {/* サマリー */}
-      {summary && (() => {
+      {isOnsite && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          当日会員の方のお支払い金額（落札金額・手数料）は<b>会場でのご案内が正</b>となります。
+          この画面に表示される合計金額・請求書は当日会員には適用されません。ご不明な点は会場スタッフまでお声がけください。
+        </Alert>
+      )}
+
+      {/* サマリー（当日会員は手数料が異なるため非表示） */}
+      {summary && !isOnsite && (() => {
         const overall = computeTaxBreakdown(summary.subtotal, summary.commission_total, summary.shipping_fee);
         const paidTax = Math.floor((summary.paid_amount * TAX_RATE) / 100);
         const pendingTax = Math.floor((summary.pending_amount * TAX_RATE) / 100);
@@ -518,8 +530,8 @@ export default function WonItems() {
                   </Alert>
                 )}
 
-                {/* オークション単位のアクションボタン */}
-                {auctionId && (
+                {/* オークション単位のアクションボタン（当日会員は請求書/領収書の金額が実態と異なるため出さない） */}
+                {auctionId && !isOnsite && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                     {/* 送料計算状態 */}
                     {group.shipping.calculated && (
@@ -683,7 +695,8 @@ export default function WonItems() {
                   </Card>
                 ))}
 
-                {/* オークション合計（請求書/納品書PDFと同一構造） */}
+                {/* オークション合計（請求書/納品書PDFと同一構造）。当日会員は手数料が異なるため出さない */}
+                {!isOnsite && (
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
                   <Box sx={{ minWidth: 320, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -731,6 +744,7 @@ export default function WonItems() {
                     </Box>
                   </Box>
                 </Box>
+                )}
               </AccordionDetails>
             </Accordion>
           );

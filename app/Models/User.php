@@ -62,7 +62,50 @@ class User extends Authenticatable
         'email_opt_out_at',
         'unsubscribe_token',
         'is_test',
+        'is_onsite',
     ];
+
+    /**
+     * 当日会員の合成メールアドレスのドメイン。
+     *
+     * users.email は NOT NULL + UNIQUE のため、メール無しの当日会員には
+     * `onsite+{電話番号}@onsite.invalid` を入れる。`.invalid` は RFC 2606 で
+     * 配送不能が保証された予約 TLD。AppServiceProvider の MessageSending リスナーが
+     * このドメイン宛の送信を取り消す（20本超あるメール経路を個別に触らずに一括遮断）。
+     */
+    public const ONSITE_EMAIL_DOMAIN = 'onsite.invalid';
+
+    /**
+     * 電話番号を数字のみに正規化する（全角→半角、ハイフン・空白・括弧を除去）。
+     * 当日会員の登録・ログインの両方でこの形に揃えてから照合する。
+     */
+    public static function normalizePhoneDigits(?string $raw): string
+    {
+        if ($raw === null) {
+            return '';
+        }
+        $half = mb_convert_kana(trim($raw), 'as');
+        return preg_replace('/\D/', '', $half) ?? '';
+    }
+
+    /**
+     * 当日会員の合成メールアドレスを組み立てる。
+     */
+    public static function onsiteEmailFor(string $phoneDigits): string
+    {
+        return 'onsite+' . $phoneDigits . '@' . self::ONSITE_EMAIL_DOMAIN;
+    }
+
+    /**
+     * 当日会員の合成メールアドレスか（宛先が配送不能ドメインか）。
+     */
+    public static function isOnsiteEmail(?string $email): bool
+    {
+        if (!$email) {
+            return false;
+        }
+        return str_ends_with(strtolower($email), '@' . self::ONSITE_EMAIL_DOMAIN);
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -100,6 +143,7 @@ class User extends Authenticatable
             'email_complained_at' => 'datetime',
             'email_opt_out_at' => 'datetime',
             'is_test' => 'boolean',
+            'is_onsite' => 'boolean',
         ];
     }
 

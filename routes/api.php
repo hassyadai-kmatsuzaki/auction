@@ -78,6 +78,9 @@ Route::post('/webhooks/ene', [\App\Http\Controllers\Webhook\EneWebhookController
 Route::middleware('rate.limit:auth_rate_limit_per_minute,1')->prefix('auth')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
     Route::post('/register', [RegisterController::class, 'register']);
+    // 当日会員登録（会場・電話番号のみ・承認/年会費なし）。system_settings で ON の間だけ受け付ける
+    Route::get('/onsite-register/status', [\App\Http\Controllers\Auth\OnsiteRegisterController::class, 'status']);
+    Route::post('/onsite-register', [\App\Http\Controllers\Auth\OnsiteRegisterController::class, 'register']);
     Route::post('/forgot-password', [PasswordResetController::class, 'forgot']);
     Route::post('/reset-password', [PasswordResetController::class, 'reset']);
     Route::post('/verify-token', [SetPasswordController::class, 'verify']);
@@ -161,6 +164,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::post('users/{id}/switch-membership', [UserController::class, 'switchMembership']);
     Route::post('users/{id}/grant-one-day', [UserController::class, 'grantOneDay']);
     Route::delete('users/{id}/grant-one-day', [UserController::class, 'revokeOneDay']);
+    Route::post('users/{id}/set-password', [UserController::class, 'setPassword']); // 当日会員のみ
     Route::post('users/{id}/profile-image', [UserController::class, 'uploadProfileImage']);
     Route::delete('users/{id}/profile-image', [UserController::class, 'deleteProfileImage']);
     Route::post('users/{id}/seller-profile-image', [UserController::class, 'uploadSellerProfileImage']);

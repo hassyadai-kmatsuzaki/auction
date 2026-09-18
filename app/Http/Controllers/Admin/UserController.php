@@ -50,11 +50,17 @@ class UserController extends Controller
             });
         }
 
+        // 当日会員（会場登録）だけ / 除外 の絞り込み。onsite=1 で当日会員のみ、onsite=0 で正会員のみ
+        if ($request->filled('onsite')) {
+            $query->where('is_onsite', $request->boolean('onsite'));
+        }
+
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -643,6 +649,43 @@ class UserController extends Controller
      * switched_by_admin マーカーが立っている間、加入モーダルには年会費プランのみが
      * 表示され（1Day再選択ブロック）、本人の決済完了でマーカーは自動で消える。
      */
+    /**
+     * パスワードを直接設定する（当日会員向け）。
+     *
+     * 当日会員はメールアドレスを持たないため、既存の「パスワード設定メール」「パスワードリセット」が使えない。
+     * 会場で本人確認のうえ管理者が新しいパスワードを設定し、口頭で伝える運用。
+     * 誤操作防止のため対象は is_onsite=true のユーザーに限定する（正会員は従来どおりメール経由）。
+     * 設定後は発行済みトークンを全削除し、旧パスワードでログイン中の端末を追い出す。
+     */
+    public function setPassword(Request $request, $id)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8|max:100',
+        ], [
+            'password.required' => 'パスワードは必須です。',
+            'password.min'      => 'パスワードは8文字以上で入力してください。',
+        ]);
+
+        $user = User::findOrFail($id);
+
+        if (!$user->is_onsite) {
+            return response()->json([
+                'success' => false,
+                'message' => 'パスワードの直接設定は当日会員のみ可能です。正会員にはパスワード設定メールを送ってください。',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($user, $request) {
+            $user->forceFill(['password' => Hash::make($request->input('password'))])->save();
+            $user->tokens()->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'パスワードを設定しました。ログイン中の端末は再ログインが必要です。',
+        ]);
+    }
+
     public function switchMembership(Request $request, $id, SubscriptionService $service)
     {
         $request->validate([

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\LineAccount;
 use App\Models\LineNotificationLog;
 use App\Models\LineNotificationSetting;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -109,6 +110,12 @@ class LineService
      */
     public function notify(int $userId, string $notificationType, string $text, ?array $flexContent = null): bool
     {
+        // 当日会員（会場登録）は LINE 連携できても通知は一切送らない（請求書発行・入金催促など
+        // 金額入りの通知が手数料体系の違う当日会員に届くのを防ぐ）。全 LINE 通知はここを通る。
+        if (User::where('id', $userId)->where('is_onsite', true)->exists()) {
+            return false;
+        }
+
         $lineAccount = LineAccount::where('user_id', $userId)->where('is_active', true)->first();
         if (!$lineAccount) return false;
 

@@ -319,9 +319,11 @@ export const LaneCard = React.memo(({ lane, isLoading, onBidToggle, onDetailOpen
         )}
       </Box>
 
+      {/* 2026-09-18: PC（非 compact）はカード幅が 480〜600px あり、大画面に映す用途もあるので large（1200px）。
+          スマホ（compact）は 64〜84px のサムネイルなので small のまま。詳細ダイアログは medium（800px）。 */}
       <CardMedia
         component="img"
-        image={optimizedImageUrl(item.thumbnail_path, 'small')}
+        image={optimizedImageUrl(item.thumbnail_path, 'large')}
         alt={item.species_name}
         loading="lazy"
         sx={{ aspectRatio: '3/2', objectFit: 'cover' }}

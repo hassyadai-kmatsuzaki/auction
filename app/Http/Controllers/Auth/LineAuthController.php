@@ -26,6 +26,8 @@ class LineAuthController extends Controller
             return response()->json(['success' => false, 'message' => 'ログインが必要です'], 401);
         }
 
+        // 当日会員（会場登録）も連携自体は可能。通知は LineService::notify() で一括して送らない。
+
         // 連携後に戻るページ（ホワイトリストで検証）
         $returnTo = $request->input('return_to', '/participant/settings');
         $allowedReturns = ['/participant/settings', '/seller/profile'];

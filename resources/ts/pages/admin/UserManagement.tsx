@@ -50,6 +50,8 @@ interface User {
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   is_active: boolean;
   is_test: boolean;
+  /** 当日会員（会場で電話番号登録・メール無し・年会費免除） */
+  is_onsite?: boolean;
   roles: Role[];
   last_login_at: string | null;
   created_at: string;
@@ -74,6 +76,8 @@ export default function UserManagement() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  // '' = 全て / '1' = 当日会員のみ / '0' = 正会員のみ
+  const [onsiteFilter, setOnsiteFilter] = useState('');
 
   // 複数選択（ページ横断で蓄積される。ページを跨いで選んでも保持される設計）
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -124,7 +128,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers();
-  }, [statusFilter, roleFilter]);
+  }, [statusFilter, roleFilter, onsiteFilter]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -138,6 +142,7 @@ export default function UserManagement() {
       if (search) params.append('search', search);
       if (statusFilter) params.append('status', statusFilter);
       if (roleFilter) params.append('role', roleFilter);
+      if (onsiteFilter) params.append('onsite', onsiteFilter);
 
       const response = await axios.get(`/api/admin/users?${params.toString()}`);
       
@@ -281,6 +286,21 @@ export default function UserManagement() {
             </Select>
           </FormControl>
 
+          <FormControl sx={{ minWidth: 150 }}>
+            <InputLabel>会員種別</InputLabel>
+            <Select
+              value={onsiteFilter}
+              onChange={(e) => {
+                setOnsiteFilter(e.target.value);
+              }}
+              label="会員種別"
+            >
+              <MenuItem value="">全て</MenuItem>
+              <MenuItem value="0">正会員のみ</MenuItem>
+              <MenuItem value="1">当日会員のみ</MenuItem>
+            </Select>
+          </FormControl>
+
           <Button
             variant="outlined"
             startIcon={<SearchIcon />}
@@ -365,9 +385,18 @@ export default function UserManagement() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {user.email}
-                        </Typography>
+                        {user.is_onsite ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Chip label="当日会員" size="small" color="info" variant="outlined" />
+                            <Typography variant="body2" color="text.secondary">
+                              {user.phone || '-'}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            {user.email}
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>

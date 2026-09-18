@@ -47,7 +47,10 @@ export default function LineLinkGate({ children }: Props) {
 
   // 「未連携」かつ「ライブ画面以外」かつ「他の必須ゲート非表示」で表示対象。
   // 必須ゲート（サブスク登録・配送先住所）が出ている間は重ねて表示しない。
-  const shouldShow = !!user && !!status && !status.linked && !isLivePage && !isBlocking;
+  // 当日会員（会場登録）にはこの案内を出さない。文面が「落札通知をLINEで受け取るには連携が必要」
+  // という約束になっているが、当日会員には LineService::notify() が通知を送らないため嘘になる。
+  // 連携自体は塞いでいないので、必要なら設定画面の LINE連携カードから連携できる。
+  const shouldShow = !!user && !user.is_onsite && !!status && !status.linked && !isLivePage && !isBlocking;
 
   // ページ遷移（pathname 変化）のたびに再評価して再表示する。
   // shouldShow が false になれば（連携完了・ライブ画面）閉じる。

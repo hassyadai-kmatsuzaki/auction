@@ -465,15 +465,18 @@ export default function AuctionLive() {
   };
 
   // 次の商品画像をプリフェッチ（商品切替時に即表示するため）
+  // 2026-09-18: LaneCard が実際に表示するサイズと揃える（PC は large、スマホの compact は small）。
+  //   ずれていると先読みが無駄になり、切替時に本命サイズを取りに行くことになる。
   useEffect(() => {
     if (!liveState?.lanes) return;
+    const preset = isCompactLive ? 'small' : 'large';
     const urls: string[] = [];
     for (const lane of liveState.lanes) {
       // 各レーンの次の商品のサムネイルをプリフェッチ
       if (lane.upcoming_items?.length) {
         for (const item of lane.upcoming_items.slice(0, 2)) {
           if (item.thumbnail_path) {
-            urls.push(optimizedImageUrl(item.thumbnail_path, 'small'));
+            urls.push(optimizedImageUrl(item.thumbnail_path, preset));
           }
         }
       }
@@ -481,7 +484,7 @@ export default function AuctionLive() {
     if (urls.length > 0) {
       prefetchImages(urls);
     }
-  }, [liveState?.lanes]);
+  }, [liveState?.lanes, isCompactLive]);
 
   // liveState から入室制御情報を同期（useEffect内でstateを更新：レンダリング中のsetState禁止パターン回避）
   useEffect(() => {

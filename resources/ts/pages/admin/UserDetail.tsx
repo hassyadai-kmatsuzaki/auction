@@ -133,6 +133,8 @@ interface User {
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   is_active: boolean;
   is_test: boolean;
+  /** 当日会員（会場で電話番号登録・メール無し・年会費免除） */
+  is_onsite?: boolean;
   email_verified_at: string | null;
   approved_at: string | null;
   approved_by: number | null;
@@ -180,6 +182,10 @@ export default function UserDetail() {
   const [switchSubmitting, setSwitchSubmitting] = useState(false);
   const [oneDayDialogOpen, setOneDayDialogOpen] = useState(false);
   const [oneDaySubmitting, setOneDaySubmitting] = useState(false);
+  // 当日会員のパスワード直接設定（メールが無いので設定メール/リセットが使えない）
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   // 編集フォーム
   const [editForm, setEditForm] = useState({
@@ -431,6 +437,23 @@ export default function UserDetail() {
     }
   };
 
+  const handleSetPassword = async () => {
+    setPasswordSubmitting(true);
+    try {
+      const response = await axios.post(`/api/admin/users/${id}/set-password`, { password: newPassword });
+      if (response.data.success) {
+        setSuccess(response.data.message || 'パスワードを設定しました');
+        setPasswordDialogOpen(false);
+        setNewPassword('');
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.errors?.password?.[0] || err.response?.data?.message;
+      setError(msg || 'パスワードの設定に失敗しました');
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
+
   const handleRevokeOneDay = async () => {
     setOneDaySubmitting(true);
     try {
@@ -647,6 +670,22 @@ export default function UserDetail() {
                 {user.phone || '-'}
               </Typography>
             </Box>
+
+            {user.is_onsite && (
+              <Box sx={{ mb: 2 }}>
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  <b>当日会員</b>（会場登録）。メールアドレスは配送不能の仮の値で、メール・LINE 通知は送られません。
+                  ログインは電話番号＋パスワードです。年会費なし・入札のみ・30日で自動失効します。
+                </Alert>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => { setNewPassword(''); setPasswordDialogOpen(true); }}
+                >
+                  パスワードを直接設定
+                </Button>
+              </Box>
+            )}
 
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" color="text.secondary">
@@ -1620,6 +1659,36 @@ export default function UserDetail() {
             startIcon={oneDaySubmitting ? <CircularProgress size={16} /> : <ConfirmationNumberIcon />}
           >
             付与する
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 当日会員のパスワード直接設定ダイアログ */}
+      <Dialog open={passwordDialogOpen} onClose={() => !passwordSubmitting && setPasswordDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>パスワードを直接設定</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            当日会員はメールを受け取れないため、管理者がここで新しいパスワードを設定し、本人に口頭で伝えてください。
+            設定するとログイン中の端末は全て切断され、再ログインが必要になります。
+          </Typography>
+          <TextField
+            fullWidth
+            label="新しいパスワード（8文字以上）"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoFocus
+            inputProps={{ minLength: 8, autoComplete: 'new-password' }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordDialogOpen(false)} disabled={passwordSubmitting}>キャンセル</Button>
+          <Button
+            onClick={handleSetPassword}
+            variant="contained"
+            disabled={passwordSubmitting || newPassword.length < 8}
+            startIcon={passwordSubmitting ? <CircularProgress size={16} /> : undefined}
+          >
+            設定する
           </Button>
         </DialogActions>
       </Dialog>

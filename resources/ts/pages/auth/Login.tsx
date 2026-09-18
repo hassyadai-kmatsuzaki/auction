@@ -18,7 +18,9 @@ import {
   EmailOutlined,
   LockOutlined,
   VisibilityOff,
+  PhoneOutlined,
 } from '@mui/icons-material';
+import axios from '../../lib/axios';
 import { useAuth } from '../../contexts/AuthContext';
 // import GoogleLoginButton from '../../features/auth/GoogleLoginButton'; // 一旦非公開
 
@@ -36,6 +38,16 @@ export default function Login() {
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [forceLogoutDialogOpen, setForceLogoutDialogOpen] = useState(false);
+  // 当日会員（会場登録）は電話番号でログインする。受付中のときだけ切替リンクを出す
+  const [phoneMode, setPhoneMode] = useState(false);
+  const [onsiteEnabled, setOnsiteEnabled] = useState(false);
+
+  useEffect(() => {
+    axios
+      .get('/api/auth/onsite-register/status', { silent: true })
+      .then((res) => setOnsiteEnabled(!!res.data?.data?.enabled))
+      .catch(() => { /* 取得できなければメールログインのみ */ });
+  }, []);
 
   useEffect(() => {
     const queryError = searchParams.get('error');
@@ -233,24 +245,47 @@ export default function Login() {
         )}
 
         <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            variant="standard"
-            label="メールアドレス"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <EmailOutlined sx={{ color: '#000', fontSize: 20 }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ ...inputSx, mb: 3 }}
-          />
+          {phoneMode ? (
+            <TextField
+              fullWidth
+              variant="standard"
+              label="電話番号（当日会員）"
+              type="tel"
+              inputMode="tel"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="tel"
+              placeholder="090-1234-5678"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <PhoneOutlined sx={{ color: '#000', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ ...inputSx, mb: 3 }}
+            />
+          ) : (
+            <TextField
+              fullWidth
+              variant="standard"
+              label="メールアドレス"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <EmailOutlined sx={{ color: '#000', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ ...inputSx, mb: 3 }}
+            />
+          )}
 
           <TextField
             fullWidth
@@ -279,19 +314,33 @@ export default function Login() {
             sx={{ ...inputSx, mb: 2 }}
           />
 
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-            <Typography
-              data-testid="link-forgot-password"
-              onClick={() => navigate('/auth/forgot-password')}
-              sx={{
-                fontSize: '0.8125rem',
-                color: '#000',
-                cursor: 'pointer',
-                '&:hover': { color: '#000' },
-              }}
-            >
-              パスワードをお忘れですか？
-            </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 1, flexWrap: 'wrap' }}>
+            {onsiteEnabled || phoneMode ? (
+              <Typography
+                onClick={() => { setPhoneMode((v) => !v); setEmail(''); setError(''); }}
+                sx={{ fontSize: '0.8125rem', color: '#000', cursor: 'pointer' }}
+              >
+                {phoneMode ? 'メールアドレスでログイン' : '当日会員の方（電話番号でログイン）'}
+              </Typography>
+            ) : <span />}
+            {phoneMode ? (
+              <Typography sx={{ fontSize: '0.8125rem', color: '#000' }}>
+                パスワードを忘れた場合は会場スタッフへ
+              </Typography>
+            ) : (
+              <Typography
+                data-testid="link-forgot-password"
+                onClick={() => navigate('/auth/forgot-password')}
+                sx={{
+                  fontSize: '0.8125rem',
+                  color: '#000',
+                  cursor: 'pointer',
+                  '&:hover': { color: '#000' },
+                }}
+              >
+                パスワードをお忘れですか？
+              </Typography>
+            )}
           </Box>
 
           <Button
@@ -320,6 +369,17 @@ export default function Login() {
           >
             {loading ? 'サインイン中...' : 'ログイン'}
           </Button>
+
+          {onsiteEnabled && (
+            <Box sx={{ mt: 2.5, textAlign: 'center' }}>
+              <Typography
+                onClick={() => navigate('/register/onsite')}
+                sx={{ fontSize: '0.8125rem', color: '#000', cursor: 'pointer', display: 'inline-block' }}
+              >
+                会場で初めての方はこちら（当日会員登録）
+              </Typography>
+            </Box>
+          )}
         </Box>
 
         {/* Googleログインは一旦非公開
@@ -357,7 +417,7 @@ export default function Login() {
         <DialogContent>
           <DialogContentText>
             このアカウントは現在、別の端末でログインされています。
-            続行すると他の端末は強制的にログアウトされ、対象のメールアドレス宛に通知が送信されます。
+            続行すると他の端末は強制的にログアウトされ{phoneMode ? 'ます' : '、対象のメールアドレス宛に通知が送信されます'}。
             よろしいですか？
           </DialogContentText>
         </DialogContent>

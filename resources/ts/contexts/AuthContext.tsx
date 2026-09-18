@@ -17,7 +17,10 @@ export interface LoginResult {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string, opts?: { forceLogoutOthers?: boolean }) => Promise<LoginResult | void>;
+  /** identifier はメールアドレス、または当日会員の電話番号 */
+  login: (identifier: string, password: string, opts?: { forceLogoutOthers?: boolean }) => Promise<LoginResult | void>;
+  /** サーバーが発行済みのトークン+ユーザーをそのままセッションにする（当日会員登録の即ログイン用） */
+  applySession: (token: string, user: AuthUser) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
@@ -79,8 +82,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const applySession = (token: string, userData: AuthUser) => {
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setUser(userData);
+  };
+
   const login = async (
-    email: string,
+    identifier: string,
     password: string,
     opts?: { forceLogoutOthers?: boolean }
   ): Promise<LoginResult | void> => {
@@ -88,7 +98,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await axios.post(
         '/api/auth/login',
         {
-          email,
+          // `login` がメールアドレス or 電話番号（当日会員）。`email` は旧サーバー互換のため併送
+          login: identifier,
+          email: identifier,
           password,
           force_logout_others: opts?.forceLogoutOthers === true,
         },
@@ -104,12 +116,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const { token, user: userData } = data;
-
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-      setUser(userData);
+      applySession(token, userData);
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { code?: string; data?: { user_id?: number } } } };
       if (e?.response?.status === 409 && e.response.data?.code === 'ALREADY_LOGGED_IN') {
@@ -153,6 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     loading,
     login,
+    applySession,
     logout,
     refreshUser,
     isAuthenticated: !!user,

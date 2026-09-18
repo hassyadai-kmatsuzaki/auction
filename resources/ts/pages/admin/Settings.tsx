@@ -73,6 +73,8 @@ interface SettingsState {
   live_bidder_updated_throttle_ms: string;
   live_notify_favorite_approaching: boolean; live_tick_broadcast_interval: string;
   live_image_optimization_bypass: boolean;
+  // 当日会員登録（会場・電話番号のみ・承認/年会費なし）
+  onsite_registration_enabled: boolean; onsite_registration_code: string;
 }
 
 const DEFAULT_PRICE_INCREMENT_TIERS: PriceIncrementTier[] = [
@@ -114,6 +116,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   live_bidder_updated_throttle_ms: '250',
   live_notify_favorite_approaching: true, live_tick_broadcast_interval: '1',
   live_image_optimization_bypass: false,
+  onsite_registration_enabled: false, onsite_registration_code: '',
 };
 
 export default function AdminSettings() {
@@ -192,6 +195,8 @@ export default function AdminSettings() {
       live_notify_favorite_approaching: d.live_operation?.live_notify_favorite_approaching?.value ?? true,
       live_tick_broadcast_interval:   String(d.live_operation?.live_tick_broadcast_interval?.value ?? '1'),
       live_image_optimization_bypass: d.live_operation?.live_image_optimization_bypass?.value ?? false,
+      onsite_registration_enabled:    d.live_operation?.onsite_registration_enabled?.value ?? false,
+      onsite_registration_code:       String(d.live_operation?.onsite_registration_code?.value ?? ''),
     });
     if (d.external_integration?.ene_crm_event_map?.value) {
       setEneCrmEventMap({ ...DEFAULT_ENE_CRM_EVENT_MAP, ...d.external_integration.ene_crm_event_map.value });
@@ -811,6 +816,31 @@ export default function AdminSettings() {
                 <Typography variant="body2" color="text.secondary">
                   ON にすると画像APIは変換せずに元画像へ転送します。サーバーCPUが張り付いたときの逃げ道です。転送量が増えるので平時は OFF。
                 </Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ mt: 3 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>当日会員登録（会場での電話番号登録）</Typography>
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              ON の間は <code>/register/onsite</code> から<strong>名前・電話番号・パスワードだけで承認なし・年会費なしの落札会員</strong>を作成できます。
+              メール・LINE の通知は一切送られず、落札金額の案内は現地で行います。<strong>開催当日だけ ON にし、終了後に必ず OFF に戻してください。</strong>
+            </Alert>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={<Switch checked={s.onsite_registration_enabled} onChange={bool('onsite_registration_enabled')} />}
+                  label="当日会員登録を受け付ける" />
+                <Typography variant="body2" color="text.secondary">
+                  OFF のときは登録ページが「受付していません」表示になり、API も 403 を返します。
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="受付コード（合言葉）" value={s.onsite_registration_code}
+                  onChange={str('onsite_registration_code')}
+                  helperText="登録フォームで入力を求めます。空欄なら受付コードなしで登録できます。会場の受付で口頭・掲示で伝えてください" />
               </Grid>
             </Grid>
           </CardContent>

@@ -11,6 +11,7 @@ import RootRedirect from './components/RootRedirect';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import RegisterSeller from './pages/auth/RegisterSeller';
+import RegisterOnsite from './pages/auth/RegisterOnsite';
 import SetPassword from './pages/auth/SetPassword';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
@@ -123,6 +124,8 @@ function App() {
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
             <Route path="/register/seller" element={<GuestRoute><RegisterSeller /></GuestRoute>} />
+            {/* 当日会員登録（会場・電話番号のみ）。管理画面の設定で ON の間だけ受け付ける */}
+            <Route path="/register/onsite" element={<GuestRoute><RegisterOnsite /></GuestRoute>} />
             <Route path="/auth/set-password" element={<SetPassword />} />
             <Route path="/auth/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
             <Route path="/auth/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />

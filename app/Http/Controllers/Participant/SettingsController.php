@@ -66,7 +66,7 @@ class SettingsController extends Controller
             ], 422);
         }
 
-        $user->update($request->only([
+        $fields = [
             'name',
             'trade_name',
             'company_name',
@@ -76,7 +76,14 @@ class SettingsController extends Controller
             'city',
             'address_line1',
             'address_line2',
-        ]));
+        ];
+        // 当日会員は電話番号がログインIDなので本人には変更させない（ハイフン付きで保存されると
+        // 電話番号ログインの照合が外れる）。変更は管理画面から。
+        if ($user->is_onsite) {
+            $fields = array_values(array_diff($fields, ['phone']));
+        }
+
+        $user->update($request->only($fields));
 
         return response()->json([
             'success' => true,

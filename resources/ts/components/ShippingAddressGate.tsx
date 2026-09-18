@@ -21,6 +21,8 @@ export default function ShippingAddressGate({ children }: Props) {
   const requiresRegistration = useMemo(() => {
     if (!user) return false;
     if (!hasRole('participant')) return false;
+    // 当日会員は住所を持たない（現地引き渡し前提）。必須ゲートで塞がない
+    if (user.is_onsite) return false;
     return (
       isMissing(user.name) ||
       isMissing(user.phone) ||

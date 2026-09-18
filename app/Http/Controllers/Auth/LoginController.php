@@ -21,18 +21,23 @@ class LoginController extends Controller
      */
     public function login(Request $request)
     {
+        // 識別子は `login`（メールアドレス or 電話番号）。旧クライアント互換で `email` も受ける。
+        // `@` を含まなければ電話番号とみなし、当日会員（is_onsite=true）だけを電話番号で引く。
+        // 正会員は従来どおりメールアドレスのみ（電話番号が重複していても当日会員側しか引かない）。
         $request->validate([
-            'email' => 'required|email',
+            'login'    => 'required_without:email|nullable|string|max:255',
+            'email'    => 'required_without:login|nullable|string|max:255',
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $identifier = trim((string) ($request->input('login') ?? $request->input('email')));
+        $user = $this->findUserByIdentifier($identifier);
 
         // ユーザーが存在しない、またはパスワードが一致しない
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'メールアドレスまたはパスワードが正しくありません。ご確認のうえ再度お試しください。',
+                'message' => 'メールアドレス（または電話番号）またはパスワードが正しくありません。ご確認のうえ再度お試しください。',
             ], 401);
         }
 
@@ -92,30 +97,61 @@ class LoginController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'status' => $user->status,
-                    'phone' => $user->phone,
-                    'postal_code' => $user->postal_code,
-                    'prefecture' => $user->prefecture,
-                    'city' => $user->city,
-                    'address_line1' => $user->address_line1,
-                    'address_line2' => $user->address_line2,
-                    'payment_method_preference' => $user->payment_method_preference,
-                    'bank_transfer_confirmed_at' => $user->bank_transfer_confirmed_at,
-                    'roles' => $user->roles->map(function ($role) {
-                        return [
-                            'id' => $role->id,
-                            'name' => $role->name,
-                            'display_name' => $role->display_name,
-                        ];
-                    }),
-                ],
+                'user' => self::userPayload($user),
                 'token' => $token,
             ],
         ]);
+    }
+
+    /**
+     * ログイン識別子からユーザーを引く。
+     * `@` を含む → メールアドレス（従来）。含まない → 電話番号（当日会員のみ）。
+     */
+    private function findUserByIdentifier(string $identifier): ?User
+    {
+        if ($identifier === '') {
+            return null;
+        }
+        if (str_contains($identifier, '@')) {
+            return User::where('email', $identifier)->first();
+        }
+
+        $digits = User::normalizePhoneDigits($identifier);
+        if ($digits === '') {
+            return null;
+        }
+        return User::where('is_onsite', true)->where('phone', $digits)->first();
+    }
+
+    /**
+     * ログイン応答 / me / 当日会員登録で共通のユーザー情報。
+     *
+     * @return array<string, mixed>
+     */
+    public static function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'status' => $user->status,
+            'phone' => $user->phone,
+            'postal_code' => $user->postal_code,
+            'prefecture' => $user->prefecture,
+            'city' => $user->city,
+            'address_line1' => $user->address_line1,
+            'address_line2' => $user->address_line2,
+            'payment_method_preference' => $user->payment_method_preference,
+            'bank_transfer_confirmed_at' => $user->bank_transfer_confirmed_at,
+            'is_onsite' => (bool) $user->is_onsite,
+            'roles' => $user->roles->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'display_name' => $role->display_name,
+                ];
+            }),
+        ];
     }
 
     /**
@@ -151,26 +187,7 @@ class LoginController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'status' => $user->status,
-                    'phone' => $user->phone,
-                    'postal_code' => $user->postal_code,
-                    'prefecture' => $user->prefecture,
-                    'city' => $user->city,
-                    'address_line1' => $user->address_line1,
-                    'address_line2' => $user->address_line2,
-                    'payment_method_preference' => $user->payment_method_preference,
-                    'bank_transfer_confirmed_at' => $user->bank_transfer_confirmed_at,
-                    'roles' => $user->roles->map(function ($role) {
-                        return [
-                            'id' => $role->id,
-                            'name' => $role->name,
-                            'display_name' => $role->display_name,
-                        ];
-                    }),
+                'user' => self::userPayload($user) + [
                     'seller_profile' => $user->sellerProfile,
                 ],
             ],

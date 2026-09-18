@@ -46,6 +46,11 @@ trait EnforcesSingleSession
             return;
         }
 
+        // 当日会員はメール無し（合成アドレス）。リスナーで取り消されるがキューに載せる意味も無いので送らない
+        if (User::isOnsiteEmail($user->email)) {
+            return;
+        }
+
         Mail::to($user->email)->queue(new OtherDeviceLoggedInMail(
             user: $user,
             loginIp: (string) $request->ip(),

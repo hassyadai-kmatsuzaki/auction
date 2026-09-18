@@ -19,6 +19,8 @@ export interface User {
   address_line2?: string;
   payment_method_preference?: 'card' | 'bank_transfer' | null;
   bank_transfer_confirmed_at?: string | null;
+  /** 当日会員（会場で電話番号登録・メール無し・年会費免除）。住所/LINE ゲートをスキップし、金額表示を出さない */
+  is_onsite?: boolean;
   roles?: Role[];
   created_at: string;
   updated_at?: string;

@@ -115,6 +115,31 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(function (MessageSending $event) use ($configurationSet, $replyTo) {
             $message = $event->message; // Symfony\Component\Mime\Email
+
+            // 当日会員（会場登録・メール無し）の合成アドレス宛は送信自体を取り消す。
+            // 20本超あるメール経路を個別に触らず、ここ1箇所で一括遮断する（第1の砦）。
+            // 宛先の一部だけが当日会員なら、その宛先だけ除いて送る。
+            $onsiteTargets = [];
+            foreach ($message->getTo() as $address) {
+                if (\App\Models\User::isOnsiteEmail($address->getAddress())) {
+                    $onsiteTargets[] = $address->getAddress();
+                }
+            }
+            if ($onsiteTargets !== []) {
+                $remaining = array_filter(
+                    $message->getTo(),
+                    fn ($address) => !\App\Models\User::isOnsiteEmail($address->getAddress())
+                );
+                \Illuminate\Support\Facades\Log::info('Mail to onsite member cancelled', [
+                    'subject' => $message->getSubject(),
+                    'to'      => $onsiteTargets,
+                ]);
+                if ($remaining === []) {
+                    return false; // 送信取消
+                }
+                $message->to(...array_values($remaining));
+            }
+
             $headers = $message->getHeaders();
 
             if ($replyTo && !$headers->has('Reply-To')) {

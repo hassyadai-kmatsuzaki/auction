@@ -20,7 +20,8 @@ class RateLimitByIp
      *   token   … verify-token / set-password（招待・再設定トークン）
      *   user_id … two-factor/verify
      */
-    private const ACCOUNT_FIELDS = ['email', 'token', 'user_id'];
+    // login = メール or 電話番号（当日会員ログイン）、phone = 当日会員登録
+    private const ACCOUNT_FIELDS = ['email', 'login', 'phone', 'token', 'user_id'];
 
     /**
      * B-3 (2026-09-08): $maxAttempts に数値以外（設定キー名）を渡すと system_settings から上限を読む。
