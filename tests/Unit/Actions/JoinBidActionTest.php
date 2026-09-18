@@ -123,6 +123,79 @@ class JoinBidActionTest extends TestCase
         }
     }
 
+    /**
+     * 2026-09-18: 1レーンの集中タップ試験（T9）で、ロック待ちに入った人の大半は
+     * 待っている間に先行 Join が価格を上げて freeze に入っていた。
+     * ロックを取れていても silent で弾かれていたので、表示を揃える。
+     *
+     * @test
+     */
+    public function test_ロック待ちの間にfreezeへ変わっていたら誤タップ防止の扱いになる(): void
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
+        $lane    = Lane::factory()->create(['auction_id' => $auction->id, 'current_item_id' => $item->id]);
+
+        // 入札受付中に押した（最前段の phase 判定は通る）
+        Cache::put("countdown:lane:{$lane->id}", [
+            'phase'             => 'bidding',
+            'remaining_seconds' => 8.0,
+            'is_running'        => true,
+        ], 60);
+
+        $heldLock = Cache::lock("bid_inflight:item:{$item->id}", 5);
+        $this->assertTrue($heldLock->get(), '先行ロックの取得に失敗');
+
+        // 先行 Join が価格を上げて freeze に入った状態へ変える
+        Cache::put("countdown:lane:{$lane->id}", [
+            'phase'             => 'freeze',
+            'remaining_seconds' => 3.0,
+            'is_running'        => true,
+        ], 60);
+
+        try {
+            $result = $this->action->execute($item, 999);
+
+            $this->assertFalse($result->success);
+            $this->assertStringContainsString('誤タップ防止中', $result->message);
+            $this->assertStringNotContainsString('処理中', $result->message);
+            $this->assertTrue($result->silent, '画面にトーストを出さない扱いであること');
+        } finally {
+            $heldLock->release();
+        }
+    }
+
+    /**
+     * phase が bidding のままなら純粋な競合なので、従来どおり画面に出して再タップを促す。
+     *
+     * @test
+     */
+    public function test_ロック待ちの間もbiddingのままなら従来どおり処理中と返す(): void
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live']);
+        $lane    = Lane::factory()->create(['auction_id' => $auction->id, 'current_item_id' => $item->id]);
+
+        Cache::put("countdown:lane:{$lane->id}", [
+            'phase'             => 'bidding',
+            'remaining_seconds' => 8.0,
+            'is_running'        => true,
+        ], 60);
+
+        $heldLock = Cache::lock("bid_inflight:item:{$item->id}", 5);
+        $this->assertTrue($heldLock->get(), '先行ロックの取得に失敗');
+
+        try {
+            $result = $this->action->execute($item, 999);
+
+            $this->assertFalse($result->success);
+            $this->assertStringContainsString('処理中', $result->message);
+            $this->assertFalse($result->silent, '競合はユーザーに知らせる');
+        } finally {
+            $heldLock->release();
+        }
+    }
+
     /** @test */
     public function test_ロック解放後は入札参加できる(): void
     {

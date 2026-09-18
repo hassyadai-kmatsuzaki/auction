@@ -89,6 +89,33 @@ class JoinBidAction
         try {
             $bidLock->block(0.3);
         } catch (LockTimeoutException $e) {
+            // 2026-09-18: 1レーン開催で「1商品に大勢が同時タップ」する条件を実測した結果の分岐。
+            // 300人が入札開始から1秒以内に押すと、ロック待ちに入った約60人のうち成功は1〜2人で、
+            // 残りは 0.3 秒で待ちきれずここに来る（T9: 6,000タップ中1,164件 = 19.4%）。
+            // ただしその大半は、待っている間に先行 Join が価格を上げて freeze に入ったあとなので、
+            // ロックを取れていたとしても「誤タップ防止中」（silent）で弾かれていたケース。
+            // 同じ瞬間に押した人のうち一部だけに赤いトーストが出るのは実態と合わないので、
+            // ロック待ちの間に phase が freeze / pre_bid に変わっていたら silent 扱いに揃える。
+            // phase が bidding のままなら純粋な競合なので、従来どおり画面に出して再タップを促す。
+            if ($lane) {
+                $cs    = Cache::get("countdown:lane:{$lane->id}");
+                $phase = $cs['phase'] ?? null;
+                if ($cs && $phase === 'freeze') {
+                    return BidResultDto::failure(
+                        '誤タップ防止中です。もう少々お待ちください。',
+                        ['freeze_remaining_seconds' => $cs['remaining_seconds'] ?? 0],
+                        silent: true,
+                    );
+                }
+                if ($cs && $phase === 'pre_bid') {
+                    return BidResultDto::failure(
+                        '入札開始待機中です。もう少々お待ちください。',
+                        ['pre_bid_remaining_seconds' => $cs['remaining_seconds'] ?? 0],
+                        silent: true,
+                    );
+                }
+            }
+
             return BidResultDto::failure('現在他のユーザーの入札を処理中です。少しお待ちください。');
         }
 
