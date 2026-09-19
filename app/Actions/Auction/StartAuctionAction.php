@@ -2,6 +2,7 @@
 
 namespace App\Actions\Auction;
 
+use App\Events\AuctionStartCountdownTick;
 use App\Events\AuctionStatusChanged;
 use App\Jobs\ProcessAuctionCountdownJob;
 use App\Models\Auction;
@@ -136,7 +137,12 @@ class StartAuctionAction
         }
 
         Cache::put("auction:{$auction->id}:lanes_to_start", $lanesToStart, $cacheTtl);
-        broadcast(new AuctionStatusChanged($auction->id, 'starting', 'オークションが間もなく開始されます', $preStartCountdown));
+        // 2026-09-19: 開始告知は即時配信（ShouldBroadcastNow）にする。
+        //   従来の AuctionStatusChanged はキュー経由で、進行ジョブの毎秒 tick（即時）より後に届くことがあった。
+        //   9/19 の本番通し試験では 2 秒遅れて「残り 60」が届き、画面が 58 → 60 に戻った。
+        //   キューが詰まっていた 9/11 は数十秒遅れて届き、「10 秒あたりで 60 に戻る」として観測されていた。
+        //   AuctionStartCountdownTick は payload / チャネル / broadcastAs が同一なのでフロント無改修。
+        broadcast(new AuctionStartCountdownTick($auction->id, 'starting', 'オークションが間もなく開始されます', $preStartCountdown));
 
         ProcessAuctionCountdownJob::dispatch($auction->id);
         Log::info("Dispatched auction countdown job for auction {$auction->id}");
