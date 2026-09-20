@@ -370,16 +370,7 @@ export default function Login() {
             {loading ? 'サインイン中...' : 'ログイン'}
           </Button>
 
-          {onsiteEnabled && (
-            <Box sx={{ mt: 2.5, textAlign: 'center' }}>
-              <Typography
-                onClick={() => navigate('/register/onsite')}
-                sx={{ fontSize: '0.8125rem', color: '#000', cursor: 'pointer', display: 'inline-block' }}
-              >
-                会場で初めての方はこちら（当日会員登録）
-              </Typography>
-            </Box>
-          )}
+          {/* 当日会員登録への導線は非表示。URL（/register/onsite）を知っている人だけが入れる運用 */}
         </Box>
 
         {/* Googleログインは一旦非公開
