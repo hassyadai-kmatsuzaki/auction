@@ -101,4 +101,34 @@ return [
         ],
     ],
 
+    // GMOあおぞらネット銀行 法人API（落札入金の自動消込）。
+    // 仕様: docs/operations/2026-06-17_GMOあおぞらネット銀行API連携_方針書.md §5
+    // クレデンシャルは .env のみ（system_settings には置かない）。ON/OFF トグルは system_settings 側。
+    'gmo_aozora' => [
+        // production => api.gmo-aozora.com / development => stg-api.gmo-aozora.com（GMO 発行の開発環境）
+        'environment'   => env('GMO_AOZORA_ENV', 'development'),
+        'client_id'     => env('GMO_AOZORA_CLIENT_ID', ''),
+        'client_secret' => env('GMO_AOZORA_CLIENT_SECRET', ''),
+        // ヒアリングシート Q10/Q11 で登録した値と完全一致させる
+        'redirect_uri'  => env('GMO_AOZORA_REDIRECT_URI', ''),
+        // 申請済みスコープ（口座 / 振込・振替 / 総合振込 / 振込入金口座）
+        'scopes'        => env('GMO_AOZORA_SCOPES', 'private:account private:transfer private:bulk-transfer private:virtual-account'),
+        // 入金口座ID（振込入金口座の親口座。/accounts の accountId）。空なら /accounts の先頭を使う
+        'ra_account_id' => env('GMO_AOZORA_RA_ACCOUNT_ID', ''),
+        // 振込入金口座を発行する際の追加名義カナ（任意）
+        'va_holder_name_kana' => env('GMO_AOZORA_VA_HOLDER_NAME_KANA', ''),
+
+        // Webhook 受信（GMO → 当方）。Q19-22 で申告した Basic 認証値
+        'webhook_basic_user' => env('GMO_AOZORA_WEBHOOK_BASIC_USER', ''),
+        'webhook_basic_pass' => env('GMO_AOZORA_WEBHOOK_BASIC_PASS', ''),
+        // x-webhook-signature（client_secret をキーにした HMAC-SHA256/Base64）を必須にする
+        'webhook_verify_signature' => env('GMO_AOZORA_WEBHOOK_VERIFY_SIGNATURE', true),
+
+        // 送金系 API（/transfer/request, /bulktransfer/request）の呼び出し許可。既定 OFF（資金移動事故防止）
+        'transfer_enabled' => env('GMO_AOZORA_TRANSFER_ENABLED', false),
+
+        // アクセストークン失効の何日前にリフレッシュするか（失効すると Webhook 配信も止まる）
+        'refresh_before_days' => (int) env('GMO_AOZORA_REFRESH_BEFORE_DAYS', 7),
+    ],
+
 ];

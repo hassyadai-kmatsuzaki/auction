@@ -73,6 +73,16 @@ Route::post('/webhooks/ene', [\App\Http\Controllers\Webhook\EneWebhookController
     ->middleware('rate.limit:120,1')
     ->name('webhooks.ene');
 
+// GMOあおぞらネット銀行（落札入金の自動消込）
+//   Webhook: 振込入金口座_入金明細通知（Basic + HMAC 署名で検証。即200＋notifyキューで非同期）
+//   OAuth コールバック: ヒアリングシート Q10/Q11 の redirect_uri（state はキャッシュで10分・1回限り）
+// 方針書: docs/operations/2026-06-17_GMOあおぞらネット銀行API連携_方針書.md
+Route::post('/gmo-aozora/webhook', [\App\Http\Controllers\Webhook\GmoAozoraWebhookController::class, 'handle'])
+    ->middleware('rate.limit:120,1')
+    ->name('webhooks.gmo-aozora');
+Route::get('/gmo-aozora/oauth/callback', [\App\Http\Controllers\GmoAozora\OAuthCallbackController::class, 'callback'])
+    ->name('gmo-aozora.oauth.callback');
+
 // 認証API（ゲスト・レート制限付き）
 // B-3 (2026-09-08): 上限は system_settings の auth_rate_limit_per_minute（既定 10）。開催当日だけ 60 に上げる
 Route::middleware('rate.limit:auth_rate_limit_per_minute,1')->prefix('auth')->group(function () {
@@ -213,6 +223,23 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::post('send', [\App\Http\Controllers\Admin\EneCrmController::class, 'send']);
         Route::get('logs', [\App\Http\Controllers\Admin\EneCrmController::class, 'logs']);
         Route::post('logs/{id}/retry', [\App\Http\Controllers\Admin\EneCrmController::class, 'retry'])->whereNumber('id');
+    });
+
+    // GMOあおぞら連携の運用（接続状態 / 認可 / 接続試験 / 入金通知の消込 / 振込入金口座）。ON/OFF は settings 側。
+    Route::prefix('gmo-aozora')->group(function () {
+        Route::get('status', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'status']);
+        Route::post('oauth/start', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'oauthStart']);
+        Route::post('oauth/refresh', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'refreshToken']);
+        Route::post('connection-test', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'connectionTest']);
+        Route::post('webhook/subscribe', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'webhookSubscribe']);
+        Route::get('deposits', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'deposits']);
+        Route::post('deposits/{id}/confirm', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'confirmDeposit'])->whereNumber('id');
+        Route::post('deposits/{id}/match', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'matchDeposit'])->whereNumber('id');
+        Route::post('deposits/{id}/ignore', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'ignoreDeposit'])->whereNumber('id');
+        Route::get('virtual-accounts', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'virtualAccounts']);
+        Route::post('virtual-accounts/issue', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'issueVirtualAccounts']);
+        Route::post('virtual-accounts/sync', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'syncVirtualAccounts']);
+        Route::post('virtual-accounts/assign', [\App\Http\Controllers\Admin\GmoAozoraController::class, 'assignVirtualAccount']);
     });
 
     // LP CVR 設定（買受者LP / 出品者LP の流入経路別CTA URL）

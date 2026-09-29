@@ -261,44 +261,25 @@ class WonItemController extends Controller
     public function confirmPayment($id)
     {
         $wonItem = WonItem::with('item')->findOrFail($id);
-        $group = $this->findGroupItems($wonItem);
 
-        $targets = $group->whereIn('payment_status', ['pending', 'paid']);
-        if ($targets->isEmpty()) {
+        // 本体は WonItemPaymentService（GMOあおぞら自動消込と共通）。挙動は従来と同じ。
+        $result = app(\App\Services\WonItemPaymentService::class)
+            ->confirmGroup($wonItem, null, null, 'admin');
+
+        if ($result === null) {
             return response()->json([
                 'success' => false,
                 'message' => '入金確認できる商品がこの落札者にありません。',
             ], 400);
         }
 
-        $now = now();
-        $ids = $targets->pluck('id');
-
-        WonItem::whereIn('id', $ids)->update([
-            'payment_status' => 'confirmed',
-            'payment_confirmed_at' => $now,
-        ]);
-
-        WonItem::whereIn('id', $ids)
-            ->whereNull('shipping_locked_at')
-            ->update(['shipping_locked_at' => $now]);
-
-        // 発送先行で既に shipped/completed の場合は巻き戻さない
-        WonItem::whereIn('id', $ids)
-            ->where('delivery_status', 'pending')
-            ->update(['delivery_status' => 'preparing']);
-
-        // 落札者通知は代表1件で1回だけ送る（出品者への入金/発送依頼通知は弊社発送のため送らない）
-        $representative = WonItem::with(['item.seller', 'user'])->find($wonItem->id);
-        $this->notificationService->sendPaymentConfirmedNotification($representative);
-
         return response()->json([
             'success' => true,
             'message' => '入金を確認しました。',
             'data' => [
-                'affected_count' => $targets->count(),
+                'affected_count' => $result['affected_count'],
                 'payment_status' => 'confirmed',
-                'payment_confirmed_at' => $now->toIso8601String(),
+                'payment_confirmed_at' => $result['payment_confirmed_at']->toIso8601String(),
             ],
         ]);
     }

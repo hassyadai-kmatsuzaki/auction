@@ -97,6 +97,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // 年会費サブスクの自動更新（毎日 3:00 に期限切れを再課金）
         $schedule->command('subscriptions:renew')->dailyAt('03:00')
             ->withoutOverlapping();
+
+        // GMOあおぞら: アクセストークンを失効前にリフレッシュ（失効すると入金通知 Webhook が止まる）
+        $schedule->command('gmo-aozora:refresh-token')->dailyAt('04:10')
+            ->withoutOverlapping();
+
+        // GMOあおぞら: 入金明細照会で Webhook の取りこぼしを補完（トグル OFF / トークン未取得なら内部でスキップ）
+        $schedule->command('gmo-aozora:sync-deposits --days=2')->hourlyAt(20)
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (\Throwable $e, Request $request) {
