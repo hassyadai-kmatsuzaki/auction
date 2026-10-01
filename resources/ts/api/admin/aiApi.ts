@@ -127,12 +127,17 @@ export const aiDashboardApi = {
 
 // ─── ユーティリティ（オークション・商品取得） ───────
 export const adminDataApi = {
+  /**
+   * AI 機能の選択肢用。生体が1件以上登録されている開催だけを返す
+   * （開催日の新しい順だと先頭に生体未登録の今後の開催が並び、選んでも商品が出ないため）
+   */
   getAuctions: async () => {
-    const res = await axios.get('/api/admin/auctions');
-    return res.data.data.auctions ?? res.data.data ?? [];
+    const res = await axios.get('/api/admin/auctions', { params: { per_page: 200 } });
+    const auctions = res.data.data.auctions ?? res.data.data ?? [];
+    return auctions.filter((a: any) => Number(a.items_count ?? 0) > 0 && a.status !== 'cancelled');
   },
   getItems: async (auctionId: number) => {
-    const res = await axios.get(`/api/admin/auctions/${auctionId}/items`, { params: { per_page: 100 } });
+    const res = await axios.get(`/api/admin/auctions/${auctionId}/items`, { params: { per_page: 500 } });
     return res.data.data.items ?? res.data.data ?? [];
   },
 };

@@ -157,7 +157,7 @@ export default function AIFraudDetection() {
           <Grid item xs={12} md={6}>
             <Autocomplete
               options={auctions}
-              getOptionLabel={(o) => `${o.title}（${o.event_date}）`}
+              getOptionLabel={(o) => `${o.title}（${String(o.event_date ?? '').slice(0, 10)}）`}
               value={selectedAuction}
               onChange={(_, v) => setSelectedAuction(v)}
               renderInput={(params) => <TextField {...params} label="検知対象オークション" size="small" />}
