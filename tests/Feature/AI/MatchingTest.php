@@ -73,11 +73,32 @@ class MatchingTest extends TestCase
 
         $buyers = app(MatchingService::class)->matchBuyersForItem($upcoming, 10, null, 3000);
 
-        $this->assertSame($this->redFan->id, $buyers[0]['user_id']);
-        $this->assertNotContains($this->house->id, array_column($buyers, 'user_id'), '自社アカウントは除外');
-        $this->assertNotContains($this->yokihiFan->id, array_column($buyers, 'user_id'), '品種にも出品者にも接点が無い人は候補外');
+        $ids = array_column($buyers, 'user_id');
+        $this->assertSame($this->redFan->id, $ids[0]);
+        $this->assertNotContains($this->house->id, $ids, '自社アカウントは除外');
+        // 品種・出品者に接点が無い人は、活動量だけの低い点数で下位になる
+        $this->assertGreaterThan(array_search($this->redFan->id, $ids), array_search($this->yokihiFan->id, $ids));
         $this->assertSame(6, $buyers[0]['wins']);
+        $this->assertSame(100.0, $buyers[0]['score'], '1位を100とした相対値');
         $this->assertContains('この出品者の生体を好む', $buyers[0]['reasons']);
+    }
+
+    public function test_pre_auction_favorite_and_limit_on_the_item_rank_first(): void
+    {
+        $this->seedHistory();
+        $newcomer = $this->createParticipant(); // 過去の行動は無いが、この生体に指値を入れている
+        $upcoming = Item::factory()->registered()->create([
+            'auction_id' => $this->auction('2026-10-10', 'scheduled')->id,
+            'seller_profile_id' => $this->sellerA->id, 'species_name' => '紅白ラメ', 'start_price' => 500,
+        ]);
+        DB::table('bid_limit_prices')->insert(['item_id' => $upcoming->id, 'user_id' => $newcomer->id, 'limit_price' => 3000, 'is_triggered' => false, 'created_at' => now(), 'updated_at' => now()]);
+
+        $buyers = collect(app(MatchingService::class)->matchBuyersForItem($upcoming))->keyBy('user_id');
+
+        // 過去の行動が無くても、開催前の指値で上位に入る（同品種・同出品者の常連の次）
+        $ids = $buyers->keys()->all();
+        $this->assertSame([$this->redFan->id, $newcomer->id], array_slice($ids, 0, 2));
+        $this->assertContains('この生体に指値あり', $buyers[$newcomer->id]['reasons']);
     }
 
     public function test_bids_favorites_and_limits_count_as_interest(): void

@@ -16,7 +16,7 @@ class EvaluateMatchingCommand extends Command
 
         $this->info("検証: 直近 {$r['auctions']} 開催・落札 {$r['items']} 件（各開催より前のデータだけで判定）");
         $this->table(
-            ['指標', 'マッチング', '比較: よく落札する人上位10人'],
+            ['指標', 'マッチング', '比較: 最近の活動量が多い上位10人'],
             [['実際の落札者が上位10人に入った割合', "{$r['hit_rate_at_10']}%", "{$r['baseline_hit_rate_at_10']}%"]],
         );
         $this->info("過去の行動データがある落札者の割合: {$r['coverage']}%");

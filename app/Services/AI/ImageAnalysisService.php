@@ -5,9 +5,9 @@ namespace App\Services\AI;
 use App\Models\AIImageAnalysis;
 use App\Models\Item;
 use App\Models\ItemMedia;
+use App\Services\MediaOptimizer;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class ImageAnalysisService
 {
@@ -37,8 +37,11 @@ class ImageAnalysisService
         }
 
         try {
-            $imageUrl = $this->getImageUrl($media);
-            $response = $this->callVisionApi($imageUrl, $item->species_name);
+            $imageInput = $this->getImageInput($media);
+            if ($imageInput === null) {
+                return null;
+            }
+            $response = $this->callVisionApi($imageInput, $item->species_name);
 
             if (!$response) {
                 return null;
@@ -109,7 +112,10 @@ EOT;
             ]);
 
         if (!$response->successful()) {
-            Log::error('OpenAI Vision API failed', ['status' => $response->status()]);
+            Log::error('OpenAI Vision API failed', [
+                'status' => $response->status(),
+                'error' => mb_substr((string) $response->json('error.message'), 0, 300),
+            ]);
             return null;
         }
 
@@ -117,18 +123,29 @@ EOT;
         return json_decode($content, true);
     }
 
-    private function getImageUrl(ItemMedia $media): string
+    /**
+     * OpenAI に渡す画像。
+     * URL で渡すと S3 の公開設定や元画像のサイズ・形式に左右されて失敗する（400）ため、
+     * 画面表示と同じ仕組み（MediaOptimizer: S3 から読み込み・縮小・キャッシュ）で長辺1200pxの JPEG にして直接送る。
+     * 外部サイトの画像URLはそのまま渡す。
+     */
+    private function getImageInput(ItemMedia $media): ?string
     {
-        if (str_starts_with($media->file_path, 'http')) {
-            return $media->file_path;
+        $optimizer = app(MediaOptimizer::class);
+        $path = (string) $media->file_path;
+
+        $storagePath = str_starts_with($path, 'http') ? $optimizer->extractStoragePath($path) : $path;
+        if ($storagePath === null) {
+            return $path;
         }
 
-        // S3の場合は一時URLを生成
-        if (config('filesystems.default') === 's3') {
-            return Storage::temporaryUrl($media->file_path, now()->addMinutes(15));
+        $variant = $optimizer->variant($storagePath, $optimizer->resolveParams('large', null, null, 'jpg'), $media->mime_type);
+        if ($variant === null) {
+            Log::warning('AI Image Analysis: image could not be read', ['media_id' => $media->id, 'path' => $storagePath]);
+            return null;
         }
 
-        return Storage::url($media->file_path);
+        return 'data:' . $variant['mime'] . ';base64,' . base64_encode($variant['content']);
     }
 
     /**
@@ -140,7 +157,7 @@ EOT;
     /**
      * バッチ解析（オークション全商品）
      *
-     * @return array{analyzed: int, remaining: int}
+     * @return array{analyzed: int, remaining: int, failed: int}
      */
     public function analyzeAuctionItems(int $auctionId): array
     {
@@ -164,6 +181,6 @@ EOT;
             usleep(500000); // API レート制限対策: 0.5秒待機
         }
 
-        return ['analyzed' => $count, 'remaining' => $items->count() - $attempted];
+        return ['analyzed' => $count, 'remaining' => $items->count() - $attempted, 'failed' => $attempted - $count];
     }
 }

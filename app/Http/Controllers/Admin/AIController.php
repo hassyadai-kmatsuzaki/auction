@@ -65,7 +65,15 @@ class AIController extends Controller
         $count = $result['analyzed'];
         $remaining = $result['remaining'];
 
+        $failed = $result['failed'] ?? 0;
+
         $message = "{$count}件の商品を解析しました";
+        if ($failed > 0) {
+            $message .= "（{$failed}件は解析に失敗しました。時間をおいて再度お試しください）";
+        }
+        if ($count === 0 && $failed === 0 && $remaining === 0) {
+            $message = '解析対象の商品がありません（画像が登録されていない、または解析済みです）';
+        }
         if ($remaining > 0) {
             $message .= "（未解析が{$remaining}件あります。再度実行すると続きから解析します）";
         }
@@ -73,7 +81,7 @@ class AIController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data' => ['analyzed_count' => $count, 'remaining_count' => $remaining],
+            'data' => ['analyzed_count' => $count, 'remaining_count' => $remaining, 'failed_count' => $failed],
         ]);
     }
 
