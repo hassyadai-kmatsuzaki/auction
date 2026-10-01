@@ -54,12 +54,26 @@ class AIController extends Controller
 
     public function batchAnalyzeImages(int $auctionId, ImageAnalysisService $service): JsonResponse
     {
-        $count = $service->analyzeAuctionItems($auctionId);
+        if (empty(config('services.openai.api_key'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI解析APIの設定が未完了です。管理者にお問い合わせください。',
+            ], 503);
+        }
+
+        $result = $service->analyzeAuctionItems($auctionId);
+        $count = $result['analyzed'];
+        $remaining = $result['remaining'];
+
+        $message = "{$count}件の商品を解析しました";
+        if ($remaining > 0) {
+            $message .= "（未解析が{$remaining}件あります。再度実行すると続きから解析します）";
+        }
 
         return response()->json([
             'success' => true,
-            'message' => "{$count}件の商品を解析しました",
-            'data' => ['analyzed_count' => $count],
+            'message' => $message,
+            'data' => ['analyzed_count' => $count, 'remaining_count' => $remaining],
         ]);
     }
 

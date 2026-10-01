@@ -40,8 +40,10 @@ import {
   PlayCircleOutline as PlayCircleOutlineIcon,
   CheckCircle as CheckCircleIcon,
   ErrorOutline as ErrorOutlineIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { aiNlpApi } from '../../api/admin/aiApi';
 import NumberField from '../../components/NumberField';
 
 interface SellerProfile {
@@ -88,6 +90,9 @@ export default function ItemForm() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
+  // AI入力支援（F-054・ベータ）
+  const [aiFilling, setAiFilling] = useState(false);
+  const [aiMessage, setAiMessage] = useState<{ severity: 'success' | 'info' | 'error'; text: string } | null>(null);
 
   const [formData, setFormData] = useState({
     species_name: '',
@@ -197,6 +202,51 @@ export default function ItemForm() {
       setSnackbar({ open: true, message: '生体情報の取得に失敗しました。', severity: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * 「個体情報（出品者からの説明）」の文章から品種名・数量・特徴を読み取り、空欄にだけ反映する。
+   * 入力済みの項目は上書きしない。
+   */
+  const handleAiFill = async () => {
+    setAiFilling(true);
+    setAiMessage(null);
+    try {
+      const data = await aiNlpApi.extract(formData.individual_info);
+      const filled: string[] = [];
+      const next = { ...formData };
+
+      if (!next.species_name.trim() && data.species_name) {
+        next.species_name = String(data.species_name);
+        filled.push('品種名');
+      }
+      if (!String(next.quantity).trim() && Number(data.quantity) > 0) {
+        next.quantity = String(Math.round(Number(data.quantity)));
+        filled.push('数量');
+      }
+      if (!next.inspection_info.trim()) {
+        const features = [
+          data.size ? `体長${data.size}cm` : null,
+          data.sex ? String(data.sex) : null,
+          data.age ? `${data.age}` : null,
+          data.grade ? String(data.grade) : null,
+        ].filter(Boolean);
+        if (features.length) {
+          next.inspection_info = features.join(' ／ ');
+          filled.push('個体情報（オークション表示用）');
+        }
+      }
+
+      setFormData(next);
+      const category = data.category_label ? `（カテゴリ判定：${data.category_label}）` : '';
+      setAiMessage(filled.length
+        ? { severity: 'success', text: `AIが「${filled.join('・')}」を反映しました${category}。内容を確認してから登録してください。` }
+        : { severity: 'info', text: `反映できる項目がありませんでした${category}。入力済みの項目は上書きしません。` });
+    } catch (err: any) {
+      setAiMessage({ severity: 'error', text: err.response?.data?.message || 'AIでの読み取りに失敗しました' });
+    } finally {
+      setAiFilling(false);
     }
   };
 
@@ -644,6 +694,25 @@ export default function ItemForm() {
                       rows={3}
                       placeholder="出品者からの個体説明"
                     />
+                    {/* AI入力支援（ベータ）: 説明文があるときだけ表示 */}
+                    {formData.individual_info.trim() !== '' && (
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                        <Button
+                          size="small"
+                          onClick={handleAiFill}
+                          disabled={aiFilling}
+                          startIcon={aiFilling ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon />}
+                          sx={{ color: '#D97706' }}
+                        >
+                          AIで項目に反映（ベータ）
+                        </Button>
+                      </Box>
+                    )}
+                    {aiMessage && (
+                      <Alert severity={aiMessage.severity} onClose={() => setAiMessage(null)} sx={{ mt: 1 }}>
+                        {aiMessage.text}
+                      </Alert>
+                    )}
                   </Grid>
 
                   <Grid item xs={12}>

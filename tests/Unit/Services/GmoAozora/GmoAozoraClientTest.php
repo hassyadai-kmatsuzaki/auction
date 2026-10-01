@@ -27,7 +27,106 @@ class GmoAozoraClientTest extends TestCase
             'services.gmo_aozora.redirect_uri'  => 'https://staging.medaka-ichiba.com/api/gmo-aozora/oauth/callback',
             'services.gmo_aozora.transfer_enabled' => false,
             'services.gmo_aozora.refresh_before_days' => 7,
+            // 流量制御はテスト速度のため無効化（専用テストでだけ有効にする）
+            'services.gmo_aozora.min_interval_ms' => 0,
         ]);
+    }
+
+    private function captureApiLog(): string
+    {
+        $log = sys_get_temp_dir() . '/gmo-api-outbound-' . uniqid() . '.log';
+        config(['logging.channels.gmo_aozora_api' => [
+            'driver' => 'single', 'path' => $log, 'level' => 'info',
+            'tap' => [\App\Logging\PlainJsonFormatter::class],
+        ]]);
+        return $log;
+    }
+
+    public function test_requests_are_throttled_to_min_interval(): void
+    {
+        $this->token();
+        config(['services.gmo_aozora.min_interval_ms' => 300]);
+        Http::fake([self::STG . '/*' => Http::response(['accounts' => []])]);
+        $client = app(GmoAozoraClient::class);
+
+        $start = microtime(true);
+        $client->accounts();
+        $client->accounts();
+        $client->accounts();
+        $elapsed = microtime(true) - $start;
+
+        // 1本目は即時、2本目・3本目はそれぞれ 300ms 待つ
+        $this->assertGreaterThanOrEqual(0.58, $elapsed);
+        Http::assertSentCount(3);
+    }
+
+    public function test_every_outbound_request_is_logged_without_secrets(): void
+    {
+        $this->token();
+        $log = $this->captureApiLog();
+        Http::fake([
+            self::STG . '/ganb/api/corporation/v1/accounts' => Http::response(['accounts' => [['accountId' => '101011234567', 'accountTypeCode' => '01']]], 200, ['x-request-id' => 'req-1']),
+            self::STG . '/ganb/api/corporation/v1/transfer/status*' => Http::response(['errorCode' => 'ERR403', 'errorMessage' => 'insufficient_scope'], 403),
+            self::STG . '/*' => Http::response(['count' => '0']),
+        ]);
+
+        app(GmoConnectionTestService::class)->run('2026-09-01', '2026-09-24');
+
+        $lines = array_map(fn ($l) => json_decode($l, true), file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));
+        $this->assertCount(5, $lines);
+        $this->assertSame(['account', 'transfer', 'bulk-transfer', 'virtual-account', 'virtual-account'], array_column($lines, 'scope'));
+        $this->assertSame('outbound', $lines[0]['direction']);
+        $this->assertSame('GET', $lines[0]['method']);
+        $this->assertSame(self::STG . '/ganb/api/corporation/v1/accounts', $lines[0]['url']);
+        $this->assertSame(200, $lines[0]['status']);
+        $this->assertSame('req-1', $lines[0]['request_id']);
+        $this->assertSame('development', $lines[0]['env']);
+        $this->assertArrayHasKey('duration_ms', $lines[0]);
+        $this->assertSame(403, $lines[1]['status']);
+        $this->assertSame('ERR403', $lines[1]['error_code']);
+        $this->assertStringContainsString('queryKeyClass=2', $lines[1]['url']);
+        $this->assertSame('POST', $lines[3]['method']);
+
+        $raw = file_get_contents($log);
+        $this->assertStringNotContainsString('ACCESS1', $raw);
+        $this->assertStringNotContainsString('csecret', $raw);
+        @unlink($log);
+    }
+
+    public function test_token_requests_are_logged_as_auth_scope(): void
+    {
+        $this->token(1);
+        $log = $this->captureApiLog();
+        Http::fake([
+            self::STG . '/ganb/api/auth/v1/token' => Http::response(['access_token' => 'ACCESS2', 'refresh_token' => 'REFRESH2', 'expires_in' => 2592000]),
+            self::STG . '/*' => Http::response(['accounts' => []]),
+        ]);
+
+        app(GmoAozoraClient::class)->accounts();
+
+        $lines = array_map(fn ($l) => json_decode($l, true), file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));
+        $this->assertSame(['auth', 'account'], array_column($lines, 'scope'));
+        $this->assertSame('token:refresh_token', $lines[0]['context']);
+        $raw = file_get_contents($log);
+        $this->assertStringNotContainsString('REFRESH1', $raw);
+        $this->assertStringNotContainsString('ACCESS2', $raw);
+        @unlink($log);
+    }
+
+    public function test_refresh_keeps_previous_access_token_for_webhook_grace(): void
+    {
+        $this->token(1);
+        config(['services.gmo_aozora.previous_token_grace_minutes' => 120]);
+        Http::fake([self::STG . '/ganb/api/auth/v1/token' => Http::response(['access_token' => 'ACCESS2', 'refresh_token' => 'REFRESH2', 'expires_in' => 2592000])]);
+
+        $t = app(GmoAozoraOAuthService::class)->refresh();
+
+        $this->assertSame('ACCESS1', $t->previous_access_token);
+        $this->assertTrue($t->previous_token_valid_until->between(now()->addMinutes(119), now()->addMinutes(121)));
+        $this->assertTrue($t->matchesAccessToken('ACCESS2'));
+        $this->assertTrue($t->matchesAccessToken('ACCESS1'));
+        $this->assertFalse($t->matchesAccessToken('other'));
+        $this->assertFalse($t->matchesAccessToken(''));
     }
 
     private function token(int $daysUntilExpiry = 30): GmoAozoraToken

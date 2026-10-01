@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 class RecommendationService
 {
+    public function __construct(
+        private readonly ?MatchingService $matching = null,
+    ) {}
+
     /**
      * ユーザーに対する商品レコメンドを生成
      */
@@ -42,19 +46,43 @@ class RecommendationService
             }
         }
 
+        // 4. マッチング（F-059: 購買プロファイルと出品物の相性）
+        $registered = Item::where('status', 'registered')->limit(500)->get(['id', 'species_name', 'seller_profile_id', 'start_price']);
+        $matched = ($this->matching ?? app(MatchingService::class))->scoreItemsForBuyer($user->id, $registered);
+        usort($matched, fn ($a, $b) => $b['score'] <=> $a['score']);
+        foreach (array_slice($matched, 0, $limit) as $rec) {
+            if (isset($recommendations[$rec['item_id']])) {
+                $recommendations[$rec['item_id']]['score'] = ($recommendations[$rec['item_id']]['score'] + $rec['score']) / 2;
+                $recommendations[$rec['item_id']]['source'] = 'hybrid';
+            } else {
+                $recommendations[$rec['item_id']] = $rec + ['source' => 'matching'];
+            }
+        }
+
         // スコア順にソートして保存
         usort($recommendations, fn($a, $b) => $b['score'] <=> $a['score']);
         $recommendations = array_slice($recommendations, 0, $limit);
 
         // DB保存（FK制約違反を防ぐため、存在しないitem_idはスキップ）
-        $existingItemIds = Item::whereIn('id', array_column($recommendations, 'item_id'))
-            ->pluck('id')
-            ->toArray();
+        $existingItems = Item::whereIn('id', array_column($recommendations, 'item_id'))
+            ->get(['id', 'species_name', 'start_price', 'thumbnail_path'])
+            ->keyBy('id');
 
-        foreach ($recommendations as $rec) {
-            if (!in_array($rec['item_id'], $existingItemIds)) {
-                continue;
-            }
+        $recommendations = array_values(array_filter(
+            $recommendations,
+            fn ($rec) => $existingItems->has($rec['item_id']),
+        ));
+
+        foreach ($recommendations as &$rec) {
+            // 管理画面の一覧表示用に商品情報を添える
+            $item = $existingItems->get($rec['item_id']);
+            $rec['item'] = [
+                'id' => $item->id,
+                'species_name' => $item->species_name,
+                'start_price' => $item->start_price,
+                'thumbnail_path' => $item->thumbnail_path,
+            ];
+
             AIRecommendation::updateOrCreate(
                 ['user_id' => $user->id, 'item_id' => $rec['item_id']],
                 [
@@ -64,6 +92,7 @@ class RecommendationService
                 ],
             );
         }
+        unset($rec);
 
         return $recommendations;
     }

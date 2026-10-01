@@ -42,7 +42,7 @@ class LoginTest extends TestCase
             'password' => 'wrongpassword',
         ]);
 
-        $response->assertStatus(422); // ValidationException
+        $response->assertStatus(401); // 認証失敗は 401
     }
 
     public function test_user_cannot_login_with_nonexistent_email(): void
@@ -52,7 +52,7 @@ class LoginTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(401);
     }
 
     public function test_login_requires_email_and_password(): void

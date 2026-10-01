@@ -68,4 +68,61 @@ class PricePredictionServiceTest extends TestCase
 
         $this->assertIsArray($trends);
     }
+
+    public function test_confirmed_payments_are_used_as_historical_data(): void
+    {
+        $auction = Auction::factory()->create();
+        $item = Item::factory()->create([
+            'auction_id' => $auction->id,
+            'species_name' => '紅帝メダカ',
+            'start_price' => 500,
+        ]);
+
+        // 入金確認まで進んだ取引（payment_status=confirmed）も集計対象になること
+        for ($i = 0; $i < 4; $i++) {
+            $otherItem = Item::factory()->create([
+                'auction_id' => Auction::factory()->create()->id,
+                'species_name' => '紅帝メダカ',
+            ]);
+            WonItem::factory()->create([
+                'item_id' => $otherItem->id,
+                'winning_price' => 3000,
+                'payment_status' => 'confirmed',
+            ]);
+        }
+
+        $prediction = (new PricePredictionService())->predictPrice($item);
+
+        $this->assertGreaterThan(10, (float) $prediction->confidence);
+        $this->assertNotContains(
+            'insufficient_data',
+            array_column($prediction->factors, 'type'),
+        );
+
+        $trends = (new PricePredictionService())->getMarketTrends();
+        $row = collect($trends)->firstWhere('species_name', '紅帝メダカ');
+        $this->assertNotNull($row);
+        $this->assertSame(4, $row['transaction_count']);
+        $this->assertIsFloat($row['avg_price']);
+        $this->assertEquals(3000, $row['avg_price']);
+    }
+
+    public function test_pending_and_refunded_payments_are_excluded(): void
+    {
+        foreach (['pending', 'refunded', 'pending'] as $status) {
+            $otherItem = Item::factory()->create([
+                'auction_id' => Auction::factory()->create()->id,
+                'species_name' => '未入金メダカ',
+            ]);
+            WonItem::factory()->create([
+                'item_id' => $otherItem->id,
+                'winning_price' => 3000,
+                'payment_status' => $status,
+            ]);
+        }
+
+        $trends = (new PricePredictionService())->getMarketTrends();
+
+        $this->assertNull(collect($trends)->firstWhere('species_name', '未入金メダカ'));
+    }
 }

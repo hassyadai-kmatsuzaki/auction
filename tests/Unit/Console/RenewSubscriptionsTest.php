@@ -68,7 +68,7 @@ class RenewSubscriptionsTest extends TestCase
 
         $this->artisan('subscriptions:renew')
             ->expectsOutputToContain('更新対象: 0 件')
-            ->expectsOutputToContain('完了: 成功 0 / 失敗 0')
+            ->expectsOutputToContain('完了: 更新成功 0 / 失効処理 0 / 失敗 0')
             ->assertExitCode(0);
     }
 
@@ -93,7 +93,7 @@ class RenewSubscriptionsTest extends TestCase
         $this->artisan('subscriptions:renew')
             ->expectsOutputToContain('更新対象: 1 件')
             ->expectsOutputToContain("OK  user={$sub->user_id}")
-            ->expectsOutputToContain('完了: 成功 1 / 失敗 0')
+            ->expectsOutputToContain('完了: 更新成功 1 / 失効処理 0 / 失敗 0')
             ->assertExitCode(0);
     }
 
@@ -104,7 +104,7 @@ class RenewSubscriptionsTest extends TestCase
 
         $this->artisan('subscriptions:renew')
             ->expectsOutputToContain('NG')
-            ->expectsOutputToContain('完了: 成功 0 / 失敗 1')
+            ->expectsOutputToContain('完了: 更新成功 0 / 失効処理 0 / 失敗 1')
             ->assertExitCode(0);
     }
 
@@ -118,7 +118,7 @@ class RenewSubscriptionsTest extends TestCase
 
         $this->artisan('subscriptions:renew')
             ->expectsOutputToContain('ERR')
-            ->expectsOutputToContain('完了: 成功 0 / 失敗 1')
+            ->expectsOutputToContain('完了: 更新成功 0 / 失効処理 0 / 失敗 1')
             ->assertExitCode(0);
     }
 }

@@ -3,31 +3,42 @@
 namespace Tests\Feature\GmoAozora;
 
 use App\Jobs\ProcessGmoDepositNotificationJob;
+use App\Models\GmoAozoraToken;
 use App\Models\GmoDepositNotification;
 use App\Models\SystemSetting;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
- * GMOあおぞら 入金明細通知 Webhook の受信（Basic + 署名 + 冪等 + トグル）。
+ * GMOあおぞら 入金明細通知 Webhook の受信（Basic + アクセストークン + 任意の署名 + 冪等 + トグル）。
  */
 class WebhookTest extends TestCase
 {
     private const SECRET = 'client-secret-xyz';
     private const BASIC_USER = 'gmo-wh-dev-02a94253';
-    private const BASIC_PASS = 'qG6dCKSaeRmIBOxbQhdIUMyMK0nZQkW';
+    private const BASIC_PASS = 'qG6/dCKSaeRmIBOxbQhdIUMyMK0nZQkW';
+    private const ACCESS_TOKEN = 'ACCESS-CURRENT';
 
     protected function setUp(): void
     {
         parent::setUp();
         config([
+            'services.gmo_aozora.environment'             => 'development',
             'services.gmo_aozora.client_secret'           => self::SECRET,
             'services.gmo_aozora.webhook_basic_user'      => self::BASIC_USER,
             'services.gmo_aozora.webhook_basic_pass'      => self::BASIC_PASS,
-            'services.gmo_aozora.webhook_verify_signature' => true,
+            'services.gmo_aozora.webhook_verify_access_token' => true,
+            'services.gmo_aozora.min_interval_ms'         => 0,
         ]);
         // マイグレーションで投入済みのキーを ON にする
         SystemSetting::set('gmo_aozora_webhook_enabled', '1');
+
+        GmoAozoraToken::create([
+            'environment'   => 'development',
+            'access_token'  => self::ACCESS_TOKEN,
+            'refresh_token' => 'R',
+            'expires_at'    => now()->addDays(30),
+        ]);
     }
 
     private function body(string $messageId = '0000000000123456789', string $amount = '10000'): string
@@ -50,16 +61,29 @@ class WebhookTest extends TestCase
         return base64_encode(hash_hmac('sha256', $body, self::SECRET, true));
     }
 
+    /**
+     * GMO の実際の送り方（Basic + x-access-token、署名なし）を既定にする。
+     */
     private function sendWebhook(string $body, array $overrides = [])
     {
         $server = array_merge([
-            'PHP_AUTH_USER'            => self::BASIC_USER,
-            'PHP_AUTH_PW'              => self::BASIC_PASS,
-            'HTTP_X_WEBHOOK_SIGNATURE' => $this->sign($body),
-            'HTTP_X_EVENTTYPE'         => 'va-deposit-transaction',
-            'CONTENT_TYPE'             => 'application/json;charset=UTF-8',
+            'PHP_AUTH_USER'       => self::BASIC_USER,
+            'PHP_AUTH_PW'         => self::BASIC_PASS,
+            'HTTP_X_ACCESS_TOKEN' => self::ACCESS_TOKEN,
+            'HTTP_X_EVENTTYPE'    => 'va-deposit-transaction',
+            'HTTP_USER_AGENT'     => 'GMO Aozora Net Bank Notification Service Agent',
+            'CONTENT_TYPE'        => 'application/json;charset=UTF-8',
         ], $overrides);
         return $this->call('POST', '/api/gmo-aozora/webhook', [], [], [], $server, $body);
+    }
+
+    public function test_signature_is_not_required_by_default(): void
+    {
+        // .env に何も書かなければ署名検証は OFF（Basic 認証のみで申請済みのため）
+        $services = require base_path('config/services.php');
+        $this->assertFalse((bool) $services['gmo_aozora']['webhook_verify_signature']);
+        $this->assertTrue((bool) $services['gmo_aozora']['webhook_verify_access_token']);
+        $this->assertSame(1000, $services['gmo_aozora']['min_interval_ms']);
     }
 
     public function test_rejects_wrong_basic_auth(): void
@@ -70,12 +94,55 @@ class WebhookTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_rejects_invalid_signature(): void
+    public function test_rejects_missing_or_wrong_access_token(): void
     {
         Queue::fake();
-        $this->sendWebhook($this->body(), ['HTTP_X_WEBHOOK_SIGNATURE' => 'bad'])->assertStatus(401);
-        $this->sendWebhook($this->body(), ['HTTP_X_WEBHOOK_SIGNATURE' => ''])->assertStatus(401);
+        $this->sendWebhook($this->body(), ['HTTP_X_ACCESS_TOKEN' => ''])->assertStatus(401);
+        $this->sendWebhook($this->body(), ['HTTP_X_ACCESS_TOKEN' => 'forged'])->assertStatus(401);
         $this->assertDatabaseCount('gmo_deposit_notifications', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_rejects_when_not_yet_authorized(): void
+    {
+        Queue::fake();
+        GmoAozoraToken::query()->delete();
+        $this->sendWebhook($this->body())->assertStatus(401);
+        $this->assertDatabaseCount('gmo_deposit_notifications', 0);
+    }
+
+    public function test_accepts_previous_token_within_grace_only(): void
+    {
+        Queue::fake();
+        $t = GmoAozoraToken::first();
+        $t->forceFill([
+            'access_token' => 'ACCESS-NEW',
+            'previous_access_token' => self::ACCESS_TOKEN,
+            'previous_token_valid_until' => now()->addMinutes(30),
+        ])->save();
+        $this->sendWebhook($this->body('0000000000000000001'))->assertStatus(200);
+
+        $t->forceFill(['previous_token_valid_until' => now()->subMinute()])->save();
+        $this->sendWebhook($this->body('0000000000000000002'))->assertStatus(401);
+
+        $this->sendWebhook($this->body('0000000000000000003'), ['HTTP_X_ACCESS_TOKEN' => 'ACCESS-NEW'])->assertStatus(200);
+        $this->assertDatabaseCount('gmo_deposit_notifications', 2);
+    }
+
+    public function test_access_token_check_can_be_disabled(): void
+    {
+        Queue::fake();
+        config(['services.gmo_aozora.webhook_verify_access_token' => false]);
+        $this->sendWebhook($this->body(), ['HTTP_X_ACCESS_TOKEN' => 'anything'])->assertStatus(200);
+    }
+
+    public function test_signature_enforced_only_when_enabled(): void
+    {
+        Queue::fake();
+        config(['services.gmo_aozora.webhook_verify_signature' => true]);
+        $this->sendWebhook($this->body(), ['HTTP_X_WEBHOOK_SIGNATURE' => 'bad'])->assertStatus(401);
+        $this->sendWebhook($this->body())->assertStatus(401); // 署名なし
+        $this->sendWebhook($this->body(), ['HTTP_X_WEBHOOK_SIGNATURE' => $this->sign($this->body())])->assertStatus(200);
     }
 
     public function test_returns_500_when_not_configured(): void
@@ -126,11 +193,29 @@ class WebhookTest extends TestCase
         $this->assertDatabaseCount('gmo_deposit_notifications', 0);
     }
 
-    public function test_signature_optional_when_verification_disabled(): void
+    public function test_inbound_requests_are_written_to_api_log(): void
     {
         Queue::fake();
-        config(['services.gmo_aozora.webhook_verify_signature' => false]);
-        $this->sendWebhook($this->body('0000000000123456790'), ['HTTP_X_WEBHOOK_SIGNATURE' => ''])->assertStatus(200);
-        $this->assertDatabaseCount('gmo_deposit_notifications', 1);
+        $log = sys_get_temp_dir() . '/gmo-api-inbound-' . uniqid() . '.log';
+        config(['logging.channels.gmo_aozora_api' => [
+            'driver' => 'single', 'path' => $log, 'level' => 'info',
+            'tap' => [\App\Logging\PlainJsonFormatter::class],
+        ]]);
+
+        $this->sendWebhook($this->body())->assertStatus(200);
+        $this->sendWebhook($this->body('0000000000000000009'), ['PHP_AUTH_PW' => 'wrong'])->assertStatus(401);
+
+        $lines = array_map(fn ($l) => json_decode($l, true), file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));
+        $this->assertCount(2, $lines);
+        $this->assertSame('inbound', $lines[0]['direction']);
+        $this->assertSame('virtual-account', $lines[0]['scope']);
+        $this->assertSame(200, $lines[0]['status']);
+        $this->assertSame('accepted', $lines[0]['result']);
+        $this->assertSame('0000000000123456789', $lines[0]['message_id']);
+        $this->assertSame(401, $lines[1]['status']);
+        $this->assertSame('basic_auth', $lines[1]['reason']);
+        $this->assertStringNotContainsString(self::ACCESS_TOKEN, file_get_contents($log));
+        $this->assertStringNotContainsString(self::BASIC_PASS, file_get_contents($log));
+        @unlink($log);
     }
 }

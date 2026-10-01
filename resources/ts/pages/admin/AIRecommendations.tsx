@@ -10,8 +10,10 @@ import {
   Person as PersonIcon,
   PlayArrow as RunIcon,
   Favorite as FavoriteIcon,
+  Groups as GroupsIcon,
 } from '@mui/icons-material';
 import { aiRecommendApi, aiDashboardApi } from '../../api/admin/aiApi';
+import AIMatchingDialog from '../../components/admin/AIMatchingDialog';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 
@@ -37,6 +39,7 @@ export default function AIRecommendations() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<{ recommendations_generated: number } | null>(null);
+  const [matchingItemId, setMatchingItemId] = useState<number | null>(null);
 
   useEffect(() => {
     // 参加者ロールのユーザー一覧を取得
@@ -73,12 +76,14 @@ export default function AIRecommendations() {
     s === 'collaborative' ? '協調フィルタリング' :
     s === 'content_based' ? 'コンテンツベース' :
     s === 'hybrid' ? 'ハイブリッド' :
-    s === 'trending' ? 'トレンド' : s;
+    s === 'trending' ? 'トレンド' :
+    s === 'matching' ? 'マッチング' : s;
 
-  const sourceColor = (s: string): 'primary' | 'secondary' | 'success' | 'warning' =>
+  const sourceColor = (s: string): 'primary' | 'secondary' | 'success' | 'warning' | 'info' =>
     s === 'collaborative' ? 'primary' :
     s === 'content_based' ? 'secondary' :
-    s === 'hybrid' ? 'success' : 'warning';
+    s === 'hybrid' ? 'success' :
+    s === 'matching' ? 'info' : 'warning';
 
   return (
     <Box>
@@ -167,11 +172,12 @@ export default function AIRecommendations() {
                   <TableCell>スコア</TableCell>
                   <TableCell>推薦理由</TableCell>
                   <TableCell>アルゴリズム</TableCell>
+                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {recommendations.map((rec, i) => (
-                  <TableRow key={i} hover>
+                  <TableRow key={i}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {rec.item?.thumbnail_path ? (
@@ -219,6 +225,16 @@ export default function AIRecommendations() {
                         variant="outlined"
                       />
                     </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        startIcon={<GroupsIcon />}
+                        onClick={() => setMatchingItemId(rec.item_id)}
+                        sx={{ whiteSpace: 'nowrap' }}
+                      >
+                        見込み買受者
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -236,6 +252,8 @@ export default function AIRecommendations() {
           </Typography>
         </Paper>
       )}
+
+      <AIMatchingDialog itemId={matchingItemId} onClose={() => setMatchingItemId(null)} />
     </Box>
   );
 }

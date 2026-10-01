@@ -148,6 +148,21 @@ return [
             'permission' => 0664,
         ],
 
+        /*
+        | GMOあおぞら API 実行ログ（1行=1JSON）。接続試験後に GMO へ「API実行ログ（全スコープ分）」として提出する。
+        | GmoAozoraRequestGate が送信（outbound）と Webhook 受信（inbound）を記録する。トークン・秘密値は書かない。
+        | 書き出しは php artisan gmo-aozora:export-api-log。
+        */
+        'gmo_aozora_api' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/gmo-aozora-api.log'),
+            'level' => 'info',
+            'days' => env('GMO_AOZORA_API_LOG_DAYS', 400),
+            'tap' => [\App\Logging\PlainJsonFormatter::class],
+            'replace_placeholders' => false,
+            'permission' => 0664,
+        ],
+
         'alerts' => [
             'driver' => 'daily',
             'path' => storage_path('logs/alerts.log'),

@@ -22,13 +22,15 @@ use Illuminate\Support\Str;
  *   総合振込    private:bulk-transfer    GET /bulktransfer/status, POST /bulktransfer/request（要 transfer_enabled）
  *   振込入金口座 private:virtual-account POST /va/list, GET /va/deposit-transactions, POST /va/issue
  *
- * 送金系（resultCode を伴う更新 API）は資金移動を起こすため、config services.gmo_aozora.transfer_enabled が
- * true でない限り GmoAozoraApiException を投げて呼び出さない。
+ * すべての送信は GmoAozoraRequestGate を通る（1秒1リクエスト以下の流量制御 + API 実行ログ）。
+ * 送金系（資金移動を起こす更新 API）は config services.gmo_aozora.transfer_enabled が true でない限り呼ばない。
  */
 class GmoAozoraClient
 {
-    public function __construct(private readonly GmoAozoraOAuthService $oauth)
-    {
+    public function __construct(
+        private readonly GmoAozoraOAuthService $oauth,
+        private readonly GmoAozoraRequestGate $gate,
+    ) {
     }
 
     public function oauth(): GmoAozoraOAuthService
@@ -62,13 +64,13 @@ class GmoAozoraClient
     /** 口座一覧照会 */
     public function accounts(): array
     {
-        return $this->get('/accounts', [], 'accounts');
+        return $this->get('account', '/accounts', [], 'accounts');
     }
 
     /** 残高照会 */
     public function balances(): array
     {
-        return $this->get('/accounts/balances', [], 'balances');
+        return $this->get('account', '/accounts/balances', [], 'balances');
     }
 
     /**
@@ -76,12 +78,12 @@ class GmoAozoraClient
      */
     public function accountTransactions(string $accountId, ?string $dateFrom = null, ?string $dateTo = null, ?string $nextItemKey = null): array
     {
-        return $this->get('/accounts/transactions', array_filter([
+        return $this->get('account', '/accounts/transactions', self::filled([
             'accountId'   => $accountId,
             'dateFrom'    => $dateFrom,
             'dateTo'      => $dateTo,
             'nextItemKey' => $nextItemKey,
-        ], fn ($v) => $v !== null && $v !== ''), 'accountTransactions');
+        ]), 'accountTransactions');
     }
 
     /**
@@ -110,21 +112,21 @@ class GmoAozoraClient
      */
     public function transferStatus(string $accountId, string $dateFrom, string $dateTo, ?string $nextItemKey = null): array
     {
-        return $this->get('/transfer/status', array_filter([
+        return $this->get('transfer', '/transfer/status', self::filled([
             'accountId'     => $accountId,
             'queryKeyClass' => '2',
             'dateFrom'      => $dateFrom,
             'dateTo'        => $dateTo,
             'nextItemKey'   => $nextItemKey,
-        ], fn ($v) => $v !== null && $v !== ''), 'transferStatus');
+        ]), 'transferStatus');
     }
 
     /**
-     * 振込依頼結果照会（申請番号指定）
+     * 振込状況照会（申請番号指定: queryKeyClass=1）
      */
     public function transferStatusByApplyNo(string $accountId, string $applyNo): array
     {
-        return $this->get('/transfer/status', [
+        return $this->get('transfer', '/transfer/status', [
             'accountId'     => $accountId,
             'queryKeyClass' => '1',
             'applyNo'       => $applyNo,
@@ -141,8 +143,7 @@ class GmoAozoraClient
     {
         $this->assertTransferEnabled('transferRequest');
         $key = $idempotencyKey ?: (string) Str::uuid();
-        $response = $this->request()->withHeaders(['Idempotency-Key' => $key])->post('/transfer/request', $body);
-        $data = $this->ensureOk($response, 'transferRequest');
+        $data = $this->post('transfer', '/transfer/request', $body, 'transferRequest', ['Idempotency-Key' => $key]);
         Log::channel('audit')->info('GMO_AOZORA_TRANSFER_REQUEST', [
             'idempotency_key' => $key,
             'apply_no'        => $data['applyNo'] ?? null,
@@ -161,13 +162,13 @@ class GmoAozoraClient
      */
     public function bulkTransferStatus(string $accountId, string $dateFrom, string $dateTo, ?string $nextItemKey = null): array
     {
-        return $this->get('/bulktransfer/status', array_filter([
+        return $this->get('bulk-transfer', '/bulktransfer/status', self::filled([
             'accountId'     => $accountId,
             'queryKeyClass' => '2',
             'dateFrom'      => $dateFrom,
             'dateTo'        => $dateTo,
             'nextItemKey'   => $nextItemKey,
-        ], fn ($v) => $v !== null && $v !== ''), 'bulkTransferStatus');
+        ]), 'bulkTransferStatus');
     }
 
     /**
@@ -177,8 +178,7 @@ class GmoAozoraClient
     {
         $this->assertTransferEnabled('bulkTransferRequest');
         $key = $idempotencyKey ?: (string) Str::uuid();
-        $response = $this->request()->withHeaders(['Idempotency-Key' => $key])->post('/bulktransfer/request', $body);
-        $data = $this->ensureOk($response, 'bulkTransferRequest');
+        $data = $this->post('bulk-transfer', '/bulktransfer/request', $body, 'bulkTransferRequest', ['Idempotency-Key' => $key]);
         Log::channel('audit')->info('GMO_AOZORA_BULK_TRANSFER_REQUEST', [
             'idempotency_key' => $key,
             'apply_no'        => $data['applyNo'] ?? null,
@@ -200,8 +200,7 @@ class GmoAozoraClient
      */
     public function vaList(array $filter = []): array
     {
-        $response = $this->request()->post('/va/list', (object) $filter);
-        return $this->ensureOk($response, 'vaList');
+        return $this->post('virtual-account', '/va/list', (object) $filter, 'vaList');
     }
 
     /**
@@ -209,13 +208,13 @@ class GmoAozoraClient
      */
     public function vaDepositTransactions(?string $raId, ?string $vaId = null, ?string $dateFrom = null, ?string $dateTo = null, ?string $nextItemKey = null): array
     {
-        return $this->get('/va/deposit-transactions', array_filter([
+        return $this->get('virtual-account', '/va/deposit-transactions', self::filled([
             'raId'        => $raId,
             'vaId'        => $vaId,
             'dateFrom'    => $dateFrom,
             'dateTo'      => $dateTo,
             'nextItemKey' => $nextItemKey,
-        ], fn ($v) => $v !== null && $v !== ''), 'vaDepositTransactions');
+        ]), 'vaDepositTransactions');
     }
 
     /**
@@ -234,8 +233,7 @@ class GmoAozoraClient
         if ($kana !== '') {
             $body['vaHolderNameKana'] = $kana;
         }
-        $response = $this->request()->post('/va/issue', $body);
-        $data = $this->ensureOk($response, 'vaIssue');
+        $data = $this->post('virtual-account', '/va/issue', $body, 'vaIssue');
         Log::channel('audit')->info('GMO_AOZORA_VA_ISSUED', [
             'count' => count($data['vaList'] ?? []),
             'ra_id' => $raId,
@@ -252,10 +250,11 @@ class GmoAozoraClient
      */
     public function webhookSubscribe(bool $start = true, string $eventType = 'va-deposit-transaction'): array
     {
-        $response = $this->webhookRequest()->post('/subscribe', [
+        $url = $this->webhooksBaseUrl() . '/subscribe';
+        $response = $this->gate->send('webhook', 'webhookSubscribe', 'POST', $url, fn () => $this->webhookRequest()->post('/subscribe', [
             'subscribeStatus' => $start ? '1' : '0',
             'eventTypes'      => [['eventType' => $eventType]],
-        ]);
+        ]));
         $data = $this->ensureOk($response, 'webhookSubscribe');
         Log::channel('audit')->info('GMO_AOZORA_WEBHOOK_SUBSCRIBE', ['start' => $start, 'event_type' => $eventType]);
         return $data;
@@ -268,7 +267,9 @@ class GmoAozoraClient
      */
     public function webhookUnsentList(): array
     {
-        $response = $this->webhookRequest()->get('/unsentlist/va-deposit-transaction');
+        $path = '/unsentlist/va-deposit-transaction';
+        $response = $this->gate->send('webhook', 'webhookUnsentList', 'GET', $this->webhooksBaseUrl() . $path,
+            fn () => $this->webhookRequest()->get($path));
         if ($response->status() === 404) {
             return ['messages' => []];
         }
@@ -279,17 +280,31 @@ class GmoAozoraClient
     // 内部
     // ------------------------------------------------------------------
 
-    private function get(string $path, array $query, string $context): array
+    private function get(string $scope, string $path, array $query, string $context): array
     {
-        $response = $this->request()->get($path, $query);
+        // トークン取得（必要ならリフレッシュ）はゲートの外で済ませる（リフレッシュ自体もゲートを通るため）
+        $pending = $this->request();
+        $url = $this->apiBaseUrl() . $path . ($query ? '?' . http_build_query($query) : '');
+        $response = $this->gate->send($scope, $context, 'GET', $url, fn () => $pending->get($path, $query));
         return $this->ensureOk($response, $context);
     }
 
-    private function request(bool $forceRefresh = false): PendingRequest
+    private function post(string $scope, string $path, array|object $body, string $context, array $headers = []): array
+    {
+        $pending = $this->request();
+        if ($headers) {
+            $pending = $pending->withHeaders($headers);
+        }
+        $url = $this->apiBaseUrl() . $path;
+        $response = $this->gate->send($scope, $context, 'POST', $url, fn () => $pending->post($path, $body));
+        return $this->ensureOk($response, $context);
+    }
+
+    private function request(): PendingRequest
     {
         return Http::baseUrl($this->apiBaseUrl())
             ->withHeaders([
-                'x-access-token' => $this->oauth->accessToken($forceRefresh),
+                'x-access-token' => $this->oauth->accessToken(),
                 'Accept'         => 'application/json',
             ])
             ->acceptJson()
@@ -304,6 +319,11 @@ class GmoAozoraClient
             ->acceptJson()
             ->asJson()
             ->timeout(30);
+    }
+
+    private static function filled(array $params): array
+    {
+        return array_filter($params, fn ($v) => $v !== null && $v !== '');
     }
 
     private function assertTransferEnabled(string $context): void

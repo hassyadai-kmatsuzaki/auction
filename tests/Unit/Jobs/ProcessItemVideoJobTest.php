@@ -98,7 +98,7 @@ class ProcessItemVideoJobTest extends TestCase
         $this->assertSame('videos/orig.mov', $media->file_path);
     }
 
-    public function test_handle_updates_media_and_deletes_original_on_success(): void
+    public function test_handle_updates_media_and_keeps_original_on_success(): void
     {
         $item = $this->makeItem();
         Storage::disk('public')->put('videos/orig.mov', 'orig-bytes');
@@ -125,7 +125,9 @@ class ProcessItemVideoJobTest extends TestCase
         $this->assertTrue($media->is_processed);
         $this->assertSame('videos/orig.mp4', $media->file_path);
         $this->assertSame('video/mp4', $media->mime_type);
-        Storage::disk('public')->assertMissing('videos/orig.mov');
+        // オリジナルは削除せず original_path に温存する仕様
+        $this->assertSame('videos/orig.mov', $media->original_path);
+        Storage::disk('public')->assertExists('videos/orig.mov');
         Storage::disk('public')->assertExists('videos/orig.mp4');
     }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aiDashboardApi, aiFraudApi } from '../../api/admin/aiApi';
+import AICategoryDialog from '../../components/admin/AICategoryDialog';
 import {
   Box,
   Typography,
@@ -42,6 +43,7 @@ export default function AIAnalytics() {
   const navigate = useNavigate();
   const [aiMetrics, setAiMetrics] = useState(defaultMetrics);
   const [fraudAlertsList, setFraudAlertsList] = useState<any[]>([]);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
 
   useEffect(() => {
     // AI ダッシュボード統計を取得
@@ -132,6 +134,7 @@ export default function AIAnalytics() {
     icon,
     status,
     path,
+    onClick,
     color,
   }: {
     title: string;
@@ -139,19 +142,21 @@ export default function AIAnalytics() {
     icon: React.ReactNode;
     status: 'active' | 'beta' | 'coming';
     path?: string;
+    /** 画面遷移ではなくダイアログ等を開くカード用（「詳細を見る」行は出さない） */
+    onClick?: () => void;
     color: string;
   }) => (
     <Card 
       sx={{ 
         height: '100%', 
-        cursor: path ? 'pointer' : 'default',
+        cursor: path || onClick ? 'pointer' : 'default',
         transition: 'all 0.2s',
-        '&:hover': path ? {
+        '&:hover': path || onClick ? {
           transform: 'translateY(-4px)',
           boxShadow: '0 12px 24px rgba(0,0,0,0.1)',
         } : {},
       }}
-      onClick={() => path && navigate(path)}
+      onClick={() => (onClick ? onClick() : path && navigate(path))}
     >
       <CardContent sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
@@ -291,6 +296,7 @@ export default function AIAnalytics() {
             description="商品説明文から品種・タイプを自動判別します"
             icon={<AutoAwesomeIcon />}
             status="beta"
+            onClick={() => setCategoryDialogOpen(true)}
             color="#F59E0B"
           />
         </Grid>
@@ -401,6 +407,8 @@ export default function AIAnalytics() {
           </Paper>
         </Grid>
       </Grid>
+
+      <AICategoryDialog open={categoryDialogOpen} onClose={() => setCategoryDialogOpen(false)} />
     </Box>
   );
 }

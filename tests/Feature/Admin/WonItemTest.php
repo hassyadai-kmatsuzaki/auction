@@ -199,15 +199,17 @@ class WonItemTest extends TestCase
         $this->assertSame(['1111-2222-3333', '4444-5555-6666'], $row['tracking_numbers']);
     }
 
-    public function test_admin_cannot_ship_without_payment_confirmation(): void
+    public function test_admin_cannot_ship_without_shipping_approval(): void
     {
+        // 発送の前提は送料承認（入金前の発送先行は許容する仕様）
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/won-items/{$this->wonItem->id}/ship", [
                 'shipping_company' => 'ヤマト運輸',
                 'tracking_number' => '1234-5678-9012',
             ]);
 
-        $response->assertStatus(400);
+        $response->assertStatus(409)
+            ->assertJsonPath('message', '送料が未承認です。先に送料承認を行ってください。');
     }
 
     public function test_admin_can_complete_delivery(): void

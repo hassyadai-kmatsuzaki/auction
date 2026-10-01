@@ -49,6 +49,14 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 
+    'ai' => [
+        // 自社の下支え入札アカウント（全商品に最低1入札を入れる運用）。落札価格の学習・マッチングから除外する
+        'house_buyer_ids' => array_values(array_filter(array_map('intval', explode(',', (string) env('AI_HOUSE_BUYER_IDS', '821'))))),
+        // is_test は付いていないが通常の開催と性質が違うもの。学習・マッチングから除外する
+        // 39: 5/8 デモ開催（実取引だが運用テストを兼ねた開催） / 90: 9/20 練習用の開催
+        'excluded_auction_ids' => array_values(array_filter(array_map('intval', explode(',', (string) env('AI_EXCLUDED_AUCTION_IDS', '39,90'))))),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
@@ -121,8 +129,16 @@ return [
         // Webhook 受信（GMO → 当方）。Q19-22 で申告した Basic 認証値
         'webhook_basic_user' => env('GMO_AOZORA_WEBHOOK_BASIC_USER', ''),
         'webhook_basic_pass' => env('GMO_AOZORA_WEBHOOK_BASIC_PASS', ''),
-        // x-webhook-signature（client_secret をキーにした HMAC-SHA256/Base64）を必須にする
-        'webhook_verify_signature' => env('GMO_AOZORA_WEBHOOK_VERIFY_SIGNATURE', true),
+        // x-webhook-signature（client_secret をキーにした HMAC-SHA256/Base64）を必須にするか。
+        // GMO は「署名 / Basic 認証のどちらか一方」しか選べず、Basic 認証で申請済み（6/25）なので署名は届かない。既定 false。
+        'webhook_verify_signature' => env('GMO_AOZORA_WEBHOOK_VERIFY_SIGNATURE', false),
+        // x-access-token（通知対象ユーザーのアクセストークン）が保存済みトークンと一致するかを検証する（仕様書 イベント通知編のセキュリティ対策）
+        'webhook_verify_access_token' => env('GMO_AOZORA_WEBHOOK_VERIFY_ACCESS_TOKEN', true),
+        // リフレッシュ直後の旧アクセストークンを何分間まで受け付けるか（GMO の再送は最大1時間）
+        'previous_token_grace_minutes' => (int) env('GMO_AOZORA_PREVIOUS_TOKEN_GRACE_MINUTES', 120),
+
+        // 流量制御: GMO API へのリクエスト間隔の下限（ミリ秒）。接続試験の条件は「1秒あたり1リクエスト以下」
+        'min_interval_ms' => (int) env('GMO_AOZORA_MIN_INTERVAL_MS', 1000),
 
         // 送金系 API（/transfer/request, /bulktransfer/request）の呼び出し許可。既定 OFF（資金移動事故防止）
         'transfer_enabled' => env('GMO_AOZORA_TRANSFER_ENABLED', false),

@@ -26,9 +26,11 @@ class PlanManagementTest extends TestCase
 
         $res = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/plans');
 
+        // migration で one_day / onsite_free も投入済みのため、件数は DB 全件と一致すること
         $res->assertStatus(200)
             ->assertJsonPath('success', true)
-            ->assertJsonCount(1, 'data.plans');
+            ->assertJsonCount(Plan::count(), 'data.plans');
+        $this->assertContains('bid_only', array_column($res->json('data.plans'), 'code'));
     }
 
     public function test_admin_can_create_plan(): void
@@ -69,7 +71,7 @@ class PlanManagementTest extends TestCase
             ->assertStatus(403);
     }
 
-    public function test_cannot_delete_plan_with_active_subscriptions(): void
+    public function test_plan_cannot_be_deleted(): void
     {
         $plan = Plan::create([
             'code' => 'bid_only', 'name' => '落札専用', 'amount' => 5000,
@@ -87,6 +89,8 @@ class PlanManagementTest extends TestCase
 
         $this->actingAs($this->admin, 'sanctum')
             ->deleteJson("/api/admin/plans/{$plan->id}")
-            ->assertStatus(409);
+            ->assertStatus(405); // 削除ルート自体が無い（履歴保護。受付停止は is_active で行う）
+
+        $this->assertDatabaseHas('plans', ['id' => $plan->id]);
     }
 }

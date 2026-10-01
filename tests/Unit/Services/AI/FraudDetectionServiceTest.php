@@ -60,6 +60,53 @@ class FraudDetectionServiceTest extends TestCase
         return $ref->invoke($this->service, ...$args);
     }
 
+    public function test_detectShillBidding_does_not_duplicate_alerts_on_rerun(): void
+    {
+        $item = $this->makeItem();
+        $bidder = $this->createParticipant();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->insertBidEvent($item->id, $bidder->id, 'leave');
+        }
+
+        $first = $this->callPrivate('detectShillBidding', [$this->auction->id]);
+        $second = $this->callPrivate('detectShillBidding', [$this->auction->id]);
+
+        $this->assertCount(1, $first);
+        $this->assertCount(0, $second);
+        $this->assertSame(1, AIFraudAlert::where('auction_id', $this->auction->id)->count());
+    }
+
+    public function test_detectPriceManipulation_uses_confirmed_payments_as_baseline(): void
+    {
+        $winner = $this->createParticipant();
+        $otherAuction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
+        for ($i = 0; $i < 3; $i++) {
+            $past = Item::factory()->create([
+                'auction_id' => $otherAuction->id,
+                'seller_profile_id' => $this->sellerProfile->id,
+                'species_name' => '基準メダカ',
+            ]);
+            WonItem::factory()->create([
+                'item_id' => $past->id,
+                'winning_price' => 1000,
+                'payment_status' => 'confirmed',
+            ]);
+        }
+        $item = $this->makeItem(['species_name' => '基準メダカ']);
+        WonItem::factory()->create([
+            'item_id' => $item->id,
+            'winner_id' => $winner->id,
+            'winning_price' => 5000,
+            'payment_status' => 'pending',
+        ]);
+
+        $alerts = $this->callPrivate('detectPriceManipulation', [$this->auction->id]);
+
+        $this->assertCount(1, $alerts);
+        $this->assertSame('price_manipulation', $alerts[0]->alert_type);
+    }
+
     public function test_detectShillBidding_creates_alert_with_repeated_leaves_and_no_wins(): void
     {
         $item = $this->makeItem();

@@ -18,6 +18,7 @@ class OAuthCallbackTest extends TestCase
             'services.gmo_aozora.client_id'     => 'cid',
             'services.gmo_aozora.client_secret' => 'csecret',
             'services.gmo_aozora.redirect_uri'  => 'https://staging.medaka-ichiba.com/api/gmo-aozora/oauth/callback',
+            'services.gmo_aozora.min_interval_ms' => 0,
         ]);
     }
 

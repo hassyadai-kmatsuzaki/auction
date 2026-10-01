@@ -86,7 +86,11 @@ class ReportTest extends TestCase
 
     public function test_generateMonthlyReport_は_今月集計を返す(): void
     {
-        $this->makeWonItemWithin(1, ['winning_price' => 12000]);
+        // 「1日前」だと毎月1日に前月扱いになって落ちるため、今月の月初に固定する
+        $this->makeWonItemWithin(0, [
+            'winning_price' => 12000,
+            'created_at' => now()->startOfMonth()->addHour(),
+        ]);
 
         $report = app(ReportService::class)->generateMonthlyReport();
         $this->assertSame('monthly', $report['report_type']);

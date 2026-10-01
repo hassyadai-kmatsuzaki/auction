@@ -154,7 +154,7 @@ export default function AIPricePrediction() {
             <Grid item xs={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, bgcolor: `${confidenceColor(result.confidence)}.50`, borderRadius: 2 }}>
                 <Typography variant="h4" fontWeight={700} color={`${confidenceColor(result.confidence)}.main`}>
-                  {result.confidence.toFixed(0)}%
+                  {Number(result.confidence).toFixed(0)}%
                 </Typography>
                 <Typography variant="caption" color="text.secondary">信頼度</Typography>
               </Box>

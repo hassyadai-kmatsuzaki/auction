@@ -212,7 +212,7 @@ export default function AIImageRecognition() {
                   <Grid item xs={6} md={3}>
                     <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.50', borderRadius: 2 }}>
                       <Typography variant="h4" fontWeight={700} color="primary.main">
-                        {result.quality_score?.toFixed(1) ?? '-'}
+                        {result.quality_score != null ? Number(result.quality_score).toFixed(1) : '-'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">品質スコア / 10</Typography>
                     </Box>
@@ -228,7 +228,7 @@ export default function AIImageRecognition() {
                   <Grid item xs={6} md={3}>
                     <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'warning.50', borderRadius: 2 }}>
                       <Typography variant="h4" fontWeight={700} color="warning.main">
-                        {result.breed_confidence?.toFixed(0) ?? '-'}%
+                        {result.breed_confidence != null ? Number(result.breed_confidence).toFixed(0) : '-'}%
                       </Typography>
                       <Typography variant="caption" color="text.secondary">品種信頼度</Typography>
                     </Box>

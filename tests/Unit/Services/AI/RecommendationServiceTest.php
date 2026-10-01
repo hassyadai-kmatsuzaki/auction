@@ -46,6 +46,27 @@ class RecommendationServiceTest extends TestCase
         $this->assertSame([], $result);
     }
 
+    public function test_generateRecommendations_includes_item_details_for_display(): void
+    {
+        $item = $this->makeItem(['species_name' => '幹之メダカ', 'start_price' => 1200]);
+        $other = $this->createParticipant();
+
+        DB::table('favorites')->insert([
+            'user_id' => $other->id,
+            'item_id' => $item->id,
+            'created_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
+        ]);
+
+        $result = $this->service->generateRecommendations($this->user, 10);
+
+        $this->assertNotEmpty($result);
+        $this->assertSame($item->id, $result[0]['item']['id']);
+        $this->assertSame('幹之メダカ', $result[0]['item']['species_name']);
+        $this->assertEquals(1200, $result[0]['item']['start_price']);
+        $this->assertArrayHasKey('thumbnail_path', $result[0]['item']);
+    }
+
     public function test_generateRecommendations_returns_trending_items_based_on_recent_favorites(): void
     {
         $item = $this->makeItem(['species_name' => '幹之メダカ']);

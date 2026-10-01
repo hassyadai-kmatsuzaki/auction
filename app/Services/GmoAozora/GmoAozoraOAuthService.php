@@ -25,6 +25,10 @@ class GmoAozoraOAuthService
     private const STATE_CACHE_PREFIX = 'gmo_aozora:oauth_state:';
     private const STATE_TTL_SECONDS  = 600;
 
+    public function __construct(private readonly GmoAozoraRequestGate $gate)
+    {
+    }
+
     public function environment(): string
     {
         return (string) config('services.gmo_aozora.environment', 'development');
@@ -120,15 +124,16 @@ class GmoAozoraOAuthService
      */
     public function exchangeAuthorizationCode(string $code): GmoAozoraToken
     {
-        $response = Http::asForm()
+        $url = $this->authBaseUrl() . '/token';
+        $response = $this->gate->send('auth', 'token:authorization_code', 'POST', $url, fn () => Http::asForm()
             ->withBasicAuth($this->clientId(), $this->clientSecret())
             ->acceptJson()
             ->timeout(30)
-            ->post($this->authBaseUrl() . '/token', [
+            ->post($url, [
                 'grant_type'   => 'authorization_code',
                 'code'         => $code,
                 'redirect_uri' => $this->redirectUri(),
-            ]);
+            ]));
 
         $data = $this->ensureTokenResponse($response, 'exchangeAuthorizationCode');
 
@@ -165,14 +170,15 @@ class GmoAozoraOAuthService
             throw new GmoAozoraApiException('GMOあおぞらのトークンが未取得です。先に認可を行ってください。', 0, null, [], 'refresh');
         }
 
-        $response = Http::asForm()
+        $url = $this->authBaseUrl() . '/token';
+        $response = $this->gate->send('auth', 'token:refresh_token', 'POST', $url, fn () => Http::asForm()
             ->withBasicAuth($this->clientId(), $this->clientSecret())
             ->acceptJson()
             ->timeout(30)
-            ->post($this->authBaseUrl() . '/token', [
+            ->post($url, [
                 'grant_type'    => 'refresh_token',
                 'refresh_token' => $token->refresh_token,
-            ]);
+            ]));
 
         try {
             $data = $this->ensureTokenResponse($response, 'refresh');
@@ -181,7 +187,11 @@ class GmoAozoraOAuthService
             throw $e;
         }
 
+        $graceMinutes = (int) config('services.gmo_aozora.previous_token_grace_minutes', 120);
         $token->forceFill([
+            // 旧トークンで送られた Webhook（再送は最大1時間）を猶予期間だけ受け付けるため保持する
+            'previous_access_token'      => $token->access_token,
+            'previous_token_valid_until' => now()->addMinutes($graceMinutes),
             'access_token'  => $data['access_token'],
             // 仕様上は毎回 refresh_token も返るが、欠けていた場合は現行値を維持
             'refresh_token' => $data['refresh_token'] ?? $token->refresh_token,

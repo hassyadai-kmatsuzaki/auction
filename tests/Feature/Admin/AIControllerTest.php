@@ -146,14 +146,42 @@ class AIControllerTest extends TestCase
 
     public function test_batch_analyze_images(): void
     {
+        config(['services.openai.api_key' => 'test-key']);
         $this->mock(ImageAnalysisService::class, function ($m) {
-            $m->shouldReceive('analyzeAuctionItems')->once()->andReturn(5);
+            $m->shouldReceive('analyzeAuctionItems')->once()->andReturn(['analyzed' => 5, 'remaining' => 0]);
         });
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/admin/ai/image-analysis/batch/{$this->auction->id}")
             ->assertOk()
-            ->assertJsonPath('data.analyzed_count', 5);
+            ->assertJsonPath('data.analyzed_count', 5)
+            ->assertJsonPath('message', '5件の商品を解析しました');
+    }
+
+    public function test_batch_analyze_images_reports_remaining_when_time_budget_exceeded(): void
+    {
+        config(['services.openai.api_key' => 'test-key']);
+        $this->mock(ImageAnalysisService::class, function ($m) {
+            $m->shouldReceive('analyzeAuctionItems')->once()->andReturn(['analyzed' => 8, 'remaining' => 12]);
+        });
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/image-analysis/batch/{$this->auction->id}")
+            ->assertOk()
+            ->assertJsonPath('data.remaining_count', 12)
+            ->assertJsonPath('message', '8件の商品を解析しました（未解析が12件あります。再度実行すると続きから解析します）');
+    }
+
+    public function test_batch_analyze_images_returns_503_when_api_key_missing(): void
+    {
+        config(['services.openai.api_key' => '']);
+        $this->mock(ImageAnalysisService::class, function ($m) {
+            $m->shouldNotReceive('analyzeAuctionItems');
+        });
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/ai/image-analysis/batch/{$this->auction->id}")
+            ->assertStatus(503);
     }
 
     public function test_image_analysis_results_returns_latest(): void

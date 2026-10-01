@@ -204,7 +204,7 @@ class ItemActionsTest extends TestCase
         $this->assertNotNull($item->fresh()->thumbnail_path);
     }
 
-    public function test_uploadMedia_動画はProcessItemVideoJobをdispatchする(): void
+    public function test_uploadMedia_動画は圧縮せずオリジナルのまま処理済みで保存する(): void
     {
         Queue::fake();
         $this->fakePublicStorage();
@@ -232,8 +232,9 @@ class ItemActionsTest extends TestCase
             'item_id' => $item->id,
             'media_type' => 'video_top',
             'is_thumbnail' => false,
-            'is_processed' => false,
+            'is_processed' => true,
         ]);
-        Queue::assertPushed(ProcessItemVideoJob::class);
+        // 動画は圧縮しない仕様（UploadMediaAction のコメント参照）
+        Queue::assertNotPushed(ProcessItemVideoJob::class);
     }
 }

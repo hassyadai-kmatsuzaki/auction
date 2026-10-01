@@ -52,6 +52,9 @@ class DocumentControllerTest extends TestCase
         return WonItem::factory()->create(array_merge([
             'item_id' => $item->id,
             'winner_id' => $this->winner->id,
+            // 一覧の金額は帳票と同じく winning_price × quantity から算出する
+            'winning_price' => 12000,
+            'quantity' => 1,
             'total_amount' => 12000,
             'commission_amount' => 600,
             'seller_amount' => 11400,
@@ -63,7 +66,7 @@ class DocumentControllerTest extends TestCase
     public function test_invoices_lists_grouped_by_winner(): void
     {
         $this->makeWon();
-        $this->makeWon(['total_amount' => 5000, 'shipping_fee' => 500]);
+        $this->makeWon(['winning_price' => 5000, 'total_amount' => 5000, 'shipping_fee' => 500]);
 
         $r = $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/admin/documents/invoices');
@@ -71,7 +74,8 @@ class DocumentControllerTest extends TestCase
         $rows = $r->json('data');
         $this->assertCount(1, $rows, 'グルーピングで1行');
         $this->assertSame(2, $rows[0]['items_count']);
-        $this->assertSame(12000 + 5000 + 800 + 500, $rows[0]['total_amount']);
+        // 税込合計 = (落札 12000+5000) + 手数料 600×2 + 送料 800+500 = 19500、消費税10% = 1950
+        $this->assertSame(19500 + 1950, $rows[0]['total_amount']);
         $this->assertSame('pending', $rows[0]['status']);
         $this->assertStringStartsWith('INV-A', $rows[0]['invoice_number']);
     }
@@ -132,9 +136,12 @@ class DocumentControllerTest extends TestCase
         $rows = $r->json('data');
         $this->assertCount(1, $rows);
         $this->assertSame(2, $rows[0]['items_count']);
-        $this->assertSame(24000, $rows[0]['sales_amount']);
-        $this->assertSame(1200, $rows[0]['commission']);
-        $this->assertSame(22800, $rows[0]['net_amount']);
+        // 税込（落札分は出品者の課税区分に応じた税率、手数料は常に10%）
+        $winningTaxRate = $rows[0]['winning_tax_rate'];
+        $expectedSales = 24000 + (int) floor(24000 * $winningTaxRate / 100);
+        $this->assertSame($expectedSales, $rows[0]['sales_amount']);
+        $this->assertSame(1200 + 120, $rows[0]['commission']);
+        $this->assertSame($expectedSales - 1320, $rows[0]['net_amount']);
         $this->assertSame('draft', $rows[0]['status']);
     }
 

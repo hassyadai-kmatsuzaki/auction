@@ -108,9 +108,25 @@ class SubscriptionFlowTest extends TestCase
         $this->assertDatabaseMissing('subscriptions', ['user_id' => $user->id]);
     }
 
+    /**
+     * CheckSubscription は id <= 509 をテストユーザーとして免除するため、
+     * ミドルウェアの判定を確かめるテストでは免除範囲外の id で作成する。
+     */
+    private function createParticipantOutsideTestRange(): User
+    {
+        $user = User::factory()->create([
+            'id' => 10000 + User::max('id'),
+            'status' => 'approved',
+            'approved_at' => now(),
+        ]);
+        $user->roles()->attach(\App\Models\Role::firstOrCreate(['name' => 'participant'])->id);
+
+        return $user;
+    }
+
     public function test_check_subscription_middleware_blocks_without_active_sub(): void
     {
-        $user = $this->createParticipant();
+        $user = $this->createParticipantOutsideTestRange();
 
         // 入札系エンドポイント（toggle）は allows_bid が必要
         $this->actingAs($user, 'sanctum')
@@ -121,7 +137,7 @@ class SubscriptionFlowTest extends TestCase
     public function test_check_subscription_middleware_blocks_when_plan_lacks_capability(): void
     {
         $plan = $this->makePlan(['allows_bid' => false, 'allows_sell' => true, 'code' => 'sell_only']);
-        $user = $this->createParticipant();
+        $user = $this->createParticipantOutsideTestRange();
         Subscription::create([
             'user_id' => $user->id,
             'plan_id' => $plan->id,

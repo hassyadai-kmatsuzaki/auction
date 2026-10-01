@@ -423,6 +423,11 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         // NLP
         Route::post('/nlp/extract', [\App\Http\Controllers\Admin\AIController::class, 'extractItemInfo']);
         Route::post('/nlp/classify', [\App\Http\Controllers\Admin\AIController::class, 'classifyCategory']);
+        // 自動カテゴリ分類（ベータ）
+        Route::post('/categories/classify', [\App\Http\Controllers\Admin\AICategoryController::class, 'classify']);
+        Route::get('/categories/auction/{auctionId}', [\App\Http\Controllers\Admin\AICategoryController::class, 'classifyAuctionItems']);
+        // マッチング（基本版）
+        Route::get('/matching/items/{itemId}/buyers', [\App\Http\Controllers\Admin\AIMatchingController::class, 'buyersForItem']);
     });
 
     // レポートAPI

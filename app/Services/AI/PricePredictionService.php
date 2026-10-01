@@ -5,22 +5,57 @@ namespace App\Services\AI;
 use App\Models\AIPricePrediction;
 use App\Models\Item;
 use App\Models\WonItem;
+use App\Services\AI\ML\PriceModelPredictor;
 use Illuminate\Support\Facades\DB;
 
 class PricePredictionService
 {
     /**
+     * 集計対象とする入金済みステータス（入金確認後は paid → confirmed に進む）
+     */
+    private const SETTLED_PAYMENT_STATUSES = ['paid', 'confirmed'];
+
+    public function __construct(
+        private readonly PriceModelPredictor $modelPredictor = new PriceModelPredictor(),
+    ) {}
+
+    /**
      * 商品の予想落札価格を算出
+     * 有効な機械学習モデル（F-053）があればそれを使い、無ければ品種の過去取引からの統計で算出する。
      */
     public function predictPrice(Item $item): AIPricePrediction
     {
+        $ml = $this->modelPredictor->predict($item);
+        if ($ml !== null) {
+            $metrics = $ml['model']->metrics ?? [];
+
+            return AIPricePrediction::updateOrCreate(
+                ['item_id' => $item->id],
+                [
+                    'species_name' => $item->species_name,
+                    'predicted_price' => $ml['price'],
+                    'price_low' => $ml['low'],
+                    'price_high' => $ml['high'],
+                    'confidence' => $ml['confidence'],
+                    'factors' => [
+                        ['type' => 'model', 'value' => $ml['model']->label()],
+                        ['type' => 'trained_samples', 'value' => $ml['model']->train_samples + $ml['model']->test_samples],
+                        ['type' => 'recent_median_error_pct', 'value' => $metrics['median_error_pct'] ?? null],
+                        ['type' => 'species_known', 'value' => $ml['species_known']],
+                        ['type' => 'species', 'value' => $item->species_name],
+                    ],
+                    'model_version' => $ml['model']->label(),
+                ],
+            );
+        }
+
         $speciesName = $item->species_name;
 
         // 同品種の過去取引データを取得
         // STDDEV は SQLite で未対応のため、価格列を取得して PHP 側で集計する
         $prices = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
             ->where('items.species_name', $speciesName)
-            ->where('won_items.payment_status', 'paid')
+            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
             ->pluck('won_items.winning_price')
             ->map(fn ($v) => (float) $v);
 
@@ -41,7 +76,7 @@ class PricePredictionService
         $recentTrend = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
             ->where('items.species_name', $speciesName)
             ->where('won_items.created_at', '>=', now()->subDays(30))
-            ->where('won_items.payment_status', 'paid')
+            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
             ->selectRaw('AVG(won_items.winning_price) as recent_avg, COUNT(*) as recent_count')
             ->first();
 
@@ -128,7 +163,7 @@ class PricePredictionService
     public function getMarketTrends(int $limit = 20): array
     {
         return WonItem::join('items', 'won_items.item_id', '=', 'items.id')
-            ->where('won_items.payment_status', 'paid')
+            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
             ->where('won_items.created_at', '>=', now()->subDays(90))
             ->groupBy('items.species_name')
             ->selectRaw('
@@ -142,6 +177,14 @@ class PricePredictionService
             ->orderByDesc('transaction_count')
             ->limit($limit)
             ->get()
+            // MySQL の集計値は文字列で返るため、グラフ描画用に数値へ揃える
+            ->map(fn ($row) => [
+                'species_name' => $row->species_name,
+                'transaction_count' => (int) $row->transaction_count,
+                'avg_price' => round((float) $row->avg_price),
+                'max_price' => (float) $row->max_price,
+                'min_price' => (float) $row->min_price,
+            ])
             ->toArray();
     }
 }

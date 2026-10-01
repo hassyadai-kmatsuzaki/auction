@@ -6,6 +6,7 @@ use App\Jobs\SendAuctionPreviewJob;
 use App\Jobs\SendLineNotificationJob;
 use App\Mail\AuctionPreviewMail;
 use App\Models\Auction;
+use App\Services\TestModeService;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -29,7 +30,7 @@ class SendAuctionPreviewJobTest extends TestCase
             'created_by' => $this->createAdmin()->id,
         ]);
 
-        (new SendAuctionPreviewJob())->handle();
+        (new SendAuctionPreviewJob())->handle(app(TestModeService::class));
 
         Mail::assertNothingQueued();
         Bus::assertNotDispatched(SendLineNotificationJob::class);
@@ -54,7 +55,7 @@ class SendAuctionPreviewJobTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
-        (new SendAuctionPreviewJob())->handle();
+        (new SendAuctionPreviewJob())->handle(app(TestModeService::class));
 
         Mail::assertQueued(AuctionPreviewMail::class, 2); // participant + seller
         Bus::assertDispatched(SendLineNotificationJob::class, 2);
@@ -74,7 +75,7 @@ class SendAuctionPreviewJobTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
-        (new SendAuctionPreviewJob())->handle();
+        (new SendAuctionPreviewJob())->handle(app(TestModeService::class));
 
         Mail::assertNotQueued(AuctionPreviewMail::class);
         // メール無効でも LINE 通知ジョブはディスパッチされる
@@ -95,7 +96,7 @@ class SendAuctionPreviewJobTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
-        (new SendAuctionPreviewJob())->handle();
+        (new SendAuctionPreviewJob())->handle(app(TestModeService::class));
 
         Mail::assertNothingQueued();
         Bus::assertNotDispatched(SendLineNotificationJob::class);
@@ -156,7 +157,7 @@ class SendAuctionPreviewJobTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
-        (new SendAuctionPreviewJob())->handle();
+        (new SendAuctionPreviewJob())->handle(app(TestModeService::class));
 
         Mail::assertNothingQueued();
         Bus::assertNotDispatched(SendLineNotificationJob::class);

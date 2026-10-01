@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Log;
 class FraudDetectionService
 {
     /**
+     * 集計対象とする入金済みステータス（入金確認後は paid → confirmed に進む）
+     */
+    private const SETTLED_PAYMENT_STATUSES = ['paid', 'confirmed'];
+
+    /**
      * オークションの入札パターンを分析して不正を検知
      */
     public function analyzeAuction(int $auctionId): array
@@ -36,6 +41,24 @@ class FraudDetectionService
     }
 
     /**
+     * 同一オークション・同一種別・同一内容のアラートが既にあれば作成しない（検知の再実行で重複させない）。
+     * 新規作成した場合のみアラートを返す。
+     */
+    private function createAlertOnce(array $attributes): ?AIFraudAlert
+    {
+        $alert = AIFraudAlert::firstOrCreate(
+            [
+                'auction_id' => $attributes['auction_id'],
+                'alert_type' => $attributes['alert_type'],
+                'description' => $attributes['description'],
+            ],
+            $attributes,
+        );
+
+        return $alert->wasRecentlyCreated ? $alert : null;
+    }
+
+    /**
      * サクラ入札（吊り上げ入札）の検知
      */
     private function detectShillBidding(int $auctionId): array
@@ -59,7 +82,7 @@ class FraudDetectionService
                 ->count();
 
             if ($wonCount === 0 && $pattern->leave_count >= 3) {
-                $alert = AIFraudAlert::create([
+                $alert = $this->createAlertOnce([
                     'auction_id' => $auctionId,
                     'user_id' => $this->resolveUserId($pattern->user_id),
                     'alert_type' => 'shill_bidding',
@@ -72,7 +95,9 @@ class FraudDetectionService
                         'won_count' => $wonCount,
                     ],
                 ]);
-                $alerts[] = $alert;
+                if ($alert) {
+                    $alerts[] = $alert;
+                }
             }
         }
 
@@ -101,7 +126,7 @@ class FraudDetectionService
             ->get();
 
         foreach ($rapidBidders as $bidder) {
-            $alert = AIFraudAlert::create([
+            $alert = $this->createAlertOnce([
                 'auction_id' => $auctionId,
                 'user_id' => $this->resolveUserId($bidder->user_id),
                 'alert_type' => 'bid_pattern',
@@ -112,7 +137,9 @@ class FraudDetectionService
                     'rapid_bid_count' => $bidder->rapid_count,
                 ],
             ]);
-            $alerts[] = $alert;
+            if ($alert) {
+                $alerts[] = $alert;
+            }
         }
 
         return $alerts;
@@ -136,11 +163,11 @@ class FraudDetectionService
                 ->join('items', 'won_items.item_id', '=', 'items.id')
                 ->where('items.species_name', $won->species_name)
                 ->where('items.auction_id', '!=', $auctionId)
-                ->where('won_items.payment_status', 'paid')
+                ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
                 ->avg('won_items.winning_price');
 
             if ($avgPrice && $won->winning_price > $avgPrice * 3) {
-                $alert = AIFraudAlert::create([
+                $alert = $this->createAlertOnce([
                     'auction_id' => $auctionId,
                     'user_id' => $this->resolveUserId($won->winner_id),
                     'alert_type' => 'price_manipulation',
@@ -153,7 +180,9 @@ class FraudDetectionService
                         'species' => $won->species_name,
                     ],
                 ]);
-                $alerts[] = $alert;
+                if ($alert) {
+                    $alerts[] = $alert;
+                }
             }
         }
 

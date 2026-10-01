@@ -18,6 +18,8 @@ class GmoAozoraToken extends BaseModel
         'environment',
         'access_token',
         'refresh_token',
+        'previous_access_token',
+        'previous_token_valid_until',
         'scope',
         'token_type',
         'expires_at',
@@ -27,14 +29,33 @@ class GmoAozoraToken extends BaseModel
     ];
 
     protected $casts = [
-        'access_token'  => 'encrypted',
-        'refresh_token' => 'encrypted',
+        'access_token'          => 'encrypted',
+        'refresh_token'         => 'encrypted',
+        'previous_access_token' => 'encrypted',
+        'previous_token_valid_until' => 'datetime',
         'expires_at'    => 'datetime',
         'authorized_at' => 'datetime',
         'refreshed_at'  => 'datetime',
     ];
 
-    protected $hidden = ['access_token', 'refresh_token'];
+    protected $hidden = ['access_token', 'refresh_token', 'previous_access_token'];
+
+    /**
+     * Webhook の x-access-token が現行トークン（または猶予期間内の旧トークン）と一致するか。タイミングセーフ比較。
+     */
+    public function matchesAccessToken(string $presented): bool
+    {
+        if ($presented === '') {
+            return false;
+        }
+        if (hash_equals((string) $this->access_token, $presented)) {
+            return true;
+        }
+        return $this->previous_access_token !== null
+            && $this->previous_token_valid_until !== null
+            && $this->previous_token_valid_until->isFuture()
+            && hash_equals((string) $this->previous_access_token, $presented);
+    }
 
     public function isExpired(): bool
     {

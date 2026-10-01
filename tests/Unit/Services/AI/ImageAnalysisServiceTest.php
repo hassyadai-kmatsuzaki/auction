@@ -131,15 +131,15 @@ class ImageAnalysisServiceTest extends TestCase
         ]);
 
         $service = new ImageAnalysisService();
-        $count = $service->analyzeAuctionItems($this->auction->id);
+        $result = $service->analyzeAuctionItems($this->auction->id);
 
-        $this->assertSame(1, $count);
+        $this->assertSame(['analyzed' => 1, 'remaining' => 0], $result);
     }
 
     public function test_analyzeAuctionItems_returns_zero_when_no_items(): void
     {
         $service = new ImageAnalysisService();
-        $count = $service->analyzeAuctionItems($this->auction->id);
-        $this->assertSame(0, $count);
+        $result = $service->analyzeAuctionItems($this->auction->id);
+        $this->assertSame(['analyzed' => 0, 'remaining' => 0], $result);
     }
 }

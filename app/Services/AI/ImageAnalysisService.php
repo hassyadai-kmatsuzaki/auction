@@ -132,23 +132,38 @@ EOT;
     }
 
     /**
-     * バッチ解析（オークション全商品）
+     * バッチ解析の1リクエストあたりの処理時間上限（秒）。
+     * ALB の idle timeout（60秒）で 504 にならないよう、超えたら打ち切って残りは再実行で続きから処理する。
      */
-    public function analyzeAuctionItems(int $auctionId): int
+    private const BATCH_TIME_BUDGET_SECONDS = 45;
+
+    /**
+     * バッチ解析（オークション全商品）
+     *
+     * @return array{analyzed: int, remaining: int}
+     */
+    public function analyzeAuctionItems(int $auctionId): array
     {
         $items = Item::where('auction_id', $auctionId)
             ->whereDoesntHave('imageAnalysis')
+            ->whereHas('media', fn ($q) => $q->where('media_type', 'like', 'photo%'))
             ->with('media')
             ->get();
 
+        $startedAt = microtime(true);
         $count = 0;
+        $attempted = 0;
         foreach ($items as $item) {
+            if (microtime(true) - $startedAt > self::BATCH_TIME_BUDGET_SECONDS) {
+                break;
+            }
+            $attempted++;
             if ($this->analyzeItem($item)) {
                 $count++;
             }
             usleep(500000); // API レート制限対策: 0.5秒待機
         }
 
-        return $count;
+        return ['analyzed' => $count, 'remaining' => $items->count() - $attempted];
     }
 }

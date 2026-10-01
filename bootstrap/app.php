@@ -98,6 +98,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('subscriptions:renew')->dailyAt('03:00')
             ->withoutOverlapping();
 
+        // AI 学習用データの蓄積（F-051・毎日 4:30。終了済みオークションの実績を読み取るだけ）
+        $schedule->command('ai:collect-training-data')->dailyAt('04:30')
+            ->withoutOverlapping();
+
+        // 価格予測モデルの再学習（F-053・毎週月曜 5:00。従来方式より良い場合だけ有効化される）
+        $schedule->command('ai:train-price-model')->weeklyOn(1, '05:00')
+            ->withoutOverlapping();
+
         // GMOあおぞら: アクセストークンを失効前にリフレッシュ（失効すると入金通知 Webhook が止まる）
         $schedule->command('gmo-aozora:refresh-token')->dailyAt('04:10')
             ->withoutOverlapping();
