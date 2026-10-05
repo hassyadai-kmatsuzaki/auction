@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  *   sudo -u ec2-user php artisan testdata:delete              # 確認だけ（何も消さない）
  *   sudo -u ec2-user php artisan testdata:delete --execute    # 削除
  *
- * 対象: 51,73,86,87,88（73/88 はキャンセル済み開催）。users は削除しない。残す開催: 39（入金確認済みの実取引）/ 43・47（5/6リハ・5/8デモ）/ 90（実会員の練習戦）。
+ * 対象: テスト開催14件 + 51,73,86,87,88（73/88 はキャンセル済み開催）。削除済みの開催はスキップ。users は削除しない。残す開催: 39（入金確認済みの実取引）/ 43・47（5/6リハ・5/8デモ）/ 90（実会員の練習戦）。
  * 件数が想定と違う / 入金確認済みが混ざる場合は何も消さずに止まる。事後確認NGなら ROLLBACK。
  */
 class DeleteTestDataCommand extends Command
@@ -20,9 +20,23 @@ class DeleteTestDataCommand extends Command
     protected $signature = 'testdata:delete {--execute : 実際に削除する}';
     protected $description = 'テスト開催とその配下（生体・入札・落札など）を削除する。ユーザーは消さない';
 
-    // 2回目（1回目の 35,36,38,40,41,42,49,50,53,54,70,72,75,85 は 2026-10-05 削除済み）
     // 想定: [生体数, 落札数]。null は件数を問わない（キャンセル済み開催。status=cancelled かつ落札0が条件）
+    // すでに存在しない開催は「削除済み」としてスキップする
     private const TARGET = [
+        35 => [0, 0],
+        36 => [0, 0],
+        38 => [0, 0],
+        40 => [0, 0],
+        41 => [0, 0],
+        42 => [0, 0],
+        49 => [0, 0],
+        50 => [29, 0],
+        53 => [1, 0],
+        54 => [4, 0],
+        70 => [12, 0],
+        72 => [15, 0],
+        75 => [2, 0],
+        85 => [9, 9],
         51 => [200, 0],   // 5/21 E2E
         73 => null,       // キャンセル済み
         86 => [80, 16],   // 9/10 500名試験
@@ -60,7 +74,7 @@ class DeleteTestDataCommand extends Command
             $confirmed = (clone $wonQuery)->where('won_items.payment_status', 'confirmed')->count();
 
             if ($a === null) {
-                $result = 'NG: 開催が存在しない';
+                $result = $items === 0 ? '削除済み' : 'NG: 開催が無いのに生体が残っている';
             } elseif ($confirmed !== 0) {
                 $result = 'NG: 入金確認済みあり';
             } elseif ($expect === null) {
@@ -68,7 +82,7 @@ class DeleteTestDataCommand extends Command
             } else {
                 $result = ($items === $expect[0] && $won === $expect[1]) ? 'OK' : "NG: 想定 生体{$expect[0]}/落札{$expect[1]}";
             }
-            $ok = $ok && $result === 'OK';
+            $ok = $ok && in_array($result, ['OK', '削除済み'], true);
             $rows[] = [$id, $a->status ?? '-', $a->title ?? '-', $items, $won, $confirmed, $result];
         }
         $this->table(['id', 'status', 'title', '生体', '落札', '入金確認済み', '判定'], $rows);
@@ -78,6 +92,11 @@ class DeleteTestDataCommand extends Command
             return self::FAILURE;
         }
 
+        $auctionIds = $auctions->keys()->all();   // 存在する開催だけ消す
+        if ($auctionIds === []) {
+            $this->info('すべて削除済みです。');
+            return self::SUCCESS;
+        }
         $itemIds = DB::table('items')->whereIn('auction_id', $auctionIds)->pluck('id')->all();
         if (! $this->option('execute')) {
             $this->info('確認OK（何も削除していません）。削除するには --execute を付けて再実行してください。');
