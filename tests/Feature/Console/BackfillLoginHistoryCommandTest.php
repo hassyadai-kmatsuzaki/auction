@@ -57,6 +57,22 @@ class BackfillLoginHistoryCommandTest extends TestCase
         $this->assertTrue($rows[1]->meta['backfilled']);
     }
 
+    public function test_wider_before_skips_periods_already_recorded(): void
+    {
+        // 計測開始後のトークン＋本物のログイン（同一リクエストなので数秒差）
+        $this->insertToken($this->bidder->id, '2026-07-09 09:59:58');
+        // 本物のログインがある日の入札は推定を入れない
+        $this->insertBidEvent($this->bidder->id, 'join', '2026-07-09 13:00:00', '203.0.113.9', 'Mozilla/5.0');
+        // 記録の無い日は入る
+        $this->insertToken($this->bidder->id, '2026-07-12 08:00:00');
+
+        $this->artisan('activity:backfill-logins --before=2026-08-01')->assertSuccessful();
+
+        $rows = ActivityEvent::query()->where('dedup_key', 'like', 'bf:%')->get();
+        $this->assertCount(1, $rows);
+        $this->assertSame('2026-07-12 08:00:00', $rows[0]->created_at->toDateTimeString());
+    }
+
     public function test_rerun_does_not_duplicate(): void
     {
         $this->insertToken($this->bidder->id, '2026-06-01 09:00:00');

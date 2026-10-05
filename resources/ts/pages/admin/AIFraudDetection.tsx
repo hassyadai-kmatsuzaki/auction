@@ -31,6 +31,30 @@ interface FraudAlert {
 
 interface AuctionOption { id: number; title: string; event_date: string; }
 
+/** 根拠データの項目名（画面表示用の日本語） */
+const EVIDENCE_LABELS: Record<string, { label: string; format?: (v: any) => string }> = {
+  user_id: { label: '対象ユーザーID' },
+  seller_profile_id: { label: '出品者ID' },
+  runner_up_count: { label: '最後まで競り合って落札しなかった商品数', format: (v) => `${v}件` },
+  runner_up_item_ids: { label: '該当の商品ID', format: (v) => (Array.isArray(v) ? v.join('、') : String(v)) },
+  seller_share: { label: 'その出品者の商品が占める割合', format: (v) => `${Math.round(Number(v) * 100)}%` },
+  won_count: { label: 'その出品者からの落札数', format: (v) => `${v}件` },
+  leave_count: { label: '入札から離脱した回数', format: (v) => `${v}回` },
+  rapid_bid_count: { label: '直前の入札から1秒以内の入札回数', format: (v) => `${v}回` },
+  winning_price: { label: '落札価格', format: (v) => `¥${Number(v).toLocaleString()}` },
+  average_price: { label: '同品種の平均落札価格', format: (v) => `¥${Number(v).toLocaleString()}` },
+  ratio: { label: '平均に対する倍率', format: (v) => `${v}倍` },
+  species: { label: '品種' },
+};
+
+/** 根拠データを「項目名: 値」の文に直す（未知の項目は項目名をそのまま出す） */
+const evidenceLines = (evidence: Record<string, any> | null): string[] =>
+  Object.entries(evidence ?? {}).map(([key, value]) => {
+    const def = EVIDENCE_LABELS[key];
+    const text = def?.format ? def.format(value) : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+    return `${def?.label ?? key}: ${text}`;
+  });
+
 export default function AIFraudDetection() {
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,24 +243,36 @@ export default function AIFraudDetection() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>重要度</TableCell>
-                <TableCell>種類</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>重要度</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>種類</TableCell>
                 <TableCell>説明</TableCell>
-                <TableCell>対象ユーザー</TableCell>
-                <TableCell>ステータス</TableCell>
-                <TableCell>検知日時</TableCell>
-                <TableCell align="center">操作</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>対象ユーザー</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>ステータス</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>検知日時</TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>操作</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {alerts.map((alert) => (
-                <TableRow key={alert.id} hover>
+                <TableRow key={alert.id}>
                   <TableCell>
                     <Chip label={severityLabel(alert.severity)} color={severityColor(alert.severity)} size="small" />
                   </TableCell>
-                  <TableCell>{typeLabel(alert.alert_type)}</TableCell>
-                  <TableCell sx={{ maxWidth: 300 }}>
-                    <Typography variant="body2" noWrap>{alert.description}</Typography>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{typeLabel(alert.alert_type)}</TableCell>
+                  <TableCell sx={{ minWidth: 320 }}>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {alert.description}
+                    </Typography>
+                    {alert.auction?.title && (
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        対象オークション: {alert.auction.title}
+                      </Typography>
+                    )}
+                    {evidenceLines(alert.evidence).map((line) => (
+                      <Typography key={line} variant="caption" color="text.secondary" component="div" sx={{ wordBreak: 'break-word' }}>
+                        {line}
+                      </Typography>
+                    ))}
                   </TableCell>
                   <TableCell>{alert.user?.name ?? `ID:${alert.user_id}`}</TableCell>
                   <TableCell>
@@ -245,10 +281,10 @@ export default function AIFraudDetection() {
                   <TableCell>
                     <Typography variant="caption">{new Date(alert.created_at).toLocaleString('ja-JP')}</Typography>
                   </TableCell>
-                  <TableCell align="center">
-                    {alert.status === 'open' && (
-                      <Button size="small" onClick={() => setSelectedAlert(alert)}>対応</Button>
-                    )}
+                  <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                    <Button size="small" onClick={() => setSelectedAlert(alert)}>
+                      {alert.status === 'open' ? '対応' : '詳細'}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -259,48 +295,67 @@ export default function AIFraudDetection() {
 
       {/* 対応ダイアログ */}
       <Dialog open={!!selectedAlert} onClose={() => setSelectedAlert(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>アラート対応</DialogTitle>
+        <DialogTitle>{selectedAlert?.status === 'open' ? 'アラート対応' : 'アラート詳細'}</DialogTitle>
         <DialogContent>
           {selectedAlert && (
             <Box>
               <Chip label={severityLabel(selectedAlert.severity)} color={severityColor(selectedAlert.severity)} sx={{ mb: 2 }} />
               <Typography variant="subtitle1" fontWeight={600}>{typeLabel(selectedAlert.alert_type)}</Typography>
-              <Typography variant="body2" sx={{ my: 1 }}>{selectedAlert.description}</Typography>
-              {selectedAlert.evidence && (
-                <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'grey.50' }}>
-                  <Typography variant="caption" fontWeight={600}>根拠データ</Typography>
-                  <pre style={{ fontSize: '0.75rem', margin: 0, whiteSpace: 'pre-wrap' }}>
-                    {JSON.stringify(selectedAlert.evidence, null, 2)}
-                  </pre>
-                </Paper>
+              <Typography variant="body2" sx={{ my: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {selectedAlert.description}
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="caption" fontWeight={600} component="div" sx={{ mb: 0.5 }}>検知の根拠</Typography>
+                <Typography variant="body2" component="div">
+                  対象ユーザー: {selectedAlert.user?.name ?? (selectedAlert.user_id ? `ID:${selectedAlert.user_id}` : '-')}
+                </Typography>
+                {selectedAlert.auction?.title && (
+                  <Typography variant="body2" component="div">対象オークション: {selectedAlert.auction.title}</Typography>
+                )}
+                <Typography variant="body2" component="div">
+                  検知日時: {new Date(selectedAlert.created_at).toLocaleString('ja-JP')}
+                </Typography>
+                {evidenceLines(selectedAlert.evidence).map((line) => (
+                  <Typography key={line} variant="body2" component="div" sx={{ wordBreak: 'break-word' }}>{line}</Typography>
+                ))}
+              </Paper>
+              {selectedAlert.status === 'open' ? (
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="対応メモ"
+                  value={resolveNotes}
+                  onChange={(e) => setResolveNotes(e.target.value)}
+                />
+              ) : (
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {`状態: ${statusLabel(selectedAlert.status)}${selectedAlert.resolution_notes ? `\n対応メモ: ${selectedAlert.resolution_notes}` : ''}`}
+                </Typography>
               )}
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="対応メモ"
-                value={resolveNotes}
-                onChange={(e) => setResolveNotes(e.target.value)}
-              />
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSelectedAlert(null)}>キャンセル</Button>
-          <Button
-            color="warning"
-            onClick={() => handleResolve('false_positive')}
-            disabled={resolving}
-          >
-            誤検知として処理
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => handleResolve('resolved')}
-            disabled={resolving}
-          >
-            解決済みにする
-          </Button>
+          <Button onClick={() => setSelectedAlert(null)}>{selectedAlert?.status === 'open' ? 'キャンセル' : '閉じる'}</Button>
+          {selectedAlert?.status === 'open' && (
+            <>
+              <Button
+                color="warning"
+                onClick={() => handleResolve('false_positive')}
+                disabled={resolving}
+              >
+                誤検知として処理
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleResolve('resolved')}
+                disabled={resolving}
+              >
+                解決済みにする
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

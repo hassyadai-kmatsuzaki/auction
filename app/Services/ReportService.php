@@ -34,6 +34,14 @@ class ReportService
         return $this->generateReport($start, $end, 'monthly');
     }
 
+    /**
+     * 期間指定レポートデータを生成（開始日〜終了日。両端の日を含む）
+     */
+    public function generateCustomReport(Carbon $startDate, Carbon $endDate): array
+    {
+        return $this->generateReport($startDate->copy()->startOfDay(), $endDate->copy()->endOfDay(), 'custom');
+    }
+
     private function generateReport(Carbon $start, Carbon $end, string $type): array
     {
         // オークション統計

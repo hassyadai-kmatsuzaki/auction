@@ -45,10 +45,23 @@ export const aiFraudApi = {
 };
 
 // ─── レコメンド ────────────────────────────────────
+export interface RecommendationUser {
+  id: number;
+  name: string;
+  email: string;
+  wins: number;
+  last_won_at: string | null;
+}
+
 export const aiRecommendApi = {
   generate: async (userId: number) => {
     const res = await axios.post(`/api/admin/ai/recommendations/${userId}`);
     return res.data.data;
+  },
+  /** 対象ユーザーの選択肢（落札実績の多い順） */
+  users: async (): Promise<RecommendationUser[]> => {
+    const res = await axios.get('/api/admin/ai/recommendation-users');
+    return res.data.data.users ?? [];
   },
 };
 

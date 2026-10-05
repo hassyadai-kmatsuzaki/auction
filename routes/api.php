@@ -433,6 +433,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::patch('/fraud-alerts/{id}', [\App\Http\Controllers\Admin\AIController::class, 'resolveFraudAlert']);
         // レコメンド
         Route::post('/recommendations/{userId}', [\App\Http\Controllers\Admin\AIController::class, 'generateRecommendations']);
+        Route::get('/recommendation-users', [\App\Http\Controllers\Admin\AIRecommendationUserController::class, 'index']);
         // NLP
         Route::post('/nlp/extract', [\App\Http\Controllers\Admin\AIController::class, 'extractItemInfo']);
         Route::post('/nlp/classify', [\App\Http\Controllers\Admin\AIController::class, 'classifyCategory']);
@@ -447,6 +448,7 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::prefix('reports')->group(function () {
         Route::get('/weekly', [\App\Http\Controllers\Admin\ReportController::class, 'weekly']);
         Route::get('/monthly', [\App\Http\Controllers\Admin\ReportController::class, 'monthly']);
+        Route::get('/custom', [\App\Http\Controllers\Admin\ReportController::class, 'custom']);
         Route::post('/generate', [\App\Http\Controllers\Admin\ReportController::class, 'generate']);
     });
 

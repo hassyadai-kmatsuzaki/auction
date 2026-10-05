@@ -54,8 +54,14 @@ class BackfillLoginHistoryCommand extends Command
         $userIds = $this->targetUserIds();
         $this->line('対象ユーザー: ' . count($userIds) . ' 人');
 
-        $tokenRows = $this->tokenRows($userIds, $before);
-        $bidRows = $this->bidRows($before, $tokenRows);
+        // --before で計測開始後まで広げた場合に、本物の記録と二重にならないようにする
+        $realLogins = $this->realLogins($before);
+
+        $tokenRows = array_values(array_filter(
+            $this->tokenRows($userIds, $before),
+            fn (array $r) => ! $this->hasRealLoginNear($realLogins, $r['user_id'], $r['created_at'])
+        ));
+        $bidRows = $this->bidRows($before, $tokenRows, $realLogins);
 
         $this->line('① トークン（確定）: ' . count($tokenRows) . ' 件 / ' . count(array_unique(array_column($tokenRows, 'user_id'))) . ' 人');
         $this->line('② 入札（推定）    : ' . count($bidRows) . ' 件 / ' . count(array_unique(array_column($bidRows, 'user_id'))) . ' 人');
@@ -88,6 +94,42 @@ class BackfillLoginHistoryCommand extends Command
             ->min('created_at');
 
         return $first ? Carbon::parse($first) : null;
+    }
+
+    /**
+     * 期間内の本物のログイン記録（遡り登録分を除く）。user_id => [unix timestamp, ...]
+     *
+     * @return array<int, array<int, int>>
+     */
+    private function realLogins(Carbon $before): array
+    {
+        $map = [];
+        DB::table('activity_events')
+            ->where('event_type', ActivityEvent::LOGIN)
+            ->where('created_at', '<', $before)
+            ->where(fn ($q) => $q->whereNull('dedup_key')->orWhere('dedup_key', 'not like', 'bf:%'))
+            ->orderBy('id')
+            ->select(['id', 'user_id', 'created_at'])
+            ->chunkById(5000, function ($rows) use (&$map) {
+                foreach ($rows as $r) {
+                    $map[(int) $r->user_id][] = Carbon::parse($r->created_at)->getTimestamp();
+                }
+            });
+
+        return $map;
+    }
+
+    /** トークン発行とログイン記録は同じリクエスト内なので数秒以内に並ぶ */
+    private function hasRealLoginNear(array $realLogins, int $userId, string $at): bool
+    {
+        $ts = Carbon::parse($at)->getTimestamp();
+        foreach ($realLogins[$userId] ?? [] as $real) {
+            if (abs($real - $ts) <= 10) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return array<int, int> */
@@ -152,11 +194,17 @@ class BackfillLoginHistoryCommand extends Command
     /**
      * ② 手動入札の 1ユーザー1日の最初の1件。①がある日は入れない。
      */
-    private function bidRows(Carbon $before, array $tokenRows): array
+    private function bidRows(Carbon $before, array $tokenRows, array $realLogins): array
     {
+        // ①または本物のログイン記録がある日は推定を入れない
         $tokenDays = [];
         foreach ($tokenRows as $r) {
             $tokenDays[$r['user_id'] . ':' . $r['event_date']] = true;
+        }
+        foreach ($realLogins as $userId => $timestamps) {
+            foreach ($timestamps as $ts) {
+                $tokenDays[$userId . ':' . date('Y-m-d', $ts)] = true;
+            }
         }
 
         // ユーザー×日 → 最小 id（archive は元 id を保持するので両表で id 順＝時系列）

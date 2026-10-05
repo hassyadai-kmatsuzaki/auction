@@ -3,7 +3,7 @@ import {
   Box, Typography, Paper, Grid, Card, CardContent,
   Button, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Avatar, Tabs, Tab, FormControl, InputLabel, Select, MenuItem,
-  CircularProgress, Alert,
+  CircularProgress, Alert, TextField,
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
@@ -46,19 +46,35 @@ interface ReportData {
   payment_rate: number;
 }
 
+type ReportType = 'weekly' | 'monthly' | 'custom';
+
+/** ローカル日付を YYYY-MM-DD に */
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  weekly: '週次レポート',
+  monthly: '月次レポート',
+  custom: '期間指定レポート',
+};
+
 export default function Reports() {
   const [tabValue, setTabValue] = useState(0);
-  const [reportType, setReportType] = useState<'weekly' | 'monthly'>('weekly');
+  const [reportType, setReportType] = useState<ReportType>('weekly');
+  // 期間指定（初期値: 今月1日〜今日）
+  const [startDate, setStartDate] = useState(() => ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [endDate, setEndDate] = useState(() => ymd(new Date()));
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
 
-  const fetchReport = async (type: 'weekly' | 'monthly') => {
+  const fetchReport = async (type: ReportType) => {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.get(`/api/admin/reports/${type}`);
+      const res = type === 'custom'
+        ? await axios.get('/api/admin/reports/custom', { params: { start_date: startDate, end_date: endDate } })
+        : await axios.get(`/api/admin/reports/${type}`);
       setReport(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'レポートの取得に失敗しました');
@@ -70,6 +86,8 @@ export default function Reports() {
   useEffect(() => {
     fetchReport(reportType);
   }, [reportType]);
+
+  const customRangeInvalid = !startDate || !endDate || startDate > endDate;
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -96,22 +114,53 @@ export default function Reports() {
             取引データの集計・分析レポート（週次/月次で自動生成）
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>期間</InputLabel>
-            <Select value={reportType} label="期間" onChange={(e) => setReportType(e.target.value as any)}>
+            <Select value={reportType} label="期間" onChange={(e) => setReportType(e.target.value as ReportType)}>
               <MenuItem value="weekly">週次</MenuItem>
               <MenuItem value="monthly">月次</MenuItem>
+              <MenuItem value="custom">期間指定</MenuItem>
             </Select>
           </FormControl>
-          <Button
-            variant="contained"
-            startIcon={generating ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-            onClick={handleGenerate}
-            disabled={generating}
-          >
-            再生成
-          </Button>
+          {reportType === 'custom' ? (
+            <>
+              <TextField
+                type="date"
+                size="small"
+                label="開始日"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                type="date"
+                size="small"
+                label="終了日"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                error={!!startDate && !!endDate && startDate > endDate}
+              />
+              <Button
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AssessmentIcon />}
+                onClick={() => fetchReport('custom')}
+                disabled={loading || customRangeInvalid}
+              >
+                表示
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="contained"
+              startIcon={generating ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+              onClick={handleGenerate}
+              disabled={generating}
+            >
+              再生成
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -126,7 +175,7 @@ export default function Reports() {
           {/* 期間表示 */}
           <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
             <Chip
-              label={report.report_type === 'weekly' ? '週次レポート' : '月次レポート'}
+              label={REPORT_TYPE_LABELS[report.report_type] ?? 'レポート'}
               color="primary"
             />
             <Typography variant="body2">

@@ -47,7 +47,9 @@ class RecommendationService
         }
 
         // 4. マッチング（F-059: 購買プロファイルと出品物の相性）
-        $registered = Item::where('status', 'registered')->limit(500)->get(['id', 'species_name', 'seller_profile_id', 'start_price']);
+        // 出品予定の生体（テスト開催・除外開催の生体は候補にしない）
+        $registered = AiDataScope::realAuctions(Item::where('status', 'registered'), 'items.auction_id')
+            ->limit(500)->get(['id', 'species_name', 'seller_profile_id', 'start_price']);
         $matched = ($this->matching ?? app(MatchingService::class))->scoreItemsForBuyer($user->id, $registered);
         usort($matched, fn ($a, $b) => $b['score'] <=> $a['score']);
         foreach (array_slice($matched, 0, $limit) as $rec) {
@@ -131,8 +133,8 @@ class RecommendationService
         // 推薦品種の出品中商品を取得
         $recommendations = [];
         foreach ($similarUserItems as $species) {
-            $items = Item::where('species_name', $species->species_name)
-                ->where('status', 'registered')
+            $items = AiDataScope::realAuctions(Item::where('species_name', $species->species_name)
+                ->where('status', 'registered'), 'items.auction_id')
                 ->limit(3)
                 ->get();
 
@@ -166,8 +168,8 @@ class RecommendationService
 
         $recommendations = [];
         foreach ($favoriteSpecies as $species => $count) {
-            $items = Item::where('species_name', $species)
-                ->where('status', 'registered')
+            $items = AiDataScope::realAuctions(Item::where('species_name', $species)
+                ->where('status', 'registered'), 'items.auction_id')
                 ->whereNotIn('id', function ($q) use ($user) {
                     $q->select('item_id')->from('favorites')->where('user_id', $user->id);
                 })
@@ -196,6 +198,8 @@ class RecommendationService
         $trendingItems = AiDataScope::realUsers(DB::table('favorites')
             ->join('items', 'favorites.item_id', '=', 'items.id')
             ->where('items.status', 'registered')
+            ->whereNotIn('items.auction_id', AiDataScope::excludedAuctionIds() ?: [0])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('auctions as ta')->whereColumn('ta.id', 'items.auction_id')->where('ta.is_test', true))
             ->where('favorites.created_at', '>=', now()->subDays(7)), 'favorites.user_id')
             ->groupBy('items.id', 'items.species_name')
             ->selectRaw('items.id as item_id, items.species_name, COUNT(*) as fav_count')

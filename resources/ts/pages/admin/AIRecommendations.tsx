@@ -14,10 +14,9 @@ import {
 } from '@mui/icons-material';
 import { aiRecommendApi, aiDashboardApi } from '../../api/admin/aiApi';
 import AIMatchingDialog from '../../components/admin/AIMatchingDialog';
-import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 
-interface UserOption { id: number; name: string; email: string; }
+interface UserOption { id: number; name: string; email: string; wins: number; }
 interface Recommendation {
   id: number;
   item_id: number;
@@ -42,13 +41,8 @@ export default function AIRecommendations() {
   const [matchingItemId, setMatchingItemId] = useState<number | null>(null);
 
   useEffect(() => {
-    // 参加者ロールのユーザー一覧を取得
-    axios.get('/api/admin/users', { params: { per_page: 200, role: 'participant' } }).then((res) => {
-      // Laravel paginator: res.data.data は { data: [...], current_page, ... }
-      const paginated = res.data.data;
-      const userList = Array.isArray(paginated) ? paginated : (paginated?.data ?? []);
-      setUsers(userList);
-    }).catch(() => {});
+    // 対象ユーザー（落札実績の多い順。実績のある人を選べばおすすめが出る）
+    aiRecommendApi.users().then(setUsers).catch(() => {});
 
     // 統計取得
     aiDashboardApi.getSummary().then(setStats).catch(() => {});
@@ -126,17 +120,21 @@ export default function AIRecommendations() {
           <Grid item xs={12} md={7}>
             <Autocomplete
               options={users}
-              getOptionLabel={(o) => `${o.name}（${o.email}）`}
+              groupBy={(o) => (o.wins > 0 ? '落札実績あり（実績の多い順）' : '落札実績なし')}
+              getOptionLabel={(o) => `${o.name}（${o.wins > 0 ? `落札${o.wins}件` : o.email}）`}
               value={selectedUser}
               onChange={(_, v) => { setSelectedUser(v); setRecommendations([]); setError(''); }}
               renderInput={(params) => <TextField {...params} label="対象ユーザー" size="small" placeholder="ユーザーを検索..." />}
               renderOption={(props, option) => (
                 <li {...props}>
                   <Avatar sx={{ width: 28, height: 28, mr: 1, fontSize: '0.75rem' }}>{option.name[0]}</Avatar>
-                  <Box>
+                  <Box sx={{ flex: 1 }}>
                     <Typography variant="body2">{option.name}</Typography>
                     <Typography variant="caption" color="text.secondary">{option.email}</Typography>
                   </Box>
+                  {option.wins > 0 && (
+                    <Chip label={`落札${option.wins}件`} size="small" color="primary" variant="outlined" sx={{ ml: 1 }} />
+                  )}
                 </li>
               )}
             />
