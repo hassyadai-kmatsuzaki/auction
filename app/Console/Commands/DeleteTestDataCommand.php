@@ -11,21 +11,25 @@ use Illuminate\Support\Facades\Schema;
  *
  *   sudo -u ec2-user php artisan testdata:delete              # 確認だけ（何も消さない）
  *   sudo -u ec2-user php artisan testdata:delete --execute    # 削除
- *   --include-b を付けると証跡になりうる開催（43,47,51,86,87）も対象
  *
- * users は削除しない。39（入金確認済みの実取引）と 90（実会員の練習戦）は対象外。
+ * 対象: 51,73,86,87,88（73/88 はキャンセル済み開催）。users は削除しない。残す開催: 39（入金確認済みの実取引）/ 43・47（5/6リハ・5/8デモ）/ 90（実会員の練習戦）。
  * 件数が想定と違う / 入金確認済みが混ざる場合は何も消さずに止まる。事後確認NGなら ROLLBACK。
  */
 class DeleteTestDataCommand extends Command
 {
-    protected $signature = 'testdata:delete {--execute : 実際に削除する} {--include-b : 証跡になりうる開催（43,47,51,86,87）も含める}';
+    protected $signature = 'testdata:delete {--execute : 実際に削除する}';
     protected $description = 'テスト開催とその配下（生体・入札・落札など）を削除する。ユーザーは消さない';
 
-    // A: 純粋なテスト・E2E
-    private const GROUP_A = [35, 36, 38, 40, 41, 42, 49, 50, 53, 54, 70, 72, 75, 85];
-    // B: 補助金の証跡と対応する可能性あり（5/6リハ・5/8デモ・5/21 E2E・9/10 500名試験・9/19通し試験）
-    private const GROUP_B = [43, 47, 51, 86, 87];
-    private const PROTECTED = [39, 90];
+    // 2回目（1回目の 35,36,38,40,41,42,49,50,53,54,70,72,75,85 は 2026-10-05 削除済み）
+    // 想定: [生体数, 落札数]。null は件数を問わない（キャンセル済み開催。status=cancelled かつ落札0が条件）
+    private const TARGET = [
+        51 => [200, 0],   // 5/21 E2E
+        73 => null,       // キャンセル済み
+        86 => [80, 16],   // 9/10 500名試験
+        87 => [30, 8],    // 9/19 通し試験
+        88 => null,       // キャンセル済み
+    ];
+    private const PROTECTED = [39, 43, 47, 90];
 
     private const ARCHIVE_TABLES = [
         'bid_events_archive',
@@ -37,37 +41,44 @@ class DeleteTestDataCommand extends Command
 
     public function handle(): int
     {
-        $includeB   = (bool) $this->option('include-b');
-        $auctionIds = $includeB ? array_merge(self::GROUP_A, self::GROUP_B) : self::GROUP_A;
-        $expected   = $includeB
-            ? ['auctions' => 19, 'items' => 448, 'won' => 33]
-            : ['auctions' => 14, 'items' => 72, 'won' => 9];
+        $auctionIds = array_keys(self::TARGET);
 
         if (array_intersect($auctionIds, self::PROTECTED)) {
-            $this->error('中止: 39 / 90 が対象に含まれています');
+            $this->error('中止: 残す開催（39 / 43 / 47 / 90）が対象に含まれています');
             return self::FAILURE;
         }
 
-        // ---------- 事前確認 ----------
-        $auctions = DB::table('auctions')->whereIn('id', $auctionIds)->orderBy('id')->get(['id', 'title', 'status']);
-        $this->table(['id', 'status', 'title'], $auctions->map(fn ($a) => [$a->id, $a->status, $a->title])->all());
+        // ---------- 事前確認（開催ごと） ----------
+        $auctions = DB::table('auctions')->whereIn('id', $auctionIds)->get(['id', 'title', 'status'])->keyBy('id');
+        $rows = [];
+        $ok   = true;
+        foreach (self::TARGET as $id => $expect) {
+            $a         = $auctions->get($id);
+            $items     = DB::table('items')->where('auction_id', $id)->count();
+            $wonQuery  = DB::table('won_items')->join('items', 'items.id', '=', 'won_items.item_id')->where('items.auction_id', $id);
+            $won       = (clone $wonQuery)->count();
+            $confirmed = (clone $wonQuery)->where('won_items.payment_status', 'confirmed')->count();
 
-        $itemIds   = DB::table('items')->whereIn('auction_id', $auctionIds)->pluck('id')->all();
-        $wonCount  = DB::table('won_items')->whereIn('item_id', $itemIds)->count();
-        $confirmed = DB::table('won_items')->whereIn('item_id', $itemIds)->where('payment_status', 'confirmed')->count();
-        $actual    = ['auctions' => $auctions->count(), 'items' => count($itemIds), 'won' => $wonCount];
+            if ($a === null) {
+                $result = 'NG: 開催が存在しない';
+            } elseif ($confirmed !== 0) {
+                $result = 'NG: 入金確認済みあり';
+            } elseif ($expect === null) {
+                $result = ($a->status === 'cancelled' && $won === 0) ? 'OK' : 'NG: キャンセル済み・落札0 ではない';
+            } else {
+                $result = ($items === $expect[0] && $won === $expect[1]) ? 'OK' : "NG: 想定 生体{$expect[0]}/落札{$expect[1]}";
+            }
+            $ok = $ok && $result === 'OK';
+            $rows[] = [$id, $a->status ?? '-', $a->title ?? '-', $items, $won, $confirmed, $result];
+        }
+        $this->table(['id', 'status', 'title', '生体', '落札', '入金確認済み', '判定'], $rows);
 
-        $this->table(['', '実際', '想定'], [
-            ['開催', $actual['auctions'], $expected['auctions']],
-            ['生体', $actual['items'], $expected['items']],
-            ['落札', $actual['won'], $expected['won']],
-            ['入金確認済み', $confirmed, 0],
-        ]);
-
-        if ($actual !== $expected || $confirmed !== 0) {
-            $this->error('中止: 件数が想定と違います。何も削除していません。');
+        if (! $ok) {
+            $this->error('中止: 想定と違う開催があります。何も削除していません。');
             return self::FAILURE;
         }
+
+        $itemIds = DB::table('items')->whereIn('auction_id', $auctionIds)->pluck('id')->all();
         if (! $this->option('execute')) {
             $this->info('確認OK（何も削除していません）。削除するには --execute を付けて再実行してください。');
             return self::SUCCESS;
@@ -103,7 +114,7 @@ class DeleteTestDataCommand extends Command
                     + DB::table('won_items')->whereIn('item_id', $itemIds)->count();
                 $kept = DB::table('auctions')->whereIn('id', self::PROTECTED)->count();
                 if ($left !== 0 || $kept !== count(self::PROTECTED)) {
-                    throw new \RuntimeException("事後確認NG（残り {$left} 件 / 39・90 残存 {$kept} 件）");
+                    throw new \RuntimeException("事後確認NG（残り {$left} 件 / 残す開催の残存 {$kept} 件）");
                 }
             });
         } catch (\Throwable $e) {
