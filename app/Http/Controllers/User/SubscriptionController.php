@@ -73,12 +73,44 @@ class SubscriptionController extends Controller
                 'requires_registration' => $requiresRegistration,
                 'bank_transfer_pending' => $bankTransferPending,
                 'is_active'    => $subscription ? $subscription->isActive() : false,
+                // 自動更新を停止中か（F-086）。停止中でも期間満了までは is_active=true
+                'auto_renew_stopped' => $subscription ? $subscription->isAutoRenewStopped() : false,
                 'square_public' => [
                     'application_id' => config('services.square.application_id'),
                     'location_id'    => config('services.square.location_id'),
                     'environment'    => config('services.square.environment'),
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * 自動更新の停止・再開（F-086）。停止しても期間満了までは利用できる
+     */
+    public function updateAutoRenew(Request $request)
+    {
+        abort_unless(config('features.subscription_self_service'), 404);
+        $validated = $request->validate(['enabled' => 'required|boolean']);
+
+        $subscription = $request->user()->subscription()->with('plan')->first();
+        if (!$subscription) {
+            return response()->json(['success' => false, 'message' => 'サブスクリプションがありません'], 404);
+        }
+
+        try {
+            $validated['enabled']
+                ? $this->service->resumeAutoRenew($subscription)
+                : $this->service->stopAutoRenew($subscription);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['enabled']
+                ? '自動更新を再開しました'
+                : '自動更新を停止しました。' . $subscription->current_period_end?->format('Y年n月j日') . 'までご利用いただけます',
+            'data' => ['auto_renew_stopped' => $subscription->fresh()->isAutoRenewStopped()],
         ]);
     }
 

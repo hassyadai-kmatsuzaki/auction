@@ -29,6 +29,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   Receipt as ReceiptIcon,
@@ -40,12 +42,14 @@ import {
   ExpandMore as ExpandMoreIcon,
   Event as EventIcon,
   Star as StarIcon,
+  Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { formatYen } from '../../lib/formatPrice';
 import ReviewDialog from '../../features/reviews/ReviewDialog';
 import { optimizedImageUrl } from '../../lib/optimizedMedia';
 import { useAuth } from '../../contexts/AuthContext';
+import { features } from '../../lib/features';
 
 interface WonItemData {
   id: number;
@@ -57,6 +61,8 @@ interface WonItemData {
     quantity: number;
     thumbnail_path?: string;
     seller_name?: string | null;
+    /** 出品者の評価（F-023） */
+    seller_rating?: { average: number; count: number } | null;
   } | null;
   winning_price: number;
   quantity: number;
@@ -73,6 +79,8 @@ interface WonItemData {
   tracking_numbers?: string[];
   shipping_company?: string;
   shipped_at?: string;
+  /** 発行済みの血統証明書がある */
+  has_pedigree_certificate?: boolean;
   created_at: string;
 }
 
@@ -98,6 +106,8 @@ interface AuctionGroup {
     can_calculate: boolean;
     calculation_mode?: 'auto' | 'manual' | 'mixed' | null;
     pending_manual_approval?: boolean;
+    /** 受取方法の希望（F-038。表示スイッチ ON のときだけ返る） */
+    delivery_method?: 'shipping' | 'pickup';
   };
   won_items: WonItemData[];
 }
@@ -330,6 +340,37 @@ export default function WonItems() {
     }
   };
 
+  // 受取方法の希望（F-038）。送料・請求は変わらず、運営が会場受取として扱う
+  const handleDeliveryMethod = async (auctionId: number, method: 'shipping' | 'pickup') => {
+    try {
+      const res = await axios.put(`/api/participant/auctions/${auctionId}/delivery-method`, { delivery_method: method });
+      setSnackbar({ open: true, message: res.data.message, severity: 'success' });
+      fetchWonItems();
+    } catch {
+      // エラー内容はインターセプタがトースト表示する
+    }
+  };
+
+  // 血統証明書は署名付きURL（10分有効）で開く。LINE内ブラウザ・スマホは Blob 保存できないためそのまま遷移して表示する
+  const handleOpenPedigreeCertificate = async (wonItemId: number) => {
+    try {
+      const res = await axios.get(`/api/participant/won-items/${wonItemId}/pedigree-certificate-link`);
+      const url: string = res.data.data.url;
+      if (useEmailDelivery) {
+        window.location.href = url;
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', '');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      // エラートーストは axios インターセプタが出す
+    }
+  };
+
   const getPaymentStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return '支払い待ち';
@@ -522,6 +563,26 @@ export default function WonItems() {
                   </Typography>
                 </Box>
 
+                {/* 受取方法の希望（F-038）。表示スイッチ ON のときだけ */}
+                {features.pickupRequest && group.shipping.delivery_method && auctionId && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2, px: 2, py: 1.5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>受取方法</Typography>
+                    <ToggleButtonGroup
+                      size="small"
+                      exclusive
+                      value={group.shipping.delivery_method}
+                      disabled={!group.shipping.can_update}
+                      onChange={(_, v) => v && v !== group.shipping.delivery_method && handleDeliveryMethod(auctionId, v)}
+                    >
+                      <ToggleButton value="shipping">配送</ToggleButton>
+                      <ToggleButton value="pickup">会場で受け取る</ToggleButton>
+                    </ToggleButtonGroup>
+                    <Typography variant="caption" color="text.secondary">
+                      {group.shipping.can_update ? '会場受取の日時は運営からご案内します' : '発送準備に入ったため変更できません'}
+                    </Typography>
+                  </Box>
+                )}
+
                 {/* 「その他」種別を含むため送料が手動確定待ちの案内 */}
                 {group.shipping.pending_manual_approval && (
                   <Alert severity="info" sx={{ mb: 2 }}>
@@ -626,6 +687,16 @@ export default function WonItems() {
                                 評価する
                               </Button>
                             )}
+                            {features.pedigreeCertificate && wonItem.has_pedigree_certificate && (
+                              <Button
+                                size="small"
+                                startIcon={<VerifiedIcon />}
+                                onClick={() => handleOpenPedigreeCertificate(wonItem.id)}
+                                sx={{ fontSize: '0.7rem' }}
+                              >
+                                血統証明書
+                              </Button>
+                            )}
                           </Box>
 
                           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -635,6 +706,13 @@ export default function WonItems() {
                           {/* 出品者（屋号） */}
                           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
                             出品者: {wonItem.item?.seller_name ?? '-'}
+                            {features.sellerRating && wonItem.item?.seller_rating && (
+                              <Chip
+                                size="small"
+                                label={`★ ${wonItem.item.seller_rating.average.toFixed(1)}（評価 ${wonItem.item.seller_rating.count}件）`}
+                                sx={{ ml: 1, bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 600, fontSize: '0.7rem' }}
+                              />
+                            )}
                           </Typography>
 
                           {/* 金額情報 */}

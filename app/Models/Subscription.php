@@ -24,6 +24,8 @@ class Subscription extends BaseModel
      */
     public const REASON_SWITCHED_BY_ADMIN = 'switched_by_admin';
     public const REASON_ONE_DAY_EXPIRED   = 'one_day_expired';
+    /** 会員が自動更新を停止した（期間満了までは active のまま利用可。F-086） */
+    public const REASON_AUTO_RENEW_STOPPED = 'auto_renew_stopped';
 
     protected $fillable = [
         'user_id',
@@ -90,7 +92,31 @@ class Subscription extends BaseModel
         return $query->where('status', self::STATUS_ACTIVE)
                      ->whereNotNull('current_period_end')
                      ->where('current_period_end', '<=', now())
-                     ->whereHas('plan', fn ($q) => $q->whereNull('duration_days'));
+                     ->whereHas('plan', fn ($q) => $q->whereNull('duration_days'))
+                     // 自動更新を停止した会員は再課金しない（期間満了で autoRenewStoppedExpired 側が解約にする）
+                     ->where(fn ($q) => $q->whereNull('suspended_reason')
+                         ->orWhere('suspended_reason', '!=', self::REASON_AUTO_RENEW_STOPPED));
+    }
+
+    /**
+     * 自動更新を停止したまま期間が満了した年会費プラン。課金せず canceled へ遷移させる対象（F-086）
+     */
+    public function scopeAutoRenewStoppedExpired($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE)
+                     ->where('suspended_reason', self::REASON_AUTO_RENEW_STOPPED)
+                     ->whereNotNull('current_period_end')
+                     ->where('current_period_end', '<=', now());
+    }
+
+    /**
+     * 自動更新を停止中か（期間満了までは利用可）。canceled_at と理由の両方で判定し、旧データを誤判定しない
+     */
+    public function isAutoRenewStopped(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE
+            && $this->canceled_at !== null
+            && $this->suspended_reason === self::REASON_AUTO_RENEW_STOPPED;
     }
 
     /**

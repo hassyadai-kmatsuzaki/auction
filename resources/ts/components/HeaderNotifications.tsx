@@ -23,6 +23,7 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import axios from '../lib/axios';
+import { features } from '../lib/features';
 
 interface Announcement {
   id: number;
@@ -30,6 +31,8 @@ interface Announcement {
   content: string;
   is_important: boolean;
   published_at: string;
+  /** 既読済み（F-092）。古い API 応答では無い */
+  is_read?: boolean;
 }
 
 interface HeaderNotificationsProps {
@@ -53,12 +56,13 @@ export default function HeaderNotifications({ role }: HeaderNotificationsProps) 
       if (response.data.success) {
         const announcements = response.data.data.announcements;
         setNotifications(announcements);
-        
-        // 7日以内の未読カウント
-        const recentCount = announcements.filter((a: Announcement) => 
+
+        // 7日以内の未読数（サーバーで既読を除いて数える）。古い API 応答なら従来どおり7日以内の件数
+        // 既読管理が OFF のときは従来どおり「7日以内の件数」
+        const serverCount = features.announcementRead ? response.data.data.unread_count : undefined;
+        setUnreadCount(typeof serverCount === 'number' ? serverCount : announcements.filter((a: Announcement) =>
           new Date(a.published_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        ).length;
-        setUnreadCount(recentCount);
+        ).length);
       }
     } catch (err) {
       console.error('通知取得エラー:', err);
@@ -73,6 +77,20 @@ export default function HeaderNotifications({ role }: HeaderNotificationsProps) 
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
+    markShownAsRead();
+  };
+
+  // ベルを開いたら表示中のお知らせを既読にする。失敗しても表示には影響させない
+  const markShownAsRead = async () => {
+    if (!features.announcementRead) return;
+    const unreadIds = notifications.filter((n) => n.is_read === false).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    try {
+      const res = await axios.post('/api/announcements/read', { ids: unreadIds }, { silent: true });
+      setUnreadCount(res.data.data.unread_count);
+    } catch {
+      // 既読化の失敗は無視（次回開いたときに再送される）
+    }
   };
 
   const handleClose = () => {
@@ -119,8 +137,10 @@ export default function HeaderNotifications({ role }: HeaderNotificationsProps) 
     }
   };
 
-  const isNew = (dateString: string) => {
-    return new Date(dateString) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // 7日以内かつ未読のものだけ強調する（既読情報が無い古い応答では従来どおり7日以内）
+  const isNew = (notification: Announcement) => {
+    return (!features.announcementRead || notification.is_read !== true)
+      && new Date(notification.published_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   };
 
   return (
@@ -182,7 +202,7 @@ export default function HeaderNotifications({ role }: HeaderNotificationsProps) 
                     sx={{
                       py: 1.5,
                       px: 2,
-                      bgcolor: isNew(notification.published_at) ? 'action.hover' : 'transparent',
+                      bgcolor: isNew(notification) ? 'action.hover' : 'transparent',
                     }}
                   >
                     <Avatar
@@ -205,7 +225,7 @@ export default function HeaderNotifications({ role }: HeaderNotificationsProps) 
                           <Typography
                             variant="body2"
                             sx={{
-                              fontWeight: isNew(notification.published_at) ? 600 : 400,
+                              fontWeight: isNew(notification) ? 600 : 400,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',

@@ -29,6 +29,8 @@ import {
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import TwoFactorSettings from '../../features/settings/TwoFactorSettings';
+import SubscriptionStatusCard from '../../components/SubscriptionStatusCard';
+import { features } from '../../lib/features';
 import NotificationPreferencesPanel, {
   NotificationRow,
 } from '@/features/notifications/NotificationPreferencesPanel';
@@ -393,6 +395,8 @@ export default function ParticipantSettings() {
         </Grid>
 
         <Grid item xs={12} md={9}>
+          {/* 年会費プラン（F-086）。表示スイッチ ON のときだけ */}
+          {features.subscriptionSelfService && <SubscriptionStatusCard />}
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>

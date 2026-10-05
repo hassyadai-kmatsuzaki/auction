@@ -24,6 +24,7 @@ class PedigreeCertificateServiceTest extends TestCase
         parent::setUp();
         $this->seedRoles();
 
+        config(['features.pedigree_certificate' => true]);
         $this->service = new PedigreeCertificateService();
         $this->admin = $this->createAdmin();
         $this->sellerUser = $this->createSeller();
@@ -69,11 +70,20 @@ class PedigreeCertificateServiceTest extends TestCase
         $this->assertSame('draft', $cert->status);
     }
 
-    public function test_certificate_number_format_is_PD_DATE_RANDOM(): void
+    public function test_draft_has_placeholder_number_until_issued(): void
+    {
+        $cert = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'みゆき']);
+
+        $this->assertTrue($this->service->isDraftNumber($cert->certificate_number));
+        $this->assertNull($this->service->verificationUrl($cert));
+    }
+
+    public function test_certificate_number_format_is_PD_DATE_RANDOM_assigned_at_issue(): void
     {
         $cert = $this->service->create($this->item, $this->admin->id, [
             'breed_name' => 'みゆき',
         ]);
+        $this->service->issue($cert);
 
         $expectedDate = now()->format('Ymd');
         $this->assertMatchesRegularExpression(
@@ -85,9 +95,91 @@ class PedigreeCertificateServiceTest extends TestCase
     public function test_certificate_number_is_unique_across_creations(): void
     {
         $cert1 = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
-        $cert2 = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'B']);
+        $item2 = Item::factory()->registered()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+        ]);
+        $cert2 = $this->service->create($item2, $this->admin->id, ['breed_name' => 'B']);
+        $this->service->issue($cert1);
+        $this->service->issue($cert2);
 
         $this->assertNotSame($cert1->certificate_number, $cert2->certificate_number);
+    }
+
+    public function test_create_rejects_second_certificate_for_same_item(): void
+    {
+        $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->service->create($this->item, $this->admin->id, ['breed_name' => 'B']);
+    }
+
+    public function test_generatePdf_with_qr_for_issued_certificate(): void
+    {
+        $cert = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
+        $this->service->issue($cert);
+
+        $output = $this->service->generatePdf($cert->fresh())->output();
+
+        $this->assertStringStartsWith('%PDF', $output);
+    }
+
+    public function test_issue_twice_keeps_first_number(): void
+    {
+        $cert = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
+        $stale = PedigreeCertificate::find($cert->id);
+        $this->service->issue($cert);
+        $number = $cert->certificate_number;
+
+        // 画面に古い状態（draft）を持ったまま2回目の発行が来ても、DB の状態で弾き番号は変わらない
+        try {
+            $this->service->issue($stale);
+            $this->fail('2回目の発行が通ってしまった');
+        } catch (\Illuminate\Validation\ValidationException) {
+        }
+        $this->assertSame($number, $cert->fresh()->certificate_number);
+    }
+
+    public function test_pdf_shows_market_as_issuer_not_admin_name(): void
+    {
+        // 落札者もダウンロードするため、管理者アカウントの名前は出さない
+        $this->admin->update(['name' => '管理者個人名']);
+        $cert = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
+        $this->service->issue($cert);
+        $html = view('pdf.pedigree-certificate', [
+            'certificate' => $cert, 'item' => $this->item, 'issuer' => $this->admin, 'verifyUrl' => null, 'qrDataUri' => null,
+        ])->render();
+
+        $this->assertStringContainsString('発行者: 日本メダカオンライン市場', $html);
+        $this->assertStringNotContainsString('管理者個人名', $html);
+        $this->assertStringContainsString('生体No', $html);
+    }
+
+    public function test_draft_pdf_does_not_show_placeholder_number(): void
+    {
+        $cert = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
+        $html = view('pdf.pedigree-certificate', [
+            'certificate' => $cert, 'item' => $this->item, 'issuer' => $this->admin, 'verifyUrl' => null, 'qrDataUri' => null,
+        ])->render();
+
+        $this->assertStringContainsString('発行時に付与', $html);
+        $this->assertStringNotContainsString('DRAFT-', $html);
+    }
+
+    public function test_pdf_view_shows_verify_url_only_when_qr_given(): void
+    {
+        $cert = $this->service->create($this->item, $this->admin->id, ['breed_name' => 'A']);
+        $this->service->issue($cert);
+        $render = fn (?string $qr) => view('pdf.pedigree-certificate', [
+            'certificate' => $cert,
+            'item' => $this->item,
+            'issuer' => $this->admin,
+            'verifyUrl' => $this->service->verificationUrl($cert),
+            'qrDataUri' => $qr,
+        ])->render();
+
+        $this->assertStringNotContainsString('/pedigree/verify/', $render(null));
+        $this->assertStringContainsString('/pedigree/verify/' . $cert->certificate_number, $render('data:image/png;base64,AAAA'));
     }
 
     public function test_issue_changes_status_and_sets_issued_at(): void

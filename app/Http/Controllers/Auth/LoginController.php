@@ -71,6 +71,8 @@ class LoginController extends Controller
                 'data' => [
                     'two_factor_required' => true,
                     'user_id' => $user->id,
+                    // パスワード確認済みの証明。2段階目はこれが無いと通らない
+                    'two_factor_token' => app(\App\Services\TwoFactorService::class)->issueLoginChallenge($user),
                 ],
             ]);
         }

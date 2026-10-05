@@ -51,11 +51,11 @@ class PricePredictionService
 
         $speciesName = $item->species_name;
 
-        // 同品種の過去取引データを取得
+        // 同品種の過去取引データを取得（実取引のみ: テスト・除外開催、下支え・テスト会員の落札は除く）
         // STDDEV は SQLite で未対応のため、価格列を取得して PHP 側で集計する
-        $prices = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+        $prices = AiDataScope::realWonItems(WonItem::join('items', 'won_items.item_id', '=', 'items.id')
             ->where('items.species_name', $speciesName)
-            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
+            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES))
             ->pluck('won_items.winning_price')
             ->map(fn ($v) => (float) $v);
 
@@ -73,10 +73,10 @@ class PricePredictionService
         ];
 
         // 最近のトレンド（直近30日）
-        $recentTrend = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+        $recentTrend = AiDataScope::realWonItems(WonItem::join('items', 'won_items.item_id', '=', 'items.id')
             ->where('items.species_name', $speciesName)
             ->where('won_items.created_at', '>=', now()->subDays(30))
-            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
+            ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES))
             ->selectRaw('AVG(won_items.winning_price) as recent_avg, COUNT(*) as recent_count')
             ->first();
 
@@ -162,9 +162,9 @@ class PricePredictionService
      */
     public function getMarketTrends(int $limit = 20): array
     {
-        return WonItem::join('items', 'won_items.item_id', '=', 'items.id')
+        return AiDataScope::realWonItems(WonItem::join('items', 'won_items.item_id', '=', 'items.id')
             ->whereIn('won_items.payment_status', self::SETTLED_PAYMENT_STATUSES)
-            ->where('won_items.created_at', '>=', now()->subDays(90))
+            ->where('won_items.created_at', '>=', now()->subDays(90)))
             ->groupBy('items.species_name')
             ->selectRaw('
                 items.species_name,

@@ -114,7 +114,7 @@ class PriceModelTrainer
      */
     private function loadRows(): array
     {
-        $houseBuyers = array_map('intval', (array) config('services.ai.house_buyer_ids', []));
+        $houseBuyers = \App\Services\AI\AiDataScope::houseBuyerIds();
         $rows = [];
 
         AITrainingData::where('data_type', AITrainingData::TYPE_PRICE)

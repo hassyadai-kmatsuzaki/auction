@@ -57,6 +57,7 @@ import {
   RemoveCircleOutline as RemoveIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import { features } from '../../lib/features';
 import { formatYen } from '../../lib/formatPrice';
 import { adminCsvExportApi } from '../../api/admin/csvExportApi';
 import NumberField from '../../components/NumberField';
@@ -1201,6 +1202,10 @@ export default function WonItemManagement() {
                           <Box>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                               {group.winner.name}
+                              {/* 受取方法の希望（F-038）。表示スイッチ ON のときだけ */}
+                              {features.pickupRequest && group.items.some((i) => i.delivery_method === 'pickup') && (
+                                <Chip size="small" label="会場受取希望" sx={{ ml: 1, bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 600 }} />
+                              )}
                             </Typography>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
                               {group.winner.email}

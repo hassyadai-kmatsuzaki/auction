@@ -102,6 +102,7 @@ Route::middleware('rate.limit:auth_rate_limit_per_minute,1')->prefix('auth')->gr
     // Google OAuth
     Route::get('/google/redirect', [GoogleAuthController::class, 'redirect']);
     Route::get('/google/callback', [GoogleAuthController::class, 'callback']);
+    Route::post('/google/exchange', [GoogleAuthController::class, 'exchange']);
 });
 
 // 配送料金計算API（認証必須）
@@ -112,6 +113,15 @@ Route::middleware('auth:sanctum')->group(function () {
 // 画像最適化API（元画像がpublicディスクで公開済みのため認証不要）
 Route::get('/media/{mediaId}/optimized', [OptimizedMediaController::class, 'show']);
 Route::get('/media/optimized-by-path', [OptimizedMediaController::class, 'showByPath']);
+
+// 血統証明書の真正性確認（証明書番号で照会・認証不要。番号の総当たりを throttle で抑制）
+Route::get('/pedigree/verify/{certificateNumber}', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'verify'])
+    ->middleware('throttle:30,1');
+
+// 落札者マイページからの血統証明書PDF（signed URL で保護、有効期限付き）
+Route::get('/pedigree/certificates/{id}/pdf', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'signedDownload'])
+    ->middleware('signed')
+    ->name('pedigree.signed-pdf');
 
 // LINE 通知からアクセスされる請求書PDF（signed URL で保護、有効期限付き）
 Route::get('/line/invoices/{auctionId}/{winnerId}', [InvoiceController::class, 'lineDownloadInvoice'])
@@ -150,6 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [\App\Http\Controllers\User\SubscriptionController::class, 'show']);
         Route::post('/', [\App\Http\Controllers\User\SubscriptionController::class, 'store']);
         Route::put('/card', [\App\Http\Controllers\User\SubscriptionController::class, 'replaceCard']);
+        Route::put('/auto-renew', [\App\Http\Controllers\User\SubscriptionController::class, 'updateAutoRenew']);
         Route::delete('/', [\App\Http\Controllers\User\SubscriptionController::class, 'cancel']);
     });
 
@@ -342,6 +353,8 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::get('documents/invoices', [\App\Http\Controllers\Admin\DocumentController::class, 'invoices']);
     Route::get('documents/payment-notices', [\App\Http\Controllers\Admin\DocumentController::class, 'paymentNotices']);
     Route::post('documents/payment-notices/notify', [\App\Http\Controllers\Admin\DocumentController::class, 'notifyPaymentNotices']);
+    Route::put('documents/payment-notices/{auctionId}/{sellerProfileId}/paid', [\App\Http\Controllers\Admin\DocumentController::class, 'updateSettlementPaid'])
+        ->whereNumber(['auctionId', 'sellerProfileId']);
     Route::get('documents/delivery-notes', [\App\Http\Controllers\Admin\DocumentController::class, 'deliveryNotes']);
 
     // 配送マスタ管理
@@ -451,7 +464,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
     Route::prefix('pedigree')->group(function () {
         Route::get('/{itemId}', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'show']);
         Route::post('/', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'store']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'update']);
         Route::post('/{id}/issue', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'issue']);
+        Route::post('/{id}/revoke', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'revoke']);
         Route::get('/{id}/download', [\App\Http\Controllers\Api\PedigreeCertificateController::class, 'download']);
     });
 
@@ -534,11 +549,14 @@ Route::middleware(['auth:sanctum', 'check.role:admin'])->prefix('internal')->gro
 // ユーザーAPI（参加者・出品者共通）
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/announcements', [UserAnnouncementController::class, 'index']);
+    Route::post('/announcements/read', [UserAnnouncementController::class, 'markAsRead']);
     Route::get('/announcements/{id}', [UserAnnouncementController::class, 'show']);
 });
 
 // 出品者API
 Route::middleware(['auth:sanctum', 'check.role:seller'])->prefix('seller')->group(function () {
+    // 出品者から落札者への評価（F-023）。評価処理は参加者側と同じ（評価者の立場は取引から自動判定）
+    Route::post('/reviews', [\App\Http\Controllers\Participant\ReviewController::class, 'storeAsSeller']);
     // ダッシュボード
     Route::get('/dashboard', [SellerDashboardController::class, 'index']);
     
@@ -604,6 +622,10 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
         Route::delete('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'destroy']);
     });
     Route::get('/bids/my-active', [ParticipantBidController::class, 'myActive']);
+    // 出品一覧のカテゴリ＝品種名マスタ（F-013・表示スイッチ OFF の間は 404）
+    Route::get('/species-categories', [\App\Http\Controllers\Participant\SpeciesCategoryController::class, 'index']);
+    // 入札履歴（F-022・表示スイッチ OFF の間は 404）
+    Route::get('/bid-history', [\App\Http\Controllers\Participant\BidHistoryController::class, 'index']);
 
     // 指値参照は非課金でも可
     Route::get('/bid-limits',          [ParticipantBidLimitController::class, 'index']);
@@ -612,7 +634,10 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     // 落札商品
     Route::get('/won-items', [ParticipantWonItemController::class, 'index']);
     Route::get('/won-items/{id}', [ParticipantWonItemController::class, 'show']);
+    Route::get('/won-items/{id}/pedigree-certificate-link', [ParticipantWonItemController::class, 'pedigreeCertificateLink']);
     Route::put('/auctions/{auctionId}/address', [ParticipantWonItemController::class, 'updateAddress']);
+    // 受取方法の希望（F-038・表示スイッチ OFF の間は 404）
+    Route::put('/auctions/{auctionId}/delivery-method', [ParticipantWonItemController::class, 'updateDeliveryMethod']);
     Route::get('/auctions/{auctionId}/invoice', [InvoiceController::class, 'downloadInvoice']);
     Route::get('/auctions/{auctionId}/receipt', [InvoiceController::class, 'downloadReceipt']);
     // LINE内ブラウザ等ダウンロード不可環境向け: PDFをメール添付で送信

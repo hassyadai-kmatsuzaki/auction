@@ -40,6 +40,13 @@ class DispatchEmailCampaignJob implements ShouldQueue
         $campaign = EmailCampaign::find($this->campaignId);
         if (!$campaign) return;
 
+        // 予約配信（F-093）: 予定より早く動いた場合は予定時刻に投入し直す（キュー再起動などへの保険）
+        if (config('features.campaign_schedule') && $campaign->status === 'queued'
+            && $campaign->scheduled_at && $campaign->scheduled_at->gt(now()->addMinute())) {
+            self::dispatch($campaign->id)->delay($campaign->scheduled_at);
+            return;
+        }
+
         if ($campaign->status !== 'queued') {
             Log::info('DispatchEmailCampaignJob: status is not queued, skip', [
                 'campaign_id' => $campaign->id,

@@ -47,6 +47,10 @@ class ImageAnalysisService
                 return null;
             }
 
+            // 品質スコア（F-052）: AI の観点別採点を決まった重みで合成する。内訳は raw_response に残す
+            $quality = app(QualityScoreCalculator::class)->calculate($response);
+            $response['quality_breakdown'] = $quality['breakdown'];
+
             return AIImageAnalysis::updateOrCreate(
                 ['item_id' => $item->id],
                 [
@@ -54,7 +58,7 @@ class ImageAnalysisService
                     'body_shape_features' => $response['body_shape'] ?? null,
                     'color_features' => $response['color'] ?? null,
                     'pattern_features' => $response['pattern'] ?? null,
-                    'quality_score' => $response['quality_score'] ?? null,
+                    'quality_score' => $quality['score'],
                     'predicted_breed' => $response['predicted_breed'] ?? null,
                     'breed_confidence' => $response['breed_confidence'] ?? null,
                     'raw_response' => $response,
@@ -88,7 +92,9 @@ class ImageAnalysisService
 4. quality_score: 総合品質スコア（0-10の小数点1桁）
 5. predicted_breed: 推定品種名
 6. breed_confidence: 品種推定の信頼度（0-100%）
+7. 
 EOT;
+        $prompt .= QualityScoreCalculator::RUBRIC;
 
         if ($speciesName) {
             $prompt .= "\n\n出品者による品種名: {$speciesName}";

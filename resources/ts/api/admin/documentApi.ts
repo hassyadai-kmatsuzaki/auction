@@ -27,6 +27,8 @@ export type PaymentNoticeRow = {
   issued_at: string | null;
   transfer_scheduled: string | null;
   notice_sent_at: string | null;
+  /** 出品者への精算を支払済にした日時（F-037） */
+  settlement_paid_at?: string | null;
 };
 
 export type NotifyPaymentNoticesResult = {
@@ -73,6 +75,10 @@ export const adminDocumentApi = {
       auction_id: auctionId,
     });
     return res.data;
+  },
+  setSettlementPaid: async (auctionId: number, sellerProfileId: number, paid: boolean): Promise<{ message: string; paidAt: string | null }> => {
+    const res = await axios.put(`/api/admin/documents/payment-notices/${auctionId}/${sellerProfileId}/paid`, { paid });
+    return { message: res.data.message, paidAt: res.data.data.settlement_paid_at };
   },
   getDeliveryNotes: async (): Promise<DeliveryNoteRow[]> => {
     const res = await axios.get('/api/admin/documents/delivery-notes');

@@ -43,6 +43,7 @@ import {
   DeliveryNoteRow,
 } from '@/api/admin/documentApi';
 import { formatYen } from '@/lib/formatPrice';
+import { features } from '@/lib/features';
 
 export default function DocumentManagement() {
   const [tabValue, setTabValue] = useState(0);
@@ -57,6 +58,27 @@ export default function DocumentManagement() {
   const [notifyAuctionId, setNotifyAuctionId] = useState<number | ''>('');
   const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  // 精算の支払済（F-037）: 確認ダイアログの対象と処理中フラグ
+  const [paidTarget, setPaidTarget] = useState<{ row: PaymentNoticeRow; paid: boolean } | null>(null);
+  const [savingPaid, setSavingPaid] = useState(false);
+
+  const handleSettlementPaid = async () => {
+    if (!paidTarget || savingPaid) return;
+    const { row, paid } = paidTarget;
+    setSavingPaid(true);
+    try {
+      const result = await adminDocumentApi.setSettlementPaid(row.auction_id, row.seller_id, paid);
+      setPaymentNotices((prev) => prev.map((p) =>
+        p.auction_id === row.auction_id && p.seller_id === row.seller_id ? { ...p, settlement_paid_at: result.paidAt } : p,
+      ));
+      setSuccessMessage(result.message);
+      setPaidTarget(null);
+    } catch (e: any) {
+      setErrorMessage(e?.response?.data?.message ?? '更新に失敗しました');
+    } finally {
+      setSavingPaid(false);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -423,6 +445,22 @@ export default function DocumentManagement() {
                             </IconButton>
                           </span>
                         </Tooltip>
+                        {features.settlementMarkPaid && (
+                          row.settlement_paid_at ? (
+                            <Tooltip title="クリックで支払済を取り消す">
+                              <Chip
+                                size="small"
+                                label={`支払済 ${new Date(row.settlement_paid_at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}`}
+                                onClick={() => setPaidTarget({ row, paid: false })}
+                                sx={{ ml: 0.5, bgcolor: '#DCFCE7', color: '#15803D', fontWeight: 600 }}
+                              />
+                            </Tooltip>
+                          ) : (
+                            <Button size="small" variant="outlined" onClick={() => setPaidTarget({ row, paid: true })} sx={{ ml: 0.5, whiteSpace: 'nowrap' }}>
+                              支払済にする
+                            </Button>
+                          )
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -554,6 +592,24 @@ export default function DocumentManagement() {
             startIcon={notifying ? <CircularProgress size={16} /> : <SendIcon />}
           >
             {notifyLastSentAt ? '再送する' : '送信する'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 精算の支払済（F-037）確認 */}
+      <Dialog open={!!paidTarget} onClose={() => !savingPaid && setPaidTarget(null)}>
+        <DialogTitle>{paidTarget?.paid ? '支払済にする' : '支払済を取り消す'}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {paidTarget?.row.seller.name}（{paidTarget?.row.auction}）への振込
+            ¥{formatYen(paidTarget?.row.net_amount ?? 0)} を
+            {paidTarget?.paid ? '支払済にします。出品者の「売上・精算」画面にも反映されます。' : '未払いに戻します。'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPaidTarget(null)} disabled={savingPaid}>やめる</Button>
+          <Button variant="contained" color={paidTarget?.paid ? 'primary' : 'error'} onClick={handleSettlementPaid} disabled={savingPaid}>
+            {paidTarget?.paid ? '支払済にする' : '取り消す'}
           </Button>
         </DialogActions>
       </Dialog>

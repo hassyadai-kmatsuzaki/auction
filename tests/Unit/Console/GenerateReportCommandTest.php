@@ -83,4 +83,24 @@ class GenerateReportCommandTest extends TestCase
             ->expectsOutputToContain('Total sales: 123456')
             ->assertExitCode(0);
     }
+
+    public function test_scheduled_weekly_run_covers_previous_week(): void
+    {
+        // 月曜 09:00 の定期実行 → 前週（月〜日）を集計する
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-05 09:00:00')); // 月曜
+
+        $this->artisan('reports:generate', ['type' => 'weekly'])->assertExitCode(0);
+
+        Storage::assertExists('reports/weekly_2026-09-28_2026-10-04.json');
+    }
+
+    public function test_scheduled_monthly_run_covers_previous_month(): void
+    {
+        // 毎月1日 09:00 の定期実行 → 前月を集計する（月末日が短い月でもずれない）
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-03-01 09:00:00'));
+
+        $this->artisan('reports:generate', ['type' => 'monthly'])->assertExitCode(0);
+
+        Storage::assertExists('reports/monthly_2026-02-01_2026-02-28.json');
+    }
 }

@@ -73,7 +73,7 @@ class TrainingDataCollector
     /** @return int[] */
     private function excludedAuctionIds(): array
     {
-        return array_map('intval', (array) config('services.ai.excluded_auction_ids', []));
+        return AiDataScope::excludedAuctionIds();
     }
 
     private function storePriceRecord(Item $item, int $bidderCount): void

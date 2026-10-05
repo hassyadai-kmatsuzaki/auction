@@ -24,6 +24,7 @@ import {
   Home as HomeIcon,
   Gavel as GavelIcon,
   Receipt as ReceiptIcon,
+  History as HistoryIcon,
   Logout as LogoutIcon,
 
   Settings as SettingsIcon,
@@ -34,7 +35,8 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
-// import TutorialGuide from '../features/tutorial/TutorialGuide';
+import TutorialGuide from '../features/tutorial/TutorialGuide';
+import { features } from '../lib/features';
 import axios from '../lib/axios';
 import { trackEvent } from '../lib/track';
 import type { Auction } from '../types';
@@ -111,6 +113,8 @@ export default function ParticipantLayout() {
     { text: 'オークション', icon: <GavelIcon />, path: '/participant/auctions' },
     { text: 'お気に入り', icon: <FavoriteIcon />, path: '/participant/favorites' },
     { text: '落札管理', icon: <ReceiptIcon />, path: '/participant/won-items' },
+    // 入札履歴（F-022）。表示スイッチ ON のときだけ
+    ...(features.bidHistory ? [{ text: '入札履歴', icon: <HistoryIcon />, path: '/participant/bid-history' }] : []),
     { text: 'デモ', icon: <DemoIcon />, path: '/presentation' },
     { text: '設定', icon: <SettingsIcon />, path: '/participant/settings' },
   ];
@@ -159,7 +163,8 @@ export default function ParticipantLayout() {
                 display: hasMultipleRoles ? { xs: 'none', lg: 'block' } : 'block',
               }}
             />
-            {/* <TutorialGuide role="participant" /> */}
+            {/* 初回ガイダンス（F-044）。表示スイッチ ON のときだけ */}
+            {features.tutorial && <TutorialGuide role="participant" />}
             {user && <RoleSwitcher roles={user.roles} currentPath={location.pathname} />}
           </Box>
 

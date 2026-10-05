@@ -11,9 +11,11 @@ interface ReviewDialogProps {
   wonItemId: number;
   targetName: string;
   onSubmitted?: () => void;
+  /** 送信先。出品者からの評価（F-023）は /api/seller/reviews */
+  endpoint?: string;
 }
 
-export default function ReviewDialog({ open, onClose, wonItemId, targetName, onSubmitted }: ReviewDialogProps) {
+export default function ReviewDialog({ open, onClose, wonItemId, targetName, onSubmitted, endpoint = '/api/participant/reviews' }: ReviewDialogProps) {
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
@@ -25,7 +27,7 @@ export default function ReviewDialog({ open, onClose, wonItemId, targetName, onS
     setLoading(true);
 
     try {
-      await axios.post('/api/participant/reviews', {
+      await axios.post(endpoint, {
         won_item_id: wonItemId,
         rating,
         comment: comment || undefined,

@@ -16,7 +16,7 @@ class EscrowController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = EscrowTransaction::with(['buyer:id,name', 'seller:id,name', 'wonItem.item:id,species_name,item_number']);
+        $query = EscrowTransaction::with(['buyer:id,name', 'seller:id,name', 'wonItem.item:id,auction_id,species_name,item_number', 'wonItem.item.auction:id,title']);
 
         if ($request->status) {
             $query->where('status', $request->status);

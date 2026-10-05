@@ -76,6 +76,41 @@ class ReportTest extends TestCase
         $this->assertSame(50.0, (float) $report['payment_rate']);
     }
 
+    public function test_売上は数量を掛け_入金率は確認済みも入金扱い(): void
+    {
+        $start = now()->startOfWeek();
+        $this->makeWonItemWithin(0, ['winning_price' => 1000, 'quantity' => 3, 'payment_status' => 'confirmed', 'created_at' => $start->copy()->addHour()]);
+        $this->makeWonItemWithin(0, ['winning_price' => 2000, 'quantity' => 1, 'payment_status' => 'paid', 'created_at' => $start->copy()->addHours(2)]);
+        $this->makeWonItemWithin(0, ['winning_price' => 4000, 'quantity' => 1, 'created_at' => $start->copy()->addHours(3)]);
+
+        $report = app(ReportService::class)->generateWeeklyReport($start);
+
+        $this->assertSame(9000, $report['transaction_summary']['total_sales']);
+        $this->assertSame(1000, $report['transaction_summary']['lowest_price']); // 平均・最高・最低は落札単価
+        $this->assertSame(66.7, (float) $report['payment_rate']);
+        $this->assertSame(9000, (int) $report['species_ranking'][0]->total_amount);
+    }
+
+    public function test_テスト開催_テスト会員_下支えアカウントの落札は集計しない(): void
+    {
+        $start = now()->startOfWeek();
+        $house = $this->createParticipant();
+        config(['services.ai.house_buyer_ids' => [$house->id]]);
+        $tester = $this->createParticipant();
+        $tester->forceFill(['is_test' => true])->save();
+
+        $this->makeWonItemWithin(0, ['winning_price' => 1000, 'created_at' => $start->copy()->addHour()]);
+        $this->makeWonItemWithin(0, ['winning_price' => 500, 'winner_id' => $house->id, 'created_at' => $start->copy()->addHour()]);
+        $this->makeWonItemWithin(0, ['winning_price' => 700, 'winner_id' => $tester->id, 'created_at' => $start->copy()->addHour()]);
+        $testWon = $this->makeWonItemWithin(0, ['winning_price' => 900, 'created_at' => $start->copy()->addHour()]);
+        $testWon->item->auction->forceFill(['is_test' => true])->save();
+
+        $report = app(ReportService::class)->generateWeeklyReport($start);
+
+        $this->assertSame(1, $report['transaction_summary']['total_transactions']);
+        $this->assertSame(1000, $report['transaction_summary']['total_sales']);
+    }
+
     public function test_generateWeeklyReport_は_期間指定で動作する(): void
     {
         $this->makeWonItemWithin(40, ['winning_price' => 9000]); // 範囲外

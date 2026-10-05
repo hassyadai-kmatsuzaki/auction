@@ -20,6 +20,9 @@ class RenewSubscriptions extends Command
         // 単発プラン（1Day会員）は再課金せず canceled へ遷移させる
         $expired = Subscription::oneShotExpired()->with('plan', 'user')->get();
 
+        // 自動更新を停止した年会費プランも、期間満了で再課金せず canceled へ（F-086）
+        $stopped = Subscription::autoRenewStoppedExpired()->with('plan', 'user')->get();
+
         $this->info(sprintf('更新対象: %d 件 / 単発プラン失効対象: %d 件', $due->count(), $expired->count()));
 
         if ($this->option('dry-run')) {
@@ -28,6 +31,9 @@ class RenewSubscriptions extends Command
             }
             foreach ($expired as $s) {
                 $this->line(sprintf(' - [失効] user=%d  plan=%s  current_period_end=%s', $s->user_id, $s->plan->code ?? '-', $s->current_period_end));
+            }
+            foreach ($stopped as $s) {
+                $this->line(sprintf(' - [自動更新停止の満了] user=%d  plan=%s  current_period_end=%s', $s->user_id, $s->plan->code ?? '-', $s->current_period_end));
             }
             return self::SUCCESS;
         }
@@ -62,6 +68,19 @@ class RenewSubscriptions extends Command
             } catch (\Throwable $e) {
                 $ng++;
                 Log::error('One-shot subscription expire error', ['subscription_id' => $subscription->id, 'err' => $e->getMessage()]);
+                $this->error(sprintf(' ERR user=%d  %s', $subscription->user_id, $e->getMessage()));
+            }
+        }
+
+        foreach ($stopped as $subscription) {
+            try {
+                // cancel() がカード無効化 + status=canceled + canceled_at 打刻まで行う（再加入は通常どおり可能）
+                $service->cancel($subscription, Subscription::REASON_AUTO_RENEW_STOPPED);
+                $expiredOk++;
+                $this->info(sprintf(' ENDED  user=%d  plan=%s', $subscription->user_id, $subscription->plan->code ?? '-'));
+            } catch (\Throwable $e) {
+                $ng++;
+                Log::error('Auto-renew stopped subscription end error', ['subscription_id' => $subscription->id, 'err' => $e->getMessage()]);
                 $this->error(sprintf(' ERR user=%d  %s', $subscription->user_id, $e->getMessage()));
             }
         }

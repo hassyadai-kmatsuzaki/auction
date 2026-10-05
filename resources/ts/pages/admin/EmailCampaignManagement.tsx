@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Cancel as CancelIcon } from '@mui/icons-material';
 import { emailCampaignApi, EmailCampaign, CampaignStatus } from '../../api/admin/emailCampaignApi';
+import { features } from '../../lib/features';
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
   draft: '下書き',
@@ -156,7 +157,12 @@ export default function EmailCampaignManagement() {
                     {c.subject}
                   </TableCell>
                   <TableCell>{TARGET_LABEL[c.target_type] ?? c.target_type}</TableCell>
-                  <TableCell><Chip label={STATUS_LABEL[c.status]} color={STATUS_COLOR[c.status]} size="small" /></TableCell>
+                  <TableCell>
+                    {/* 予約配信（F-093）: 送信待ちで予約日時が未来なら「予約」と日時を出す */}
+                    {features.campaignSchedule && c.status === 'queued' && c.scheduled_at && new Date(c.scheduled_at) > new Date()
+                      ? <Chip label={`予約 ${new Date(c.scheduled_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`} color="info" size="small" />
+                      : <Chip label={STATUS_LABEL[c.status]} color={STATUS_COLOR[c.status]} size="small" />}
+                  </TableCell>
                   <TableCell align="right">{c.total_recipients}</TableCell>
                   <TableCell align="right">{c.sent_count}</TableCell>
                   <TableCell align="right">{c.failed_count > 0 ? <span style={{ color: '#DC2626' }}>{c.failed_count}</span> : 0}</TableCell>

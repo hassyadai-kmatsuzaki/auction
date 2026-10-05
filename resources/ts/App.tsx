@@ -32,6 +32,7 @@ import TermsOfService from './pages/legal/TermsOfService';
 
 // Error pages
 import NotFound from './pages/NotFound';
+import { features } from './lib/features';
 
 // ─── 遅延読み込み（重いページ群） ────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ const AuctionList            = lazy(() => import('./pages/participant/AuctionLis
 const AuctionItems           = lazy(() => import('./pages/participant/AuctionItems'));
 const AuctionLive            = lazy(() => import('./pages/participant/AuctionLive'));
 const WonItems               = lazy(() => import('./pages/participant/WonItems'));
+const BidHistory             = lazy(() => import('./pages/participant/BidHistory'));
 const Favorites              = lazy(() => import('./pages/participant/Favorites'));
 const ParticipantSettings    = lazy(() => import('./pages/participant/Settings'));
 const ParticipantManual      = lazy(() => import('./pages/participant/Manual'));
@@ -87,6 +89,7 @@ const AIRecommendations      = lazy(() => import('./pages/admin/AIRecommendation
 const PlanManagement         = lazy(() => import('./pages/admin/PlanManagement'));
 const SubscriptionManagement = lazy(() => import('./pages/admin/SubscriptionManagement'));
 const PaymentManagement      = lazy(() => import('./pages/admin/PaymentManagement'));
+const EscrowStatus           = lazy(() => import('./pages/admin/EscrowStatus'));
 
 // Media Editor (admin / media_editor 共用、メディアのみ編集)
 const MediaEditorAuctionList = lazy(() => import('./pages/admin/MediaEditor/AuctionList'));
@@ -104,6 +107,9 @@ const SalesSettlement        = lazy(() => import('./pages/seller/SalesSettlement
 
 // Presentation（認証不要）
 const Presentation           = lazy(() => import('./pages/presentation/Presentation'));
+
+// 血統証明書の真正性確認（認証不要）
+const PedigreeVerify         = lazy(() => import('./pages/pedigree/PedigreeVerify'));
 
 // ローディングフォールバック
 const PageLoader = () => (
@@ -140,6 +146,10 @@ function App() {
           <Route path="/legal/tokushoho" element={<SpecifiedCommercialTransaction />} />
           <Route path="/legal/terms" element={<TermsOfService />} />
 
+          {/* 血統証明書の真正性確認（PDF の QR コードから着地・認証不要） */}
+          {features.pedigreeCertificate && <Route path="/pedigree/verify" element={<PedigreeVerify />} />}
+          {features.pedigreeCertificate && <Route path="/pedigree/verify/:certificateNumber" element={<PedigreeVerify />} />}
+
           {/* 参加者（買受者）ページ */}
           <Route path="/participant" element={
             <PrivateRoute requiredRoles={['participant']}>
@@ -153,6 +163,7 @@ function App() {
             <Route path="auction/:auctionId/live" element={<AuctionLive />} />
             <Route path="favorites" element={<Favorites />} />
             <Route path="won-items" element={<WonItems />} />
+            {features.bidHistory && <Route path="bid-history" element={<BidHistory />} />}
             <Route path="manual" element={<ParticipantManual />} />
             <Route path="demo" element={<Navigate to="/presentation" replace />} />
             <Route path="settings" element={<ParticipantSettings />} />
@@ -266,6 +277,7 @@ function App() {
             <Route path="plans" element={<PlanManagement />} />
             <Route path="subscriptions" element={<SubscriptionManagement />} />
             <Route path="payments" element={<PaymentManagement />} />
+            {features.escrowView && <Route path="escrow" element={<EscrowStatus />} />}
             
             {/* 設定 */}
             <Route path="settings" element={<Settings />} />

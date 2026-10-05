@@ -147,7 +147,7 @@ class UserController extends Controller
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
-            ->get(['id', 'created_at', 'ip_address', 'user_agent']);
+            ->get(['id', 'created_at', 'ip_address', 'user_agent', 'meta']);
 
         return response()->json([
             'success' => true,
@@ -158,6 +158,8 @@ class UserController extends Controller
                     'ip_address' => $e->ip_address,
                     'user_agent' => $e->user_agent,
                     'device' => $this->summarizeUserAgent($e->user_agent),
+                    // 遡り登録分（activity:backfill-logins）は token=トークンから復元 / bid=入札時刻から推定。本物の記録は null
+                    'backfill_source' => ($e->meta['backfilled'] ?? false) ? ($e->meta['source'] ?? null) : null,
                 ])->values(),
                 'total' => (clone $base)->count(),
                 'limit' => $limit,

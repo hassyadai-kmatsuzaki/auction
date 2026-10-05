@@ -259,4 +259,41 @@ class DocumentControllerTest extends TestCase
 
         Mail::assertNotQueued(SellerPaymentNoticeMail::class);
     }
+
+    public function test_settlement_can_be_marked_paid_and_reverted(): void
+    {
+        config(['features.settlement_mark_paid' => true]);
+        $this->makeWon(['payment_status' => 'confirmed']);
+        $url = "/api/admin/documents/payment-notices/{$this->auction->id}/{$this->sellerProfile->id}/paid";
+
+        $this->actingAs($this->admin, 'sanctum')->putJson($url, ['paid' => true])->assertOk();
+        $row = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/documents/payment-notices')->json('data.0');
+        $this->assertNotNull($row['settlement_paid_at']);
+        $this->assertDatabaseHas('seller_settlements', [
+            'auction_id' => $this->auction->id, 'seller_profile_id' => $this->sellerProfile->id,
+            'status' => 'completed', 'paid_by' => $this->admin->id,
+        ]);
+
+        // 出品者の精算画面にも反映される
+        $sellerStatus = $this->actingAs($this->sellerProfile->user, 'sanctum')->getJson('/api/seller/settlements')->json('data.settlements.0.status')
+            ?? $this->actingAs($this->sellerProfile->user, 'sanctum')->getJson('/api/seller/settlements')->json('data.0.status');
+        $this->assertSame('completed', $sellerStatus);
+
+        $this->actingAs($this->admin, 'sanctum')->putJson($url, ['paid' => false])->assertOk();
+        $this->assertDatabaseHas('seller_settlements', [
+            'auction_id' => $this->auction->id, 'seller_profile_id' => $this->sellerProfile->id,
+            'status' => 'pending', 'paid_at' => null,
+        ]);
+    }
+
+    public function test_settlement_paid_is_closed_when_feature_off_or_not_admin(): void
+    {
+        $url = "/api/admin/documents/payment-notices/{$this->auction->id}/{$this->sellerProfile->id}/paid";
+
+        $this->actingAs($this->admin, 'sanctum')->putJson($url, ['paid' => true])->assertStatus(404);
+
+        config(['features.settlement_mark_paid' => true]);
+        $this->actingAs($this->winner, 'sanctum')->putJson($url, ['paid' => true])->assertStatus(403);
+        $this->assertDatabaseCount('seller_settlements', 0);
+    }
 }

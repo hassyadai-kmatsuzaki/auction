@@ -146,7 +146,19 @@ class TwoFactorController extends Controller
         $request->validate([
             'user_id' => 'required|integer',
             'code' => 'required|string',
+            'two_factor_token' => 'nullable|string',
         ]);
+
+        // パスワード確認済みの証明（ログイン時に発行したチャレンジ）が無ければ受け付けない。
+        // user_id と6桁コードだけで通すと、パスワードを知らなくてもコード総当たりでログインできてしまう
+        $challenge = (string) $request->input('two_factor_token', '');
+        if (!$this->twoFactorService->isValidLoginChallenge($challenge, (int) $request->user_id)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'TWO_FACTOR_CHALLENGE_EXPIRED',
+                'message' => '認証の有効期限が切れました。お手数ですが、もう一度ログインからやり直してください。',
+            ], 422);
+        }
 
         $user = \App\Models\User::findOrFail($request->user_id);
 
@@ -158,6 +170,7 @@ class TwoFactorController extends Controller
         }
 
         if (!$valid) {
+            $this->twoFactorService->recordFailedLoginChallenge($challenge);
             return response()->json([
                 'success' => false,
                 'message' => '認証コードが正しくありません',
@@ -197,8 +210,9 @@ class TwoFactorController extends Controller
         // 最終ログイン日時を更新
         $user->update(['last_login_at' => now()]);
 
-        // トークン発行
+        // トークン発行。チャレンジは使い切り（409 の確認モーダル経由の再送では残しておく必要があるので、ここで消す）
         $token = $user->createToken('auth-token')->plainTextToken;
+        $this->twoFactorService->clearLoginChallenge($challenge);
 
         // 計測: ログイン（2FA 経由）
         ActivityLogger::login($user->id);

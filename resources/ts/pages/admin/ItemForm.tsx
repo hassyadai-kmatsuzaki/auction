@@ -41,10 +41,14 @@ import {
   CheckCircle as CheckCircleIcon,
   ErrorOutline as ErrorOutlineIcon,
   AutoAwesome as AutoAwesomeIcon,
+  Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { aiNlpApi } from '../../api/admin/aiApi';
 import NumberField from '../../components/NumberField';
+import PedigreeCertificateDialog from './PedigreeCertificateDialog';
+import { features } from '../../lib/features';
+import { ITEM_SEX_OPTIONS } from '../../lib/itemDetailFields';
 
 interface SellerProfile {
   id: number;
@@ -93,6 +97,7 @@ export default function ItemForm() {
   // AI入力支援（F-054・ベータ）
   const [aiFilling, setAiFilling] = useState(false);
   const [aiMessage, setAiMessage] = useState<{ severity: 'success' | 'info' | 'error'; text: string } | null>(null);
+  const [pedigreeOpen, setPedigreeOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     species_name: '',
@@ -107,6 +112,10 @@ export default function ItemForm() {
     is_anonymous: false,
     unsold_action: 'return',
     status: 'registered',
+    // 性別・親魚・飼育環境（F-010）
+    sex: '',
+    parent_fish_info: '',
+    breeding_environment: '',
   });
   const [speciesTypes, setSpeciesTypes] = useState<Array<{ id: number; code: string; name: string; calculation_mode: 'auto' | 'manual'; allowed_quantity_units: ('fish'|'kg'|'bag')[]; is_default: boolean }>>([]);
 
@@ -179,6 +188,9 @@ export default function ItemForm() {
           is_anonymous: item.is_anonymous || false,
           unsold_action: item.unsold_action || 'return',
           status: item.status || 'registered',
+          sex: item.sex ?? '',
+          parent_fish_info: item.parent_fish_info ?? '',
+          breeding_environment: item.breeding_environment ?? '',
         });
         setExistingMedia(item.media || []);
         
@@ -275,6 +287,11 @@ export default function ItemForm() {
         unsold_action: formData.unsold_action,
         seller_profile_id: selectedSeller?.id || null,
         status: formData.status,
+        ...(features.itemDetailFields ? {
+          sex: formData.sex || null,
+          parent_fish_info: formData.parent_fish_info,
+          breeding_environment: formData.breeding_environment,
+        } : {}),
       };
       
       if (isEdit) {
@@ -455,6 +472,16 @@ export default function ItemForm() {
             {isEdit ? '生体情報を編集します' : '新しい生体を登録します'}
           </Typography>
         </Box>
+        {isEdit && features.pedigreeCertificate && (
+          <Button
+            variant="outlined"
+            startIcon={<VerifiedIcon />}
+            onClick={() => setPedigreeOpen(true)}
+            sx={{ ml: 'auto' }}
+          >
+            血統証明書
+          </Button>
+        )}
       </Box>
 
       <Grid container spacing={3}>
@@ -670,6 +697,29 @@ export default function ItemForm() {
                       sx={{ mt: 1 }}
                     />
                   </Grid>
+
+                  {/* 性別・親魚・飼育環境（F-010）。表示スイッチ ON のときだけ */}
+                  {features.itemDetailFields && (
+                    <>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth>
+                          <InputLabel id="item-sex-label">性別</InputLabel>
+                          <Select labelId="item-sex-label" value={formData.sex} label="性別" onChange={handleChange('sex')}>
+                            <MenuItem value="">未設定</MenuItem>
+                            {ITEM_SEX_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={8}>
+                        <TextField fullWidth label="飼育環境" value={formData.breeding_environment} onChange={handleChange('breeding_environment')}
+                          placeholder="例：屋外・グリーンウォーター" inputProps={{ maxLength: 500 }} />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField fullWidth label="親魚情報" value={formData.parent_fish_info} onChange={handleChange('parent_fish_info')}
+                          placeholder="例：父 楊貴妃 F5 / 母 楊貴妃 F5" inputProps={{ maxLength: 500 }} />
+                      </Grid>
+                    </>
+                  )}
 
                   <Grid item xs={12}>
                     <TextField
@@ -1040,6 +1090,15 @@ export default function ItemForm() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {isEdit && features.pedigreeCertificate && (
+        <PedigreeCertificateDialog
+          open={pedigreeOpen}
+          itemId={Number(id)}
+          defaultBreedName={formData.species_name}
+          onClose={() => setPedigreeOpen(false)}
+        />
+      )}
 
       {/* 動画プレビューダイアログ */}
       <Dialog

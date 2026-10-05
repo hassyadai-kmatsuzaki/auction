@@ -26,6 +26,7 @@ class GoogleAuthTest extends TestCase
             'services.google.client_secret' => 'gauth-secret',
             'services.google.redirect' => 'http://localhost/api/auth/google/callback',
             'app.frontend_url' => 'http://localhost:5173',
+            'features.google_login' => true,
         ]);
     }
 
@@ -140,9 +141,81 @@ class GoogleAuthTest extends TestCase
 
         $response->assertRedirect();
         $location = $response->headers->get('Location');
-        $this->assertStringContainsString('/auth/google-callback?token=', $location);
+        $this->assertStringContainsString('/auth/google-callback?code=', $location);
         $this->assertSame('GID_EXIST_002', $user->fresh()->google_id);
+
+        // 画面がコードをトークンに交換したときに初めてログイン扱いになる
+        parse_str(parse_url($location, PHP_URL_QUERY), $q);
+        $this->postJson('/api/auth/google/exchange', ['code' => $q['code']])
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['token']]);
         $this->assertNotNull($user->fresh()->last_login_at);
+
+        // 使い切り
+        $this->postJson('/api/auth/google/exchange', ['code' => $q['code']])->assertStatus(422);
+    }
+
+    private function handoffFor(User $user): string
+    {
+        $code = \Illuminate\Support\Str::random(64);
+        Cache::put('google_login_handoff:' . hash('sha256', $code), $user->id, 120);
+
+        return $code;
+    }
+
+    private function approvedUser(): User
+    {
+        $user = User::factory()->create(['status' => 'approved', 'is_active' => true]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'participant'])->id);
+
+        return $user;
+    }
+
+    public function test_exchange_requires_2fa_when_enabled(): void
+    {
+        $user = $this->approvedUser();
+        (new \App\Services\TwoFactorService())->generateSecret($user);
+        $user->update(['two_factor_confirmed_at' => now()]);
+
+        $this->postJson('/api/auth/google/exchange', ['code' => $this->handoffFor($user)])
+            ->assertOk()
+            ->assertJsonPath('data.two_factor_required', true)
+            ->assertJsonMissingPath('data.token');
+        $this->assertSame(0, $user->tokens()->count());
+    }
+
+    public function test_exchange_asks_before_logging_out_other_devices(): void
+    {
+        $user = $this->approvedUser();
+        $user->createToken('auth-token');
+        $code = $this->handoffFor($user);
+
+        $this->postJson('/api/auth/google/exchange', ['code' => $code])->assertStatus(409);
+        $this->postJson('/api/auth/google/exchange', ['code' => $code, 'force_logout_others' => true])
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_exchange_rejects_unknown_code_and_suspended_user(): void
+    {
+        $this->postJson('/api/auth/google/exchange', ['code' => 'unknown'])->assertStatus(422);
+
+        $user = $this->approvedUser();
+        $code = $this->handoffFor($user);
+        $user->update(['status' => 'suspended']);
+        $this->postJson('/api/auth/google/exchange', ['code' => $code])->assertStatus(403);
+    }
+
+    public function test_everything_is_closed_when_feature_is_off(): void
+    {
+        config(['features.google_login' => false]);
+        $user = $this->approvedUser();
+
+        $this->getJson('/api/auth/google/redirect')->assertStatus(404);
+        $this->postJson('/api/auth/google/exchange', ['code' => $this->handoffFor($user)])->assertStatus(404);
+        $r = $this->get('/api/auth/google/callback?code=x&state=y');
+        $r->assertRedirect();
+        $this->assertStringContainsString('error=', $r->headers->get('Location'));
     }
 
     public function test_callback_blocks_inactive_or_suspended_user(): void

@@ -6,6 +6,7 @@ use App\Models\Auction;
 use App\Models\WonItem;
 use App\Models\User;
 use App\Models\UserReview;
+use App\Services\AI\AiDataScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -43,22 +44,22 @@ class ReportService
             ")
             ->first();
 
-        // 取引統計
-        $transactionStats = WonItem::whereBetween('created_at', [$start, $end])
+        // 取引統計（実取引のみ: テスト開催・下支えアカウント・テストユーザーの落札は除く）
+        // 売上は 落札単価×数量（税抜）。平均・最高・最低は落札単価
+        $transactionStats = $this->realWonItems($start, $end)
             ->selectRaw("
                 COUNT(*) as total_transactions,
-                SUM(winning_price) as total_sales,
-                AVG(winning_price) as average_price,
-                MAX(winning_price) as highest_price,
-                MIN(winning_price) as lowest_price
+                SUM(won_items.winning_price * won_items.quantity) as total_sales,
+                AVG(won_items.winning_price) as average_price,
+                MAX(won_items.winning_price) as highest_price,
+                MIN(won_items.winning_price) as lowest_price
             ")
             ->first();
 
         // 品種別ランキング
-        $speciesRanking = WonItem::join('items', 'won_items.item_id', '=', 'items.id')
-            ->whereBetween('won_items.created_at', [$start, $end])
+        $speciesRanking = $this->realWonItems($start, $end)
             ->groupBy('items.species_name')
-            ->selectRaw('items.species_name, COUNT(*) as count, SUM(won_items.winning_price) as total_amount, AVG(won_items.winning_price) as avg_price')
+            ->selectRaw('items.species_name, COUNT(*) as count, SUM(won_items.winning_price * won_items.quantity) as total_amount, AVG(won_items.winning_price) as avg_price')
             ->orderByDesc('count')
             ->limit(10)
             ->get();
@@ -76,11 +77,11 @@ class ReportService
                 ->count('seller_profile_id'),
         ];
 
-        // 入金率
-        $paymentStats = WonItem::whereBetween('created_at', [$start, $end])
+        // 入金率（入金確認後は paid → confirmed に進むので両方を入金済みとして数える）
+        $paymentStats = $this->realWonItems($start, $end)
             ->selectRaw("
                 COUNT(*) as total,
-                SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) as paid
+                SUM(CASE WHEN won_items.payment_status IN ('paid', 'confirmed') THEN 1 ELSE 0 END) as paid
             ")
             ->first();
         $paymentRate = $paymentStats->total > 0
@@ -109,5 +110,18 @@ class ReportService
             'user_stats' => $userStats,
             'payment_rate' => $paymentRate,
         ];
+    }
+
+    /**
+     * 期間内の実取引の落札（won_items × items）。AI 学習用の除外開催指定は売上集計には適用しない
+     */
+    private function realWonItems(Carbon $start, Carbon $end): \Illuminate\Database\Eloquent\Builder
+    {
+        return AiDataScope::realWonItems(
+            WonItem::query()
+                ->join('items', 'won_items.item_id', '=', 'items.id')
+                ->whereBetween('won_items.created_at', [$start, $end]),
+            includeExcluded: true,
+        );
     }
 }

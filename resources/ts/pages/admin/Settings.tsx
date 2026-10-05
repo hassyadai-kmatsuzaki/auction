@@ -20,6 +20,7 @@ import EneCrmPushCard, {
   DEFAULT_ENE_CRM_EVENT_MAP, type EneCrmEventMap,
 } from '../../features/settings/components/EneCrmPushCard';
 import NumberField from '../../components/NumberField';
+import { features } from '../../lib/features';
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number; }
 const TabPanel = ({ children, value, index }: TabPanelProps) => (
@@ -129,6 +130,9 @@ export default function AdminSettings() {
   const [packingMaterials, setPackingMaterials]        = useState<any[]>([]);
   const [shippingMasterLoading, setShippingMasterLoading] = useState(false);
   const [savingRates, setSavingRates]                 = useState(false);
+  // 梱包資材費の編集（F-107）
+  const [editingPacking, setEditingPacking] = useState<{ box_size: number; styrofoam_cost: number; bag_material_cost: number; coolant_cost: number }[] | null>(null);
+  const [savingPacking, setSavingPacking] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as const });
   const [incrementTiers, setIncrementTiers]           = useState<PriceIncrementTier[]>(DEFAULT_PRICE_INCREMENT_TIERS);
   const [countdownTiers, setCountdownTiers]           = useState<CountdownTier[]>(DEFAULT_COUNTDOWN_TIERS);
@@ -252,6 +256,20 @@ export default function AdminSettings() {
       setSnackbar({ open: true, message: '更新に失敗しました', severity: 'error' as any });
     }
     setSavingRates(false);
+  };
+
+  const handleSavePackingMaterials = async () => {
+    if (!editingPacking || savingPacking) return;
+    setSavingPacking(true);
+    try {
+      await axios.put('/api/admin/shipping-master/packing-materials', { materials: editingPacking });
+      setSnackbar({ open: true, message: '梱包資材費を更新しました', severity: 'success' });
+      setEditingPacking(null);
+      fetchShippingMaster();
+    } catch {
+      setSnackbar({ open: true, message: '更新に失敗しました', severity: 'error' as any });
+    }
+    setSavingPacking(false);
   };
 
   useEffect(() => { fetchShippingMaster(); }, []);
@@ -609,7 +627,19 @@ export default function AdminSettings() {
                 )}
                 {packingMaterials.length > 0 && (
                   <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>梱包資材費</Typography>
+                    {/* 梱包資材費の編集（F-107）。スイッチ OFF の間は従来と同じ見出しだけ */}
+                    {features.packingMaterialEdit ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>梱包資材費</Typography>
+                        <Button size="small" variant="outlined" onClick={() => setEditingPacking(packingMaterials.map((m: any) => ({
+                          box_size: m.box_size, styrofoam_cost: m.styrofoam_cost, bag_material_cost: m.bag_material_cost, coolant_cost: m.coolant_cost,
+                        })))}>
+                          編集
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>梱包資材費</Typography>
+                    )}
                     <Table size="small">
                       <TableHead>
                         <TableRow>
@@ -852,6 +882,51 @@ export default function AdminSettings() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert severity={snackbar.severity} onClose={() => setSnackbar((p) => ({ ...p, open: false }))}>{snackbar.message}</Alert>
       </Snackbar>
+
+      {/* 梱包資材費編集ダイアログ（F-107） */}
+      <Dialog open={!!editingPacking} onClose={() => !savingPacking && setEditingPacking(null)} maxWidth="md" fullWidth>
+        <DialogTitle>梱包資材費の編集</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>税抜で入力してください。変更は以後の送料計算に即座に反映されます。</Alert>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>箱サイズ</TableCell>
+                <TableCell align="center">発泡スチロール</TableCell>
+                <TableCell align="center">袋資材</TableCell>
+                <TableCell align="center">保冷剤</TableCell>
+                <TableCell align="right">合計</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(editingPacking ?? []).map((m, i) => (
+                <TableRow key={m.box_size}>
+                  <TableCell sx={{ fontWeight: 600 }}>{m.box_size}サイズ</TableCell>
+                  {(['styrofoam_cost', 'bag_material_cost', 'coolant_cost'] as const).map((k) => (
+                    <TableCell key={k}>
+                      <NumberField
+                        size="small"
+                        value={m[k]}
+                        onValueChange={(v) => setEditingPacking((prev) => prev && prev.map((row, j) => (j === i ? { ...row, [k]: Number(v) || 0 } : row)))}
+                        InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                        inputProps={{ min: 0 }}
+                        sx={{ width: 140 }}
+                      />
+                    </TableCell>
+                  ))}
+                  <TableCell align="right">¥{formatYen(m.styrofoam_cost + m.bag_material_cost + m.coolant_cost)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingPacking(null)} disabled={savingPacking}>キャンセル</Button>
+          <Button variant="contained" onClick={handleSavePackingMaterials} disabled={savingPacking}>
+            {savingPacking ? <CircularProgress size={20} /> : '保存'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 配送料金編集ダイアログ */}
       <Dialog open={editShippingDialog} onClose={() => setEditShippingDialog(false)} maxWidth="lg" fullWidth>

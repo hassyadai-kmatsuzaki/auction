@@ -151,17 +151,23 @@ class EmailCampaignController extends Controller
             ]);
         });
 
-        DispatchEmailCampaignJob::dispatch($campaign->id);
+        // 予約配信（F-093）: 指定日時まで遅延して投入する。キャンセルされていれば Job 側で送らない
+        $scheduledAt = config('features.campaign_schedule') && $campaign->scheduled_at?->isFuture()
+            ? $campaign->scheduled_at : null;
+        $scheduledAt
+            ? DispatchEmailCampaignJob::dispatch($campaign->id)->delay($scheduledAt)
+            : DispatchEmailCampaignJob::dispatch($campaign->id);
 
         Log::info('EmailCampaign created and queued', [
             'campaign_id' => $campaign->id,
             'target_type' => $campaign->target_type,
             'created_by' => Auth::id(),
+            'scheduled_at' => $scheduledAt?->toIso8601String(),
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'キャンペーンを投入しました',
+            'message' => $scheduledAt ? '配信を予約しました' : 'キャンペーンを投入しました',
             'data' => ['campaign' => $campaign],
         ], 201);
     }

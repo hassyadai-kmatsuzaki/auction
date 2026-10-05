@@ -120,4 +120,21 @@ class AuctionTest extends TestCase
         // 実装によってはステータスが異なる
         $response->assertStatus(401); // 認証が必要な場合
     }
+
+    public function test_items_include_favorites_count_only_when_search_feature_is_on(): void
+    {
+        $auction = Auction::factory()->scheduled()->create(['created_by' => $this->admin->id]);
+        $sellerProfile = SellerProfile::factory()->create(['user_id' => $this->createSeller()->id]);
+        $item = Item::factory()->registered()->create(['auction_id' => $auction->id, 'seller_profile_id' => $sellerProfile->id]);
+        \App\Models\Favorite::create(['user_id' => $this->participant->id, 'item_id' => $item->id]);
+        \App\Models\Favorite::create(['user_id' => $this->createParticipant()->id, 'item_id' => $item->id]);
+        $url = "/api/participant/auctions/{$auction->id}/items";
+
+        $off = $this->actingAs($this->participant, 'sanctum')->getJson($url)->assertOk()->json('data.lanes.0.items.0');
+        $this->assertArrayNotHasKey('favorites_count', $off);
+
+        config(['features.item_search' => true]);
+        $on = $this->actingAs($this->participant, 'sanctum')->getJson($url)->assertOk()->json('data.lanes.0.items.0');
+        $this->assertSame(2, $on['favorites_count']);
+    }
 }

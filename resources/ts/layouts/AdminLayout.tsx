@@ -47,6 +47,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
+import { features } from '../lib/features';
 import BankTransferRenewalsAlert from '../components/BankTransferRenewalsAlert';
 
 const drawerWidth = 280;
@@ -123,6 +124,8 @@ export default function AdminLayout() {
     { text: 'プラン管理', icon: <PlanIcon />, path: '/admin/plans' },
     { text: 'サブスクリプション', icon: <SubscriptionsIcon />, path: '/admin/subscriptions' },
     { text: '決済管理', icon: <CreditCardIcon />, path: '/admin/payments' },
+    // エスクロー状況（F-032・閲覧のみ）。表示スイッチ ON のときだけ
+    ...(features.escrowView ? [{ text: 'エスクロー状況', icon: <CreditCardIcon />, path: '/admin/escrow' }] : []),
   ];
 
   const aiSubItems = [

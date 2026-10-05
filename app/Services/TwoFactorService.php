@@ -3,10 +3,66 @@
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class TwoFactorService
 {
+    /** ログイン2段階目のチャレンジ（パスワード確認済みの証明）の有効期限と試行上限 */
+    public const CHALLENGE_TTL_MINUTES = 10;
+    public const CHALLENGE_MAX_ATTEMPTS = 5;
+
+    /**
+     * パスワード確認に成功した直後に発行する一時トークン。
+     * 2段階目はこのトークンが無いと受け付けない（user_id とコードだけでは通さない）
+     */
+    public function issueLoginChallenge(User $user): string
+    {
+        $token = Str::random(64);
+        Cache::put($this->challengeKey($token), ['user_id' => $user->id, 'attempts' => 0], now()->addMinutes(self::CHALLENGE_TTL_MINUTES));
+
+        return $token;
+    }
+
+    public function isValidLoginChallenge(?string $token, int $userId): bool
+    {
+        if (!$token) {
+            return false;
+        }
+        $challenge = Cache::get($this->challengeKey($token));
+
+        return is_array($challenge) && (int) $challenge['user_id'] === $userId;
+    }
+
+    /**
+     * コード誤りを記録。上限に達したらチャレンジを破棄し、ログインからやり直させる
+     */
+    public function recordFailedLoginChallenge(string $token): void
+    {
+        $key = $this->challengeKey($token);
+        $challenge = Cache::get($key);
+        if (!is_array($challenge)) {
+            return;
+        }
+
+        $challenge['attempts']++;
+        if ($challenge['attempts'] >= self::CHALLENGE_MAX_ATTEMPTS) {
+            Cache::forget($key);
+            return;
+        }
+        Cache::put($key, $challenge, now()->addMinutes(self::CHALLENGE_TTL_MINUTES));
+    }
+
+    public function clearLoginChallenge(string $token): void
+    {
+        Cache::forget($this->challengeKey($token));
+    }
+
+    private function challengeKey(string $token): string
+    {
+        return '2fa_login_challenge:' . hash('sha256', $token);
+    }
+
     /**
      * TOTP秘密鍵を生成しユーザーに保存
      */

@@ -74,6 +74,15 @@ class UpdateAuctionStatusAction
             } catch (\Exception $e) {
                 Log::warning('新規オークション通知でエラー', ['error' => $e->getMessage()]);
             }
+
+            // おすすめの作成（F-057・表示スイッチ ON のときだけ）。裏で作るだけで、ステータス変更には影響させない
+            if (config('features.recommendations')) {
+                try {
+                    \App\Jobs\GenerateAuctionRecommendationsJob::dispatch($auction->id);
+                } catch (\Throwable $e) {
+                    Log::warning('おすすめ作成の投入でエラー', ['auction_id' => $auction->id, 'error' => $e->getMessage()]);
+                }
+            }
         }
 
         return 'ステータスを「予定（出品受付中）」に変更しました。';

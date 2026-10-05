@@ -151,8 +151,9 @@ class MiscEndpointsTest extends TestCase
             'issued_by' => $admin->id,
         ]);
 
-        $this->mock(PedigreeCertificateService::class, function ($m) use ($cert) {
-            $m->shouldReceive('issue')->once()->with(Mockery::on(fn ($c) => $c->id === $cert->id));
+        $this->mock(PedigreeCertificateService::class, function ($m) use ($cert, $admin) {
+            $m->shouldReceive('issue')->once()->with(Mockery::on(fn ($c) => $c->id === $cert->id), $admin->id);
+            $m->shouldReceive('verificationUrl')->andReturn('http://localhost/pedigree/verify/PED-002');
         });
 
         $this->actingAs($admin, 'sanctum')

@@ -17,9 +17,11 @@ class GenerateReportCommand extends Command
 
         $this->info("Generating {$type} report...");
 
+        // 定期実行（月曜 09:00 / 毎月1日 09:00）は「締まった直前の期間」を集計する。
+        // 引数なしの既定（当週・当月）は管理画面のその場集計用なので、ここでは開始日を明示する
         $report = match ($type) {
-            'monthly' => $reportService->generateMonthlyReport(),
-            default => $reportService->generateWeeklyReport(),
+            'monthly' => $reportService->generateMonthlyReport(now()->subMonthNoOverflow()->startOfMonth()),
+            default => $reportService->generateWeeklyReport(now()->subWeek()->startOfWeek()),
         };
 
         $filename = "reports/{$type}_{$report['period']['start']}_{$report['period']['end']}.json";

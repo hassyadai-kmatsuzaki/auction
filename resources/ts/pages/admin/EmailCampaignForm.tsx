@@ -24,6 +24,7 @@ import { Send as SendIcon, Preview as PreviewIcon, Outbox as TestIcon } from '@m
 import { emailCampaignApi, TargetType, CampaignTargetFilter } from '../../api/admin/emailCampaignApi';
 import MultiUserPicker, { PickerUser } from '../../components/admin/MultiUserPicker';
 import axios from '../../lib/axios';
+import { features } from '../../lib/features';
 
 /**
  * メール一斉/個別配信の作成画面。
@@ -55,6 +56,9 @@ export default function EmailCampaignForm() {
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // 予約配信（F-093）。空文字＝すぐに配信。値は datetime-local（ローカル時刻）
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
 
   // 起動時に「どのユーザーが事前選択されているか」を解決する
   useEffect(() => {
@@ -112,6 +116,8 @@ export default function EmailCampaignForm() {
     target_type: targetType,
     target_filter: targetType === 'filter' ? filter : null,
     target_user_ids: targetType === 'manual' ? selectedUsers.map((u) => u.id) : null,
+    ...(features.campaignSchedule && scheduleMode === 'later' && scheduledAt
+      ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
   });
 
   const handlePreview = async () => {
@@ -154,7 +160,15 @@ export default function EmailCampaignForm() {
       setError('送信前に必ずプレビューで対象件数を確認してください');
       return;
     }
-    const confirmMsg = `${previewCount} 件のメールを配信します。\n\n` +
+    if (features.campaignSchedule && scheduleMode === 'later') {
+      if (!scheduledAt || new Date(scheduledAt) <= new Date()) {
+        setError('配信日時は現在より後の日時を指定してください');
+        return;
+      }
+    }
+    const when = features.campaignSchedule && scheduleMode === 'later'
+      ? `${new Date(scheduledAt).toLocaleString('ja-JP')} に` : '';
+    const confirmMsg = `${previewCount} 件のメールを${when}配信します。\n\n` +
       `件名: ${subject}\n\n本当に配信を開始しますか？\n` +
       `（投入後は配信中の Job をキャンセルできない場合があります）`;
     if (!window.confirm(confirmMsg)) return;
@@ -215,6 +229,29 @@ export default function EmailCampaignForm() {
             <FormControlLabel value="manual" control={<Radio />} label="ユーザーを選んで指定" />
           </RadioGroup>
         </FormControl>
+
+        {/* 予約配信（F-093）。表示スイッチ ON のときだけ */}
+        {features.campaignSchedule && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>配信タイミング</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <RadioGroup row value={scheduleMode} onChange={(e) => setScheduleMode(e.target.value as 'now' | 'later')}>
+                <FormControlLabel value="now" control={<Radio />} label="すぐに配信" />
+                <FormControlLabel value="later" control={<Radio />} label="日時を指定" />
+              </RadioGroup>
+              {scheduleMode === 'later' && (
+                <TextField
+                  size="small"
+                  type="datetime-local"
+                  label="配信日時"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              )}
+            </Box>
+          </Box>
+        )}
 
         {targetType === 'filter' && (
           <Box sx={{ mt: 2, pl: 1 }}>

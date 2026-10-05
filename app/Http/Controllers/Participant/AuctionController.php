@@ -281,7 +281,9 @@ class AuctionController extends Controller
                     },
                     'sellerProfile:id,user_id,profile_image_path',
                     'sellerProfile.user:id,trade_name,profile_image_path',
-                ]);
+                ])
+                // 人気順の並び替え用（F-042）。表示スイッチ OFF の間は数えない（クエリを増やさない）
+                ->when(config('features.item_search'), fn ($q) => $q->withCount('favorites'));
             $this->testMode->applyToItemQuery($laneItemsQuery);
             $laneItems = $laneItemsQuery
                 ->orderBy('lane_items.sequence_order')
@@ -312,7 +314,7 @@ class AuctionController extends Controller
                         'seller_name' => $isAnon ? '匿名出品' : ($item->sellerProfile?->user?->trade_name ?? null),
                         'seller_profile_image_url' => $isAnon ? null : $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
-                    ];
+                    ] + (config('features.item_search') ? ['favorites_count' => (int) $item->favorites_count] : []);
                 }),
             ];
         }
@@ -327,7 +329,8 @@ class AuctionController extends Controller
                 },
                 'sellerProfile:id,user_id,profile_image_path',
                 'sellerProfile.user:id,trade_name,profile_image_path',
-            ]);
+            ])
+            ->when(config('features.item_search'), fn ($q) => $q->withCount('favorites'));
         $this->testMode->applyToItemQuery($unassignedItemsQuery);
         $unassignedItems = $unassignedItemsQuery
             ->orderBy('item_number')
@@ -359,7 +362,7 @@ class AuctionController extends Controller
                         'seller_name' => $isAnon ? '匿名出品' : ($item->sellerProfile?->user?->trade_name ?? null),
                         'seller_profile_image_url' => $isAnon ? null : $item->sellerProfile?->profile_image_url,
                         'media' => $this->transformMedia($item->media),
-                    ];
+                    ] + (config('features.item_search') ? ['favorites_count' => (int) $item->favorites_count] : []);
                 }),
             ];
         }

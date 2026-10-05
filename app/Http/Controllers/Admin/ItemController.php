@@ -159,6 +159,9 @@ class ItemController extends Controller
             ], 422);
         }
 
+        // 性別・親魚・飼育環境（F-010。表示スイッチ OFF の間は空）
+        $detailFields = \App\Support\ItemDetailFields::extract($request);
+
         $speciesType = $this->resolveSpeciesType($request->input('species_type_id'));
         $quantityUnit = $request->input('quantity_unit', SpeciesType::UNIT_FISH);
         if (!$speciesType->allowsQuantityUnit($quantityUnit)) {
@@ -198,6 +201,7 @@ class ItemController extends Controller
                 'is_premium' => $request->boolean('is_premium', false),
                 'is_anonymous' => $request->boolean('is_anonymous', false),
                 'unsold_action' => $request->unsold_action ?? 'return',
+                ...$detailFields,
                 // 管理画面からの新規登録は「審査中(draft)」で受け入れる。
                 // 承認(draft→registered)するまで落札ユーザーには非表示・liveにも昇格しない。
                 // レーン割り当ては審査中でも可能（LaneController 参照）。
@@ -265,6 +269,7 @@ class ItemController extends Controller
                     'notes' => $item->notes,
                     'is_premium' => $item->is_premium,
                     'is_anonymous' => (bool) $item->is_anonymous,
+                    ...\App\Support\ItemDetailFields::present($item),
                     'premium_fee' => $item->premium_fee,
                     'status' => $item->status,
                     'unsold_action' => $item->unsold_action,
@@ -378,8 +383,9 @@ class ItemController extends Controller
         }
 
         $oldStatus = $item->status;
+        $detailFields = \App\Support\ItemDetailFields::extract($request);
 
-        $item->update($request->only([
+        $item->update($detailFields + $request->only([
             'species_name',
             'species_type_id',
             'quantity',

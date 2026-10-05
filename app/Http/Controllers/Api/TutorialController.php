@@ -70,9 +70,9 @@ class TutorialController extends Controller
     {
         return [
             ['id' => 's_welcome', 'title' => '出品者ガイド', 'description' => '出品の流れと操作方法を確認しましょう', 'target' => '/seller/dashboard'],
-            ['id' => 's_submit', 'title' => '商品の出品方法', 'description' => '写真・動画のアップロード、商品情報の入力方法', 'target' => '/seller/submit'],
+            ['id' => 's_submit', 'title' => '出品の申込方法', 'description' => '品種名・数量などを入力して出品を申し込みます。写真・動画は運営が撮影します', 'target' => '/seller/submit'],
             ['id' => 's_profile', 'title' => 'プロフィール設定', 'description' => '口座情報や表示名の設定', 'target' => '/seller/profile'],
-            ['id' => 's_shipping', 'title' => '発送管理', 'description' => '落札後の発送手続きと追跡番号の入力', 'target' => '/seller/shipping'],
+            ['id' => 's_shipping', 'title' => '生体の送付', 'description' => '出品する生体を運営へ送付し、伝票番号を登録します（落札者への発送は運営が行います）', 'target' => '/seller/shipping'],
             ['id' => 's_settlement', 'title' => '売上・精算', 'description' => '売上の確認と精算の流れ', 'target' => '/seller/sales'],
         ];
     }

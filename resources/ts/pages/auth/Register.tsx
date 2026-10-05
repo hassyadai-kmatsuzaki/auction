@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -21,6 +21,9 @@ interface RegisterProps {
 
 export default function Register({ registrationType = 'buyer' }: RegisterProps = {}) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Googleで初めてログインした人は承認待ちとして登録される（F-021）
+  const googlePending = searchParams.get('google_pending') === '1';
   const isSeller = registrationType === 'seller';
   const [formData, setFormData] = useState({
     name: '',
@@ -262,6 +265,12 @@ export default function Register({ registrationType = 'buyer' }: RegisterProps =
               : '必要な情報を入力してください (承認制)'}
           </Typography>
         </Box>
+
+        {googlePending && (
+          <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+            Googleアカウントでの登録を受け付けました。運営による承認が完了すると、Googleでログインできるようになります。
+          </Alert>
+        )}
 
         {error && (
           <Alert

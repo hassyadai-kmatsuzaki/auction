@@ -91,6 +91,34 @@ class ImageAnalysisServiceTest extends TestCase
         ]);
     }
 
+    public function test_quality_score_is_weighted_from_ai_axis_scores(): void
+    {
+        $item = $this->makeItem();
+        $this->attachPhoto($item);
+        $sent = null;
+        Http::fake(function ($request) use (&$sent) {
+            $sent = $request->data();
+            return Http::response(['choices' => [['message' => ['content' => json_encode([
+                'body_shape' => ['length' => '3cm'],
+                'color' => ['main' => '朱赤'],
+                'pattern' => ['type' => 'none'],
+                'quality_score' => 9.9,
+                'quality_scores' => ['body_shape' => 8, 'color' => 6, 'pattern' => 4],
+            ])]]]], 200);
+        });
+
+        $result = (new ImageAnalysisService())->analyzeItem($item);
+
+        // 8*0.40 + 6*0.35 + 4*0.25 = 6.3（AI の総合点 9.9 ではなく決まった式の値）
+        $this->assertSame('6.30', (string) $result->quality_score);
+        $this->assertSame('weighted_v1', $result->raw_response['quality_breakdown']['method']);
+        $this->assertSame(9.9, $result->raw_response['quality_breakdown']['ai_overall']);
+        // 画面の特徴カードに出る項目は変えない
+        $this->assertSame(['length' => '3cm'], $result->body_shape_features);
+        // AI に採点基準を渡している
+        $this->assertStringContainsString('quality_scores', $sent['messages'][0]['content'][0]['text']);
+    }
+
     public function test_analyzeItem_returns_null_when_api_call_fails(): void
     {
         $item = $this->makeItem();

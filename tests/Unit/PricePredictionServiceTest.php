@@ -125,4 +125,33 @@ class PricePredictionServiceTest extends TestCase
 
         $this->assertNull(collect($trends)->firstWhere('species_name', '未入金メダカ'));
     }
+
+    public function test_house_buyer_test_users_and_test_auctions_are_excluded(): void
+    {
+        $house = \App\Models\User::factory()->create();
+        config(['services.ai.house_buyer_ids' => [$house->id]]);
+        $tester = \App\Models\User::factory()->create(['is_test' => true]);
+        $testAuction = Auction::factory()->create(['is_test' => true]);
+
+        foreach ([[null, $house->id], [null, $tester->id], [$testAuction->id, null]] as [$auctionId, $winnerId]) {
+            for ($i = 0; $i < 2; $i++) {
+                $otherItem = Item::factory()->create([
+                    'auction_id' => $auctionId ?? Auction::factory()->create()->id,
+                    'species_name' => '下支えメダカ',
+                ]);
+                WonItem::factory()->create(array_filter([
+                    'item_id' => $otherItem->id,
+                    'winner_id' => $winnerId,
+                    'winning_price' => 500,
+                    'payment_status' => 'paid',
+                ]));
+            }
+        }
+
+        $this->assertNull(collect((new PricePredictionService())->getMarketTrends())->firstWhere('species_name', '下支えメダカ'));
+
+        $item = Item::factory()->create(['auction_id' => Auction::factory()->create()->id, 'species_name' => '下支えメダカ', 'start_price' => 500]);
+        $prediction = (new PricePredictionService())->predictPrice($item);
+        $this->assertContains('insufficient_data', array_column($prediction->factors, 'type'));
+    }
 }

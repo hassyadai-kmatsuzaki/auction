@@ -25,6 +25,7 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
   const [open, setOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [autoOpened, setAutoOpened] = useState(false);
 
   useEffect(() => {
     axios.get(`/api/tutorials?role=${role}`)
@@ -36,6 +37,7 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
         const allNew = data.every((s: TutorialStep) => !s.completed);
         if (allNew && data.length > 0) {
           setOpen(true);
+          setAutoOpened(true);
         }
 
         const firstIncomplete = data.findIndex((s: TutorialStep) => !s.completed);
@@ -52,6 +54,15 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
 
   const completedCount = steps.filter(s => s.completed).length;
 
+  // 自動表示されたガイドを閉じたら最初のステップを完了扱いにし、毎回出続けないようにする
+  const handleClose = () => {
+    setOpen(false);
+    if (autoOpened && steps.length > 0 && steps.every((s) => !s.completed)) {
+      handleComplete(steps[0].id).catch(() => {});
+    }
+    setAutoOpened(false);
+  };
+
   if (loading || steps.length === 0) return null;
 
   return (
@@ -66,7 +77,7 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
         ガイド ({completedCount}/{steps.length})
       </Button>
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <School color="primary" />
           はじめてガイド
@@ -94,7 +105,7 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
                         size="small"
                         onClick={() => {
                           navigate(step.target!);
-                          setOpen(false);
+                          handleClose();
                         }}
                       >
                         ページを開く
@@ -115,7 +126,7 @@ export default function TutorialGuide({ role }: TutorialGuideProps) {
           </Stepper>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>閉じる</Button>
+          <Button onClick={handleClose}>閉じる</Button>
         </DialogActions>
       </Dialog>
     </>

@@ -221,6 +221,9 @@ class ItemController extends Controller
             $startPrice = 100;
         }
         
+        // 性別・親魚・飼育環境（F-010。表示スイッチ OFF の間は空）
+        $detailFields = \App\Support\ItemDetailFields::extract($request);
+
         // トランザクションと行ロックで生体番号の重複を防ぐ
         \DB::beginTransaction();
         try {
@@ -249,6 +252,7 @@ class ItemController extends Controller
                 'is_anonymous' => $request->boolean('is_anonymous', false),
                 'unsold_action' => $request->unsold_action ?? 'return',
                 'status' => 'draft',
+                ...$detailFields,
             ]);
             
             \DB::commit();
@@ -345,7 +349,11 @@ class ItemController extends Controller
                         'seller_amount' => $item->wonItem->seller_amount,
                         'payment_status' => $item->wonItem->payment_status,
                         'delivery_status' => $item->wonItem->delivery_status,
-                    ] : null,
+                    ] + (config('features.seller_review_buyer') ? [
+                        // 出品者から落札者への評価（F-023）。表示スイッチ ON のときだけ
+                        'id' => $item->wonItem->id,
+                        'seller_reviewed' => \App\Models\UserReview::where('won_item_id', $item->wonItem->id)->where('role', 'seller')->exists(),
+                    ] : []) : null,
                     'created_at' => $item->created_at->format('Y-m-d H:i:s'),
                     'updated_at' => $item->updated_at->format('Y-m-d H:i:s'),
                 ],
@@ -428,7 +436,7 @@ class ItemController extends Controller
         }
 
         // 開始価格の処理
-        $updateData = $request->only([
+        $updateData = \App\Support\ItemDetailFields::extract($request) + $request->only([
             'species_name',
             'species_type_id',
             'quantity',

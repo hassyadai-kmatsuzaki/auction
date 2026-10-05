@@ -32,6 +32,8 @@ import {
   PlayCircle as PlayCircleIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import ReviewDialog from '../../features/reviews/ReviewDialog';
+import { features } from '../../lib/features';
 import { formatYen } from '../../lib/formatPrice';
 
 interface ItemDetail {
@@ -63,6 +65,9 @@ interface ItemDetail {
     is_thumbnail: boolean;
   }[];
   won_item: {
+    /** F-023（表示スイッチ ON のときだけ返る） */
+    id?: number;
+    seller_reviewed?: boolean;
     winning_price: number;
     quantity: number;
     total_amount: number;
@@ -81,6 +86,8 @@ export default function ItemDetail() {
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 落札者を評価（F-023）
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -460,6 +467,14 @@ export default function ItemDetail() {
                     ¥{formatYen(item.won_item.seller_amount)}
                   </Typography>
                 </Box>
+                {/* 落札者を評価（F-023）。入金確認後・未評価のときだけ */}
+                {features.sellerReviewBuyer && item.won_item.id && item.won_item.payment_status === 'paid' && (
+                  item.won_item.seller_reviewed ? (
+                    <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>落札者を評価済みです</Typography>
+                  ) : (
+                    <Button fullWidth variant="outlined" sx={{ mt: 2 }} onClick={() => setReviewOpen(true)}>落札者を評価</Button>
+                  )
+                )}
               </CardContent>
             </Card>
           )}
@@ -562,6 +577,17 @@ export default function ItemDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {features.sellerReviewBuyer && item?.won_item?.id && (
+        <ReviewDialog
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
+          wonItemId={item.won_item.id}
+          targetName="落札者"
+          endpoint="/api/seller/reviews"
+          onSubmitted={fetchItem}
+        />
+      )}
     </Box>
   );
 }

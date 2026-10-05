@@ -98,6 +98,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('subscriptions:renew')->dailyAt('03:00')
             ->withoutOverlapping();
 
+        // エスクローの状態同期（F-032・毎時40分。won_items を読んで escrow_transactions だけ更新）。
+        // 開催時間帯（基本 11:00-14:00）を前後1時間の余裕を持って避ける。時間外でもライブ中ならコマンド側でスキップ
+        $schedule->command('escrow:sync')->hourlyAt(40)
+            ->unlessBetween('10:00', '16:00')
+            ->withoutOverlapping();
+
+        // 不正入札検知の自動実行（F-056・毎日 4:20。直近7日に終了した開催を読み取り、新規分だけアラート化）
+        $schedule->command('ai:detect-fraud')->dailyAt('04:20')
+            ->withoutOverlapping();
+
         // AI 学習用データの蓄積（F-051・毎日 4:30。終了済みオークションの実績を読み取るだけ）
         $schedule->command('ai:collect-training-data')->dailyAt('04:30')
             ->withoutOverlapping();

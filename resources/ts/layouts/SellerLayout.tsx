@@ -38,6 +38,8 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import RoleSwitcher from '../components/RoleSwitcher';
 import HeaderNotifications from '../components/HeaderNotifications';
+import TutorialGuide from '../features/tutorial/TutorialGuide';
+import { features } from '../lib/features';
 import HeaderHelp from '../components/HeaderHelp';
 import axios from '../lib/axios';
 
@@ -436,6 +438,8 @@ export default function SellerLayout() {
                 <HeaderNotifications role="seller" />
               </span>
             </Tooltip>
+            {/* 初回ガイダンス（F-044）。表示スイッチ ON のときだけ */}
+            {features.tutorial && <TutorialGuide role="seller" />}
           </Box>
         </Box>
 

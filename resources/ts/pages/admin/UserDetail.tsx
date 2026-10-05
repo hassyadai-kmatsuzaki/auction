@@ -160,6 +160,7 @@ interface LoginHistoryEntry {
   ip_address: string | null;
   user_agent: string | null;
   device: string | null;
+  backfill_source: 'token' | 'bid' | null;
 }
 
 export default function UserDetail() {
@@ -933,6 +934,14 @@ export default function UserDetail() {
                             {entry.logged_in_at
                               ? new Date(entry.logged_in_at).toLocaleString('ja-JP')
                               : '-'}
+                            {entry.backfill_source && (
+                              <Chip
+                                label={entry.backfill_source === 'token' ? '復元' : '推定（入札時刻）'}
+                                size="small"
+                                variant="outlined"
+                                sx={{ ml: 1 }}
+                              />
+                            )}
                           </TableCell>
                           <TableCell sx={{ whiteSpace: 'nowrap' }}>
                             {entry.ip_address || '-'}

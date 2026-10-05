@@ -9,8 +9,9 @@ import axios from '../../lib/axios';
 export default function TwoFactorVerify() {
   const navigate = useNavigate();
   const location = useLocation();
-  const navState = (location.state as { userId?: number; forceLogoutOthers?: boolean }) ?? {};
+  const navState = (location.state as { userId?: number; twoFactorToken?: string; forceLogoutOthers?: boolean }) ?? {};
   const userId = navState.userId;
+  const twoFactorToken = navState.twoFactorToken;
   const initialForce = navState.forceLogoutOthers === true;
 
   const [code, setCode] = useState('');
@@ -34,6 +35,7 @@ export default function TwoFactorVerify() {
         '/api/auth/two-factor/verify',
         {
           user_id: userId,
+          two_factor_token: twoFactorToken,
           code: codeValue,
           force_logout_others: forceLogoutOthers,
         },

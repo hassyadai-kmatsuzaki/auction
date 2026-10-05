@@ -36,6 +36,8 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
+import SubscriptionStatusCard from '../../components/SubscriptionStatusCard';
+import { features } from '../../lib/features';
 import NotificationPreferencesPanel, {
   NotificationRow,
 } from '@/features/notifications/NotificationPreferencesPanel';
@@ -453,6 +455,8 @@ export default function SellerProfile() {
 
         {/* 右側：タブ */}
         <Grid item xs={12} lg={9}>
+          {/* 年会費プラン（F-086）。表示スイッチ ON のときだけ */}
+          {features.subscriptionSelfService && <SubscriptionStatusCard />}
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto">

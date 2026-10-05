@@ -103,10 +103,16 @@ class DocumentController extends Controller
             ->get(['auction_id', 'seller_profile_id', 'payment_notice_sent_at'])
             ->keyBy(fn ($s) => $s->auction_id.'-'.$s->seller_profile_id);
 
+        // 精算の支払済（F-037）。出品者画面の精算ステータスと同じ seller_settlements を参照
+        $paidMap = SellerSettlement::query()
+            ->where('status', SellerSettlement::STATUS_COMPLETED)
+            ->get(['auction_id', 'seller_profile_id', 'paid_at'])
+            ->keyBy(fn ($s) => $s->auction_id.'-'.$s->seller_profile_id);
+
         $grouped = $wonItems
             ->filter(fn ($w) => $w->item && $w->item->auction && $w->item->sellerProfile)
             ->groupBy(fn ($w) => $w->item->auction_id.'-'.$w->item->seller_profile_id)
-            ->map(function ($group, $groupKey) use ($resolver, $sentAtMap) {
+            ->map(function ($group, $groupKey) use ($resolver, $sentAtMap, $paidMap) {
                 $first = $group->first();
                 $auction = $first->item->auction;
                 $seller = $first->item->sellerProfile;
@@ -150,6 +156,7 @@ class DocumentController extends Controller
                     'winning_tax_rate' => $taxMeta['winning_tax_rate'],
                     'transition_rate' => $taxMeta['transition_rate'],
                     'notice_sent_at' => $sentAtMap->get($groupKey)?->payment_notice_sent_at?->toIso8601String(),
+                    'settlement_paid_at' => $paidMap->get($groupKey)?->paid_at?->toIso8601String(),
                 ];
             })
             ->values();
@@ -281,5 +288,32 @@ class DocumentController extends Controller
             ->values();
 
         return response()->json(['success' => true, 'data' => $grouped]);
+    }
+
+    /**
+     * 出品者への精算（振込）を支払済にする／取り消す（F-037）。
+     * 出品者の「売上・精算」画面のステータスにもそのまま反映される
+     */
+    public function updateSettlementPaid(Request $request, int $auctionId, int $sellerProfileId)
+    {
+        abort_unless(config('features.settlement_mark_paid'), 404);
+        $validated = $request->validate(['paid' => 'required|boolean']);
+        Auction::findOrFail($auctionId);
+        SellerProfile::findOrFail($sellerProfileId);
+
+        $settlement = SellerSettlement::firstOrCreate(
+            ['auction_id' => $auctionId, 'seller_profile_id' => $sellerProfileId],
+            ['status' => SellerSettlement::STATUS_PENDING],
+        );
+        $settlement->fill($validated['paid']
+            ? ['status' => SellerSettlement::STATUS_COMPLETED, 'paid_at' => now(), 'paid_by' => Auth::id()]
+            : ['status' => SellerSettlement::STATUS_PENDING, 'paid_at' => null, 'paid_by' => null]
+        )->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['paid'] ? '支払済にしました' : '支払済を取り消しました',
+            'data' => ['settlement_paid_at' => $settlement->paid_at?->toIso8601String()],
+        ]);
     }
 }

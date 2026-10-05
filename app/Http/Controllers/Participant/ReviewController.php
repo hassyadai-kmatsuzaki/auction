@@ -24,6 +24,16 @@ class ReviewController extends Controller
     }
 
     /**
+     * 出品者から落札者への評価（F-023・出品者ルート）。処理は store と同じ（評価者の立場は取引から自動判定）
+     */
+    public function storeAsSeller(Request $request): JsonResponse
+    {
+        abort_unless(config('features.seller_review_buyer'), 404);
+
+        return $this->store($request);
+    }
+
+    /**
      * 取引に対する評価を投稿
      */
     public function store(Request $request): JsonResponse

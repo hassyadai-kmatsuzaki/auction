@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   Paper, Typography, Chip, Button, Stack, Divider, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import { AccountBalance } from '@mui/icons-material';
 import axios from '../lib/axios';
 import SubscriptionRegisterModal from './SubscriptionRegisterModal';
 import BankTransferInfoModal from './BankTransferInfoModal';
 
-interface Plan { id: number; name: string; amount: number; allows_bid: boolean; allows_sell: boolean; }
+interface Plan { id: number; name: string; amount: number; allows_bid: boolean; allows_sell: boolean; duration_days?: number | null; }
 interface Subscription {
   id: number;
   status: 'pending' | 'active' | 'past_due' | 'canceled' | 'suspended';
@@ -38,6 +39,27 @@ export default function SubscriptionStatusCard() {
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [bankInfoOpen, setBankInfoOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 自動更新の停止・再開（F-086）。停止しても期間満了までは利用できる
+  const [autoRenewStopped, setAutoRenewStopped] = useState(false);
+  const [confirmStopOpen, setConfirmStopOpen] = useState(false);
+  const [savingAutoRenew, setSavingAutoRenew] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const updateAutoRenew = async (enabled: boolean) => {
+    if (savingAutoRenew) return;
+    setSavingAutoRenew(true);
+    setError(null);
+    try {
+      const res = await axios.put('/api/me/subscription/auto-renew', { enabled });
+      setAutoRenewStopped(res.data.data.auto_renew_stopped);
+      setInfo(res.data.message);
+      setConfirmStopOpen(false);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? '更新に失敗しました');
+    } finally {
+      setSavingAutoRenew(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -45,6 +67,7 @@ export default function SubscriptionStatusCard() {
       const res = await axios.get('/api/me/subscription');
       const d = res.data.data;
       setSub(d.subscription);
+      setAutoRenewStopped(!!d.auto_renew_stopped);
 
       // 直近の payment から決済手段を判定（subscription レスポンスに付随）
       const lastPayment = d.subscription?.payments?.[0];
@@ -67,6 +90,7 @@ export default function SubscriptionStatusCard() {
     <Paper sx={{ p: 3, mb: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>年会費プラン</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {info && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setInfo(null)}>{info}</Alert>}
 
       {!sub ? (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
@@ -132,6 +156,24 @@ export default function SubscriptionStatusCard() {
             </Stack>
           )}
 
+          {/* 自動更新の停止・再開（F-086）。年会費プラン（単発プラン以外）の有効な契約のみ */}
+          {sub.status === 'active' && sub.plan && !sub.plan.duration_days && (
+            autoRenewStopped ? (
+              <Alert
+                severity="info"
+                action={<Button color="inherit" size="small" onClick={() => updateAutoRenew(true)} disabled={savingAutoRenew}>自動更新を再開</Button>}
+              >
+                自動更新を停止しています。{fmtDate(sub.current_period_end)} までご利用いただけます（以降は自動で解約になります）。
+              </Alert>
+            ) : (
+              <Stack direction="row" justifyContent="flex-end">
+                <Button size="small" color="inherit" sx={{ color: 'text.secondary' }} onClick={() => setConfirmStopOpen(true)}>
+                  自動更新を停止（解約）
+                </Button>
+              </Stack>
+            )
+          )}
+
           {!isBankTransfer && sub.status === 'past_due' && (
             <Alert severity="warning">年会費のお支払いに失敗しました。カード情報を更新してください。</Alert>
           )}
@@ -156,6 +198,19 @@ export default function SubscriptionStatusCard() {
         open={bankInfoOpen}
         onClose={() => setBankInfoOpen(false)}
       />
+      <Dialog open={confirmStopOpen} onClose={() => !savingAutoRenew && setConfirmStopOpen(false)}>
+        <DialogTitle>自動更新を停止しますか？</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {fmtDate(sub?.current_period_end ?? null)} まではこれまでどおりご利用いただけます。
+            その日以降は年会費の自動更新（再課金）を行わず、解約になります。期間中であれば再開もできます。
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmStopOpen(false)} disabled={savingAutoRenew}>やめる</Button>
+          <Button variant="contained" color="error" onClick={() => updateAutoRenew(false)} disabled={savingAutoRenew}>停止する</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

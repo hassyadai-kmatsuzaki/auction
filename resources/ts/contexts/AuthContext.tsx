@@ -9,6 +9,8 @@ interface AuthUser extends Omit<User, 'roles'> {
 
 export interface LoginResult {
   twoFactorRequired?: boolean;
+  /** パスワード確認済みの証明（2段階目の送信に必須） */
+  twoFactorToken?: string;
   userId?: number;
   /** サーバが ALREADY_LOGGED_IN を返した場合に true（呼び出し側で確認モーダルを出す） */
   alreadyLoggedIn?: boolean;
@@ -112,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // 2FA が必要な場合
       if (data.two_factor_required) {
-        return { twoFactorRequired: true, userId: data.user_id };
+        return { twoFactorRequired: true, userId: data.user_id, twoFactorToken: data.two_factor_token };
       }
 
       const { token, user: userData } = data;

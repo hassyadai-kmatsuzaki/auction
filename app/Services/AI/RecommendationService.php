@@ -114,14 +114,14 @@ class RecommendationService
             return [];
         }
 
-        // 同じ品種を落札した他のユーザーが落札した別の品種
-        $similarUserItems = DB::table('won_items as wi1')
+        // 同じ品種を落札した他のユーザーが落札した別の品種（下支え・テスト会員と、テスト・除外開催の落札は使わない）
+        $similarUserItems = AiDataScope::realWonItems(DB::table('won_items as wi1')
             ->join('items as i1', 'wi1.item_id', '=', 'i1.id')
             ->join('won_items as wi2', 'wi1.winner_id', '=', 'wi2.winner_id')
             ->join('items as i2', 'wi2.item_id', '=', 'i2.id')
             ->whereIn('i1.species_name', $userSpecies)
             ->where('wi2.winner_id', '!=', $user->id)
-            ->whereNotIn('i2.species_name', $userSpecies)
+            ->whereNotIn('i2.species_name', $userSpecies), 'wi1', 'i1')
             ->groupBy('i2.species_name')
             ->selectRaw('i2.species_name, COUNT(DISTINCT wi1.winner_id) as co_occurrence')
             ->orderByDesc('co_occurrence')
@@ -192,10 +192,11 @@ class RecommendationService
      */
     private function getTrending(User $user, int $limit): array
     {
-        $trendingItems = DB::table('favorites')
+        // テストユーザー・下支えアカウントのお気に入りは数えない
+        $trendingItems = AiDataScope::realUsers(DB::table('favorites')
             ->join('items', 'favorites.item_id', '=', 'items.id')
             ->where('items.status', 'registered')
-            ->where('favorites.created_at', '>=', now()->subDays(7))
+            ->where('favorites.created_at', '>=', now()->subDays(7)), 'favorites.user_id')
             ->groupBy('items.id', 'items.species_name')
             ->selectRaw('items.id as item_id, items.species_name, COUNT(*) as fav_count')
             ->orderByDesc('fav_count')

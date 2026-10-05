@@ -513,6 +513,43 @@ class SubscriptionService
     /**
      * サブスクリプション解約（カードは無効化し、期限まで待たずに canceled 扱い）
      */
+    /**
+     * 自動更新を停止する（F-086）。期間満了までは利用でき、満了日の更新処理で解約になる。
+     * 年会費プラン（単発プラン以外）の有効な契約のみ
+     */
+    public function stopAutoRenew(Subscription $subscription): void
+    {
+        $subscription->loadMissing('plan');
+        if ($subscription->status !== Subscription::STATUS_ACTIVE || !$subscription->plan || $subscription->plan->isOneShot()) {
+            throw new \RuntimeException('自動更新を停止できる契約ではありません');
+        }
+        if ($subscription->isAutoRenewStopped()) {
+            return;
+        }
+
+        $subscription->update([
+            'canceled_at'      => now(),
+            'suspended_reason' => Subscription::REASON_AUTO_RENEW_STOPPED,
+        ]);
+        Log::info('Subscription auto-renew stopped', ['subscription_id' => $subscription->id, 'user_id' => $subscription->user_id]);
+    }
+
+    /**
+     * 自動更新を再開する（期間満了前のみ）
+     */
+    public function resumeAutoRenew(Subscription $subscription): void
+    {
+        if (!$subscription->isAutoRenewStopped()) {
+            return;
+        }
+        if (!$subscription->current_period_end || !$subscription->current_period_end->isFuture()) {
+            throw new \RuntimeException('期間が終了しているため再開できません。再加入してください');
+        }
+
+        $subscription->update(['canceled_at' => null, 'suspended_reason' => null]);
+        Log::info('Subscription auto-renew resumed', ['subscription_id' => $subscription->id, 'user_id' => $subscription->user_id]);
+    }
+
     public function cancel(Subscription $subscription, ?string $reason = null): void
     {
         if ($subscription->square_card_id) {

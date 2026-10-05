@@ -376,12 +376,12 @@ class MatchingService
     /** @return int[] */
     private function houseBuyerIds(): array
     {
-        return array_map('intval', (array) config('services.ai.house_buyer_ids', []));
+        return AiDataScope::houseBuyerIds();
     }
 
     /** @return int[] */
     private function excludedAuctionIds(): array
     {
-        return array_map('intval', (array) config('services.ai.excluded_auction_ids', []));
+        return AiDataScope::excludedAuctionIds();
     }
 }

@@ -29,6 +29,7 @@ class SocialAuthTest extends TestCase
             'services.line.channel_secret' => 'test-channel-secret',
             'services.line.redirect_uri' => 'http://localhost/api/auth/line/callback',
             'app.frontend_url' => 'http://localhost:5173',
+            'features.google_login' => true,
         ]);
     }
 
@@ -116,7 +117,9 @@ class SocialAuthTest extends TestCase
         $response = $this->get("/api/auth/google/callback?code=ok&state={$state}");
 
         $response->assertRedirect();
-        $this->assertStringContainsString('/auth/google-callback?token=', $response->headers->get('Location'));
+        // トークンは URL に載せず、使い切りコードだけを渡す
+        $this->assertStringContainsString('/auth/google-callback?code=', $response->headers->get('Location'));
+        $this->assertStringNotContainsString('token=', $response->headers->get('Location'));
         $this->assertSame('GOOGLE_EXIST', $user->fresh()->google_id);
     }
 

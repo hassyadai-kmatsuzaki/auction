@@ -149,17 +149,37 @@ class TwoFactorAuthTest extends TestCase
         $this->assertCount(8, $response->json('data.recovery_codes'));
     }
 
-    public function test_2fa_verify_with_valid_code(): void
+    /** 2FA を有効にしてパスワードでログインし、2段階目用のチャレンジを受け取る */
+    private function enable2faAndLogin(): array
     {
-        $service = new TwoFactorService();
-        $service->generateSecret($this->user);
+        (new TwoFactorService())->generateSecret($this->user);
         $this->user->update(['two_factor_confirmed_at' => now()]);
         $secret = decrypt($this->user->fresh()->two_factor_secret);
-        $code = $this->generateTotpCode($secret);
+
+        $challenge = $this->postJson('/api/auth/login', [
+            'email' => $this->user->email,
+            'password' => 'password',
+        ])->assertOk()->json('data.two_factor_token');
+        $this->assertIsString($challenge);
+
+        return [$secret, $challenge];
+    }
+
+    public function test_login_requires_2fa_returns_challenge_token(): void
+    {
+        [, $challenge] = $this->enable2faAndLogin();
+
+        $this->assertSame(64, strlen($challenge));
+    }
+
+    public function test_2fa_verify_with_valid_code(): void
+    {
+        [$secret, $challenge] = $this->enable2faAndLogin();
 
         $response = $this->postJson('/api/auth/two-factor/verify', [
             'user_id' => $this->user->id,
-            'code' => $code,
+            'two_factor_token' => $challenge,
+            'code' => $this->generateTotpCode($secret),
         ]);
 
         $response->assertOk()
@@ -168,30 +188,109 @@ class TwoFactorAuthTest extends TestCase
 
     public function test_2fa_verify_with_wrong_code_fails(): void
     {
-        $service = new TwoFactorService();
-        $service->generateSecret($this->user);
-        $this->user->update(['two_factor_confirmed_at' => now()]);
+        [, $challenge] = $this->enable2faAndLogin();
 
         $response = $this->postJson('/api/auth/two-factor/verify', [
             'user_id' => $this->user->id,
+            'two_factor_token' => $challenge,
             'code' => '000000',
         ]);
 
         $response->assertStatus(422);
     }
 
+    public function test_2fa_verify_without_password_step_is_rejected_even_with_valid_code(): void
+    {
+        // 脆弱性の再発防止: パスワードを通さず user_id と正しいコードだけを送ってもログインできない
+        (new TwoFactorService())->generateSecret($this->user);
+        $this->user->update(['two_factor_confirmed_at' => now()]);
+        $secret = decrypt($this->user->fresh()->two_factor_secret);
+
+        $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id,
+            'code' => $this->generateTotpCode($secret),
+        ])->assertStatus(422)->assertJsonPath('code', 'TWO_FACTOR_CHALLENGE_EXPIRED');
+
+        $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id,
+            'two_factor_token' => str_repeat('a', 64),
+            'code' => $this->generateTotpCode($secret),
+        ])->assertStatus(422);
+
+        $this->assertSame(0, $this->user->tokens()->count());
+    }
+
+    public function test_challenge_of_another_user_cannot_be_used(): void
+    {
+        [, $challenge] = $this->enable2faAndLogin();
+        $victim = User::factory()->create(['status' => 'approved', 'is_active' => true]);
+        (new TwoFactorService())->generateSecret($victim);
+        $victim->update(['two_factor_confirmed_at' => now()]);
+
+        $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $victim->id,
+            'two_factor_token' => $challenge,
+            'code' => $this->generateTotpCode(decrypt($victim->fresh()->two_factor_secret)),
+        ])->assertStatus(422)->assertJsonPath('code', 'TWO_FACTOR_CHALLENGE_EXPIRED');
+
+        $this->assertSame(0, $victim->tokens()->count());
+    }
+
+    public function test_challenge_is_discarded_after_too_many_wrong_codes(): void
+    {
+        [$secret, $challenge] = $this->enable2faAndLogin();
+
+        for ($i = 0; $i < TwoFactorService::CHALLENGE_MAX_ATTEMPTS; $i++) {
+            $this->postJson('/api/auth/two-factor/verify', [
+                'user_id' => $this->user->id,
+                'two_factor_token' => $challenge,
+                'code' => '000000',
+            ])->assertStatus(422);
+        }
+
+        // 上限後は正しいコードでも通らない（ログインからやり直し）
+        $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id,
+            'two_factor_token' => $challenge,
+            'code' => $this->generateTotpCode($secret),
+        ])->assertStatus(422)->assertJsonPath('code', 'TWO_FACTOR_CHALLENGE_EXPIRED');
+    }
+
+    public function test_challenge_is_single_use(): void
+    {
+        [$secret, $challenge] = $this->enable2faAndLogin();
+        $payload = ['user_id' => $this->user->id, 'two_factor_token' => $challenge, 'code' => $this->generateTotpCode($secret), 'force_logout_others' => true];
+
+        $this->postJson('/api/auth/two-factor/verify', $payload)->assertOk();
+        $this->postJson('/api/auth/two-factor/verify', $payload)->assertStatus(422);
+    }
+
+    public function test_challenge_survives_already_logged_in_confirmation(): void
+    {
+        // 他端末ログイン中の 409 → 確認モーダル → force_logout_others=true で同じチャレンジを再送できる
+        [$secret, $challenge] = $this->enable2faAndLogin();
+        $this->user->createToken('auth-token'); // 他端末のログイン
+
+        $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id, 'two_factor_token' => $challenge, 'code' => $this->generateTotpCode($secret),
+        ])->assertStatus(409);
+
+        $this->postJson('/api/auth/two-factor/verify', [
+            'user_id' => $this->user->id, 'two_factor_token' => $challenge, 'code' => $this->generateTotpCode($secret),
+            'force_logout_others' => true,
+        ])->assertOk()->assertJsonStructure(['data' => ['token']]);
+    }
+
     public function test_2fa_verify_rejects_suspended_user(): void
     {
         // パスワード入力（1段目）の後に管理画面で停止されたケース。正しいコードでもトークンを出さない
-        $service = new TwoFactorService();
-        $service->generateSecret($this->user);
-        $this->user->update(['two_factor_confirmed_at' => now(), 'status' => 'suspended']);
-        $secret = decrypt($this->user->fresh()->two_factor_secret);
-        $code = $this->generateTotpCode($secret);
+        [$secret, $challenge] = $this->enable2faAndLogin();
+        $this->user->update(['status' => 'suspended']);
 
         $response = $this->postJson('/api/auth/two-factor/verify', [
             'user_id' => $this->user->id,
-            'code' => $code,
+            'two_factor_token' => $challenge,
+            'code' => $this->generateTotpCode($secret),
         ]);
 
         $response->assertStatus(403)

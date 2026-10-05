@@ -47,10 +47,15 @@ import {
   Remove as RemoveIcon,
   Delete as DeleteIcon,
   ContentCopy as CopyIcon,
+  FileDownload as FileDownloadIcon,
+  FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import axios from '../../lib/axios';
 import { sellerSpeciesNameApi } from '../../api/seller/speciesNameApi';
 import SpeciesNamePickerDialog from './SpeciesNamePickerDialog';
+import { features } from '../../lib/features';
+import { ITEM_SEX_OPTIONS } from '../../lib/itemDetailFields';
+import { buildTemplateCsv, csvToItems } from '../../features/seller-csv/itemCsv';
 
 const steps = ['出品情報', '確認'];
 
@@ -106,6 +111,10 @@ interface ItemFormData {
   is_anonymous: boolean;
   individual_info: string;
   age_months: string;
+  // 性別・親魚・飼育環境（F-010）
+  sex: string;
+  parent_fish_info: string;
+  breeding_environment: string;
 }
 
 type Carrier = 'yu_pack' | 'sagawa' | 'yamato';
@@ -142,6 +151,9 @@ const createEmptyItem = (defaults?: { species_type_id?: number; quantity_unit?: 
   is_anonymous: false,
   individual_info: '',
   age_months: '',
+  sex: '',
+  parent_fish_info: '',
+  breeding_environment: '',
 });
 
 export default function SubmitItem() {
@@ -290,6 +302,32 @@ export default function SubmitItem() {
     });
   };
 
+  // CSV 一括入力（F-015）。読み込んだ行はフォームに入るだけで、送信は通常の申込と同じ
+  const [csvResult, setCsvResult] = useState<{ added: number; errors: string[] } | null>(null);
+
+  const handleDownloadCsvTemplate = () => {
+    const blob = new Blob([buildTemplateCsv()], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'shuppin_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const { items: rows, errors } = csvToItems(await file.text(), speciesTypes);
+    if (rows.length > 0) {
+      const imported = rows.map((r) => ({ ...createEmptyItem(), ...r }));
+      // 何も入力していない最初の1件だけなら置き換え、入力済みなら後ろに追加する
+      setItems((prev) => (prev.length === 1 && !prev[0].species_name.trim() ? imported : [...prev, ...imported]));
+    }
+    setCsvResult({ added: rows.length, errors });
+  };
+
   const removeItem = (index: number) => {
     if (items.length <= 1) return;
     setItems(prev => prev.filter((_, i) => i !== index));
@@ -334,6 +372,11 @@ export default function SubmitItem() {
           inspection_info: null,
           notes: null,
           unsold_action: 'return',
+          ...(features.itemDetailFields ? {
+            sex: item.sex || null,
+            parent_fish_info: item.parent_fish_info,
+            breeding_environment: item.breeding_environment,
+          } : {}),
         });
       });
 
@@ -465,6 +508,39 @@ export default function SubmitItem() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* CSV 一括入力（F-015）。表示スイッチ ON のときだけ */}
+              {features.sellerCsv && (
+                <Card sx={{ mb: 3 }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        たくさん出品するときは、CSVで一括入力できます（読み込んだ内容は下のフォームで確認・修正できます）
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button size="small" variant="outlined" startIcon={<FileDownloadIcon />} onClick={handleDownloadCsvTemplate}>
+                          CSVテンプレート
+                        </Button>
+                        <Button size="small" variant="contained" startIcon={<FileUploadIcon />} component="label">
+                          CSVを読み込む
+                          <input type="file" accept=".csv,text/csv" hidden onChange={handleImportCsv} />
+                        </Button>
+                      </Box>
+                    </Box>
+                    {csvResult && (
+                      <Alert severity={csvResult.errors.length ? 'warning' : 'success'} sx={{ mt: 2 }} onClose={() => setCsvResult(null)}>
+                        {csvResult.added}件を読み込みました。
+                        {csvResult.errors.length > 0 && (
+                          <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2 }}>
+                            {csvResult.errors.slice(0, 10).map((m) => <li key={m}>{m}</li>)}
+                            {csvResult.errors.length > 10 && <li>ほか{csvResult.errors.length - 10}件</li>}
+                          </Box>
+                        )}
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* 生体リスト */}
               {items.map((item, index) => (
@@ -654,6 +730,31 @@ export default function SubmitItem() {
                           label={<Typography variant="body2">匿名出品（出品者名を非公開にする）</Typography>}
                         />
                       </Grid>
+
+                      {/* 性別・親魚・飼育環境（F-010）。表示スイッチ ON のときだけ */}
+                      {features.itemDetailFields && (
+                        <>
+                          <Grid item xs={12} md={4}>
+                            <FormControl fullWidth size="small">
+                              <InputLabel id={`item-sex-label-${index}`}>性別（任意）</InputLabel>
+                              <Select labelId={`item-sex-label-${index}`} value={item.sex} label="性別（任意）" onChange={(e) => updateItem(index, 'sex', e.target.value)}>
+                                <MenuItem value="">未設定</MenuItem>
+                                {ITEM_SEX_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={12} md={8}>
+                            <TextField fullWidth size="small" label="飼育環境（任意）" value={item.breeding_environment}
+                              onChange={(e) => updateItem(index, 'breeding_environment', e.target.value)}
+                              placeholder="例：屋外・グリーンウォーター" inputProps={{ maxLength: 500 }} />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField fullWidth size="small" label="親魚情報（任意）" value={item.parent_fish_info}
+                              onChange={(e) => updateItem(index, 'parent_fish_info', e.target.value)}
+                              placeholder="例：父 楊貴妃 F5 / 母 楊貴妃 F5" inputProps={{ maxLength: 500 }} />
+                          </Grid>
+                        </>
+                      )}
 
                       <Grid item xs={12}>
                         <TextField

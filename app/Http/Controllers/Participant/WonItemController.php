@@ -8,6 +8,7 @@ use App\Services\TestModeService;
 use App\Traits\MediaUrlTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 
 class WonItemController extends Controller
@@ -28,7 +29,7 @@ class WonItemController extends Controller
 
         $wonItemsQuery = WonItem::forWinner($userId)
             ->whereHas('item.auction', fn ($q) => $q->where('is_published', true))
-            ->with(['item.auction', 'item.media', 'item.sellerProfile.user:id,trade_name']);
+            ->with(['item.auction', 'item.media', 'item.sellerProfile.user:id,trade_name,trust_score,review_count', 'item.pedigreeCertificate:id,item_id,status']);
         $this->testMode->applyToWonItemQuery($wonItemsQuery);
         $wonItems = $wonItemsQuery
             ->orderBy('created_at', 'desc')
@@ -94,7 +95,10 @@ class WonItemController extends Controller
                     'can_calculate' => false,
                     'calculation_mode' => $unitCalculationMode,
                     'pending_manual_approval' => $anyManual && !$shippingApproved,
-                ],
+                ] + (config('features.pickup_request') ? [
+                    // 受取方法の希望（F-038）。1件でも会場受取なら pickup
+                    'delivery_method' => $items->contains(fn ($w) => $w->delivery_method === 'pickup') ? 'pickup' : 'shipping',
+                ] : []),
                 'won_items' => $items->map(function ($wonItem) {
                     $item = $wonItem->item;
 
@@ -109,6 +113,10 @@ class WonItemController extends Controller
                             'thumbnail_path' => $item->thumbnail_path,
                             // 屋号（users.trade_name）を直参照。未設定は null（フロントで「-」表示）。
                             'seller_name' => $item->is_anonymous ? '匿名出品' : $item->sellerProfile?->user?->trade_name,
+                            // 出品者の評価（F-023）。匿名出品・評価0件・表示スイッチ OFF のときは null
+                            'seller_rating' => config('features.seller_rating') && !$item->is_anonymous && ($item->sellerProfile?->user?->review_count ?? 0) > 0
+                                ? ['average' => round((float) $item->sellerProfile->user->trust_score * 5, 1), 'count' => (int) $item->sellerProfile->user->review_count]
+                                : null,
                         ] : null,
                         'winning_price' => $wonItem->winning_price,
                         'quantity' => $wonItem->quantity,
@@ -125,6 +133,8 @@ class WonItemController extends Controller
                         'tracking_number' => $wonItem->tracking_number,
                         'tracking_numbers' => $wonItem->tracking_numbers,
                         'shipped_at' => $wonItem->shipped_at ? $wonItem->shipped_at->toIso8601String() : null,
+                        // 発行済みの血統証明書があるときだけ true（下書き・取消済みは出さない）
+                        'has_pedigree_certificate' => config('features.pedigree_certificate') && $item?->pedigreeCertificate?->status === 'issued',
                         'created_at' => $wonItem->created_at->toIso8601String(),
                     ];
                 })->values(),
@@ -222,6 +232,66 @@ class WonItemController extends Controller
                     'notes' => $wonItem->notes,
                     'created_at' => $wonItem->created_at->toIso8601String(),
                 ],
+            ],
+        ]);
+    }
+
+    /**
+     * 受取方法の希望を登録する（F-038）。オークション単位で配送／会場受取を切り替える。
+     * 送料・請求は変えない（会場受取の扱いは管理者が発送登録で「引き取り」を選んで行う）
+     */
+    public function updateDeliveryMethod(Request $request, $auctionId)
+    {
+        abort_unless(config('features.pickup_request'), 404);
+        $validated = $request->validate(['delivery_method' => 'required|in:shipping,pickup']);
+
+        $wonItemsQuery = WonItem::forWinner(Auth::id())
+            ->whereHas('item', fn ($q) => $q->where('auction_id', $auctionId));
+        $this->testMode->applyToWonItemQuery($wonItemsQuery);
+        $wonItems = $wonItemsQuery->get();
+
+        if ($wonItems->isEmpty()) {
+            return response()->json(['success' => false, 'message' => '落札商品が見つかりません'], 404);
+        }
+        // 配送先がロックされた後（送料確定・発送準備後）は変更できない
+        if ($wonItems->contains(fn ($w) => !$w->canUpdateShippingAddress() || !in_array($w->delivery_status, ['pending', 'preparing'], true))) {
+            return response()->json(['success' => false, 'message' => '発送準備に入っているため、受取方法を変更できません。運営までお問い合わせください'], 422);
+        }
+
+        WonItem::whereIn('id', $wonItems->pluck('id'))->update(['delivery_method' => $validated['delivery_method']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['delivery_method'] === 'pickup' ? '会場での受け取りを希望として登録しました' : '配送に戻しました',
+            'data' => ['delivery_method' => $validated['delivery_method']],
+        ]);
+    }
+
+    /**
+     * 落札した生体の血統証明書 PDF の署名付き URL（10分有効）を返す。発行済みのみ
+     */
+    public function pedigreeCertificateLink($id)
+    {
+        abort_unless(config('features.pedigree_certificate'), 404);
+
+        $wonItemQuery = WonItem::forWinner(Auth::id())
+            ->whereHas('item.auction', fn ($q) => $q->where('is_published', true))
+            ->with('item.pedigreeCertificate:id,item_id,status')
+            ->where('id', $id);
+        $this->testMode->applyToWonItemQuery($wonItemQuery);
+        $certificate = $wonItemQuery->first()?->item?->pedigreeCertificate;
+
+        if ($certificate?->status !== 'issued') {
+            return response()->json([
+                'success' => false,
+                'message' => '発行済みの血統証明書はありません',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'url' => URL::temporarySignedRoute('pedigree.signed-pdf', now()->addMinutes(10), ['id' => $certificate->id]),
             ],
         ]);
     }

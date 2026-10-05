@@ -23,6 +23,8 @@ import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
 import { bidLimitApi } from '../../api/participant/bidLimitApi';
 import type { LaneItem } from '../../types';
+import { features } from '../../lib/features';
+import ItemSearchBar, { EMPTY_CONDITIONS, type ItemSearchConditions } from '../../features/auction-items/components/ItemSearchBar';
 
 const STATUS_CONFIG: Record<string, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
   registered: { label: '出品中', color: 'primary' },
@@ -71,6 +73,16 @@ export default function AuctionItems() {
   const [selectedItem, setSelectedItem]     = useState<ItemData | null>(null);
   const [favoriteIds, setFavoriteIds]       = useState<Set<number>>(new Set());
   const [sellerFilter, setSellerFilter]     = useState<string>('all');
+  // 検索・絞り込み（F-042/F-043）。表示スイッチ OFF の間は常に空条件＝従来どおり
+  const [search, setSearch]                 = useState<ItemSearchConditions>(EMPTY_CONDITIONS);
+  // カテゴリ＝品種名マスタ（F-013）。'all' はすべて、'other' はマスタに無い品種名
+  const [category, setCategory]             = useState<string>('all');
+  const { data: masterNames = [] } = useQuery<string[]>({
+    queryKey: ['species-categories'],
+    queryFn: async () => (await axios.get('/api/participant/species-categories', { silent: true })).data.data,
+    enabled: features.itemCategory,
+    staleTime: 10 * 60_000,
+  });
 
   const queryClient = useQueryClient();
   // 指値モーダル
@@ -180,9 +192,36 @@ export default function AuctionItems() {
     )
   ).sort();
 
-  const currentItems: ItemData[] = sellerFilter === 'all'
+  // カテゴリ候補: マスタの並び順のうち、このレーンに出品がある名前だけ（F-013）
+  const masterSet = new Set(masterNames);
+  const categoryOptions = features.itemCategory
+    ? [
+        ...masterNames.map((n) => ({ key: n, label: n, count: laneFilteredItems.filter((i) => i.species_name === n).length })).filter((c) => c.count > 0),
+        ...(() => { const c = laneFilteredItems.filter((i) => !masterSet.has(i.species_name)).length; return c > 0 ? [{ key: 'other', label: 'その他', count: c }] : []; })(),
+      ]
+    : [];
+  const categoryFilteredItems: ItemData[] = !features.itemCategory || category === 'all'
     ? laneFilteredItems
-    : laneFilteredItems.filter((i) => i.seller_name === sellerFilter);
+    : laneFilteredItems.filter((i) => (category === 'other' ? !masterSet.has(i.species_name) : i.species_name === category));
+
+  const sellerFilteredItems: ItemData[] = sellerFilter === 'all'
+    ? categoryFilteredItems
+    : categoryFilteredItems.filter((i) => i.seller_name === sellerFilter);
+
+  const currentItems: ItemData[] = useMemo(() => {
+    if (!features.itemSearch) return sellerFilteredItems;
+    const keyword = search.keyword.trim().toLowerCase();
+    const [min, max] = search.price === 'all' ? [null, null] : search.price.split('-').map((v) => (v === '' ? null : Number(v)));
+    const filtered = sellerFilteredItems.filter((i) =>
+      (!keyword || i.species_name.toLowerCase().includes(keyword))
+      && (min === null || Number(i.start_price) >= min)
+      && (max === null || Number(i.start_price) <= max));
+    const byPopular = (i: ItemData) => Number((i as ItemData & { favorites_count?: number }).favorites_count ?? 0);
+    if (search.sort === 'popular') return [...filtered].sort((a, b) => byPopular(b) - byPopular(a));
+    if (search.sort === 'price_asc') return [...filtered].sort((a, b) => Number(a.start_price) - Number(b.start_price));
+    if (search.sort === 'price_desc') return [...filtered].sort((a, b) => Number(b.start_price) - Number(a.start_price));
+    return filtered;
+  }, [sellerFilteredItems, search]);
 
   if (isLoading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -235,13 +274,37 @@ export default function AuctionItems() {
 
       {/* レーンタブ */}
       <Paper sx={{ mb: 2 }}>
-        <Tabs value={selectedLane} onChange={(_, v) => { setSelectedLane(v); setSellerFilter('all'); }} variant="scrollable" scrollButtons="auto">
+        <Tabs value={selectedLane} onChange={(_, v) => { setSelectedLane(v); setSellerFilter('all'); setCategory('all'); }} variant="scrollable" scrollButtons="auto">
           <Tab label={`すべて (${totalItems})`} />
           {lanes.map((lane: any, i: number) => (
             <Tab key={i} label={`${lane.lane_name} (${lane.items.length})`} />
           ))}
         </Tabs>
       </Paper>
+
+      {/* カテゴリ（品種名マスタ・F-013）。表示スイッチ ON かつ候補があるときだけ */}
+      {features.itemCategory && categoryOptions.length > 0 && (
+        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>カテゴリ</Typography>
+          <Chip
+            label={`すべて (${laneFilteredItems.length})`}
+            onClick={() => setCategory('all')}
+            color={category === 'all' ? 'primary' : 'default'}
+            variant={category === 'all' ? 'filled' : 'outlined'}
+            size="small"
+          />
+          {categoryOptions.map((c) => (
+            <Chip
+              key={c.key}
+              label={`${c.label} (${c.count})`}
+              onClick={() => setCategory(c.key)}
+              color={category === c.key ? 'primary' : 'default'}
+              variant={category === c.key ? 'filled' : 'outlined'}
+              size="small"
+            />
+          ))}
+        </Box>
+      )}
 
       {/* 生産者フィルタ */}
       {sellerOptions.length > 0 && (
@@ -272,6 +335,9 @@ export default function AuctionItems() {
           )}
         </Box>
       )}
+
+      {/* 検索・絞り込み（F-042/F-043） */}
+      {features.itemSearch && <ItemSearchBar value={search} onChange={setSearch} />}
 
       {/* アイテム一覧 */}
       {currentItems.length === 0 ? (
