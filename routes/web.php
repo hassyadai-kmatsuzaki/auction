@@ -6,14 +6,18 @@ use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\Webhook\SesEventController;
 use Illuminate\Support\Facades\Route;
 
-// 公開準備中ページ（LP を Coming Soon に差し向ける）。
-// 法務関連（/legal/*）は SPA の catch-all で React 側のページを表示する。
+// 公開準備中ページ（LP と法務関連を Coming Soon に差し向ける）。
+// 法務3ページは React 側に実装済み。公開するときは下の /legal/* 3行を外すと SPA の catch-all で表示される。
+// 2026-10-06: 実地検査のため一時的に外して公開したが、検査終了後に元のゲートへ戻した。
 $comingSoon = function () {
     return response()
         ->view('coming-soon')
         ->header('X-Robots-Tag', 'noindex, nofollow');
 };
 Route::get('/', $comingSoon);
+Route::get('/legal/terms', $comingSoon);
+Route::get('/legal/privacy', $comingSoon);
+Route::get('/legal/tokushoho', $comingSoon);
 
 // LP（業者向けオンラインオークション）— 公開前のため noindex 必須。
 // CTA URL は LP CVR 設定（lp_cvr_settings + system_settings）から解決。
