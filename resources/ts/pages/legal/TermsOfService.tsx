@@ -20,7 +20,7 @@ export default function TermsOfService() {
               第1条（適用）
             </Typography>
             <Typography variant="body2" paragraph sx={{ lineHeight: 1.8 }}>
-              本規約は、日本メダカオンライン市場運営事務局（以下「当社」）が運営する日本メダカオンライン市場（以下「本サービス」）の利用に関する条件を、本サービスを利用するすべてのユーザー（以下「ユーザー」）と当社との間で定めるものです。
+              本規約は、{LEGAL_CONTACT.businessName}（以下「当社」）が運営する日本メダカオンライン市場（以下「本サービス」）の利用に関する条件を、本サービスを利用するすべてのユーザー（以下「ユーザー」）と当社との間で定めるものです。
             </Typography>
           </section>
 
@@ -179,9 +179,11 @@ export default function TermsOfService() {
               お問い合わせ先
             </Typography>
             <Typography variant="body2" sx={{ lineHeight: 2 }}>
-              日本メダカオンライン市場運営事務局<br />
+              {LEGAL_CONTACT.businessName}<br />
               {LEGAL_CONTACT.postalCode}<br />
-              {LEGAL_CONTACT.street}
+              {LEGAL_CONTACT.street}<br />
+              TEL: {LEGAL_CONTACT.tel}<br />
+              {LEGAL_CONTACT.email}
             </Typography>
           </section>
         </Box>

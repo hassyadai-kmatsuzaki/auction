@@ -449,6 +449,9 @@ Route::middleware(['auth:sanctum', 'check.role:admin', 'audit'])->prefix('admin'
         Route::get('/weekly', [\App\Http\Controllers\Admin\ReportController::class, 'weekly']);
         Route::get('/monthly', [\App\Http\Controllers\Admin\ReportController::class, 'monthly']);
         Route::get('/custom', [\App\Http\Controllers\Admin\ReportController::class, 'custom']);
+        Route::get('/history', [\App\Http\Controllers\Admin\ReportController::class, 'history']);
+        Route::get('/history/{filename}', [\App\Http\Controllers\Admin\ReportController::class, 'showHistory'])
+            ->where('filename', '(weekly|monthly)_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.json');
         Route::post('/generate', [\App\Http\Controllers\Admin\ReportController::class, 'generate']);
     });
 

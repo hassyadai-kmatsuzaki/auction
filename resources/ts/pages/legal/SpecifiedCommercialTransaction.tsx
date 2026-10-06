@@ -4,7 +4,7 @@ import { LEGAL_CONTACT } from '@/lib/legalContact';
 
 export default function SpecifiedCommercialTransaction() {
   const tableData = [
-    { label: '販売業者', value: '日本メダカオンライン市場運営事務局' },
+    { label: '販売業者', value: LEGAL_CONTACT.businessName },
     { label: '運営統括責任者', value: LEGAL_CONTACT.operator },
     { label: '所在地', value: `${LEGAL_CONTACT.postalCode}\n${LEGAL_CONTACT.street}` },
     { label: '電話番号', value: LEGAL_CONTACT.tel },
@@ -66,7 +66,7 @@ export default function SpecifiedCommercialTransaction() {
             お問い合わせ先
           </Typography>
           <Typography variant="body2" sx={{ lineHeight: 2 }}>
-            日本メダカオンライン市場運営事務局<br />
+            {LEGAL_CONTACT.businessName}<br />
             {LEGAL_CONTACT.postalCode}<br />
             {LEGAL_CONTACT.street}
           </Typography>

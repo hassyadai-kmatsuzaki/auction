@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\ReportArchive;
 use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,32 @@ class ReportController extends Controller
             'success' => true,
             'data' => $this->reportService->generateCustomReport($start, $end),
         ]);
+    }
+
+    /**
+     * 自動生成で保存された週次・月次レポートの一覧
+     * GET /api/admin/reports/history
+     */
+    public function history(ReportArchive $archive): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => ['reports' => $archive->list()],
+        ]);
+    }
+
+    /**
+     * 保存されたレポート1件
+     * GET /api/admin/reports/history/{filename}
+     */
+    public function showHistory(string $filename, ReportArchive $archive): JsonResponse
+    {
+        $report = $archive->get($filename);
+        if ($report === null) {
+            return response()->json(['success' => false, 'message' => 'レポートが見つかりません。'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => $report]);
     }
 
     public function generate(Request $request): JsonResponse
