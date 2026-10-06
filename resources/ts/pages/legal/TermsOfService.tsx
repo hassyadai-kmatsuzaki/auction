@@ -181,9 +181,7 @@ export default function TermsOfService() {
             <Typography variant="body2" sx={{ lineHeight: 2 }}>
               {LEGAL_CONTACT.businessName}<br />
               {LEGAL_CONTACT.postalCode}<br />
-              {LEGAL_CONTACT.street}<br />
-              TEL: {LEGAL_CONTACT.tel}<br />
-              {LEGAL_CONTACT.email}
+              {LEGAL_CONTACT.street}
             </Typography>
           </section>
         </Box>
