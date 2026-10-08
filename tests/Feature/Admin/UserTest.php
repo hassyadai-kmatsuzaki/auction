@@ -158,6 +158,40 @@ class UserTest extends TestCase
             ->assertStatus(401);
     }
 
+    public function test_adding_seller_role_to_approved_user_creates_active_seller_profile(): void
+    {
+        // 2026-10-08: ロール追加だけだと seller_profiles が無く、出品者一覧（一括インポート）に出なかった
+        $buyer = $this->createParticipant();
+        $this->assertNull(SellerProfile::where('user_id', $buyer->id)->first());
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/users/{$buyer->id}", ['roles' => ['participant', 'seller']])
+            ->assertStatus(200);
+
+        $profile = SellerProfile::where('user_id', $buyer->id)->first();
+        $this->assertNotNull($profile);
+        $this->assertTrue((bool) $profile->is_active);
+
+        // 出品者一覧 API に載る
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/sellers/list')
+            ->assertStatus(200)
+            ->assertJsonFragment(['id' => $profile->id, 'seller_code' => $profile->seller_code]);
+    }
+
+    public function test_adding_seller_role_reactivates_inactive_seller_profile(): void
+    {
+        $buyer = $this->createParticipant();
+        $profile = SellerProfile::factory()->create(['user_id' => $buyer->id, 'is_active' => false]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/users/{$buyer->id}", ['roles' => ['participant', 'seller']])
+            ->assertStatus(200);
+
+        $this->assertTrue((bool) $profile->fresh()->is_active);
+        $this->assertSame(1, SellerProfile::where('user_id', $buyer->id)->count());
+    }
+
     public function test_updating_user_without_losing_access_keeps_tokens(): void
     {
         $buyer = $this->createParticipant();

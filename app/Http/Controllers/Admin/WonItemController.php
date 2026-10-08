@@ -517,6 +517,33 @@ class WonItemController extends Controller
             $apportioned = \App\Services\ShippingCalculatorService::apportionFee($totalShippingFee, $quantities);
             $now = now();
             $adminId = $request->user()->id;
+
+            // 固定袋サイズ種別（「その他」= M袋）を含む場合は、自動計算した金額を
+            // 保存するだけに留め、確定と落札者通知は管理者の「送料承認」で行う。
+            if (!empty($result['requires_approval'])) {
+                foreach ($wonItems as $i => $wonItem) {
+                    $wonItem->update([
+                        'shipping_fee' => $apportioned[$i],
+                        'shipping_fee_auto' => $apportioned[$i],
+                        'shipping_breakdown' => $result,
+                        'calculation_mode' => $mode,
+                        'shipping_calculated_at' => $now,
+                        'shipping_approved_at' => null,
+                        'shipping_approved_by' => null,
+                        'shipping_adjustment_reason' => null,
+                    ]);
+                }
+                return response()->json([
+                    'success' => true,
+                    'message' => ($result['approval_reason'] ?? '管理者の承認が必要です。') . ' 承認画面で金額を確認してください。',
+                    'data' => [
+                        'calculation_mode' => $mode,
+                        'requires_approval' => true,
+                        'total_shipping_fee' => $totalShippingFee,
+                    ],
+                ]);
+            }
+
             foreach ($wonItems as $i => $wonItem) {
                 $wonItem->update([
                     'shipping_fee' => $apportioned[$i],

@@ -419,6 +419,12 @@ class UserController extends Controller
                     ]);
                 }
 
+                // 承認済み会員に出品者ロールを付けた場合は SellerProfile を用意・有効化する。
+                // （無いと出品者一覧＝一括インポート等の出品者選択に出ない。switchMembership と同じ扱い）
+                if (in_array('seller', $request->roles, true) && $user->fresh()->status === 'approved') {
+                    $this->ensureActiveSellerProfile($user);
+                }
+
                 // 会員種別の変化に合わせて年会費サブスクのプランも切替（次回更新から新料金適用）
                 $planSyncMessage = $this->syncSubscriptionPlanWithRoles($user, $request->roles);
             }
@@ -438,6 +444,43 @@ class UserController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * 承認済み会員の SellerProfile を「存在し、有効」な状態にそろえる。
+     * 無ければ users の保持値から作成し、無効なら有効化する（既存値は上書きしない）。
+     */
+    private function ensureActiveSellerProfile(User $user): void
+    {
+        $profile = SellerProfile::where('user_id', $user->id)->first();
+
+        if (!$profile) {
+            SellerProfile::create([
+                'user_id'        => $user->id,
+                'seller_code'    => 'S' . str_pad((SellerProfile::max('id') ?? 0) + 1, 6, '0', STR_PAD_LEFT),
+                'seller_name'    => $user->trade_name ?? $user->name,
+                'corporate_name' => $user->company_name,
+                'business_registration_number' => $user->business_registration_number,
+                'contact_name'   => $user->name,
+                'email'          => $user->email,
+                'phone'          => $user->phone ?? '',
+                'postal_code'    => $user->postal_code,
+                'prefecture'     => $user->prefecture,
+                'city'           => $user->city,
+                'address_line1'  => $user->address_line1,
+                'address_line2'  => $user->address_line2,
+                'is_active'      => true,
+            ]);
+            return;
+        }
+
+        if (!$profile->is_active) {
+            $updates = ['is_active' => true];
+            if (!$profile->business_registration_number && $user->business_registration_number) {
+                $updates['business_registration_number'] = $user->business_registration_number;
+            }
+            $profile->update($updates);
         }
     }
 

@@ -103,7 +103,10 @@ class CreateApprovedMemberAction
                 }
             }
 
-            // 出品者は SellerProfile も用意（管理者作成・出品者登録と同型、is_active=false）
+            // 出品者は SellerProfile も用意。契約締結済み＝承認済みで作成するため、
+            // 管理者作成（UserController::store）と同様に is_active=true とする。
+            // ※ false にすると承認時の自動有効化（status 遷移時のみ）が一度も走らず、
+            //   出品者一覧（一括インポート等）に永久に出ない（2026-10-08 user 1183 で発生）。
             if ($isSeller) {
                 SellerProfile::create([
                     'user_id'       => $user->id,
@@ -120,7 +123,7 @@ class CreateApprovedMemberAction
                     'city'          => $user->city,
                     'address_line1' => $user->address_line1,
                     'address_line2' => $user->address_line2,
-                    'is_active'     => false,
+                    'is_active'     => true,
                 ]);
             }
 

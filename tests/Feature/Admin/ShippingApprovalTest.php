@@ -89,9 +89,35 @@ class ShippingApprovalTest extends TestCase
         Mail::assertQueued(ShippingFeeFinalizedMail::class);
     }
 
-    public function test_その他を含む発送単位は計算では承認されず手動入力待ちになる(): void
+    public function test_その他を含む発送単位はM袋で自動計算されるが承認は管理者が行う(): void
     {
         Mail::fake();
+        $this->makeWonItem($this->otherTypeId, 1);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/winners/{$this->winner->id}/calculate-shipping");
+
+        // その他 1 出品 = M袋 1 つ → 80 箱 1 個 → 関東 1004 円（v5_case03 と同額）
+        $response->assertOk()
+            ->assertJsonPath('data.calculation_mode', 'auto')
+            ->assertJsonPath('data.requires_approval', true)
+            ->assertJsonPath('data.total_shipping_fee', 1004);
+
+        $wonItem = WonItem::where('winner_id', $this->winner->id)->first();
+        $this->assertNotNull($wonItem->shipping_calculated_at);
+        $this->assertSame(1004, (int) $wonItem->shipping_fee, '空白ではなく自動計算額が入る');
+        $this->assertSame(1004, (int) $wonItem->shipping_fee_auto);
+        $this->assertNull($wonItem->shipping_approved_at, 'その他を含む場合は計算では承認されない');
+        $this->assertNull($wonItem->shipping_approved_by);
+
+        // 通知はまだ飛ばない（承認時のみ送信）
+        Mail::assertNotQueued(ShippingFeeFinalizedMail::class);
+    }
+
+    public function test_固定袋設定が無ければその他は従来通りmanualで手動入力待ちになる(): void
+    {
+        Mail::fake();
+        config(['shipping.fixed_bag_sizes' => []]);
         $this->makeWonItem($this->otherTypeId, 1);
 
         $response = $this->actingAs($this->admin, 'sanctum')
@@ -103,9 +129,38 @@ class ShippingApprovalTest extends TestCase
         $wonItem = WonItem::where('winner_id', $this->winner->id)->first();
         $this->assertNotNull($wonItem->shipping_calculated_at);
         $this->assertNull($wonItem->shipping_approved_at, 'manual は計算では承認されない');
-
-        // 通知はまだ飛ばない（承認時のみ送信）
         Mail::assertNotQueued(ShippingFeeFinalizedMail::class);
+    }
+
+    public function test_その他を含む発送単位は承認ボタンで確定して通知が飛ぶ(): void
+    {
+        Mail::fake();
+        $this->makeWonItem($this->medakaTypeId, 10);
+        $this->makeWonItem($this->otherTypeId, 1);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/winners/{$this->winner->id}/calculate-shipping")
+            ->assertOk()
+            ->assertJsonPath('data.requires_approval', true)
+            ->assertJsonPath('data.total_shipping_fee', 1197);
+
+        $autoTotal = (int) WonItem::where('winner_id', $this->winner->id)->sum('shipping_fee');
+        $this->assertSame(1197, $autoTotal);
+        Mail::assertNotQueued(ShippingFeeFinalizedMail::class);
+
+        // 自動計算額のまま承認
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/auctions/{$this->auction->id}/winners/{$this->winner->id}/approve-shipping", [
+                'shipping_fee' => $autoTotal,
+            ])
+            ->assertOk();
+
+        foreach (WonItem::where('winner_id', $this->winner->id)->get() as $w) {
+            $this->assertNotNull($w->shipping_approved_at);
+            $this->assertSame($this->admin->id, $w->shipping_approved_by);
+        }
+        $this->assertSame(1197, (int) WonItem::where('winner_id', $this->winner->id)->sum('shipping_fee'));
+        Mail::assertQueued(ShippingFeeFinalizedMail::class);
     }
 
     public function test_approve_shippingで送料を入力すると数量比で按分されて承認される(): void

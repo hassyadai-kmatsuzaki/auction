@@ -32,6 +32,7 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
+  Autocomplete,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -934,21 +935,24 @@ export default function ItemManagement() {
               まずテンプレートをダウンロードして、必要な情報を入力してください。
             </Alert>
 
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>出品者（任意）</InputLabel>
-              <Select
-                value={importSellerId}
-                label="出品者（任意）"
-                onChange={(e) => setImportSellerId(e.target.value as number | '')}
-              >
-                <MenuItem value="">出品者を指定しない</MenuItem>
-                {sellers.map((seller) => (
-                  <MenuItem key={seller.id} value={seller.id}>
-                    [{seller.seller_code}] {seller.seller_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {/* 出品者が増えたため、コード/名前で絞り込めるよう Select → Autocomplete 化 */}
+            <Autocomplete
+              fullWidth
+              sx={{ mb: 3 }}
+              options={sellers}
+              value={sellers.find((s) => s.id === importSellerId) ?? null}
+              onChange={(_, seller) => setImportSellerId(seller ? seller.id : '')}
+              getOptionLabel={(seller) => `[${seller.seller_code}] ${seller.seller_name}`}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              noOptionsText="該当する出品者がいません"
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="出品者（任意）"
+                  placeholder="出品者を指定しない（コード・名前で検索）"
+                />
+              )}
+            />
 
             <Box
               sx={{

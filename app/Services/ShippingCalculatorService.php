@@ -58,6 +58,9 @@ class ShippingCalculatorService
      */
     public function calculate(array $items, string $destinationRegion): array
     {
+        // 固定袋サイズ種別（例: その他 = M袋1つ）をデフォルト種別の箱詰めに合流させる
+        [$items, $fixedGroups] = $this->applyFixedBagSizes($items);
+
         $grouped = $this->groupItemsBySpecies($items);
         $modes = [];
         foreach ($grouped as $speciesId => $_) {
@@ -78,14 +81,91 @@ class ShippingCalculatorService
                 'species_type_id' => $speciesId,
                 'species_code' => $this->getSpecies($speciesId)->code,
                 'species_name' => $this->getSpecies($speciesId)->name,
-                'quantity' => array_sum(array_map(fn ($i) => $i['quantity'], $grouped[$speciesId])),
+                'quantity' => array_sum(array_map(
+                    fn ($i) => $i['quantity'],
+                    array_filter($grouped[$speciesId], fn ($i) => empty($i['fixed_bag_size']))
+                )),
                 'subtotal_fee' => $result['total_shipping_fee'],
             ]];
-            return $result;
+            return $this->appendFixedBagInfo($result, $fixedGroups);
         }
 
         // 複数 auto 種別 → mixed
-        return $this->buildMixedResult($grouped, $destinationRegion);
+        return $this->appendFixedBagInfo($this->buildMixedResult($grouped, $destinationRegion), $fixedGroups);
+    }
+
+    /**
+     * config('shipping.fixed_bag_sizes') に載っている種別の出品を、デフォルト種別の
+     * 「指定袋サイズ 1 つ」として扱えるよう書き換える。
+     *
+     * 戻り値: [書き換え後の items, 固定袋として合流した種別の内訳（元種別 id => info）]
+     *
+     * デフォルト種別が auto でない、または袋マスタに指定サイズが無い場合は
+     * 何も書き換えない（従来通り manual 扱いになる）。
+     */
+    private function applyFixedBagSizes(array $items): array
+    {
+        $map = (array) config('shipping.fixed_bag_sizes', []);
+        if (empty($map) || $this->defaultSpeciesId === null) {
+            return [$items, []];
+        }
+
+        $host = $this->getSpecies($this->defaultSpeciesId);
+        if ($host->calculation_mode !== SpeciesType::MODE_AUTO) {
+            return [$items, []];
+        }
+        $this->loadSpeciesMasters($host->id);
+        $hostBagSpecs = $this->speciesMasters[$host->id]['bag_specs'] ?? [];
+
+        $fixedGroups = [];
+        foreach ($items as $idx => $item) {
+            $speciesId = $item['species_type_id'] ?? null;
+            if (!$speciesId || !isset($this->speciesById[$speciesId]) || (int) $speciesId === (int) $host->id) {
+                continue;
+            }
+            $sp = $this->getSpecies((int) $speciesId);
+            $bagSize = $map[$sp->code] ?? null;
+            if ($bagSize === null || !isset($hostBagSpecs[$bagSize])) {
+                continue;
+            }
+
+            $items[$idx]['species_type_id'] = $host->id;
+            $items[$idx]['fixed_bag_size'] = (string) $bagSize;
+            $items[$idx]['origin_species_type_id'] = $sp->id;
+
+            if (!isset($fixedGroups[$sp->id])) {
+                $fixedGroups[$sp->id] = [
+                    'species_type_id' => $sp->id,
+                    'species_code' => $sp->code,
+                    'species_name' => $sp->name,
+                    'fixed_bag_size' => (string) $bagSize,
+                    'quantity' => 0,
+                    'bag_count' => 0,
+                    'subtotal_fee' => null,
+                ];
+            }
+            $fixedGroups[$sp->id]['quantity'] += (int) $item['quantity'];
+            $fixedGroups[$sp->id]['bag_count']++;
+        }
+
+        return [$items, $fixedGroups];
+    }
+
+    /**
+     * 固定袋種別が含まれていた場合、結果に内訳と「要承認」フラグを付与する。
+     */
+    private function appendFixedBagInfo(array $result, array $fixedGroups): array
+    {
+        if (empty($fixedGroups)) {
+            return $result;
+        }
+        foreach ($fixedGroups as $info) {
+            $result['species_breakdown'][] = $info;
+        }
+        $names = implode('・', array_column($fixedGroups, 'species_name'));
+        $result['requires_approval'] = true;
+        $result['approval_reason'] = "「{$names}」種別を含むため、自動計算した送料を管理者が承認して確定します。";
+        return $result;
     }
 
     /**
@@ -216,6 +296,10 @@ class ShippingCalculatorService
         $bags = array_fill_keys($bagSizes, 0);
 
         foreach ($items as $item) {
+            if (!empty($item['fixed_bag_size']) && array_key_exists($item['fixed_bag_size'], $bags)) {
+                $bags[$item['fixed_bag_size']]++;
+                continue;
+            }
             $qty = $item['quantity'];
             $itemBags = $this->determineBagsForQuantity($speciesId, $qty);
             foreach ($itemBags as $size => $count) {
@@ -577,7 +661,10 @@ class ShippingCalculatorService
                 'species_type_id' => $speciesId,
                 'species_code' => $sp->code,
                 'species_name' => $sp->name,
-                'quantity' => array_sum(array_map(fn ($i) => $i['quantity'], $items)),
+                'quantity' => array_sum(array_map(
+                    fn ($i) => $i['quantity'],
+                    array_filter($items, fn ($i) => empty($i['fixed_bag_size']))
+                )),
                 'subtotal_fee' => $sub['total_shipping_fee'],
             ];
         }
@@ -795,7 +882,9 @@ class ShippingCalculatorService
             $counts[$size] = 0;
         }
         foreach ($items as $item) {
-            $size = $this->determineBagSizeV5($speciesId, (int) $item['quantity']);
+            $size = !empty($item['fixed_bag_size']) && isset($bagSpecs[$item['fixed_bag_size']])
+                ? (string) $item['fixed_bag_size']
+                : $this->determineBagSizeV5($speciesId, (int) $item['quantity']);
             $counts[$size]++;
         }
 

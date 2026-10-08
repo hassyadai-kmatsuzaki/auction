@@ -165,8 +165,60 @@ class ShippingCalculatorServiceTest extends TestCase
     }
 
     /** @test */
-    public function その他を含むと_manual_モードで返る(): void
+    public function その他はM袋1つとしてメダカの箱詰めに合流し_要承認フラグ付きで自動計算される(): void
     {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [
+                ['quantity' => 10, 'species_type_id' => $this->medakaId],
+                ['quantity' => 1,  'species_type_id' => $this->otherId],
+            ],
+            '関東'
+        );
+
+        // メダカ10匹(S) + その他(M) → v5_case06 と同じ S+M を 100 箱に同梱 = 1197円
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertSame(1197, $result['total_shipping_fee']);
+        $this->assertCount(1, $result['boxes']);
+        $this->assertSame(100, $result['boxes'][0]['box_size']);
+        $this->assertTrue($result['requires_approval']);
+        $this->assertNotEmpty($result['approval_reason']);
+
+        $bags = collect($result['bags'])->pluck('quantity', 'size')->all();
+        $this->assertSame(1, $bags['S']);
+        $this->assertSame(1, $bags['M']);
+
+        $breakdown = collect($result['species_breakdown'])->keyBy('species_code');
+        $this->assertSame(10, $breakdown['medaka']['quantity'], 'メダカの匹数にその他は含めない');
+        $this->assertSame('M', $breakdown['other']['fixed_bag_size']);
+        $this->assertSame(1, $breakdown['other']['bag_count']);
+    }
+
+    /** @test */
+    public function その他は数量にかかわらず1出品M袋1つになる(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [
+                ['quantity' => 500, 'species_type_id' => $this->otherId],
+                ['quantity' => 1,   'species_type_id' => $this->otherId],
+            ],
+            '関東'
+        );
+
+        // M袋2個 → v5_case07 と同じ 100 箱 1197円
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertSame(1197, $result['total_shipping_fee']);
+        $this->assertTrue($result['requires_approval']);
+        $bags = collect($result['bags'])->pluck('quantity', 'size')->all();
+        $this->assertSame(2, $bags['M']);
+    }
+
+    /** @test */
+    public function 固定袋設定が無ければその他は従来通り_manual_モードで返る(): void
+    {
+        config(['shipping.fixed_bag_sizes' => []]);
+
         $calculator = new ShippingCalculatorService();
         $result = $calculator->calculate(
             [
@@ -180,6 +232,19 @@ class ShippingCalculatorServiceTest extends TestCase
         $this->assertNull($result['total_shipping_fee']);
         $this->assertEmpty($result['boxes']);
         $this->assertNotEmpty($result['species_breakdown']);
+    }
+
+    /** @test */
+    public function メダカのみなら要承認フラグは付かない(): void
+    {
+        $calculator = new ShippingCalculatorService();
+        $result = $calculator->calculate(
+            [['quantity' => 10, 'species_type_id' => $this->medakaId]],
+            '関東'
+        );
+
+        $this->assertSame('auto', $result['calculation_mode']);
+        $this->assertArrayNotHasKey('requires_approval', $result);
     }
 
     /** @test */
