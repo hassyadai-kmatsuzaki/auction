@@ -417,6 +417,75 @@ class ItemTest extends TestCase
         $this->assertContains($response->status(), [200, 201, 422, 500]);
     }
 
+    public function test_import_csv_accepts_species_type_anonymous_and_unit_columns(): void
+    {
+        $header = implode(',', array_fill(0, 14, 'h'));
+        // 列: 品種名,数量,開始価格,最低,想定,入札単位,出品者説明,表示用,備考,プレミアム,未落札,種別,匿名,単位
+        $csv = $header . "\n";
+        $csv .= "楊貴妃,10,100,,,100,体外光あり,,,0,return,メダカ,0,匹\n";       // 表示用が空 → 出品者説明を写す
+        $csv .= "ミナミヌマエビ,2,100,,,100,原文,整えた文章,,1,return,その他,1,袋\n"; // その他+袋+匿名
+        $csv .= "幹之,1,100,,,100,,,,0,return,,,\n";                              // 種別/匿名/単位が空 → 既定
+        $csv .= "旧形式,1,100,,,100,旧原文,,,0,return\n";                         // 旧テンプレート(11列)
+
+        $tmp = tempnam(sys_get_temp_dir(), 'csv') . '.csv';
+        file_put_contents($tmp, $csv);
+        $upload = new \Illuminate\Http\UploadedFile($tmp, 'items.csv', 'text/csv', null, true);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->post("/api/admin/auctions/{$this->auction->id}/items/import", [
+                'file' => $upload,
+                'seller_profile_id' => $this->sellerProfile->id,
+            ]);
+        $response->assertStatus(200);
+        $this->assertSame(4, $response->json('data.imported') ?? $response->json('imported'), $response->getContent());
+
+        $medaka = \App\Models\SpeciesType::where('code', 'medaka')->firstOrFail();
+        $other = \App\Models\SpeciesType::where('code', 'other')->firstOrFail();
+
+        $this->assertDatabaseHas('items', [
+            'species_name' => '楊貴妃', 'species_type_id' => $medaka->id, 'quantity_unit' => 'fish',
+            'is_anonymous' => 0, 'individual_info' => '体外光あり', 'inspection_info' => '体外光あり',
+        ]);
+        $this->assertDatabaseHas('items', [
+            'species_name' => 'ミナミヌマエビ', 'species_type_id' => $other->id, 'quantity_unit' => 'bag',
+            'is_anonymous' => 1, 'individual_info' => '原文', 'inspection_info' => '整えた文章',
+        ]);
+        $this->assertDatabaseHas('items', [
+            'species_name' => '幹之', 'species_type_id' => $medaka->id, 'quantity_unit' => 'fish', 'is_anonymous' => 0,
+        ]);
+        $this->assertDatabaseHas('items', [
+            'species_name' => '旧形式', 'species_type_id' => $medaka->id, 'quantity_unit' => 'fish',
+            'is_anonymous' => 0, 'inspection_info' => '旧原文',
+        ]);
+    }
+
+    public function test_import_csv_rejects_unknown_species_type_and_disallowed_unit(): void
+    {
+        $header = implode(',', array_fill(0, 14, 'h'));
+        $csv = $header . "\n";
+        $csv .= "A,1,100,,,100,,,,0,return,爬虫類,0,匹\n"; // 存在しない種別
+        $csv .= "B,1,100,,,100,,,,0,return,メダカ,0,kg\n"; // メダカで kg は不可
+        $csv .= "C,1,100,,,100,,,,0,return,金魚,0,\n";     // 正常
+
+        $tmp = tempnam(sys_get_temp_dir(), 'csv') . '.csv';
+        file_put_contents($tmp, $csv);
+        $upload = new \Illuminate\Http\UploadedFile($tmp, 'items.csv', 'text/csv', null, true);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->post("/api/admin/auctions/{$this->auction->id}/items/import", [
+                'file' => $upload,
+                'seller_profile_id' => $this->sellerProfile->id,
+            ]);
+
+        $body = implode("\n", $response->json('data.errors'));
+        $this->assertStringContainsString('種別「爬虫類」は選べません', $body);
+        $this->assertStringContainsString('単位「kg」は使えません', $body);
+        $this->assertSame(1, $response->json('data.imported'));
+        $this->assertDatabaseMissing('items', ['species_name' => 'A']);
+        $this->assertDatabaseMissing('items', ['species_name' => 'B']);
+        $this->assertDatabaseHas('items', ['species_name' => 'C']);
+    }
+
     public function test_import_validates_file_type(): void
     {
         $upload = \Illuminate\Http\UploadedFile::fake()->create('items.exe', 100);

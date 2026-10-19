@@ -64,6 +64,83 @@ class ItemTest extends TestCase
         ]);
     }
 
+    public function test_individual_info_is_copied_to_inspection_info_on_create(): void
+    {
+        $this->actingAs($this->seller, 'sanctum')
+            ->postJson('/api/seller/items', [
+                'auction_id' => $this->auction->id,
+                'species_name' => '楊貴妃',
+                'quantity' => 3,
+                'individual_info' => '体外光あり。色揚げ良好',
+            ])
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('items', [
+            'species_name' => '楊貴妃',
+            'individual_info' => '体外光あり。色揚げ良好',
+            'inspection_info' => '体外光あり。色揚げ良好',
+        ]);
+    }
+
+    public function test_explicit_inspection_info_is_kept_on_create(): void
+    {
+        $this->actingAs($this->seller, 'sanctum')
+            ->postJson('/api/seller/items', [
+                'auction_id' => $this->auction->id,
+                'species_name' => '幹之',
+                'quantity' => 1,
+                'individual_info' => '原文',
+                'inspection_info' => '表示用',
+            ])
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('items', [
+            'species_name' => '幹之',
+            'individual_info' => '原文',
+            'inspection_info' => '表示用',
+        ]);
+    }
+
+    public function test_update_individual_info_follows_when_inspection_info_untouched(): void
+    {
+        $item = Item::factory()->draft()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+            'individual_info' => '旧原文',
+            'inspection_info' => '旧原文',
+        ]);
+
+        $this->actingAs($this->seller, 'sanctum')
+            ->putJson("/api/seller/items/{$item->id}", ['individual_info' => '新原文'])
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('items', [
+            'id' => $item->id,
+            'individual_info' => '新原文',
+            'inspection_info' => '新原文',
+        ]);
+    }
+
+    public function test_update_individual_info_does_not_override_admin_edited_inspection_info(): void
+    {
+        $item = Item::factory()->draft()->create([
+            'auction_id' => $this->auction->id,
+            'seller_profile_id' => $this->sellerProfile->id,
+            'individual_info' => '旧原文',
+            'inspection_info' => '管理者が整えた文章',
+        ]);
+
+        $this->actingAs($this->seller, 'sanctum')
+            ->putJson("/api/seller/items/{$item->id}", ['individual_info' => '新原文'])
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('items', [
+            'id' => $item->id,
+            'individual_info' => '新原文',
+            'inspection_info' => '管理者が整えた文章',
+        ]);
+    }
+
     public function test_seller_can_view_own_item_detail(): void
     {
         $item = Item::factory()->create([

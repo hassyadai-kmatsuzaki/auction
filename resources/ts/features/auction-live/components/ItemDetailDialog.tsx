@@ -229,19 +229,13 @@ export const ItemDetailDialog = React.memo(({ open, item, onClose, isLoading, on
                 )}
               </Box>
 
-              {/* 備考（検査情報・個体情報） */}
-              {(item?.inspection_info || item?.individual_info) && (
+              {/* 個体情報（オークション表示用）。出品者からの説明（individual_info）は参加者には出さない:
+                  出品申込時に inspection_info へ写され、管理者が整えた文章がここに出る */}
+              {item?.inspection_info && (
                 <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
-                  {item?.inspection_info && (
-                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.9 }, whiteSpace: 'pre-wrap', color: 'text.primary', mb: item?.individual_info ? { xs: 0.75, md: 1.5 } : 0 }}>
-                      {item.inspection_info}
-                    </Typography>
-                  )}
-                  {item?.individual_info && (
-                    <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.9 }, whiteSpace: 'pre-wrap', color: { xs: 'text.primary', md: 'text.secondary' } }}>
-                      {item.individual_info}
-                    </Typography>
-                  )}
+                  <Typography variant="body2" sx={{ fontSize: { md: '1.5rem' }, lineHeight: { md: 1.9 }, whiteSpace: 'pre-wrap', color: 'text.primary' }}>
+                    {item.inspection_info}
+                  </Typography>
                 </Box>
               )}
 

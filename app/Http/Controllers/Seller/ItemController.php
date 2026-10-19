@@ -224,6 +224,11 @@ class ItemController extends Controller
         // 性別・親魚・飼育環境（F-010。表示スイッチ OFF の間は空）
         $detailFields = \App\Support\ItemDetailFields::extract($request);
 
+        // 出品者の個体情報は「オークション表示用（inspection_info）」にも初期値として写す。
+        // 参加者に見えるのは inspection_info だけなので、管理者が後から整えればその内容が表示される。
+        $individualInfo = $request->input('individual_info');
+        $inspectionInfo = $request->filled('inspection_info') ? $request->input('inspection_info') : $individualInfo;
+
         // トランザクションと行ロックで生体番号の重複を防ぐ
         \DB::beginTransaction();
         try {
@@ -245,8 +250,8 @@ class ItemController extends Controller
                 'start_price' => $startPrice,
                 'current_price' => $startPrice,
                 'estimated_price' => $request->estimated_price,
-                'inspection_info' => $request->inspection_info,
-                'individual_info' => $request->individual_info,
+                'inspection_info' => $inspectionInfo,
+                'individual_info' => $individualInfo,
                 'notes' => $request->notes,
                 'is_premium' => $request->boolean('is_premium', false),
                 'is_anonymous' => $request->boolean('is_anonymous', false),
@@ -458,7 +463,16 @@ class ItemController extends Controller
             $updateData['start_price'] = $startPrice;
             $updateData['current_price'] = $startPrice;
         }
-        
+
+        // 出品者が個体情報を書き換えたとき、オークション表示用が未編集（空 or 旧原文と同一）なら追従させる。
+        // 管理者がすでに整えた文章は上書きしない。
+        if ($request->has('individual_info') && !$request->filled('inspection_info')) {
+            $current = (string) ($item->inspection_info ?? '');
+            if ($current === '' || $current === (string) ($item->individual_info ?? '')) {
+                $updateData['inspection_info'] = $request->input('individual_info');
+            }
+        }
+
         $item->update($updateData);
         
         return response()->json([
