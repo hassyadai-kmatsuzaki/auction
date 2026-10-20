@@ -29,7 +29,6 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  TablePagination,
   Link,
   ToggleButton,
   ToggleButtonGroup,
@@ -283,9 +282,6 @@ export default function WonItemManagement() {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(500);
-  const [totalItems, setTotalItems] = useState(0);
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WonItem | null>(null);
   // 伝票番号は複数口に対応（最大 MAX_TRACKING_NUMBERS 件）。空行は送信時に除外する
@@ -341,8 +337,8 @@ export default function WonItemManagement() {
 
       const response = await axios.get(`/api/admin/auctions/${auctionId}/won-items`, {
         params: {
-          page: page + 1,
-          per_page: rowsPerPage,
+          page: 1,
+          per_page: 10000, // ページネーション撤去: 全件取得
           payment_status: paymentFilter,
           delivery_status: deliveryFilter,
         },
@@ -352,7 +348,6 @@ export default function WonItemManagement() {
         setAuction(response.data.data.auction);
         setWonItems(response.data.data.won_items);
         setStatistics(response.data.data.statistics);
-        setTotalItems(response.data.data.pagination.total);
         setError(null);
       }
     } catch (err: any) {
@@ -361,7 +356,7 @@ export default function WonItemManagement() {
     } finally {
       setLoading(false);
     }
-  }, [auctionId, page, rowsPerPage, tabValue]);
+  }, [auctionId, tabValue]);
 
   useEffect(() => {
     fetchWonItems();
@@ -1136,7 +1131,7 @@ export default function WonItemManagement() {
       {/* フィルター */}
       <Card sx={{ mb: 3 }}>
         <Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={(_, v) => { setTabValue(v); setPage(0); }}>
+          <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
             <Tab label={`すべて (${statistics?.total_items || 0})`} />
             <Tab label={`支払い待ち (${statistics?.pending_count || 0})`} />
             <Tab label={`発送準備中`} />
@@ -1346,19 +1341,6 @@ export default function WonItemManagement() {
               );
             })
           )}
-          <TablePagination
-            component="div"
-            count={totalItems}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            labelRowsPerPage="表示件数"
-            rowsPerPageOptions={[100, 200, 500, 1000]}
-          />
         </Box>
       )}
 
@@ -1394,19 +1376,6 @@ export default function WonItemManagement() {
               </TableBody>
             </Table>
           </TableContainer>
-          <TablePagination
-            component="div"
-            count={totalItems}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            labelRowsPerPage="表示件数"
-            rowsPerPageOptions={[100, 200, 500, 1000]}
-          />
         </Card>
       )}
 
