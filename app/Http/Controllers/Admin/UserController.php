@@ -957,12 +957,21 @@ class UserController extends Controller
             ], 422);
         }
 
+        // 拡張子はファイルの中身から決める（申告された拡張子で保存すると保存型 XSS になるため）
+        $file = $request->file('image');
+        $extension = $file->guessExtension();
+        if (!in_array($extension, ['jpg', 'png', 'gif', 'webp'], true)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['image' => ['画像ファイル（JPEG・PNG・GIF・WebP）を選択してください。']],
+            ], 422);
+        }
+
         if ($user->profile_image_path) {
             Storage::disk('public')->delete($user->profile_image_path);
         }
 
-        $file = $request->file('image');
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $filename = Str::uuid() . '.' . $extension;
         $path = $file->storeAs("avatars/user/{$user->id}", $filename, 'public');
 
         $user->profile_image_path = $path;
@@ -1023,12 +1032,21 @@ class UserController extends Controller
             ], 422);
         }
 
+        // 拡張子はファイルの中身から決める（申告された拡張子で保存すると保存型 XSS になるため）
+        $file = $request->file('image');
+        $extension = $file->guessExtension();
+        if (!in_array($extension, ['jpg', 'png', 'gif', 'webp'], true)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['image' => ['画像ファイル（JPEG・PNG・GIF・WebP）を選択してください。']],
+            ], 422);
+        }
+
         if ($profile->profile_image_path) {
             Storage::disk('public')->delete($profile->profile_image_path);
         }
 
-        $file = $request->file('image');
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $filename = Str::uuid() . '.' . $extension;
         $path = $file->storeAs("avatars/seller/{$profile->id}", $filename, 'public');
 
         $profile->profile_image_path = $path;
