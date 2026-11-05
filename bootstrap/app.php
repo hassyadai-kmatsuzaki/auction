@@ -24,7 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         //
         // ※ 本番デプロイ時は必ず APP_ENV=production になっていることを確認すること。
         then: function () {
-            if (app()->environment(['local', 'testing', 'staging'])) {
+            // staging は外部公開されるため対象外（2026-10-21 診断 H-4: 認証なし artisan 実行口の封鎖）
+            if (app()->environment(['local', 'testing'])) {
                 Route::middleware('api')
                     ->prefix('api')
                     ->group(__DIR__.'/../routes/api-test.php');

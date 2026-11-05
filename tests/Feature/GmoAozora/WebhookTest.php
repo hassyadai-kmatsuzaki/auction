@@ -15,8 +15,9 @@ use Tests\TestCase;
 class WebhookTest extends TestCase
 {
     private const SECRET = 'client-secret-xyz';
-    private const BASIC_USER = 'gmo-wh-dev-02a94253';
-    private const BASIC_PASS = 'qG6/dCKSaeRmIBOxbQhdIUMyMK0nZQkW';
+    // ダミー値（実値は .env のみ。記号 / 入りの挙動を保つため形式だけ揃える）
+    private const BASIC_USER = 'gmo-wh-test-user';
+    private const BASIC_PASS = 'test/BasicPassWithSlash0000000';
     private const ACCESS_TOKEN = 'ACCESS-CURRENT';
 
     protected function setUp(): void
