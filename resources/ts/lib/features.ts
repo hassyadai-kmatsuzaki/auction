@@ -20,6 +20,7 @@ type FeatureFlags = {
   pickup_request?: boolean;
   item_category?: boolean;
   escrow_view?: boolean;
+  bulk_bid_limit?: boolean;
 };
 
 const read = (): FeatureFlags => {
@@ -51,4 +52,5 @@ export const features = {
   pickupRequest: flags.pickup_request === true,
   itemCategory: flags.item_category === true,
   escrowView: flags.escrow_view === true,
+  bulkBidLimit: flags.bulk_bid_limit === true,
 };

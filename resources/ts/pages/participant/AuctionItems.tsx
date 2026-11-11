@@ -10,7 +10,7 @@ import {
   ViewModule as ViewModuleIcon, ViewList as ViewListIcon,
   Info as InfoIcon, ArrowBack as ArrowBackIcon,
   FavoriteBorder as FavoriteBorderIcon, Favorite as FavoriteIcon,
-  MeetingRoom as MeetingRoomIcon,
+  MeetingRoom as MeetingRoomIcon, ListAlt as ListAltIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from '../../lib/axios';
@@ -21,7 +21,11 @@ import type { ItemData } from '../../features/auction-items/components/ItemCard'
 import { ItemDetailDialog } from '../../features/auction-live/components/ItemDetailDialog';
 import { BidLimitBadge } from '../../features/bid-limit/components/BidLimitBadge';
 import { BidLimitModal } from '../../features/bid-limit/components/BidLimitModal';
+import { BulkBidPanel } from '../../features/bid-limit/components/BulkBidPanel';
+import type { BulkBidPanelItem, BulkBidSubmit } from '../../features/bid-limit/components/BulkBidPanel';
 import { bidLimitApi } from '../../api/participant/bidLimitApi';
+import { bulkBidLimitApi } from '../../api/participant/bulkBidLimitApi';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { LaneItem } from '../../types';
 import { features } from '../../lib/features';
 import ItemSearchBar, { EMPTY_CONDITIONS, type ItemSearchConditions } from '../../features/auction-items/components/ItemSearchBar';
@@ -63,9 +67,18 @@ const toLaneItem = (item: ItemData | null): LaneItem | null => {
   } as LaneItem;
 };
 
+/**
+ * 出品一覧。表示スイッチ bulk_bid_limit が ON かつ開催前は「開始価格でまとめて事前入札」（v7）が使える:
+ *   - 入口はヘッダーの緑ボタン（スマホは一覧の上の緑ボタン）→ この回の全品がチェック済みで中央のウィンドウが開く
+ *   - ウィンドウ内は開始価格ごとのグループ。グループの − ◯円 ＋ でまとめて、開いて品ごとにも上げ下げ
+ *   - 一覧のカードにはチェックを出さない（選ぶのはウィンドウの中だけ。お気に入り♡はそのまま）
+ *   - カードの「上限設定」も同じウィンドウを1点だけで開く（事前入札 UI を1つに統合）
+ *   - 入札済みの品はチェック外で表示し、チェックを入れ直したときだけ上書き（既存指値の事故防止）
+ */
 export default function AuctionItems() {
   const { auctionId } = useParams<{ auctionId: string }>();
   const navigate      = useNavigate();
+  const { showSuccess, showWarning } = useSnackbar();
 
   // ローカルUIState
   const [selectedLane, setSelectedLane]     = useState(0);
@@ -73,6 +86,7 @@ export default function AuctionItems() {
   const [selectedItem, setSelectedItem]     = useState<ItemData | null>(null);
   const [favoriteIds, setFavoriteIds]       = useState<Set<number>>(new Set());
   const [sellerFilter, setSellerFilter]     = useState<string>('all');
+  const [limitFilter, setLimitFilter]       = useState<'all' | 'bid' | 'unbid'>('all');
   // 検索・絞り込み（F-042/F-043）。表示スイッチ OFF の間は常に空条件＝従来どおり
   const [search, setSearch]                 = useState<ItemSearchConditions>(EMPTY_CONDITIONS);
   // カテゴリ＝品種名マスタ（F-013）。'all' はすべて、'other' はマスタに無い品種名
@@ -85,7 +99,7 @@ export default function AuctionItems() {
   });
 
   const queryClient = useQueryClient();
-  // 指値モーダル
+  // 指値モーダル（表示スイッチ OFF、または対象外の品のとき従来のモーダル）
   const [limitModalItem, setLimitModalItem] = useState<ItemData | null>(null);
   const [isSettingLimit, setIsSettingLimit] = useState(false);
 
@@ -119,6 +133,22 @@ export default function AuctionItems() {
     staleTime: 10_000,
   });
 
+  // まとめて入札（表示スイッチ ON かつ開催前）: 対象生体と入札単位・現在の指値
+  const bulkEnabled = features.bulkBidLimit && auction?.status === 'scheduled';
+  const { data: bulkData } = useQuery({
+    queryKey: ['bulk-bid-limits', auctionId],
+    queryFn: () => bulkBidLimitApi.get(auctionId!),
+    enabled: bulkEnabled && !!auctionId,
+  });
+  const bulkInfo = useMemo(() => new Map((bulkData?.items ?? []).map((i) => [i.id, i])), [bulkData]);
+  const bulkOpen = bulkData?.is_open ?? false;
+
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelItems, setPanelItems] = useState<BulkBidPanelItem[]>([]);
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [doneBanner, setDoneBanner] = useState<string | null>(null);
+
   // 計測: 生体詳細を開いたとき（item_view）。サーバ側で開始前(preparing/scheduled)のみ・
   // 1ユーザー1日×item 1行に絞る。ライブ中は記録されない。
   useEffect(() => {
@@ -136,6 +166,7 @@ export default function AuctionItems() {
 
   const invalidateLimits = () => {
     queryClient.invalidateQueries({ queryKey: ['bid-limits-batch'] });
+    queryClient.invalidateQueries({ queryKey: ['bulk-bid-limits', auctionId] });
   };
 
   const handleSetLimit = async (itemId: number, price: number) => {
@@ -204,15 +235,20 @@ export default function AuctionItems() {
     ? laneFilteredItems
     : laneFilteredItems.filter((i) => (category === 'other' ? !masterSet.has(i.species_name) : i.species_name === category));
 
-  const sellerFilteredItems: ItemData[] = sellerFilter === 'all'
+  const sellerFilteredItems: ItemData[] = (sellerFilter === 'all'
     ? categoryFilteredItems
-    : categoryFilteredItems.filter((i) => i.seller_name === sellerFilter);
+    : categoryFilteredItems.filter((i) => i.seller_name === sellerFilter));
+
+  const hasOwnLimit = (id: number) => limitSettings[id]?.limit_price != null;
+  const limitFilteredItems: ItemData[] = limitFilter === 'all'
+    ? sellerFilteredItems
+    : sellerFilteredItems.filter((i) => (limitFilter === 'bid' ? hasOwnLimit(i.id) : !hasOwnLimit(i.id)));
 
   const currentItems: ItemData[] = useMemo(() => {
-    if (!features.itemSearch) return sellerFilteredItems;
+    if (!features.itemSearch) return limitFilteredItems;
     const keyword = search.keyword.trim().toLowerCase();
     const [min, max] = search.price === 'all' ? [null, null] : search.price.split('-').map((v) => (v === '' ? null : Number(v)));
-    const filtered = sellerFilteredItems.filter((i) =>
+    const filtered = limitFilteredItems.filter((i) =>
       (!keyword || i.species_name.toLowerCase().includes(keyword))
       && (min === null || Number(i.start_price) >= min)
       && (max === null || Number(i.start_price) <= max));
@@ -221,7 +257,82 @@ export default function AuctionItems() {
     if (search.sort === 'price_asc') return [...filtered].sort((a, b) => Number(a.start_price) - Number(b.start_price));
     if (search.sort === 'price_desc') return [...filtered].sort((a, b) => Number(b.start_price) - Number(a.start_price));
     return filtered;
-  }, [sellerFilteredItems, search]);
+  }, [limitFilteredItems, search]);
+
+  // ── まとめて入札 ──
+  const toPanelItem = (item: ItemData): BulkBidPanelItem | null => {
+    const info = bulkInfo.get(item.id);
+    if (!info) return null;
+    return {
+      id: item.id,
+      name: item.species_name,
+      code: (item as any).exhibit_code ?? `No.${item.item_number}`,
+      quantity: item.quantity,
+      seller_name: item.seller_name ?? (item as any).seller?.seller_name ?? null,
+      seller_profile_image_url: item.seller_profile_image_url ?? (item as any).seller?.profile_image_url ?? null,
+      is_anonymous: (item as any).is_anonymous ?? false,
+      start_price: info.start_price,
+      unit: info.unit,
+      limit_price: limitSettings[item.id]?.limit_price ?? info.limit_price ?? null,
+      is_other: info.is_other,
+    };
+  };
+  // この回でまとめて入札できる品（レーン・絞り込みに関係なく全部。自分の出品・落札済などは bulkInfo に無い）
+  const allBulkItems = (lanes.flatMap((l: any) => l.items) as ItemData[]).map(toPanelItem).filter((x): x is BulkBidPanelItem => !!x);
+  const bulkCount = allBulkItems.filter((x) => !x.is_other).length;
+  const limitCountAll = laneFilteredItems.filter((i) => hasOwnLimit(i.id)).length;
+  const singlePanel = panelOpen && panelItems.length === 1;
+
+  const openBulkPanel = () => {
+    setDoneBanner(null);
+    setPanelItems(allBulkItems);
+    // 入札済みの品はチェック外（そのまま）。入れ直したときだけ上書きする
+    setCheckedIds(new Set(allBulkItems.filter((x) => !x.is_other && x.limit_price == null).map((x) => x.id)));
+    setPanelOpen(true);
+  };
+
+  // 「上限設定」: まとめて入札が使えるときは同じパネルを1点で開く。それ以外は従来のモーダル
+  const openLimitEditor = (item: ItemData) => {
+    // まとめて入札の受付（開始の N 分前まで）が閉じたら、1点ずつは従来のモーダルで開始まで受け付ける
+    const row = bulkEnabled && bulkOpen ? toPanelItem(item) : null;
+    if (row && !row.is_other) {
+      setDoneBanner(null);
+      setPanelItems([row]);
+      setCheckedIds(new Set([row.id]));
+      setPanelOpen(true);
+    } else {
+      setLimitModalItem(item);
+    }
+  };
+
+  const handlePanelSubmit = async ({ limits, priceLabel }: BulkBidSubmit) => {
+    setBulkSubmitting(true);
+    try {
+      const res = await bulkBidLimitApi.store(auctionId!, limits);
+      if (res.success) {
+        const n = limits.length;
+        setDoneBanner(singlePanel
+          ? `${panelItems[0]?.name} を ¥${formatYen(limits[0].limit_price)} で事前入札しました。`
+          : `${n}点を${priceLabel}で入札しました。`);
+        setPanelOpen(false);
+        setCheckedIds(new Set());
+      } else {
+        showWarning(res.message);
+      }
+      invalidateLimits();
+      // 一括はお気に入りに自動登録しない（11/9 フィードバック）
+    } catch {
+      // 失敗の文言は axios の共通処理が表示する
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  const handlePanelRemove = async (itemId: number) => {
+    await handleRemoveLimit(itemId);
+    setPanelOpen(false);
+    showSuccess('事前入札を取り消しました。');
+  };
 
   if (isLoading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -236,6 +347,8 @@ export default function AuctionItems() {
     </Container>
   );
 
+  const bulkButtonLabel = '開始価格でまとめて事前入札';
+
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
       {/* ヘッダー */}
@@ -246,11 +359,18 @@ export default function AuctionItems() {
             <Box>
               <Typography variant="h5" fontWeight="bold">{auction?.title || '出品一覧'}</Typography>
               <Typography variant="body2" color="text.secondary">
-                全{totalItems}点の出品
+                全{totalItems}点の出品{bulkEnabled && `・まとめて事前入札は開始${bulkData?.close_minutes ?? 5}分前まで`}
               </Typography>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {bulkEnabled && (
+              <Button variant="contained" color="success" data-testid="bulk-bid-entry" startIcon={<ListAltIcon />}
+                onClick={openBulkPanel} disabled={!bulkOpen || bulkCount === 0}
+                sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', px: 2.5, py: 1, display: { xs: 'none', sm: 'inline-flex' } }}>
+                {bulkButtonLabel}
+              </Button>
+            )}
             {isLiveAuction && (
               <Button size="small" variant="contained" color="success"
                 onClick={() => navigate(`/participant/auction/${auctionId}/live`)}
@@ -271,6 +391,23 @@ export default function AuctionItems() {
           </Box>
         </Box>
       </Paper>
+
+      {/* 完了メッセージ */}
+      {doneBanner && (
+        <Alert severity="success" onClose={() => setDoneBanner(null)} sx={{ mb: 2 }}>
+          <Typography variant="body2" fontWeight="bold">{doneBanner}</Typography>
+          <Typography variant="body2">他に入札が無ければ、その品はあなたの落札になります。オークション開始まで変更・取り消しできます。</Typography>
+        </Alert>
+      )}
+
+      {/* まとめて入札の入口（スマホ: 一覧の上の緑ボタン） */}
+      {bulkEnabled && (
+        <Button fullWidth variant="contained" color="success" startIcon={<ListAltIcon />} data-testid="bulk-bid-entry-sp"
+          onClick={openBulkPanel} disabled={!bulkOpen || bulkCount === 0}
+          sx={{ fontWeight: 'bold', py: 1.25, mb: 2, display: { xs: 'inline-flex', sm: 'none' } }}>
+          {bulkButtonLabel}
+        </Button>
+      )}
 
       {/* レーンタブ */}
       <Paper sx={{ mb: 2 }}>
@@ -309,7 +446,7 @@ export default function AuctionItems() {
       {/* 生産者フィルタ */}
       {sellerOptions.length > 0 && (
         <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <FormControl size="small" sx={{ minWidth: 220 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 150, sm: 220 } }}>
             <InputLabel id="seller-filter-label">生産者で絞り込み</InputLabel>
             <Select
               labelId="seller-filter-label"
@@ -336,6 +473,22 @@ export default function AuctionItems() {
         </Box>
       )}
 
+      {/* 入札済み／未入札（事前入札がある回だけ） */}
+      {bulkEnabled && limitCountAll > 0 && (
+        <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {([
+            ['all', 'すべて'],
+            ['bid', `入札済み (${limitCountAll})`],
+            ['unbid', `未入札 (${laneFilteredItems.length - limitCountAll})`],
+          ] as const).map(([key, label]) => (
+            <Chip key={key} label={label} size="small"
+              onClick={() => setLimitFilter(key)}
+              color={limitFilter === key ? 'primary' : 'default'}
+              variant={limitFilter === key ? 'filled' : 'outlined'} />
+          ))}
+        </Box>
+      )}
+
       {/* 検索・絞り込み（F-042/F-043） */}
       {features.itemSearch && <ItemSearchBar value={search} onChange={setSearch} />}
 
@@ -346,7 +499,8 @@ export default function AuctionItems() {
         </Paper>
       ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
-          {currentItems.map((item) => (
+          {currentItems.map((item) => {
+            return (
             <Grid item xs={6} sm={6} md={4} lg={3} key={item.id}>
               <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ItemCard
@@ -371,13 +525,15 @@ export default function AuctionItems() {
                   <BidLimitBadge
                     limitPrice={limitSettings[item.id]?.limit_price ?? null}
                     isTriggered={limitSettings[item.id]?.is_triggered ?? false}
-                    onEdit={() => setLimitModalItem(item)}
+                    onEdit={() => openLimitEditor(item)}
                     onRemove={() => handleRemoveLimit(item.id)}
+                    {...(bulkEnabled && { label: '入札済', color: 'success' as const })}
                   />
                 </Box>
               </Box>
             </Grid>
-          ))}
+            );
+          })}
         </Grid>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
@@ -390,7 +546,7 @@ export default function AuctionItems() {
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>匹数</TableCell>
                 <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>開始価格</TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>ステータス</TableCell>
-                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>上限価格</TableCell>
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>{bulkEnabled ? '事前入札' : '上限価格'}</TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>操作</TableCell>
               </TableRow>
             </TableHead>
@@ -424,8 +580,9 @@ export default function AuctionItems() {
                       <BidLimitBadge
                         limitPrice={limit?.limit_price ?? null}
                         isTriggered={limit?.is_triggered ?? false}
-                        onEdit={(e?: any) => { e?.stopPropagation?.(); setLimitModalItem(item); }}
+                        onEdit={(e?: any) => { e?.stopPropagation?.(); openLimitEditor(item); }}
                         onRemove={() => handleRemoveLimit(item.id)}
+                        {...(bulkEnabled && { label: '入札済', color: 'success' as const })}
                       />
                     </TableCell>
                     <TableCell align="center">
@@ -470,7 +627,7 @@ export default function AuctionItems() {
         priceLabel="start"
         startPrice={selectedItem?.start_price}
         onLimitEdit={() => {
-          if (selectedItem) setLimitModalItem(selectedItem);
+          if (selectedItem) { setSelectedItem(null); openLimitEditor(selectedItem); }
         }}
         onLimitRemove={() => {
           if (selectedItem) handleRemoveLimit(selectedItem.id);
@@ -479,7 +636,22 @@ export default function AuctionItems() {
         onFavoriteToggle={(itemId) => handleFavoriteToggle({ stopPropagation: () => {} } as React.MouseEvent, itemId)}
       />
 
-      {/* 指値（上限価格）設定モーダル（開始前） */}
+      {/* まとめて入札パネル（1点モード＝上限設定） */}
+      {bulkEnabled && (
+        <BulkBidPanel
+          open={panelOpen}
+          onClose={() => setPanelOpen(false)}
+          items={panelItems}
+          checkedIds={checkedIds}
+          onCheckedChange={setCheckedIds}
+          isOpen={bulkOpen}
+          submitting={bulkSubmitting}
+          onSubmit={handlePanelSubmit}
+          onRemove={handlePanelRemove}
+        />
+      )}
+
+      {/* 指値（上限価格）設定モーダル（表示スイッチ OFF・対象外の品） */}
       {limitModalItem && (
         <BidLimitModal
           open={!!limitModalItem}

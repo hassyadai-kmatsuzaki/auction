@@ -625,7 +625,10 @@ Route::middleware(['auth:sanctum', 'check.role:participant'])->prefix('participa
     Route::middleware(['check.subscription:bid', 'throttle:bid-limits'])->group(function () {
         Route::post('/bid-limits', [ParticipantBidLimitController::class, 'store']);
         Route::delete('/bid-limits/{itemId}', [ParticipantBidLimitController::class, 'destroy']);
+        // スタート価格別の一括指値（表示スイッチ bulk_bid_limit・OFF の間は 404）
+        Route::post('/auctions/{auctionId}/bulk-bid-limits', [\App\Http\Controllers\Participant\BulkBidLimitController::class, 'store']);
     });
+    Route::get('/auctions/{auctionId}/bulk-bid-limits', [\App\Http\Controllers\Participant\BulkBidLimitController::class, 'index']);
     Route::get('/bids/my-active', [ParticipantBidController::class, 'myActive']);
     // 出品一覧のカテゴリ＝品種名マスタ（F-013・表示スイッチ OFF の間は 404）
     Route::get('/species-categories', [\App\Http\Controllers\Participant\SpeciesCategoryController::class, 'index']);

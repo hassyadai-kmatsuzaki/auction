@@ -40,7 +40,7 @@ class SetBidLimitAction
      *   3. 商品が live 中 → 現在価格 >= 指値 → 入札せずに即発動済み
      *   4. 商品が registered（開始前） → 指値のみ保存（オークション開始時に自動入札）
      */
-    public function execute(Item $item, int $userId, float $limitPrice): BidResultDto
+    public function execute(Item $item, int $userId, float $limitPrice, bool $autoFavorite = true): BidResultDto
     {
         if ($limitPrice < 1) {
             return BidResultDto::failure('上限価格は1円以上を設定してください。');
@@ -68,12 +68,14 @@ class SetBidLimitAction
             );
         }, 3);
 
-        $autoFav = Favorite::firstOrCreate(['user_id' => $userId, 'item_id' => $item->id]);
+        // お気に入り自動登録。まとめて事前入札（$autoFavorite=false）では行わない
+        // （大量チェック→大量お気に入り→「出番が近い」通知の洪水になるため）。
+        $autoFav = $autoFavorite ? Favorite::firstOrCreate(['user_id' => $userId, 'item_id' => $item->id]) : null;
 
         // 計測: 指値保存の tx（items ロック）は上で閉じ、ロックは解放済み。
         // 入札ロック内で記録しない鉄則に従い、ここ（ロック外）で撃つ。失敗しても本処理に影響しない。
         ActivityLogger::bidLimitSet($item->id, $item->auction_id, $limitPrice, $userId);
-        if ($autoFav->wasRecentlyCreated) {
+        if ($autoFav?->wasRecentlyCreated) {
             ActivityLogger::favoriteAdd($item->id, $item->auction_id, true, $userId);
         }
 

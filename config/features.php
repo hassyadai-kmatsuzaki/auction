@@ -58,4 +58,10 @@ return [
 
     // F-057 オークション公開（予定に変更）時に参加者ごとの「おすすめ」を作成する（作成のみ・画面表示は無し）
     'recommendations' => (bool) env('FEATURE_RECOMMENDATIONS', false),
+
+    // スタート価格別の一括事前入札（出品一覧に「まとめて事前入札」、開催前の出品中の生体のみ）
+    'bulk_bid_limit' => (bool) env('FEATURE_BULK_BID_LIMIT', false),
+
+    // まとめて事前入札の受付締切（開始の何分前か）。個別の上限設定はこの締切の対象外
+    'bulk_bid_limit_close_minutes' => (int) env('FEATURE_BULK_BID_LIMIT_CLOSE_MINUTES', 5),
 ];

@@ -9,6 +9,10 @@ interface Props {
   onEdit: () => void;
   onRemove?: () => void;
   size?: 'small' | 'medium';
+  /** 設定済みチップの接頭語（既定「上限」。出品一覧のまとめて入札では「入札済」） */
+  label?: string;
+  /** 設定済みチップの色（既定 primary） */
+  color?: 'primary' | 'success';
 }
 
 /**
@@ -18,7 +22,7 @@ interface Props {
  * 未設定の場合:   「上限設定」ボタンを表示
  * 発動済みの場合: グレーのチップを表示
  */
-export const BidLimitBadge = React.memo(({ limitPrice, isTriggered, onEdit, onRemove, size = 'small' }: Props) => {
+export const BidLimitBadge = React.memo(({ limitPrice, isTriggered, onEdit, onRemove, size = 'small', label = '上限', color = 'primary' }: Props) => {
   if (!limitPrice) {
     return (
       <Tooltip title="上限価格を設定すると、その価格に達したとき自動で入札オフになります">
@@ -41,9 +45,9 @@ export const BidLimitBadge = React.memo(({ limitPrice, isTriggered, onEdit, onRe
   return (
     <Chip
       icon={<PriceCheckIcon sx={{ fontSize: size === 'small' ? 14 : 16 }} />}
-      label={`上限: ¥${formatYen(limitPrice)}`}
+      label={`${label}${label === '上限' ? ':' : ''} ¥${formatYen(limitPrice)}`}
       size={size}
-      color={isTriggered ? 'default' : 'primary'}
+      color={isTriggered ? 'default' : color}
       variant={isTriggered ? 'outlined' : 'filled'}
       onClick={onEdit}
       onDelete={showRemove ? onRemove : undefined}

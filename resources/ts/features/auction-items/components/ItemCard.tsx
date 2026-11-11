@@ -127,7 +127,7 @@ export const ItemCard = React.memo(({ item, isFavorited, onClick, onFavoriteTogg
           <Typography variant="caption" color="text.secondary">{item.quantity}匹</Typography>
         </Box>
         {onInfoClick && (
-          <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+          <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5 }}>
             <Chip
               data-tour-target="item-detail-chip"
               icon={<InfoIcon sx={{ fontSize: 16 }} />}
