@@ -26,7 +26,8 @@ class BulkBidLimitTest extends TestCase
         config(['features.bulk_bid_limit' => true]);
         $this->participant = $this->createParticipantWithSubscription();
         $admin = $this->createAdmin();
-        $this->auction = Auction::factory()->scheduled()->create(['created_by' => $admin->id]);
+        // 受付締切（開始の5分前）に掛からないよう、開催日は3日後に固定（factory の event_date は「今日」になりうる）
+        $this->auction = Auction::factory()->scheduled()->create(['created_by' => $admin->id, 'event_date' => now()->addDays(3)->toDateString(), 'start_time' => '10:00:00']);
         $this->sellerProfile = SellerProfile::factory()->create(['user_id' => $this->createSeller()->id]);
     }
 

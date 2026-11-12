@@ -11,6 +11,7 @@ use App\Models\Favorite;
 use App\Models\Item;
 use App\Models\Lane;
 use App\Services\ActivityLogger;
+use App\Services\BidLimitRebalancer;
 use App\Services\CountdownService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,8 +28,9 @@ class SetBidLimitAction
     public const MAX_LIMIT_PRICE = 2_000_000;
 
     public function __construct(
-        private readonly JoinBidAction     $joinBidAction,
-        private readonly LeaveBidAction    $leaveBidAction,
+        private readonly JoinBidAction      $joinBidAction,
+        private readonly LeaveBidAction     $leaveBidAction,
+        private readonly BidLimitRebalancer $rebalancer,
     ) {}
 
     /**
@@ -62,10 +64,15 @@ class SetBidLimitAction
             if (!$locked) {
                 throw new \RuntimeException('item not found');
             }
-            return BidLimitPrice::updateOrCreate(
+            // is_top_rank は既定の 1（計算対象）で入れる。未開始の商品なら直後の並べ直しで上位2件だけが残る。
+            // ライブ中の商品は並べ直し対象外なので、ダミーだった行を上げ直しても計算対象に戻る
+            $saved = BidLimitPrice::updateOrCreate(
                 ['item_id' => $locked->id, 'user_id' => $userId],
-                ['limit_price' => $limitPrice, 'is_triggered' => false, 'triggered_at' => null]
+                ['limit_price' => $limitPrice, 'is_triggered' => false, 'is_top_rank' => true, 'triggered_at' => null]
             );
+            // 上位2件だけ計算対象（未開始の商品のみ。例外は中で握る）
+            $this->rebalancer->rebalance($locked->id, $locked->status);
+            return $saved;
         }, 3);
 
         // お気に入り自動登録。まとめて事前入札（$autoFavorite=false）では行わない
@@ -275,10 +282,26 @@ class SetBidLimitAction
                     return;
                 }
 
-                // ロック取得後の最新状態で対象指値を再取得
+                // ─── 上位2件だけ計算対象（2026-11-12）────────────────────
+                //   保険1: 開始時に必ず並べ直す（取消・停止・手動SQL で計算対象が欠けていても繰り上がる）
+                //   保険2: それでも計算対象が0件で未発動の指値があれば全行を戻す（指値があるのに流れない）
+                //   どちらも例外を外に出さない（カウントダウンを止めない）
+                $this->rebalancer->rebalance($locked->id, $locked->status, force: true);
+                $this->rebalancer->restoreAllIfNoneTopRank($locked->id);
+                // ダミー行の回収（終了扱い＋敗退通知）はロック外の別ジョブで
+                DB::afterCommit(function () use ($itemId) {
+                    try {
+                        \App\Jobs\FinishDummyLimitsJob::dispatch($itemId);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("FinishDummyLimitsJob dispatch error: item={$itemId} - " . $e->getMessage());
+                    }
+                });
+
+                // ロック取得後の最新状態で対象指値を再取得（計算対象＝上位2件のみ）
                 // 包含的上限: 現在価格と同額の指値者も auto-bid 対象に含める
                 $limits = BidLimitPrice::forItem($locked->id)
                     ->notTriggered()
+                    ->topRank()
                     ->where('limit_price', '>=', $locked->current_price)
                     ->get();
 
@@ -373,7 +396,14 @@ class SetBidLimitAction
         // 解除前に指値額を控えておく（物理削除で履歴が消えるため、meta 用に取得）
         $removedPrice = BidLimitPrice::forItem($item->id)->forUser($userId)->value('limit_price');
 
-        BidLimitPrice::forItem($item->id)->forUser($userId)->delete();
+        // items 先行ロック下で削除し、消えたのが計算対象なら3番目を繰り上げる（上位2件だけ計算対象）
+        DB::transaction(function () use ($item, $userId) {
+            $locked = Item::where('id', $item->id)->lockForUpdate()->first();
+            BidLimitPrice::forItem($item->id)->forUser($userId)->delete();
+            if ($locked) {
+                $this->rebalancer->rebalance($locked->id, $locked->status);
+            }
+        }, 3);
         // 指値設定時に自動付与したお気に入りも併せて解除する
         Favorite::where('user_id', $userId)->where('item_id', $item->id)->delete();
 

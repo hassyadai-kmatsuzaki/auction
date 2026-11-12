@@ -612,6 +612,7 @@ class CsvExportService
                 'su.trade_name as seller_trade_name',
                 'blp.limit_price as limit_price',
                 'blp.is_triggered as is_triggered',
+                'blp.is_top_rank as is_top_rank',
                 'blp.triggered_at as triggered_at',
                 'blp.created_at as limit_set_at',
             ]);
@@ -633,6 +634,7 @@ class CsvExportService
                 '発動済み',
                 '発動日時',
                 '指値設定日時',
+                '計算対象',
             ]);
 
             foreach ($query->lazy(200) as $row) {
@@ -649,6 +651,8 @@ class CsvExportService
                     $row->is_triggered ? '発動済' : '未発動',
                     $row->triggered_at ? Carbon::parse($row->triggered_at)->format('Y-m-d H:i:s') : '',
                     $row->limit_set_at ? Carbon::parse($row->limit_set_at)->format('Y-m-d H:i:s') : '',
+                    // 上位2件だけ計算対象: 3件目以降は表示専用のダミー（落札者・価格には影響しない）
+                    $row->is_top_rank ? '対象' : 'ダミー',
                 ]);
             }
 

@@ -121,10 +121,14 @@ class SetBidLimitActionTest extends TestCase
 
         $count = $this->action->activatePendingBidLimits($item->fresh());
 
-        $this->assertSame(3, $count, '3名が activate される');
+        // 2026-11-12 上位2件だけ計算対象: 開始時の並べ直しで最高額2名（5200, 5100）だけが activate され、
+        // 3人目（5000）はダミー → 開始後に FinishDummyLimitsJob（sync）で終了扱いになる
+        $this->assertSame(2, $count, '上位2名が activate される');
+        $this->assertDatabaseMissing('bid_participants', ['item_id' => $item->id, 'user_id' => $userIds[0]]);
+        $this->assertDatabaseMissing('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userIds[0]]);
 
         // 各ユーザーが is_active=true で登録されている
-        foreach ($userIds as $uid) {
+        foreach (array_slice($userIds, 1) as $uid) {
             $this->assertDatabaseHas('bid_participants', [
                 'item_id' => $item->id, 'user_id' => $uid, 'is_active' => true,
             ]);

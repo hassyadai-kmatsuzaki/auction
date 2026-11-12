@@ -179,6 +179,7 @@ class JoinBidAction
                 //   で十分弾けるので、ここでの ignored ガードは不要。
                 $hasActiveLimits = BidLimitPrice::where('item_id', $locked->id)
                     ->where('is_triggered', false)
+                    ->where('is_top_rank', true)
                     ->exists();
 
                 $participant = BidParticipant::participate($locked->id, $userId, true, $ipAddress, $userAgent);

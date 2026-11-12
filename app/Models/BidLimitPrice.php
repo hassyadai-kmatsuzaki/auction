@@ -13,12 +13,14 @@ class BidLimitPrice extends BaseModel
         'user_id',
         'limit_price',
         'is_triggered',
+        'is_top_rank',
         'triggered_at',
     ];
 
     protected $casts = [
         'limit_price'  => 'float',
         'is_triggered' => 'boolean',
+        'is_top_rank'  => 'boolean',
         'triggered_at' => 'datetime',
     ];
 
@@ -50,6 +52,15 @@ class BidLimitPrice extends BaseModel
     public function scopeNotTriggered($query)
     {
         return $query->where('is_triggered', false);
+    }
+
+    /**
+     * 開始時の計算対象（上位2件）のみ。ダミー（is_top_rank=0）は表示専用で、
+     * 自動参加・価格調整・敗者処理には使わない（BidLimitRebalancer 参照）
+     */
+    public function scopeTopRank($query)
+    {
+        return $query->where('is_top_rank', true);
     }
 
     // ─── ユーティリティ ──────────────────────────────────────────

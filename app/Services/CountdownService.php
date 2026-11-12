@@ -780,6 +780,7 @@ class CountdownService
             // 有効な指値を持つユーザーを指値の高い順に取得
             $validLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
+                ->where('is_top_rank', true)
                 ->where('limit_price', '>=', $newPrice)
                 ->orderBy('limit_price', 'desc')
                 ->orderBy('created_at', 'asc')
@@ -886,6 +887,7 @@ class CountdownService
         // limit_price >= current_price: 包含的上限のため、現在価格と同額の指値者も「まだ払える」として残す
         $remainingLimits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
+            ->where('is_top_rank', true)
             ->where('limit_price', '>=', $freshItem->current_price)
             ->count();
 
@@ -918,6 +920,7 @@ class CountdownService
 
         $hasActiveLimits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
+            ->where('is_top_rank', true)
             ->exists();
         $threshold = $hasActiveLimits ? 1 : 2;
 
@@ -957,6 +960,7 @@ class CountdownService
         // limit_price < current_price: 包含的上限のため、現在価格 == 指値ちょうどでは発動させない（その指値者は耐える扱い）
         $query = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
+            ->where('is_top_rank', true)
             ->where('limit_price', '<', $item->current_price);
 
         if (!empty($protectedUserIds)) {
@@ -1488,6 +1492,7 @@ class CountdownService
         // 包含的上限: limit_price >= currentPrice の指値者を「まだ有効」として競合解消対象に含める。
         $limits = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
+            ->where('is_top_rank', true) // 上位2件だけ計算対象（ダミーは FinishDummyLimitsJob が回収）
             ->where('limit_price', '>=', $currentPrice)
             ->orderBy('limit_price', 'desc')
             ->orderBy('created_at', 'asc')
@@ -1592,6 +1597,7 @@ class CountdownService
             // protectedUserIds = [最高指値者] の指値レコードは触らない（自動応戦余地を残す）。
             $allTriggeredLimits = BidLimitPrice::where('item_id', $item->id)
                 ->where('is_triggered', false)
+                ->where('is_top_rank', true)
                 ->where(function ($q) use ($freshItem, $protectedUserIds) {
                     $q->where('limit_price', '<', $freshItem->current_price)
                       ->orWhere(function ($q2) use ($freshItem, $protectedUserIds) {
@@ -1787,6 +1793,7 @@ class CountdownService
         // 包含的上限: limit_price >= current_price で「まだ払える」指値者のうち最高額を holder にする
         $highestLimitUser = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
+            ->where('is_top_rank', true)
             ->where('limit_price', '>=', $freshItem->current_price)
             ->orderBy('limit_price', 'desc')
             ->orderBy('created_at', 'asc')

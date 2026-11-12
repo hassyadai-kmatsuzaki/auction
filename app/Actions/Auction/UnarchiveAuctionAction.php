@@ -203,7 +203,7 @@ class UnarchiveAuctionAction
                 'deactivated_at', 'ip_address', 'user_agent', 'created_at', 'updated_at',
             ],
             'bid_limit_prices' => [
-                'id', 'item_id', 'user_id', 'limit_price', 'is_triggered',
+                'id', 'item_id', 'user_id', 'limit_price', 'is_triggered', 'is_top_rank',
                 'triggered_at', 'created_at', 'updated_at',
             ],
             'lane_items' => [
