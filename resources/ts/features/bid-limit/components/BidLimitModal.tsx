@@ -33,12 +33,18 @@ interface Props {
   zIndex?: number;
   /** 指定した価格のみ選択可能にする（デモ用） */
   allowedPrice?: number;
+  /**
+   * 本人がこの商品に入札中（my_bid_status === 'active'）か。
+   * ライブ中にこれが true なら、現在価格より低い上限は設定できない（下げると自動離脱→流札になるため。2026-11-12）。
+   * 未指定なら従来どおり警告表示のみ（後方互換）
+   */
+  isMyBidActive?: boolean;
 }
 
 export const BidLimitModal = React.memo(({
   open, onClose, speciesName, currentLimitPrice,
   currentPrice, quickOptions, isLive,
-  isSetting, isRemoving, onSet, onRemove, zIndex, allowedPrice,
+  isSetting, isRemoving, onSet, onRemove, zIndex, allowedPrice, isMyBidActive,
 }: Props) => {
   const [inputValue, setInputValue] = useState<string>('');
   const [selectedQuick, setSelectedQuick] = useState<number | null>(null);
@@ -79,6 +85,8 @@ export const BidLimitModal = React.memo(({
   const isOverCap   = !isNaN(parsedValue) && parsedValue > MAX_BID_LIMIT_PRICE;
   const isValid     = !isNaN(parsedValue) && parsedValue >= 1 && !isOverCap;
   const isBelowCurrent = isValid && parsedValue <= currentPrice;
+  // 入札中に現在価格「未満」へ下げる操作は拒否（== は包含的上限なので許可）
+  const isBlockedLowering = !!isLive && !!isMyBidActive && isValid && parsedValue < currentPrice;
 
   const handleQuickSelect = (value: number) => {
     setSelectedQuick(value);
@@ -93,7 +101,7 @@ export const BidLimitModal = React.memo(({
   };
 
   const handleSubmit = () => {
-    if (!isValid) return;
+    if (!isValid || isBlockedLowering) return;
     onSet(parsedValue);
     onClose();
   };
@@ -151,8 +159,17 @@ export const BidLimitModal = React.memo(({
           autoComplete="off"
         />
 
+        {/* 入札中に現在価格より低く下げようとした: 設定不可（警告ではなくエラー） */}
+        {isBlockedLowering && (
+          <Alert severity="error" sx={{ mt: 1.5, py: 0.5 }}>
+            <Typography variant="caption">
+              入札中は現在価格より低い上限価格に変更できません。
+            </Typography>
+          </Alert>
+        )}
+
         {/* 現在価格以下の警告 */}
-        {isBelowCurrent && (
+        {isBelowCurrent && !isBlockedLowering && (
           <Alert severity="warning" sx={{ mt: 1.5, py: 0.5 }}>
             <Typography variant="caption">
               現在価格（¥{formatYen(currentPrice)}）以下の設定です。
@@ -183,7 +200,7 @@ export const BidLimitModal = React.memo(({
         <Button
           onClick={handleSubmit}
           variant="contained" size="small"
-          disabled={!isValid || isSetting}
+          disabled={!isValid || isSetting || isBlockedLowering}
           startIcon={isSetting ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           設定する

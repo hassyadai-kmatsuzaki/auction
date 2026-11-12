@@ -208,12 +208,13 @@ export default function AuctionLive() {
   // ライブ中の current_item と「次の商品」(upcoming_items) の両方を検索する。
   // upcoming_items にしか存在しない itemId（=次レーン表示の指値タップ）でも
   // モーダルを開けるようにするため、ヒットしたら start_price を current_price として扱う。
-  const limitModalItem: { id: number; species_name: string; current_price: number; isUpcoming: boolean } | null = (() => {
+  const limitModalItem: { id: number; species_name: string; current_price: number; isUpcoming: boolean; myBidActive: boolean } | null = (() => {
     if (!limitModalItemId || !liveState) return null;
     for (const lane of liveState.lanes) {
       const ci = lane.current_item;
       if (ci && ci.id === limitModalItemId) {
-        return { id: ci.id, species_name: ci.species_name, current_price: ci.current_price, isUpcoming: false };
+        // myBidActive: 入札中なら現在価格より低い上限は設定不可（モーダル側でボタンを止める）
+        return { id: ci.id, species_name: ci.species_name, current_price: ci.current_price, isUpcoming: false, myBidActive: ci.my_bid_status === 'active' };
       }
       const upcoming = lane.upcoming_items?.find(u => u.id === limitModalItemId);
       if (upcoming) {
@@ -223,6 +224,7 @@ export default function AuctionLive() {
           // 開始前商品なので「現在価格」は開始価格を使う（モーダルが isLive=false で扱う）
           current_price: upcoming.start_price,
           isUpcoming: true,
+          myBidActive: false,
         };
       }
     }
@@ -840,6 +842,7 @@ export default function AuctionLive() {
           currentPrice={limitModalItem.current_price}
           quickOptions={modalQuickOptions}
           isLive={!limitModalItem.isUpcoming}
+          isMyBidActive={limitModalItem.myBidActive}
           isSetting={isModalSetting}
           isRemoving={isModalRemoving}
           onSet={(price) => setModalLimit(price)}

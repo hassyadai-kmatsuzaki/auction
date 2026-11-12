@@ -53,6 +53,20 @@ class SetBidLimitAction
 
         $item->loadMissing('auction');
 
+        // ─── ライブ中に落札権利者が指値を「現在価格より低く」変更する操作を拒否（2026-11-12）──
+        //   第11回（10/23, auction 80）で、唯一の入札者が指値を現在価格未満に下げた結果、
+        //   下の live 分岐と最終ガード（checkBidLimits）で自動離脱 → active 0 → 流札になった。
+        //   「自分から入札を抜ける動線は存在しない」仕様に反するので、保存する前に弾く
+        //   （保存してから弾くと最終ガードが結局離脱させる）。
+        //   包含的上限なので current_price == limitPrice は許可。開始前の商品・入札中でない人は従来どおり。
+        //   current_price はリクエスト開始時のスナップショット（ロック下の再判定はしない。通った場合の結果は現行と同じ）。
+        if ($item->status === 'live' && $limitPrice < (float) $item->current_price) {
+            $activeParticipant = BidParticipant::forItem($item->id)->forUser($userId)->first();
+            if ($activeParticipant && $activeParticipant->is_active) {
+                return BidResultDto::failure('入札中は現在価格より低い上限価格に変更できません。');
+            }
+        }
+
         // ─── items 先行ロックでデッドロック・FK lock wait timeout を回避 ──
         // 修正前: BidLimitPrice::updateOrCreate を直接実行 → MySQL が FK 整合性確認のため
         //         items.id の SHARED LOCK を暗黙取得 → adjustPriceByBidLimits の

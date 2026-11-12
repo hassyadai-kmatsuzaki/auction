@@ -222,4 +222,84 @@ class SetBidLimitActionTest extends TestCase
             'item_id' => $item->id, 'user_id' => $userId, 'event_type' => 'leave',
         ]);
     }
+
+    // ─── 2026-11-12: ライブ中に落札権利者が指値を現在価格より低く下げる操作を拒否 ───
+
+    /** @return array{Item, int} live 商品（現在価格 210）と、指値 8000 で active な参加者 */
+    private function makeLiveItemWithActiveLimitUser(): array
+    {
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live', 'current_price' => 210]);
+        Lane::factory()->create(['auction_id' => $auction->id, 'current_item_id' => $item->id]);
+        $userId = $this->createParticipant()->id;
+        BidLimitPrice::create(['item_id' => $item->id, 'user_id' => $userId, 'limit_price' => 8000, 'is_triggered' => false]);
+        BidParticipant::participate($item->id, $userId, true, null, 'auto-bid-from-limit');
+        return [$item, $userId];
+    }
+
+    public function test_ライブ中に入札中の人が現在価格より低い指値に下げると拒否され入札は維持される(): void
+    {
+        Event::fake();
+        [$item, $userId] = $this->makeLiveItemWithActiveLimitUser();
+
+        $result = $this->action->execute($item, $userId, 200);
+
+        $this->assertFalse($result->success);
+        $this->assertSame('入札中は現在価格より低い上限価格に変更できません。', $result->message);
+        $this->assertDatabaseHas('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userId, 'limit_price' => 8000, 'is_triggered' => false]);
+        $this->assertDatabaseHas('bid_participants', ['item_id' => $item->id, 'user_id' => $userId, 'is_active' => true]);
+        $this->assertDatabaseMissing('bid_events', ['item_id' => $item->id, 'user_id' => $userId, 'event_type' => 'leave']);
+    }
+
+    public function test_ライブ中に入札中の人が現在価格と同額の指値に変えるのは許可される(): void
+    {
+        Event::fake();
+        [$item, $userId] = $this->makeLiveItemWithActiveLimitUser();
+
+        $result = $this->action->execute($item, $userId, 210);
+
+        $this->assertTrue($result->success);
+        $this->assertDatabaseHas('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userId, 'limit_price' => 210]);
+        $this->assertDatabaseHas('bid_participants', ['item_id' => $item->id, 'user_id' => $userId, 'is_active' => true]);
+    }
+
+    public function test_ライブ中に入札中の人が現在価格より高い指値に変えるのは許可される(): void
+    {
+        Event::fake();
+        [$item, $userId] = $this->makeLiveItemWithActiveLimitUser();
+
+        $result = $this->action->execute($item, $userId, 9000);
+
+        $this->assertTrue($result->success);
+        $this->assertDatabaseHas('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userId, 'limit_price' => 9000]);
+        $this->assertDatabaseHas('bid_participants', ['item_id' => $item->id, 'user_id' => $userId, 'is_active' => true]);
+    }
+
+    public function test_ライブ中に入札中でない人が現在価格より低い指値を入れるのは従来どおり発動扱い(): void
+    {
+        Event::fake();
+        $auction = Auction::factory()->create(['status' => 'live']);
+        $item    = Item::factory()->create(['auction_id' => $auction->id, 'status' => 'live', 'current_price' => 210]);
+        Lane::factory()->create(['auction_id' => $auction->id, 'current_item_id' => $item->id]);
+        $userId = $this->createParticipant()->id;
+
+        $result = $this->action->execute($item, $userId, 200);
+
+        $this->assertTrue($result->success);
+        // 即発動 → レコード削除（従来どおり）。入札参加はしない
+        $this->assertDatabaseMissing('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userId]);
+        $this->assertDatabaseMissing('bid_participants', ['item_id' => $item->id, 'user_id' => $userId, 'is_active' => true]);
+    }
+
+    public function test_開始前の商品には現在価格より低い指値でも保存される(): void
+    {
+        $auction = Auction::factory()->scheduled()->create();
+        $item    = Item::factory()->registered()->create(['auction_id' => $auction->id, 'start_price' => 1000, 'current_price' => 1000]);
+        $userId = $this->createParticipant()->id;
+
+        $result = $this->action->execute($item, $userId, 500);
+
+        $this->assertTrue($result->success);
+        $this->assertDatabaseHas('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $userId, 'limit_price' => 500, 'is_top_rank' => true]);
+    }
 }
