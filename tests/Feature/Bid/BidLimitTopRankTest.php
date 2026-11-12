@@ -220,6 +220,56 @@ class BidLimitTopRankTest extends TestCase
         Bus::assertDispatchedTimes(NotifyBidLimitChunkJob::class, 2); // 23人 → 20 + 3
     }
 
+    // ── U16〜U17: 回収前にダミーの人が手動入札した場合も上限が効く（2026-11-12）──
+
+    public function test_u16_dummy_who_bid_manually_before_cleanup_keeps_limit_as_top_rank(): void
+    {
+        Bus::fake([NotifyBidLimitChunkJob::class]);
+        Event::fake();
+
+        $item = $this->item();
+        $us = $this->users(4);
+        foreach ($us as $u) {
+            $this->action->execute($item, $u->id, 1001);
+        }
+        $this->auction->update(['status' => 'live']);
+        $item->update(['status' => 'live']);
+        Lane::factory()->create(['auction_id' => $this->auction->id, 'current_item_id' => $item->id]);
+        // 3番目（ダミー）が回収ジョブより先に手動入札して入札中
+        BidParticipant::participate($item->id, $us[2]->id, true, null, 'manual');
+
+        (new FinishDummyLimitsJob($item->id))->handle();
+
+        // 入札中の us[2] の上限は消えずに計算対象へ、入札していない us[3] は回収
+        $this->assertDatabaseHas('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $us[2]->id, 'limit_price' => 1001, 'is_top_rank' => true]);
+        $this->assertDatabaseMissing('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $us[3]->id]);
+        Bus::assertDispatched(NotifyBidLimitChunkJob::class, fn ($j) => count($j->chunk) === 1 && $j->chunk[0]['_notify_user_id'] === $us[3]->id);
+    }
+
+    public function test_u17_check_bid_limits_triggers_dummy_rows_below_current_price(): void
+    {
+        Event::fake();
+        Bus::fake();
+
+        $item = $this->item();
+        $us = $this->users(3);
+        $this->action->execute($item, $us[0]->id, 3000);
+        $this->action->execute($item, $us[1]->id, 2000);
+        $this->action->execute($item, $us[2]->id, 1500); // ダミー
+        $this->auction->update(['status' => 'live']);
+        $item->update(['status' => 'live', 'current_price' => 1600]); // ダミーの上限を超えた
+        $lane = Lane::factory()->create(['auction_id' => $this->auction->id, 'current_item_id' => $item->id]);
+        BidParticipant::participate($item->id, $us[2]->id, true, null, 'manual');
+
+        app(CountdownService::class)->checkBidLimits($lane, $item->fresh(), $this->auction->fresh());
+
+        // 上限超えのダミーは入札から外れ、指値も消える（従来どおりの上限の効き方）
+        $this->assertDatabaseMissing('bid_participants', ['item_id' => $item->id, 'user_id' => $us[2]->id, 'is_active' => true]);
+        $this->assertDatabaseMissing('bid_limit_prices', ['item_id' => $item->id, 'user_id' => $us[2]->id]);
+        // 上位2人の指値はそのまま
+        $this->assertSame(2, BidLimitPrice::where('item_id', $item->id)->count());
+    }
+
     // ── U11・U14・U15: 保険（フェイルオープン） ──────────────────
 
     public function test_u11_start_rebalance_promotes_when_top_rank_deleted_by_sql(): void

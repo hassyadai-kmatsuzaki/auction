@@ -958,9 +958,12 @@ class CountdownService
     {
         // 価格超過した全指値レコードを取得（アクティブ/非アクティブ問わず）
         // limit_price < current_price: 包含的上限のため、現在価格 == 指値ちょうどでは発動させない（その指値者は耐える扱い）
+        // is_top_rank は見ない（2026-11-12）: 上限を超えた指値はダミーでも必ず発動させる。
+        //   ダミーの人が回収ジョブより先に手動入札していた場合、ここで上限が効かないと
+        //   上限を超えても入札に残ってしまうため。通常はダミー行は開始後すぐ回収されているので、
+        //   ここで拾うのは「回収前に価格が上がった」短い窓だけ（ロック内の処理は増えない）。
         $query = BidLimitPrice::where('item_id', $item->id)
             ->where('is_triggered', false)
-            ->where('is_top_rank', true)
             ->where('limit_price', '<', $item->current_price);
 
         if (!empty($protectedUserIds)) {

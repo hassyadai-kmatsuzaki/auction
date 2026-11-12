@@ -49,6 +49,21 @@ class FinishDummyLimitsJob implements ShouldQueue
             return;
         }
 
+        // ジョブより先に会場で手動入札して入札中になっている人は、上限を消さずに計算対象へ戻す（2026-11-12）。
+        //   消すと上限なしの入札者になり、上限を超えても入札に残ってしまう。
+        //   計算対象に戻せば、以降は通常の上限チェック（handlePriceIncrement / checkBidLimits）が効く。
+        $activeUserIds = \App\Models\BidParticipant::forItem($this->itemId)->active()
+            ->whereIn('user_id', $rows->pluck('user_id'))->pluck('user_id')->all();
+        if ($activeUserIds) {
+            $promoteIds = $rows->whereIn('user_id', $activeUserIds)->pluck('id')->all();
+            BidLimitPrice::whereIn('id', $promoteIds)->where('is_top_rank', false)->update(['is_top_rank' => true]);
+            Log::info("FinishDummyLimitsJob: item={$this->itemId}, kept " . count($promoteIds) . ' active dummy limits as top-rank (manual bid before cleanup)');
+            $rows = $rows->reject(fn ($r) => in_array($r->user_id, $activeUserIds, true))->values();
+            if ($rows->isEmpty()) {
+                return;
+            }
+        }
+
         $ids = $rows->pluck('id')->all();
         // is_top_rank=0 を WHERE に固定（計算対象の行を巻き込まない）
         BidLimitPrice::whereIn('id', $ids)->where('is_top_rank', false)->update([
