@@ -291,18 +291,10 @@ export default function AuctionItems() {
     setPanelOpen(true);
   };
 
-  // 「上限設定」: まとめて入札が使えるときは同じパネルを1点で開く。それ以外は従来のモーダル
+  // 「上限設定」: 1点ずつは常に従来のモーダル（金額を直接入力できる）で開く。
+  // まとめて入札パネルの1点モードは −/＋ ボタンしか無く、開始価格が低い品で金額を入れにくかったため戻した（2026-11-26）
   const openLimitEditor = (item: ItemData) => {
-    // まとめて入札の受付（開始の N 分前まで）が閉じたら、1点ずつは従来のモーダルで開始まで受け付ける
-    const row = bulkEnabled && bulkOpen ? toPanelItem(item) : null;
-    if (row && !row.is_other) {
-      setDoneBanner(null);
-      setPanelItems([row]);
-      setCheckedIds(new Set([row.id]));
-      setPanelOpen(true);
-    } else {
-      setLimitModalItem(item);
-    }
+    setLimitModalItem(item);
   };
 
   const handlePanelSubmit = async ({ limits, priceLabel }: BulkBidSubmit) => {
@@ -636,7 +628,7 @@ export default function AuctionItems() {
         onFavoriteToggle={(itemId) => handleFavoriteToggle({ stopPropagation: () => {} } as React.MouseEvent, itemId)}
       />
 
-      {/* まとめて入札パネル（1点モード＝上限設定） */}
+      {/* まとめて入札パネル */}
       {bulkEnabled && (
         <BulkBidPanel
           open={panelOpen}
@@ -651,7 +643,7 @@ export default function AuctionItems() {
         />
       )}
 
-      {/* 指値（上限価格）設定モーダル（表示スイッチ OFF・対象外の品） */}
+      {/* 指値（上限価格）設定モーダル（1点ずつの上限設定） */}
       {limitModalItem && (
         <BidLimitModal
           open={!!limitModalItem}
